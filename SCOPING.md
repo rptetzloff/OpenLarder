@@ -41,13 +41,16 @@ The site stores facts about recipes, never the recipes themselves. Book text sta
 | Stored | Not stored |
 | --- | --- |
 | Recipe title, page number per edition | Instructions or method |
-| Ingredient list (normalized) | Headnotes, intros, author descriptions |
+| Ingredient list (normalized) | Headnotes, intros, the book's own author bio |
 | Tags: course, cuisine, diet, technique | Photos from the book |
 | Link to the recipe if the publisher posted it online | Scanned pages |
+
+*Narrowed 2026-11-06: "not stored" used to say "author descriptions" with no qualifier. Bios written by contributors or by the author are now allowed (see Author pages). The bio printed in the book still isn't stored.*
 
 **User content (allowed, user-authored only)**
 
 - Descriptions in the user's own words
+- Author bios in the contributor's own words (see Author pages)
 - Reviews and ratings
 - Likes, saves, "want to cook" lists
 - Cooking notes and substitutions
@@ -58,9 +61,9 @@ The site stores facts about recipes, never the recipes themselves. Book text sta
 
 A Recipe belongs to one Work (the book); its page number lives on Recipe Page, one row per Edition it appears in, so one recipe entry covers every printing.
 
-![OpenLarder data model: 10 catalog entities, 3 community](DATA_MODEL.svg)
+![OpenLarder data model: 11 catalog entities, 3 community](DATA_MODEL.svg)
 
-Ingredient lines keep the book's original text and point to one canonical Ingredient, which carries the shopping term and a parent for broader search. On the book page, editions show as tabs or subpages with their own page numbers and purchase links.
+Ingredient lines keep the book's original text, and each of a line's options points to one canonical Ingredient, which carries the shopping term and a parent for broader search. On the book page, editions show as tabs or subpages with their own page numbers and purchase links.
 
 Tags set on a Work (such as a diet focus like Gluten-Free) are inherited by every recipe in it, in addition to any tags set on the recipe itself.
 
@@ -82,6 +85,27 @@ Ingredients carry allergen data (contains dairy, gluten, egg). This lets the sit
 - The site never labels a recipe "safe for" an allergy. It can say what the catalog records about the ingredients, and nothing more.
 - Allergen data describes an ingredient in general, not any product. Oats may or may not be processed alongside wheat, and one brand's stock may contain milk when another's doesn't. The notice says so.
 - The wording of the notice is written with the feature and reviewed by a lawyer along with the content rules.
+
+## Author pages
+
+Every author gets a page: a bio, links, their books, the people they've written with, and their top-ranked recipes. Once verified, an author can curate their own page. *Decided by Ray, 2026-11-06.*
+
+**Authors and credits**
+
+An Author is a person or an organisation (America's Test Kitchen, The Culinary Institute of America). A Work credits its authors in order, each with a role: author, editor, and so on. The credit keeps the name as the book prints it ("Sarah Ballantyne, PhD", "Adam Rapoport (Editor)") and points to one Author, the same way an ingredient line keeps its original text and points to one Ingredient. This replaces the plain list of names on Work. Authors link to Open Library and Wikidata where those records exist.
+
+**What an author page shows**
+
+- A bio, from up to three sources: written by contributors in their own words, written by the author once verified, and short facts imported from Wikidata (born, nationality, website). Never copied from a book jacket, and never Wikipedia prose: Wikipedia is CC BY-SA, which doesn't fit the ODbL. Wikidata is CC0, so its facts do. *Sources decided by Ray, 2026-11-06.*
+- Links: the author's website, social accounts, and other official presences.
+- Books, linking to each book's page, and the co-authors credited with them.
+- Top-ranked recipes, once ratings exist (Phase 2). Until then, the section is left off rather than filled with a substitute ranking.
+
+**Verified authors**
+
+A verified author is linked to a user account and can change their page's presentation: bio, photo, links, and which books and recipes are featured. They cannot hide or remove reviews or ratings. Their edits to catalog facts about their own books (pages, ingredients) go through review like anyone else's. *Decided by Ray, 2026-11-06.*
+
+How an author proves who they are is not designed yet.
 
 ## Ingredient normalization
 
@@ -193,6 +217,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 **MVP**
 
 - Book catalog with works and editions (ISBN lookup, Open Library metadata)
+- Authors and credits, and author pages with Wikidata facts, links, books and co-authors. *MVP because Open Library supplies authors with every book anyway, so the cross-links cost little. Phase chosen by Claude, on Ray's delegation of phases.*
 - Recipe entries with page numbers per edition
 - Ranked ingredient options (fallbacks) on recipe entries
 - Substitutions, entered by hand or printed in a book. Suggesting them automatically for a diet waits on allergen data. *MVP, because the first import's books print their own swaps and would otherwise need entering twice. Ray left the phase to Claude on 2026-11-06, asking only that it be logical.*
@@ -207,6 +232,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Bulk CSV import
 - Ingredient shopping links (Instacart or similar)
 - Saves, likes, "want to cook" lists, reviews, user descriptions
+- Contributor-written author bios, with the other user-written text, and top-ranked recipes on author pages, once ratings exist
 - Personal shelf: mark books you own, filter search to your shelf
 - Amazon Associates links, once traffic supports it
 - Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.*
@@ -216,6 +242,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Meal planning and shopping lists
 - Photo/OCR import of a book's index pages
 - Magazines and web recipe sources
+- Verified authors curating their own pages (waits on the verification process)
 - Write API
 - Data dumps on a schedule
 
@@ -241,6 +268,9 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
 - [ ] Base ingredient dataset
+- [ ] How an author is verified
+- [ ] Licence for bios: contributor-written bios sit with other user content, and author-written ones belong to the author, so neither is automatically ODbL
+- [ ] Author photos: which sources are allowed and under what licence
 - [x] Which phase substitutions ship in: MVP (see the MVP list)
 - [x] Allergen data on ingredients: yes, presented as crowdsourced (see Allergen data)
 - [ ] Grocery partner and its API terms
