@@ -228,7 +228,9 @@ somewhere to abandon work without rewriting shared history.)
 - **Check whether the PR has merged before committing to its branch.** Three
   times in `are-they-sports` a push to an already-merged branch succeeded, CI
   went green, and the work was simply not in `dev`. `gh pr view <n> --json
-  state` is one command.
+  state` is one command, and `.githooks/pre-push` refuses the push. It is a
+  backstop, not the rule: it lets the push through when `gh` is missing or
+  offline.
 
 Run whichever suite can catch the change locally before opening a PR. CI is for
 confirming, not discovering.

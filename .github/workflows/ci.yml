@@ -1,0 +1,92 @@
+# Lint, tests against a real Postgres, the SPA's typecheck and build, and the
+# image. Separate jobs, because a green test job says nothing about lint, and
+# a sibling repo shipped red lint behind a green suite for exactly that reason.
+#
+# Postgres 17, what the compose file runs. Production's version is not chosen
+# yet; when it is, this follows it rather than the laptop.
+
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: openlarder
+          POSTGRES_PASSWORD: openlarder
+          POSTGRES_DB: openlarder
+        ports:
+          - 5432:5432
+        # Without this the job can connect before the server accepts
+        # connections, which fails intermittently and looks like a flaky test.
+        options: >-
+          --health-cmd "pg_isready -U openlarder -d openlarder"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      OPENLARDER_DATABASE_URL: postgresql+psycopg://openlarder:openlarder@localhost:5432/openlarder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e '.[dev]'
+      # The suite migrates its own throwaway database; this is the migration
+      # run the way the entrypoint runs it, against the configured one.
+      - run: alembic upgrade head
+      - name: Models match the migration
+        run: alembic check
+      - run: pytest
+      - name: What this run does not cover
+        if: always()
+        # alembic check is blind to CHECK constraints and expression indexes;
+        # the schema tests cover those. Said here so a green run is not read
+        # as more than it is.
+        run: |
+          echo "Covered: schema constraints, migration up and down, models vs migration."
+          echo "NOT covered: CHECK constraints and expression indexes by alembic check (tests cover them)."
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # ci, not install: it fails on a lockfile that disagrees with
+      # package.json rather than quietly resolving something new.
+      - run: npm ci
+      - run: npm run build
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The deployment artifact. Building it is the check that nothing the
+      # image needs was left out of the Dockerfile.
+      - run: docker build -t openlarder:ci .

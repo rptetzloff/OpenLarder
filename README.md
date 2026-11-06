@@ -50,3 +50,16 @@ cd web && npm run typecheck
 
 The tests need the Postgres from `docker compose up db`. Each run creates its
 own database beside the configured one, migrates it, and drops it afterwards.
+CI (`.github/workflows/ci.yml`) runs the same checks plus a build of the image.
+
+Once per clone, turn on the repo's git hooks:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+`pre-push` refuses to push to a branch whose pull request has already merged.
+It needs `gh`, and lets the push through when `gh` is missing or offline.
+
+House rules for working here are in [CLAUDE.md](CLAUDE.md); reporting a
+security problem is in [SECURITY.md](SECURITY.md).
