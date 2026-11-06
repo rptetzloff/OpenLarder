@@ -29,7 +29,8 @@ branches and no backports: the fix lands on `main` and deploys.
 
 - **Anything that lets one person act as another**, or act above their trust
   level, once accounts exist: publishing without review, reverting or merging
-  without the right level, or reaching another user's private lists.
+  without the right level, reaching another user's private lists, or curating
+  an author page without being verified as that author.
 - **Edit history.** Every change to the catalog is meant to be recorded and
   revertible. A way to change a record without leaving a revision is a finding.
 - **Cross-site scripting**, anywhere user-written text is shown: reviews,
