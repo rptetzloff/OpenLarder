@@ -403,3 +403,127 @@ def test_author_lists_become_credits_and_downgrade_keeps_roles(engine, alembic_c
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM works WHERE title = ANY(:t)"), {"t": list(titles)})
             conn.execute(text("DELETE FROM authors WHERE name IN ('Michelle Tam', 'Henry Fong')"))
+
+
+def _swap(db: Connection, **cols) -> uuid.UUID:
+    names = ", ".join(cols)
+    values = ", ".join(f":{c}" for c in cols)
+    return _insert(db, f"INSERT INTO substitutions ({names}) VALUES ({values})", **cols)
+
+
+def _ingredient(db: Connection, name: str) -> uuid.UUID:
+    return _insert(db, "INSERT INTO ingredients (name) VALUES (:n)", n=name)
+
+
+def test_substitution_from_a_book_and_between_blends(db: Connection) -> None:
+    book = _work(db, "The How Can It Be Gluten Free Cookbook Vol. 2")
+    edition = _edition(db, book)
+    butter, vegan = _ingredient(db, "butter"), _ingredient(db, "vegan butter")
+    dairy_free = _insert(db, "INSERT INTO tags (kind, name) VALUES ('diet', 'Dairy-Free')")
+    _swap(
+        db,
+        from_ingredient_id=butter,
+        to_ingredient_id=vegan,
+        diet_tag_id=dairy_free,
+        source_edition_id=edition,
+        source_page="54",
+    )
+    # The same swap printed in another book's edition is a second source, not a duplicate.
+    other = _edition(db, _work(db, "Another Book"))
+    _swap(
+        db,
+        from_ingredient_id=butter,
+        to_ingredient_id=vegan,
+        diet_tag_id=dairy_free,
+        source_edition_id=other,
+    )
+    _refused(
+        db,
+        lambda: _swap(
+            db,
+            from_ingredient_id=butter,
+            to_ingredient_id=vegan,
+            diet_tag_id=dairy_free,
+            source_edition_id=other,
+        ),
+    )
+    # One book's blend for another's, contributed, for no particular diet; twice is a duplicate.
+    atk = _recipe(db, book, "All-Purpose Flour Blend")
+    morgan = _recipe(db, _work(db, "The Everyday Art of Gluten-Free"), "Cake & Muffin Blend")
+    _swap(db, from_recipe_id=atk, to_recipe_id=morgan)
+    _refused(db, lambda: _swap(db, from_recipe_id=atk, to_recipe_id=morgan))
+    # The reverse direction is its own row.
+    _swap(db, from_recipe_id=morgan, to_recipe_id=atk)
+
+
+def test_substitution_has_one_thing_on_each_side_and_never_itself(db: Connection) -> None:
+    work = _work(db)
+    egg, flax = _ingredient(db, "egg"), _ingredient(db, "flax egg")
+    blend = _recipe(db, work, "Flour Blend")
+    _swap(db, from_ingredient_id=egg, to_recipe_id=blend)  # mixed sides are fine
+    _refused(db, lambda: _swap(db, to_ingredient_id=flax))
+    _refused(db, lambda: _swap(db, from_ingredient_id=egg))
+    _refused(
+        db, lambda: _swap(db, from_ingredient_id=egg, from_recipe_id=blend, to_ingredient_id=flax)
+    )
+    _refused(db, lambda: _swap(db, from_ingredient_id=egg, to_ingredient_id=egg))
+    _refused(db, lambda: _swap(db, from_recipe_id=blend, to_recipe_id=blend))
+
+
+def test_substitution_reason_is_a_diet_and_page_needs_an_edition(db: Connection) -> None:
+    butter, ghee = _ingredient(db, "butter"), _ingredient(db, "ghee")
+    salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Salad')")
+    _refused(
+        db, lambda: _swap(db, from_ingredient_id=butter, to_ingredient_id=ghee, diet_tag_id=salad)
+    )
+    _refused(
+        db,
+        lambda: _swap(
+            db,
+            from_ingredient_id=butter,
+            to_ingredient_id=ghee,
+            diet_kind="course",
+            diet_tag_id=salad,
+        ),
+    )
+    _refused(
+        db, lambda: _swap(db, from_ingredient_id=butter, to_ingredient_id=ghee, source_page="12")
+    )
+    edition = _edition(db, _work(db))
+    _refused(
+        db,
+        lambda: _swap(
+            db,
+            from_ingredient_id=butter,
+            to_ingredient_id=ghee,
+            source_edition_id=edition,
+            source_page="",
+        ),
+    )
+
+
+def test_substitution_goes_with_its_recipe_but_holds_its_ingredient(db: Connection) -> None:
+    work = _work(db)
+    blend = _recipe(db, work, "Flour Blend")
+    flour = _ingredient(db, "rice flour")
+    swap = _swap(db, from_ingredient_id=flour, to_recipe_id=blend)
+    _refused(db, lambda: db.execute(text("DELETE FROM ingredients WHERE id = :i"), {"i": flour}))
+    db.execute(text("DELETE FROM recipes WHERE id = :r"), {"r": blend})
+    left = db.execute(text("SELECT count(*) FROM substitutions WHERE id = :s"), {"s": swap})
+    assert left.scalar_one() == 0
+
+
+def test_downgrade_keeps_substitutions(engine, alembic_config) -> None:
+    with engine.begin() as conn:
+        a, b = _ingredient(conn, "downgrade butter"), _ingredient(conn, "downgrade ghee")
+        _swap(conn, from_ingredient_id=a, to_ingredient_id=b)
+    try:
+        engine.dispose()
+        with pytest.raises(RuntimeError, match="substitution"):
+            command.downgrade(alembic_config, "0003")
+    finally:
+        engine.dispose()
+        command.upgrade(alembic_config, "head")
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM substitutions WHERE from_ingredient_id = :a"), {"a": a})
+            conn.execute(text("DELETE FROM ingredients WHERE id IN (:a, :b)"), {"a": a, "b": b})
