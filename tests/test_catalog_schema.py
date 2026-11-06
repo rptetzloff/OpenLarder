@@ -502,6 +502,12 @@ def test_substitution_reason_is_a_diet_and_page_needs_an_edition(db: Connection)
     )
 
 
+def test_substitution_amount_is_an_optional_note(db: Connection) -> None:
+    egg, aquafaba = _ingredient(db, "egg"), _ingredient(db, "aquafaba")
+    _swap(db, from_ingredient_id=egg, to_ingredient_id=aquafaba, note="3 tablespoons per egg")
+    _refused(db, lambda: _swap(db, from_ingredient_id=aquafaba, to_ingredient_id=egg, note=""))
+
+
 def test_substitution_goes_with_its_recipe_but_holds_its_ingredient(db: Connection) -> None:
     work = _work(db)
     blend = _recipe(db, work, "Flour Blend")
