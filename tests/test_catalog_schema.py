@@ -83,20 +83,73 @@ def test_isbn13_format(db: Connection) -> None:
     _refused(db, lambda: _edition(db, work, "0393541118"))
 
 
-def test_recipe_ingredient_has_at_most_one_target(db: Connection) -> None:
+def _line(db: Connection, recipe_id, position: int, original_text: str) -> uuid.UUID:
+    return _insert(
+        db,
+        "INSERT INTO recipe_ingredients (recipe_id, position, original_text) VALUES (:r, :p, :t)",
+        r=recipe_id,
+        p=position,
+        t=original_text,
+    )
+
+
+def _option(
+    db: Connection, line_id, recipe_id, rank: int, name: str, ingredient=None, sub_recipe=None
+) -> uuid.UUID:
+    return _insert(
+        db,
+        "INSERT INTO ingredient_options"
+        " (recipe_ingredient_id, recipe_id, rank, name, ingredient_id, sub_recipe_id)"
+        " VALUES (:l, :r, :k, :n, :i, :s)",
+        l=line_id,
+        r=recipe_id,
+        k=rank,
+        n=name,
+        i=ingredient,
+        s=sub_recipe,
+    )
+
+
+def test_option_has_at_most_one_target(db: Connection) -> None:
     work = _work(db)
     recipe, blend = _recipe(db, work), _recipe(db, work, "Flour Blend")
     flour = _insert(db, "INSERT INTO ingredients (name) VALUES ('rice flour')")
-    line = (
-        "INSERT INTO recipe_ingredients"
-        " (recipe_id, position, original_text, ingredient_id, sub_recipe_id)"
-        " VALUES (:r, :p, '2 cups flour', :i, :s)"
-    )
-    db.execute(text(line), {"r": recipe, "p": 1, "i": None, "s": None})  # not matched yet
-    db.execute(text(line), {"r": recipe, "p": 2, "i": flour, "s": None})
-    db.execute(text(line), {"r": recipe, "p": 3, "i": None, "s": blend})
-    _refused(db, lambda: db.execute(text(line), {"r": recipe, "p": 4, "i": flour, "s": blend}))
-    _refused(db, lambda: db.execute(text(line), {"r": recipe, "p": 5, "i": None, "s": recipe}))
+    line = _line(db, recipe, 1, "2 cups flour")
+    _option(db, line, recipe, 1, "flour")  # not matched yet
+    _option(db, line, recipe, 2, "rice flour", ingredient=flour)
+    _option(db, line, recipe, 3, "Flour Blend", sub_recipe=blend)
+    _refused(db, lambda: _option(db, line, recipe, 4, "x", ingredient=flour, sub_recipe=blend))
+
+
+def test_line_ranks_a_first_choice_and_fallbacks(db: Connection) -> None:
+    work = _work(db)
+    recipe = _recipe(db, work, "Cottage Cheese Pancakes")
+    grapeseed = _insert(db, "INSERT INTO ingredients (name) VALUES ('grapeseed oil')")
+    olive = _insert(db, "INSERT INTO ingredients (name) VALUES ('olive oil')")
+    line = _line(db, recipe, 1, "Grapeseed Oil or Olive Oil")
+    _option(db, line, recipe, 2, "Olive Oil", ingredient=olive)
+    _option(db, line, recipe, 1, "Grapeseed Oil", ingredient=grapeseed)
+    ranked = db.execute(
+        text(
+            "SELECT ingredient_id FROM ingredient_options WHERE recipe_ingredient_id = :l"
+            " ORDER BY rank"
+        ),
+        {"l": line},
+    ).scalars()
+    assert list(ranked) == [grapeseed, olive]
+    _refused(db, lambda: _option(db, line, recipe, 2, "Canola Oil"))
+    _refused(db, lambda: _option(db, line, recipe, 0, "Canola Oil"))
+
+
+def test_option_cannot_list_its_own_recipe_or_claim_another_recipes_line(
+    db: Connection,
+) -> None:
+    work = _work(db)
+    recipe, other = _recipe(db, work), _recipe(db, work, "Focaccia")
+    line = _line(db, recipe, 1, "1 batch dressing")
+    _refused(db, lambda: _option(db, line, recipe, 1, "dressing", sub_recipe=recipe))
+    # The line belongs to recipe; an option saying it belongs to other is refused.
+    _refused(db, lambda: _option(db, line, other, 1, "dressing"))
 
 
 def test_ingredient_names_are_unique_ignoring_case(db: Connection) -> None:
@@ -119,13 +172,7 @@ def test_ingredient_in_use_cannot_be_deleted(db: Connection) -> None:
     work = _work(db)
     recipe = _recipe(db, work)
     egg = _insert(db, "INSERT INTO ingredients (name) VALUES ('egg')")
-    db.execute(
-        text(
-            "INSERT INTO recipe_ingredients (recipe_id, position, original_text, ingredient_id)"
-            " VALUES (:r, 1, '1 egg', :i)"
-        ),
-        {"r": recipe, "i": egg},
-    )
+    _option(db, _line(db, recipe, 1, "1 egg"), recipe, 1, "egg", ingredient=egg)
     _refused(db, lambda: db.execute(text("DELETE FROM ingredients WHERE id = :i"), {"i": egg}))
 
 
@@ -162,3 +209,68 @@ def test_updated_at_moves_on_update(db: Connection) -> None:
         text("SELECT updated_at = now() FROM works WHERE id = :w"), {"w": work}
     ).scalar_one()
     assert moved
+
+
+def test_existing_lines_keep_their_targets_and_downgrade_keeps_fallbacks(
+    engine, alembic_config
+) -> None:
+    """Data written under 0001 survives 0002; 0002 will not go back and drop a fallback."""
+    engine.dispose()
+    command.downgrade(alembic_config, "0001")
+    try:
+        with engine.begin() as conn:
+            work = _work(conn, "Migration Test")
+            recipe, blend = _recipe(conn, work), _recipe(conn, work, "Biscuit Blend")
+            egg = _insert(conn, "INSERT INTO ingredients (name) VALUES ('migration egg')")
+            old_line = (
+                "INSERT INTO recipe_ingredients"
+                " (recipe_id, position, original_text, ingredient_id, sub_recipe_id)"
+                " VALUES (:r, :p, :t, :i, :s)"
+            )
+            for p, t, i, s in [
+                (1, "Egg", egg, None),
+                (2, "Biscuit Blend (p. 14)", None, blend),
+                (3, "Salt", None, None),
+            ]:
+                conn.execute(text(old_line), {"r": recipe, "p": p, "t": t, "i": i, "s": s})
+
+        engine.dispose()
+        command.upgrade(alembic_config, "head")
+        with engine.begin() as conn:
+            options = conn.execute(
+                text(
+                    "SELECT ri.position, o.rank, o.name, o.ingredient_id, o.sub_recipe_id"
+                    " FROM ingredient_options o"
+                    " JOIN recipe_ingredients ri ON ri.id = o.recipe_ingredient_id"
+                    " WHERE ri.recipe_id = :r ORDER BY ri.position"
+                ),
+                {"r": recipe},
+            ).all()
+            assert [tuple(o) for o in options] == [
+                (1, 1, "Egg", egg, None),
+                (2, 1, "Biscuit Blend (p. 14)", None, blend),
+                (3, 1, "Salt", None, None),
+            ]
+            line = conn.execute(
+                text("SELECT id FROM recipe_ingredients WHERE recipe_id = :r AND position = 3"),
+                {"r": recipe},
+            ).scalar_one()
+            _option(conn, line, recipe, 2, "Sea Salt")
+
+        engine.dispose()
+        with pytest.raises(RuntimeError, match="fallback"):
+            command.downgrade(alembic_config, "0001")
+    finally:
+        engine.dispose()
+        command.upgrade(alembic_config, "head")
+        with engine.begin() as conn:
+            # Options first: RESTRICT refuses to delete a recipe still used as
+            # a sub-recipe, even by a row the same cascade would remove.
+            conn.execute(
+                text(
+                    "DELETE FROM ingredient_options WHERE recipe_id IN (SELECT r.id FROM recipes r"
+                    " JOIN works w ON w.id = r.work_id WHERE w.title = 'Migration Test')"
+                )
+            )
+            conn.execute(text("DELETE FROM works WHERE title = 'Migration Test'"))
+            conn.execute(text("DELETE FROM ingredients WHERE name = 'migration egg'"))
