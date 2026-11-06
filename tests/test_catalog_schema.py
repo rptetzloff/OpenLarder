@@ -274,3 +274,132 @@ def test_existing_lines_keep_their_targets_and_downgrade_keeps_fallbacks(
             )
             conn.execute(text("DELETE FROM works WHERE title = 'Migration Test'"))
             conn.execute(text("DELETE FROM ingredients WHERE name = 'migration egg'"))
+
+
+def _author(db: Connection, name: str, kind: str = "person", wikidata_id=None) -> uuid.UUID:
+    return _insert(
+        db,
+        "INSERT INTO authors (name, kind, wikidata_id) VALUES (:n, :k, :q)",
+        n=name,
+        k=kind,
+        q=wikidata_id,
+    )
+
+
+def _credit(db: Connection, work_id, author_id, position: int, credited_as: str, role="author"):
+    return _insert(
+        db,
+        "INSERT INTO work_credits (work_id, author_id, position, role, credited_as)"
+        " VALUES (:w, :a, :p, :r, :c)",
+        w=work_id,
+        a=author_id,
+        p=position,
+        r=role,
+        c=credited_as,
+    )
+
+
+def test_credits_keep_printed_order_and_name(db: Connection) -> None:
+    paleo, approach = _work(db, "Paleo Principles"), _work(db, "The Paleo Approach Cookbook")
+    sarah = _author(db, "Sarah Ballantyne")
+    atk = _author(db, "America's Test Kitchen", kind="organisation")
+    _credit(db, paleo, atk, 2, "America's Test Kitchen", role="contributor")
+    _credit(db, paleo, sarah, 1, "Sarah Ballantyne, PhD")
+    _credit(db, approach, sarah, 1, "Sarah Ballantyne, PhD")
+    credits = db.execute(
+        text(
+            "SELECT author_id, credited_as FROM work_credits WHERE work_id = :w ORDER BY position"
+        ),
+        {"w": paleo},
+    ).all()
+    assert [tuple(c) for c in credits] == [
+        (sarah, "Sarah Ballantyne, PhD"),
+        (atk, "America's Test Kitchen"),
+    ]
+    books = db.execute(
+        text("SELECT count(*) FROM work_credits WHERE author_id = :a"), {"a": sarah}
+    ).scalar_one()
+    assert books == 2
+
+
+def test_credit_rules(db: Connection) -> None:
+    work = _work(db, "Franklin Barbecue")
+    aaron = _author(db, "Aaron Franklin")
+    _credit(db, work, aaron, 1, "Aaron Franklin")
+    _credit(db, work, aaron, 2, "Aaron Franklin", role="photographer")  # another role: allowed
+    jordan = _author(db, "Jordan Mackay")
+    _refused(db, lambda: _credit(db, work, jordan, 1, "Jordan Mackay"))  # position taken
+    _refused(db, lambda: _credit(db, work, aaron, 3, "Aaron Franklin"))  # same role again
+    _refused(db, lambda: _credit(db, work, jordan, 3, "Jordan Mackay", role="ghost"))
+    _refused(db, lambda: _credit(db, work, jordan, 3, ""))
+
+
+def test_author_still_credited_cannot_be_deleted(db: Connection) -> None:
+    work = _work(db, "Plenty")
+    yotam = _author(db, "Yotam Ottolenghi")
+    _credit(db, work, yotam, 1, "Yotam Ottolenghi")
+    delete = text("DELETE FROM authors WHERE id = :a")
+    _refused(db, lambda: db.execute(delete, {"a": yotam}))
+    # Deleting the book takes its credits with it, and frees the author.
+    db.execute(text("DELETE FROM works WHERE id = :w"), {"w": work})
+    db.execute(delete, {"a": yotam})
+
+
+def test_author_kind_and_wikidata_id(db: Connection) -> None:
+    _author(db, "The Culinary Institute of America", kind="organisation", wikidata_id="Q1144556")
+    _refused(db, lambda: _author(db, "Someone", kind="pseudonym"))
+    _refused(db, lambda: _author(db, "Someone", wikidata_id="1144556"))
+
+
+def test_author_lists_become_credits_and_downgrade_keeps_roles(engine, alembic_config) -> None:
+    """Names listed on works under 0002 become authors and credits under 0003."""
+    engine.dispose()
+    command.downgrade(alembic_config, "0002")
+    titles = ("Credit Test A", "Credit Test B")
+    try:
+        with engine.begin() as conn:
+            listed = "INSERT INTO works (title, authors) VALUES (:t, :a) RETURNING id"
+            a = conn.execute(
+                text(listed),
+                {"t": titles[0], "a": ["Michelle Tam", "Henry Fong", "Michelle Tam", ""]},
+            ).scalar_one()
+            b = conn.execute(text(listed), {"t": titles[1], "a": ["Michelle Tam"]}).scalar_one()
+
+        engine.dispose()
+        command.upgrade(alembic_config, "head")
+        with engine.begin() as conn:
+
+            def credits(work):
+                rows = conn.execute(
+                    text(
+                        "SELECT c.position, c.role, c.credited_as, a.name FROM work_credits c"
+                        " JOIN authors a ON a.id = c.author_id WHERE c.work_id = :w"
+                        " ORDER BY c.position"
+                    ),
+                    {"w": work},
+                ).all()
+                return [tuple(r) for r in rows]
+
+            # The repeat of Michelle Tam and the empty name are dropped.
+            assert credits(a) == [
+                (1, "author", "Michelle Tam", "Michelle Tam"),
+                (2, "author", "Henry Fong", "Henry Fong"),
+            ]
+            assert credits(b) == [(1, "author", "Michelle Tam", "Michelle Tam")]
+            shared = conn.execute(
+                text("SELECT count(*) FROM authors WHERE name = 'Michelle Tam'")
+            ).scalar_one()
+            assert shared == 1
+
+            henry = conn.execute(text("SELECT id FROM authors WHERE name = 'Henry Fong'"))
+            _credit(conn, b, henry.scalar_one(), 2, "Henry Fong", role="photographer")
+
+        engine.dispose()
+        with pytest.raises(RuntimeError, match="role"):
+            command.downgrade(alembic_config, "0002")
+    finally:
+        engine.dispose()
+        command.upgrade(alembic_config, "head")
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM works WHERE title = ANY(:t)"), {"t": list(titles)})
+            conn.execute(text("DELETE FROM authors WHERE name IN ('Michelle Tam', 'Henry Fong')"))

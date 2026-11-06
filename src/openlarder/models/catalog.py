@@ -3,7 +3,7 @@
 Everything here is open data (ODbL). It records facts about recipes -- title,
 page, ingredient lines, tags -- never a book's instructions or headnotes.
 See DATA_MODEL.svg for the shape. The diagram is ahead of this file:
-substitutions and authors are scoped in SCOPING.md but not built.
+substitutions are scoped in SCOPING.md but not built.
 
 Rules the schema enforces rather than leaves to the application:
 
@@ -14,6 +14,9 @@ Rules the schema enforces rather than leaves to the application:
   null page means it is, but nobody has recorded where yet.
 - An ingredient option points at a canonical ingredient, a sub-recipe, or
   neither (not matched yet) -- never both. Ranks are unique within a line.
+- A work credit points at one author and keeps the name as printed. One
+  author can't be credited twice in the same role on the same book, and an
+  author still credited somewhere can't be deleted.
 
 Not enforced: cycles in the ingredient hierarchy or in sub-recipes longer
 than one step. A recipe cannot list itself and an ingredient cannot be its
@@ -36,7 +39,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, ENUM, UUID
+from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from openlarder.models.base import Base, Timestamps, uuid_pk
@@ -82,12 +85,70 @@ class Work(Timestamps, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     title: Mapped[str] = mapped_column(Text, nullable=False)
     subtitle: Mapped[str | None] = mapped_column(Text)
-    # Display names in credit order. To be replaced by an author table with
-    # credits, now that author pages link by author (SCOPING.md, Author pages).
-    authors: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default=text("'{}'")
-    )
     open_library_work_id: Mapped[str | None] = mapped_column(Text, unique=True)
+
+
+class Author(Timestamps, Base):
+    """A person or an organisation credited on books ("America's Test Kitchen")."""
+
+    __tablename__ = "authors"
+    __table_args__ = (
+        CheckConstraint("name <> ''", name="name_not_empty"),
+        CheckConstraint("kind IN ('person', 'organisation')", name="kind_known"),
+        CheckConstraint("wikidata_id ~ '^Q[1-9][0-9]*$'", name="wikidata_id_format"),
+        _trgm("authors", "name"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    # Not unique: two cooks can share a name. Duplicates are merged by hand.
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="person")
+    open_library_author_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    wikidata_id: Mapped[str | None] = mapped_column(Text, unique=True)
+
+
+class AuthorLink(Timestamps, Base):
+    """The author's own website or social account."""
+
+    __tablename__ = "author_links"
+    __table_args__ = (
+        UniqueConstraint("author_id", "url"),
+        CheckConstraint("url <> ''", name="url_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    author_id: Mapped[uuid.UUID] = _fk("authors.id", ondelete="CASCADE")
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str | None] = mapped_column(Text)
+
+
+class WorkCredit(Timestamps, Base):
+    """One name on a book's cover or title page, in the order printed."""
+
+    __tablename__ = "work_credits"
+    __table_args__ = (
+        UniqueConstraint("work_id", "position"),
+        # The same person credited twice in one role is a duplicate; as author
+        # and photographer is two credits.
+        UniqueConstraint("work_id", "author_id", "role"),
+        CheckConstraint("credited_as <> ''", name="credited_as_not_empty"),
+        CheckConstraint(
+            "role IN ('author', 'editor', 'contributor', 'photographer', 'illustrator',"
+            " 'translator')",
+            name="role_known",
+        ),
+        Index("ix_work_credits_author_id", "author_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    work_id: Mapped[uuid.UUID] = _fk("works.id", ondelete="CASCADE")
+    # RESTRICT: an author still credited is merged into another, not deleted.
+    author_id: Mapped[uuid.UUID] = _fk("authors.id", ondelete="RESTRICT")
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default="author")
+    # The name as the book prints it ("Sarah Ballantyne, PhD"), which can
+    # differ from the author's canonical name.
+    credited_as: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class Edition(Timestamps, Base):

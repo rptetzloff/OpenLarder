@@ -1,5 +1,7 @@
 from openlarder.models.base import Base
 from openlarder.models.catalog import (
+    Author,
+    AuthorLink,
     Edition,
     Ingredient,
     IngredientAlias,
@@ -12,10 +14,13 @@ from openlarder.models.catalog import (
     Tag,
     TagKind,
     Work,
+    WorkCredit,
     WorkTag,
 )
 
 __all__ = [
+    "Author",
+    "AuthorLink",
     "Base",
     "Edition",
     "Ingredient",
@@ -29,5 +34,6 @@ __all__ = [
     "Tag",
     "TagKind",
     "Work",
+    "WorkCredit",
     "WorkTag",
 ]
