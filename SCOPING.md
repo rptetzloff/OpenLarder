@@ -149,7 +149,7 @@ OpenLarder signs people in through an identity broker, and talks to the broker w
 
 - **Google and GitHub first**, more later. GitHub's sign-in is plain OAuth, not OpenID Connect: a site gets a token and asks GitHub's API who the user is. That is why a broker rather than generic OIDC in the app: the app would otherwise need separate code for GitHub.
 - **Email accounts too**, by password or sign-in link, for people who use neither Google nor GitHub. *Decided by Ray, 2026-11-06.*
-- **Authentik or Keycloak.** The choice between them is made by running both on Coolify when sign-in is built, and comparing upkeep and resource use there.
+- **Authentik first.** Coolify offers it as a ready-made service, so Ray is trying it first. Keycloak is the fallback if Authentik doesn't work out. *Decided by Ray, 2026-11-06.*
 
 *Superseded 2026-11-06: the stack table named "generic OIDC (e.g. Zitadel)". Zitadel was weighed and not chosen.*
 
@@ -225,7 +225,7 @@ Python and Vue, matching the structure of Sederunt and Sennight, self-hosted on 
 | Database | PostgreSQL | pg\_trgm for fuzzy ingredient matching, built-in full-text search |
 | Jobs and cache | Redis + Python worker (arq or RQ) | Bulk imports, Open Library lookups |
 | File storage | S3 (existing) | Covers, import files, Postgres backups; separate buckets or credentials for public assets vs backups |
-| Auth | Identity broker: Authentik or Keycloak | Google and GitHub first, more providers later, plus email sign-up. See Sign-in |
+| Auth | Identity broker: Authentik (Keycloak as fallback) | Google and GitHub first, more providers later, plus email sign-up. See Sign-in |
 | Hosting | Coolify (prod), Rancher Desktop with dockerd (dev) | One docker-compose.yml for both; Cloudflare Tunnel for public access |
 
 No multi-tenancy: one public catalog.
@@ -288,7 +288,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
 - [x] Base ingredient dataset: USDA FoodData Central, Wikidata as backup (see Ingredient normalization)
-- [ ] Authentik or Keycloak: chosen by running both on Coolify when sign-in is built
+- [x] Authentik or Keycloak: Authentik first, since Coolify offers it as a service; Keycloak if it doesn't work out
 - [x] Whether a substitution records an amount or ratio: only as a free-text note
 - [ ] How an author is verified
 - [ ] Licence for bios: contributor-written bios sit with other user content, and author-written ones belong to the author, so neither is automatically ODbL
