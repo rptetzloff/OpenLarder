@@ -32,6 +32,11 @@ src/openlarder/web/
 # Render-check captures: screenshots taken to measure a page, not sources.
 .render/
 
+# Personal reference data, such as Ray's own cookbook list, kept beside the
+# code to look at but never published. The repo and its catalog are public, so
+# nothing here may be copied into seeds, fixtures, tests or docs either.
+/private/
+
 npm-debug.log*
 *.log
 
