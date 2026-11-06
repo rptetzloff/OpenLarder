@@ -2,8 +2,7 @@
 
 Everything here is open data (ODbL). It records facts about recipes -- title,
 page, ingredient lines, tags -- never a book's instructions or headnotes.
-See DATA_MODEL.svg for the shape. The diagram is ahead of this file:
-substitutions are scoped in SCOPING.md but not built.
+See DATA_MODEL.svg for the shape.
 
 Rules the schema enforces rather than leaves to the application:
 
@@ -17,6 +16,8 @@ Rules the schema enforces rather than leaves to the application:
 - A work credit points at one author and keeps the name as printed. One
   author can't be credited twice in the same role on the same book, and an
   author still credited somewhere can't be deleted.
+- A substitution has exactly one thing on each side, never the same thing
+  twice, and its reason can only be a diet tag. A page needs an edition.
 
 Not enforced: cycles in the ingredient hierarchy or in sub-recipes longer
 than one step. A recipe cannot list itself and an ingredient cannot be its
@@ -350,6 +351,8 @@ class Tag(Timestamps, Base):
     __table_args__ = (
         CheckConstraint("name <> ''", name="name_not_empty"),
         Index("uq_tags_kind_name", "kind", text("lower(name)"), unique=True),
+        # The target of substitutions' composite key, which pins it to diets.
+        UniqueConstraint("kind", "id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -379,3 +382,77 @@ class RecipeTag(Base):
 
     recipe_id: Mapped[uuid.UUID] = _fk("recipes.id", ondelete="CASCADE")
     tag_id: Mapped[uuid.UUID] = _fk("tags.id", ondelete="CASCADE")
+
+
+class Substitution(Timestamps, Base):
+    """One thing that can stand in for another, usually for a diet.
+
+    Each side is an ingredient or a recipe, so a dairy-free butter can stand in
+    for butter, or one book's flour blend for another's. One-way: the reverse
+    swap is its own row, because it often doesn't hold.
+    """
+
+    __tablename__ = "substitutions"
+    __table_args__ = (
+        CheckConstraint("num_nonnulls(from_ingredient_id, from_recipe_id) = 1", name="one_from"),
+        CheckConstraint("num_nonnulls(to_ingredient_id, to_recipe_id) = 1", name="one_to"),
+        CheckConstraint(
+            "from_ingredient_id <> to_ingredient_id AND from_recipe_id <> to_recipe_id",
+            name="not_itself",
+        ),
+        # A page only makes sense in an edition; contributed swaps have neither.
+        CheckConstraint(
+            "source_page IS NULL OR source_edition_id IS NOT NULL", name="page_needs_edition"
+        ),
+        CheckConstraint("source_page <> ''", name="source_page_not_empty"),
+        CheckConstraint("diet_kind = 'diet'", name="diet_kind_is_diet"),
+        ForeignKeyConstraint(
+            ["diet_kind", "diet_tag_id"],
+            ["tags.kind", "tags.id"],
+            ondelete="RESTRICT",
+            name="fk_substitutions_diet_tag",
+        ),
+        # The same swap, for the same diet, from the same source, once.
+        Index(
+            "uq_substitutions_swap",
+            "from_ingredient_id",
+            "from_recipe_id",
+            "to_ingredient_id",
+            "to_recipe_id",
+            "diet_tag_id",
+            "source_edition_id",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+        ),
+        Index("ix_substitutions_to_ingredient_id", "to_ingredient_id"),
+        Index("ix_substitutions_from_recipe_id", "from_recipe_id"),
+        Index("ix_substitutions_to_recipe_id", "to_recipe_id"),
+        Index("ix_substitutions_diet_tag_id", "diet_tag_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    # RESTRICT on ingredients, as elsewhere: one in use is merged, not
+    # deleted. CASCADE on recipes: a swap involving a deleted recipe means
+    # nothing.
+    from_ingredient_id: Mapped[uuid.UUID | None] = _fk(
+        "ingredients.id", ondelete="RESTRICT", nullable=True
+    )
+    from_recipe_id: Mapped[uuid.UUID | None] = _fk("recipes.id", ondelete="CASCADE", nullable=True)
+    to_ingredient_id: Mapped[uuid.UUID | None] = _fk(
+        "ingredients.id", ondelete="RESTRICT", nullable=True
+    )
+    to_recipe_id: Mapped[uuid.UUID | None] = _fk("recipes.id", ondelete="CASCADE", nullable=True)
+    # Which diet the swap serves. Null for a swap that serves none in
+    # particular, such as one for an ingredient that's hard to find.
+    diet_tag_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Always 'diet'; it exists so the composite key above can only reach a
+    # diet tag.
+    diet_kind: Mapped[TagKind] = mapped_column(
+        tag_kind, nullable=False, server_default=TagKind.DIET.value
+    )
+    # Printed in a book: the edition and page, since pages differ by edition.
+    # Both null: contributed.
+    source_edition_id: Mapped[uuid.UUID | None] = _fk(
+        "editions.id", ondelete="RESTRICT", nullable=True
+    )
+    source_page: Mapped[str | None] = mapped_column(Text)

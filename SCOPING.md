@@ -75,7 +75,9 @@ Most lines have a single option. A line the book prints as "grapeseed oil or oli
 
 **Substitutions**
 
-A Substitution says one thing can stand in for another: an ingredient or a recipe on either side, for a stated reason, usually a diet ("vegan butter for butter, dairy-free"). It can link two flour blends from different books. It is catalog data under the ODbL, separate from the free-text cooking notes users write. Each substitution records where it came from: printed in a book (work and page), or contributed. *Decided by Ray, 2026-11-06: most of the books in the first import are allergen-free in some way, so this gets heavy use.*
+A Substitution says one thing can stand in for another: an ingredient or a recipe on either side, for a stated reason, usually a diet ("vegan butter for butter, dairy-free"). It can link two flour blends from different books. It is catalog data under the ODbL, separate from the free-text cooking notes users write. Each substitution records where it came from: printed in a book (edition and page), or contributed. *Decided by Ray, 2026-11-06: most of the books in the first import are allergen-free in some way, so this gets heavy use.*
+
+Built in migration 0004. A substitution goes one way: the reverse is its own entry, because it often doesn't hold. Its source is an edition rather than a work, because pages differ between editions. *Narrowed by Claude while building it; this used to say "work and page".* A substitution doesn't yet say how much to use ("3 tablespoons aquafaba per egg"); that is an open decision.
 
 **Allergen data**
 
@@ -270,6 +272,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
 - [ ] Base ingredient dataset
+- [ ] Whether a substitution records an amount or ratio ("3/4 cup oil per cup of butter")
 - [ ] How an author is verified
 - [ ] Licence for bios: contributor-written bios sit with other user content, and author-written ones belong to the author, so neither is automatically ODbL
 - [ ] Author photos: which sources are allowed and under what licence
