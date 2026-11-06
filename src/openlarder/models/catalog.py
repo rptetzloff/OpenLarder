@@ -3,7 +3,7 @@
 Everything here is open data (ODbL). It records facts about recipes -- title,
 page, ingredient lines, tags -- never a book's instructions or headnotes.
 See DATA_MODEL.svg for the shape. The diagram is ahead of this file:
-substitutions are scoped in SCOPING.md but not built.
+substitutions and authors are scoped in SCOPING.md but not built.
 
 Rules the schema enforces rather than leaves to the application:
 
