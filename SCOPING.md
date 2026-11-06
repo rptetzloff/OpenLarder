@@ -74,7 +74,14 @@ Most lines have a single option. A line the book prints as "grapeseed oil or oli
 
 A Substitution says one thing can stand in for another: an ingredient or a recipe on either side, for a stated reason, usually a diet ("vegan butter for butter, dairy-free"). It can link two flour blends from different books. It is catalog data under the ODbL, separate from the free-text cooking notes users write. Each substitution records where it came from: printed in a book (work and page), or contributed. *Decided by Ray, 2026-11-06: most of the books in the first import are allergen-free in some way, so this gets heavy use.*
 
-Not decided yet: whether ingredients carry allergen data (contains dairy, gluten, egg), which would let the site offer substitutions for a diet automatically rather than only where someone has entered one.
+**Allergen data**
+
+Ingredients carry allergen data (contains dairy, gluten, egg). This lets the site offer substitutions for a diet automatically, not only where someone has entered one. *Decided by Ray, 2026-11-06, on the condition that it is presented as crowdsourced information.*
+
+- Wherever allergen data or a diet-based suggestion appears, a notice says it is crowdsourced and unverified, and that it is not a guarantee a recipe is safe for anyone.
+- The site never labels a recipe "safe for" an allergy. It can say what the catalog records about the ingredients, and nothing more.
+- Allergen data describes an ingredient in general, not any product. Oats may or may not be processed alongside wheat, and one brand's stock may contain milk when another's doesn't. The notice says so.
+- The wording of the notice is written with the feature and reviewed by a lawyer along with the content rules.
 
 ## Ingredient normalization
 
@@ -202,6 +209,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Saves, likes, "want to cook" lists, reviews, user descriptions
 - Personal shelf: mark books you own, filter search to your shelf
 - Amazon Associates links, once traffic supports it
+- Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.*
 
 **Phase 3**
 
@@ -225,6 +233,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 | Affiliate revenue doesn't cover costs | Keep infrastructure lean; no paid services until revenue exists |
 | Publisher or author objections | Index only facts; respond to takedown requests promptly |
 | Moderator burnout | Trust levels push review work to trusted contributors |
+| Someone relies on crowdsourced allergen data and has a reaction | A crowdsourced notice wherever allergen data appears, no "safe for" claims, report button, lawyer review of the notice's wording |
 
 **Open decisions**
 
@@ -233,10 +242,10 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Data license: ODbL
 - [ ] Base ingredient dataset
 - [x] Which phase substitutions ship in: MVP (see the MVP list)
-- [ ] Allergen data on ingredients
+- [x] Allergen data on ingredients: yes, presented as crowdsourced (see Allergen data)
 - [ ] Grocery partner and its API terms
 - [ ] Edition handling when a recipe's page is unknown for an edition
 - [ ] Seeding plan: start from the existing 125-cookbook household index (self-built CSV; first bulk import target)
 - [ ] USPTO check on "Open Larder" (Classes 9 and 42)
 
-Not legal advice: have a lawyer review the content rules and license before launch.
+Not legal advice: have a lawyer review the content rules, the license, and the allergen notice before launch.
