@@ -1,0 +1,24 @@
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+/build/
+/dist/
+.pytest_cache/
+.ruff_cache/
+
+# Front end
+node_modules/
+web/dist/
+# Where the Docker build puts the SPA for the API to serve.
+src/openlarder/web/
+
+# Editors and tooling
+.idea/
+.vscode/
+.claude/
+.DS_Store
