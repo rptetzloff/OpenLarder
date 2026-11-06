@@ -406,6 +406,7 @@ class Substitution(Timestamps, Base):
         ),
         CheckConstraint("source_page <> ''", name="source_page_not_empty"),
         CheckConstraint("diet_kind = 'diet'", name="diet_kind_is_diet"),
+        CheckConstraint("note <> ''", name="note_not_empty"),
         ForeignKeyConstraint(
             ["diet_kind", "diet_tag_id"],
             ["tags.kind", "tags.id"],
@@ -456,3 +457,6 @@ class Substitution(Timestamps, Base):
         "editions.id", ondelete="RESTRICT", nullable=True
     )
     source_page: Mapped[str | None] = mapped_column(Text)
+    # Free text, such as "3 tablespoons aquafaba per egg". Amounts are a note
+    # on purpose, not structured data: Ray, 2026-11-06.
+    note: Mapped[str | None] = mapped_column(Text)
