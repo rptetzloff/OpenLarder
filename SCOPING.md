@@ -2,6 +2,8 @@
 
 Nov 6, 2026 · @Raymond Tetzloff
 
+This is a living document. A decision goes in here as part of the change that makes it, with who decided and when. A decision that gets overturned stays, marked as superseded, with a note on what changed.
+
 ## Overview
 
 A free, public, crowdsourced index of recipes in cookbooks and other sources: what's in each book, on which page of which edition, with normalized ingredients, links to buy the book or the ingredients, and an open API. Name: OpenLarder (openlarder.com and openlarder.org). Hosting: self-hosted on Coolify to start.
@@ -56,13 +58,23 @@ The site stores facts about recipes, never the recipes themselves. Book text sta
 
 A Recipe belongs to one Work (the book); its page number lives on Recipe Page, one row per Edition it appears in, so one recipe entry covers every printing.
 
-![OpenLarder data model: 8 catalog entities, 3 community](DATA_MODEL.svg)
+![OpenLarder data model: 10 catalog entities, 3 community](DATA_MODEL.svg)
 
 Ingredient lines keep the book's original text and point to one canonical Ingredient, which carries the shopping term and a parent for broader search. On the book page, editions show as tabs or subpages with their own page numbers and purchase links.
 
 Tags set on a Work (such as a diet focus like Gluten-Free) are inherited by every recipe in it, in addition to any tags set on the recipe itself.
 
-A Recipe Ingredient points to either a canonical Ingredient or another Recipe (a sub-recipe, such as a flour blend used throughout a gluten-free book). Sub-recipe links let users jump to the component recipe and its page, and shopping lists expand them into their own ingredients.
+A Recipe Ingredient holds one or more ranked Ingredient Options. Each option points to either a canonical Ingredient or another Recipe (a sub-recipe, such as a flour blend used throughout a gluten-free book). Sub-recipe links let users jump to the component recipe and its page, and shopping lists expand them into their own ingredients.
+
+Most lines have a single option. A line the book prints as "grapeseed oil or olive oil" has two: grapeseed oil first, then olive oil as the fallback. "Cheddar or any cheese" works the same way, even though cheddar sits under cheese in the hierarchy. When the book gives each option its own quantity, the option carries it. Shopping lists use the first option. *Decided by Ray, 2026-11-06, because books print lines like this often.*
+
+*Superseded 2026-11-06: a Recipe Ingredient used to point at one target directly. The schema still works that way (`one_target_at_most` on `recipe_ingredients`) until the change that adds options.*
+
+**Substitutions**
+
+A Substitution says one thing can stand in for another: an ingredient or a recipe on either side, for a stated reason, usually a diet ("vegan butter for butter, dairy-free"). It can link two flour blends from different books. It is catalog data under the ODbL, separate from the free-text cooking notes users write. Each substitution records where it came from: printed in a book (work and page), or contributed. *Decided by Ray, 2026-11-06: most of the books in the first import are allergen-free in some way, so this gets heavy use.*
+
+Not decided yet: whether ingredients carry allergen data (contains dairy, gluten, egg), which would let the site offer substitutions for a diet automatically rather than only where someone has entered one.
 
 ## Ingredient normalization
 
@@ -101,6 +113,18 @@ Modeled on OpenStreetMap and Wikipedia: anyone can contribute, everything is ver
 - Corrections to existing entries
 - New ingredients and aliases (via the matching flow)
 - Bulk imports: CSV or spreadsheet of a book's recipes
+
+**Bulk import rules** (decided by Ray, 2026-11-06, from a sample of the household index)
+
+- **Fallbacks are written as the book writes them.** "A or B" and "A, B, or C" inside one ingredient become ranked options in the order written. If splitting a line on "or" leaves a part that matches nothing, the line is flagged instead of split.
+- **Sub-recipe references** are written as "Name (p. 14)". A bare number in brackets, "Name (270)", is read the same way.
+- **Wrong page in a reference:** link to the recipe with that name in the same book, use that recipe's real page, and flag the mismatch.
+- **Reference to a recipe the book doesn't have:** flag it as an unknown ingredient.
+- **Tag that reads like a note** ("Measurement Reference on p. 72"): flag it for review.
+- **Typos** ("Lemon Jucie", "FreshGinger"): fix them when the match is close enough to be confident. Otherwise suggest a fix and flag it. "Close enough" gets a measured threshold when the importer is built.
+- **The same ingredient twice in one recipe** is kept once.
+
+Flags go to the review queue with the reason attached. Bulk imports go through review whatever the contributor's trust level.
 
 **Trust levels**
 
@@ -163,6 +187,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 - Book catalog with works and editions (ISBN lookup, Open Library metadata)
 - Recipe entries with page numbers per edition
+- Ranked ingredient options (fallbacks) on recipe entries
 - Ingredient normalization with seeded data and the matching flow
 - Search by ingredient, by book, by recipe title
 - User accounts, submissions, review queue, edit history
@@ -206,6 +231,8 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
 - [ ] Base ingredient dataset
+- [ ] Which phase substitutions ship in
+- [ ] Allergen data on ingredients
 - [ ] Grocery partner and its API terms
 - [ ] Edition handling when a recipe's page is unknown for an edition
 - [ ] Seeding plan: start from the existing 125-cookbook household index (self-built CSV; first bulk import target)
