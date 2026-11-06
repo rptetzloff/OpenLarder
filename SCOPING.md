@@ -71,7 +71,7 @@ A Recipe Ingredient holds one or more ranked Ingredient Options. Each option poi
 
 Most lines have a single option. A line the book prints as "grapeseed oil or olive oil" has two: grapeseed oil first, then olive oil as the fallback. "Cheddar or any cheese" works the same way, even though cheddar sits under cheese in the hierarchy. When the book gives each option its own quantity, the option carries it. Shopping lists use the first option. *Decided by Ray, 2026-11-06, because books print lines like this often.*
 
-*Superseded 2026-11-06: a Recipe Ingredient used to point at one target directly. The schema still works that way (`one_target_at_most` on `recipe_ingredients`) until the change that adds options.*
+*Superseded 2026-11-06: a Recipe Ingredient used to point at one target directly. Migration 0002 moved each line's target onto a single first-choice option.*
 
 **Substitutions**
 

@@ -2,8 +2,8 @@
 
 Everything here is open data (ODbL). It records facts about recipes -- title,
 page, ingredient lines, tags -- never a book's instructions or headnotes.
-See DATA_MODEL.svg for the shape. The diagram is ahead of this file: ranked
-ingredient options and substitutions are scoped in SCOPING.md but not built.
+See DATA_MODEL.svg for the shape. The diagram is ahead of this file:
+substitutions are scoped in SCOPING.md but not built.
 
 Rules the schema enforces rather than leaves to the application:
 
@@ -12,12 +12,14 @@ Rules the schema enforces rather than leaves to the application:
   wrong book cannot be written.
 - No recipe_pages row means the recipe is not in that edition. A row with a
   null page means it is, but nobody has recorded where yet.
-- A recipe ingredient points at a canonical ingredient, a sub-recipe, or
-  neither (not matched yet) -- never both.
+- An ingredient option points at a canonical ingredient, a sub-recipe, or
+  neither (not matched yet) -- never both. Ranks are unique within a line.
 
 Not enforced: cycles in the ingredient hierarchy or in sub-recipes longer
 than one step. A recipe cannot list itself and an ingredient cannot be its
-own parent, but A -> B -> A is the application's to refuse.
+own parent, but A -> B -> A is the application's to refuse. Nor that every
+line has an option, or that ranks run 1, 2, 3 without gaps; readers order by
+rank and treat the lowest as first.
 """
 
 import enum
@@ -214,18 +216,18 @@ class IngredientAlias(Timestamps, Base):
 
 
 class RecipeIngredient(Timestamps, Base):
-    """One ingredient line of a recipe, as the book printed it."""
+    """One ingredient line of a recipe, as the book printed it.
+
+    What the line names lives on its options: one for most lines, more for a
+    line like "grapeseed oil or olive oil".
+    """
 
     __tablename__ = "recipe_ingredients"
     __table_args__ = (
         UniqueConstraint("recipe_id", "position"),
+        # The target of ingredient_options' composite key.
+        UniqueConstraint("recipe_id", "id"),
         CheckConstraint("original_text <> ''", name="original_text_not_empty"),
-        CheckConstraint(
-            "num_nonnulls(ingredient_id, sub_recipe_id) <= 1", name="one_target_at_most"
-        ),
-        CheckConstraint("sub_recipe_id <> recipe_id", name="not_own_sub_recipe"),
-        Index("ix_recipe_ingredients_ingredient_id", "ingredient_id"),
-        Index("ix_recipe_ingredients_sub_recipe_id", "sub_recipe_id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -238,6 +240,42 @@ class RecipeIngredient(Timestamps, Base):
     unit: Mapped[str | None] = mapped_column(Text)
     form: Mapped[str | None] = mapped_column(Text)  # canned, dried
     prep: Mapped[str | None] = mapped_column(Text)  # diced, toasted
+
+
+class IngredientOption(Timestamps, Base):
+    """One choice on an ingredient line: rank 1 is the book's first, the rest fallbacks."""
+
+    __tablename__ = "ingredient_options"
+    __table_args__ = (
+        # Carries the line's recipe_id so the CHECK below can see it. Named by
+        # hand: the convention's name runs past Postgres' 63 characters.
+        ForeignKeyConstraint(
+            ["recipe_id", "recipe_ingredient_id"],
+            ["recipe_ingredients.recipe_id", "recipe_ingredients.id"],
+            ondelete="CASCADE",
+            name="fk_ingredient_options_line",
+        ),
+        UniqueConstraint("recipe_ingredient_id", "rank"),
+        CheckConstraint("rank >= 1", name="rank_positive"),
+        CheckConstraint("name <> ''", name="name_not_empty"),
+        CheckConstraint(
+            "num_nonnulls(ingredient_id, sub_recipe_id) <= 1", name="one_target_at_most"
+        ),
+        CheckConstraint("sub_recipe_id <> recipe_id", name="not_own_sub_recipe"),
+        Index("ix_ingredient_options_ingredient_id", "ingredient_id"),
+        Index("ix_ingredient_options_sub_recipe_id", "sub_recipe_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    recipe_ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    recipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    rank: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    # This option as the line names it ("Olive Oil"), so an option nothing
+    # matched yet can still be matched later.
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Only when the book gives this option its own amount; otherwise the line's.
+    quantity: Mapped[str | None] = mapped_column(Text)
+    unit: Mapped[str | None] = mapped_column(Text)
     # RESTRICT on both: an ingredient in use is merged, and a recipe used as a
     # component cannot vanish from the recipes that use it.
     ingredient_id: Mapped[uuid.UUID | None] = _fk(
