@@ -188,6 +188,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Book catalog with works and editions (ISBN lookup, Open Library metadata)
 - Recipe entries with page numbers per edition
 - Ranked ingredient options (fallbacks) on recipe entries
+- Substitutions, entered by hand or printed in a book. Suggesting them automatically for a diet waits on allergen data. *MVP, because the first import's books print their own swaps and would otherwise need entering twice. Ray left the phase to Claude on 2026-11-06, asking only that it be logical.*
 - Ingredient normalization with seeded data and the matching flow
 - Search by ingredient, by book, by recipe title
 - User accounts, submissions, review queue, edit history
@@ -231,7 +232,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
 - [ ] Base ingredient dataset
-- [ ] Which phase substitutions ship in
+- [x] Which phase substitutions ship in: MVP (see the MVP list)
 - [ ] Allergen data on ingredients
 - [ ] Grocery partner and its API terms
 - [ ] Edition handling when a recipe's page is unknown for an edition
