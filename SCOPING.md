@@ -92,7 +92,9 @@ Every author gets a page: a bio, links, their books, the people they've written 
 
 **Authors and credits**
 
-An Author is a person or an organisation (America's Test Kitchen, The Culinary Institute of America). A Work credits its authors in order, each with a role: author, editor, and so on. The credit keeps the name as the book prints it ("Sarah Ballantyne, PhD", "Adam Rapoport (Editor)") and points to one Author, the same way an ingredient line keeps its original text and points to one Ingredient. This replaces the plain list of names on Work. Authors link to Open Library and Wikidata where those records exist.
+An Author is a person or an organisation (America's Test Kitchen, The Culinary Institute of America). A Work credits its authors in order, each with a role: author, editor, and so on. The credit keeps the name as the book prints it ("Sarah Ballantyne, PhD", "Adam Rapoport (Editor)") and points to one Author, the same way an ingredient line keeps its original text and points to one Ingredient. This replaces the plain list of names on Work (migration 0003). Authors link to Open Library and Wikidata where those records exist.
+
+Roles are author, editor, contributor, photographer, illustrator and translator. *Chosen by Claude, 2026-11-06, as the roles cookbook covers and title pages commonly print. A new role is a one-line change to a CHECK constraint.*
 
 **What an author page shows**
 
