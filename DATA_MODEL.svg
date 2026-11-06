@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 584" width="760" height="584" font-family="Helvetica, Arial, DejaVu Sans, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#a8a59c"/>
+    </marker>
+  </defs>
+  <rect width="760" height="584" fill="#ffffff"/>
+  <text x="24" y="34" font-size="15" font-weight="600" fill="#1f1e1c">OpenLarder data model</text>
+
+  <!-- containers -->
+  <rect x="16" y="56" width="716" height="352" rx="8" fill="none" stroke="#a8a59c" stroke-dasharray="4 4"/>
+  <text x="32" y="80" font-size="11.5" font-weight="600" fill="#5f5e5a">Catalog (open data, ODbL)</text>
+  <rect x="16" y="432" width="716" height="128" rx="8" fill="none" stroke="#a8a59c" stroke-dasharray="4 4"/>
+  <text x="32" y="456" font-size="11.5" font-weight="600" fill="#5f5e5a">Community (user-authored)</text>
+
+  <!-- connectors -->
+  <g fill="none" stroke="#a8a59c" stroke-width="1.25">
+    <path d="M232 132H274" marker-end="url(#a)"/>
+    <path d="M474 132H516" marker-end="url(#a)"/>
+    <path d="M132 168V208" marker-end="url(#a)"/>
+    <path d="M232 244H274" marker-end="url(#a)"/>
+    <path d="M374 168V208" marker-end="url(#a)"/>
+    <path d="M132 280V320" marker-end="url(#a)"/>
+    <path d="M192 320V280" stroke-dasharray="4 3" marker-end="url(#a)"/>
+    <path d="M232 356H274" marker-end="url(#a)"/>
+    <path d="M474 356H516" marker-end="url(#a)"/>
+    <path d="M374 408V432" marker-end="url(#a)"/>
+    <path d="M274 508H232" marker-end="url(#a)"/>
+    <path d="M474 508H516" marker-end="url(#a)"/>
+  </g>
+
+  <!-- boxes -->
+  <g fill="none" stroke="#a8a59c" stroke-width="1.25">
+    <rect x="32" y="96" width="200" height="72" rx="8"/>
+    <rect x="274" y="96" width="200" height="72" rx="8"/>
+    <rect x="516" y="96" width="200" height="72" rx="8"/>
+    <rect x="32" y="208" width="200" height="72" rx="8"/>
+    <rect x="274" y="208" width="200" height="72" rx="8"/>
+    <rect x="32" y="320" width="200" height="72" rx="8"/>
+    <rect x="516" y="320" width="200" height="72" rx="8"/>
+    <rect x="32" y="472" width="200" height="72" rx="8"/>
+    <rect x="274" y="472" width="200" height="72" rx="8"/>
+    <rect x="516" y="472" width="200" height="72" rx="8"/>
+  </g>
+  <rect x="274" y="320" width="200" height="72" rx="8" fill="#2f6fdb" fill-opacity="0.12" stroke="#2f6fdb" stroke-width="2"/>
+
+  <!-- labels -->
+  <g fill="#1f1e1c" font-weight="600">
+    <text x="44" y="120">Work</text>
+    <text x="286" y="120">Edition</text>
+    <text x="528" y="120">Purchase Link</text>
+    <text x="44" y="232">Recipe</text>
+    <text x="286" y="232">Recipe Page</text>
+    <text x="44" y="344">Recipe Ingredient</text>
+    <text x="286" y="344">Ingredient</text>
+    <text x="528" y="344">Ingredient Alias</text>
+    <text x="44" y="496">User Content</text>
+    <text x="286" y="496">User</text>
+    <text x="528" y="496">Revision</text>
+  </g>
+  <g fill="#5f5e5a" font-size="11.5">
+    <text x="44" y="138">title, authors, tags</text>
+    <text x="44" y="154">one per book</text>
+    <text x="286" y="138">ISBN, publisher, year</text>
+    <text x="286" y="154">cover, Open Library ID</text>
+    <text x="528" y="138">retailer, affiliate URL</text>
+    <text x="44" y="250">title, tags (+ inherited)</text>
+    <text x="44" y="266">online URL if published</text>
+    <text x="286" y="250">page number per edition</text>
+    <text x="286" y="266">absent if not in edition</text>
+    <text x="44" y="362">original text line</text>
+    <text x="44" y="378">ingredient OR sub-recipe</text>
+    <text x="528" y="362">name, region (US/UK)</text>
+    <text x="44" y="514">reviews, notes, likes</text>
+    <text x="44" y="530">saves, want to cook</text>
+    <text x="286" y="514">trust level</text>
+    <text x="528" y="514">every edit, revertible</text>
+    <text x="528" y="530">review status</text>
+  </g>
+  <g fill="#1f1e1c" font-size="11.5">
+    <text x="286" y="362">canonical name</text>
+    <text x="286" y="378">shopping term, parent</text>
+  </g>
+
+  <!-- cardinality -->
+  <g fill="#5f5e5a" font-size="11.5">
+    <text x="253" y="124" text-anchor="middle">1:n</text>
+    <text x="495" y="124" text-anchor="middle">1:n</text>
+    <text x="140" y="192">1:n</text>
+    <text x="382" y="192">1:n</text>
+    <text x="253" y="236" text-anchor="middle">1:n</text>
+    <text x="140" y="304">1:n</text>
+    <text x="200" y="304">sub-recipe</text>
+    <text x="253" y="348" text-anchor="middle">n:1</text>
+    <text x="495" y="348" text-anchor="middle">1:n</text>
+    <text x="384" y="424">edits and user content attach to any catalog record</text>
+    <text x="253" y="500" text-anchor="middle">1:n</text>
+    <text x="495" y="500" text-anchor="middle">1:n</text>
+  </g>
+</svg>
