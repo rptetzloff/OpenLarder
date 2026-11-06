@@ -1,0 +1,38 @@
+# Development: `docker compose up db` and run the API from a venv, or `up`
+# with no argument to build and run the image the way production does.
+#
+# Redis and the worker join when there is a job for them (bulk import,
+# Open Library lookups); nothing in the MVP's first slice queues anything.
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: openlarder
+      POSTGRES_PASSWORD: openlarder
+      POSTGRES_DB: openlarder
+    ports:
+      # Not 5432, which a host Postgres or another project's container may
+      # already hold.
+      - "54320:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openlarder -d openlarder"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      OPENLARDER_DATABASE_URL: postgresql+psycopg://openlarder:openlarder@db:5432/openlarder
+      OPENLARDER_ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

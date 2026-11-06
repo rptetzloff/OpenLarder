@@ -1,8 +1,18 @@
-# LF everywhere regardless of core.autocrlf. Shell scripts copied into a Linux
-# image fail on a CRLF shebang.
+# LF everywhere regardless of core.autocrlf, set before the first commit so
+# there is never a mixed history to normalise. A catch-all rather than a list
+# of extensions, because the files that break are the extensionless ones: a
+# CRLF shebang in .githooks/pre-push or docker-entrypoint.sh fails with
+# "/bin/sh^M: bad interpreter" on a checkout that looked fine on Windows.
 * text=auto eol=lf
 
+# Binaries stay binary.
 *.png binary
 *.jpg binary
 *.ico binary
 *.woff2 binary
+*.ttf binary
+*.pdf binary
+*.gz binary
+
+# Imported spreadsheets and data dumps are whatever their source sent.
+*.csv -text

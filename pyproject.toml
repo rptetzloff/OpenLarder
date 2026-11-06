@@ -1,0 +1,47 @@
+[project]
+name = "openlarder"
+version = "0.1.0"
+description = "A free, open index of recipes in cookbooks."
+requires-python = ">=3.12"
+# The code. The catalog data is ODbL, which is a separate grant -- see SCOPING.md.
+license = "Apache-2.0"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    # psycopg 3 rather than asyncpg: one driver serves both the async app and
+    # Alembic, and it accepts the libpq URL options (sslmode=) that hosting
+    # platforms hand out.
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "pydantic-settings>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]

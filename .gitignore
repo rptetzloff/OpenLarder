@@ -1,0 +1,44 @@
+.env
+.env.local
+.env.*.local
+
+# Python build and tool output: rebuilt from pyproject.toml, so never a source
+# of truth. Anchored, so /dist/ does not also swallow web/dist and hide which
+# rule covers the front end.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+/build/
+/dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Front end. Vite's dependency cache re-optimises itself, so a committed copy
+# is stale the first time a package updates.
+node_modules/
+web/dist/
+web/.vite/
+# Where the Docker build puts the SPA for the API to serve. A checkout never
+# has it, but reproducing the image locally means copying a build here, and
+# that should never be committable by accident.
+src/openlarder/web/
+
+# Render-check captures: screenshots taken to measure a page, not sources.
+.render/
+
+npm-debug.log*
+*.log
+
+# Editors and agent tooling. CLAUDE.md is committed on purpose; .claude/ is
+# local scratch, and has held a full second checkout in a sibling repo.
+.idea/
+.vscode/
+*.sw?
+.claude/
+.DS_Store
