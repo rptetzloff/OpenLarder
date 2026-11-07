@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import isbn, recipes
+from openlarder import isbn, recipes, references
 from openlarder.models import (
     Edition,
     FlagKind,
@@ -271,6 +271,10 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
             outcome.flags.append((item.row, recipe.id, kind.value, detail))
         outcome.created += 1
     await session.flush()
+    # A batch can hold a recipe that earlier ones cited, so their whole books
+    # are linked again, not just the new rows.
+    for work_id in sorted({i.work_id for i in items}):
+        await references.relink(session, work_id)
     return outcome
 
 

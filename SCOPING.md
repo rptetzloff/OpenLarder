@@ -182,6 +182,8 @@ Start from an existing dataset rather than an empty table.
 
 *Decided by Ray, 2026-11-06: FoodData Central as the base and Wikidata as the backup. Leaving FoodOn out, and the reasons for it, are Claude's recommendation; Ray was unsure about FoodOn.*
 
+*Revised by Ray, 2026-11-07: canonical names come from the household index, not from FoodData Central.* FDC's names read like "Onions, raw" and "Cheese, cheddar, sharp", while the index's already follow the entry rules ("Yellow Onion", "Fresh Ginger"). The index has 10,540 distinct names across 140,645 lines; the 1,000 most used cover 85% of uses. Canonical ingredients start from those names, with obvious variants merged, and FoodData Central and Wikidata records are linked to them afterwards for allergens, nutrition and aliases, without taking over the names.
+
 **Matching flow**
 
 1. Contributor types the ingredient as the book names it, without the amount
@@ -190,6 +192,8 @@ Start from an existing dataset rather than an empty table.
 4. New ingredients go to a moderation queue to be approved, merged, or mapped as an alias
 
 The original text line is kept alongside the match, so mappings can be corrected later without re-entry.
+
+**Options and recipe references** (built, migration 0014). Each line is read into its ranked options: split on "or", and on commas only in a list ending ", or" ("Dry Sherry, Hard Cider, or Dry White Wine"), since names carry commas of their own. An option citing a page ("Basic Cauli-Rice (p. 269)") is linked to the recipe it means in the same book: the recipe of that name on that page; else of that name on another page, flagged; else the one other recipe on that page, since a component is often printed inside the recipe that uses it ("Tomato Sauce (p. 114)" in the ravioli on page 114; *Ray, 2026-11-07*); else, on a page with several, the one whose title shares the most words with the name ("Chicken Stock (p. 475)" on a page of stocks); else nothing, flagged when the page has no recipe at all. A recipe page links its references and lists the recipes that use it. Over the household index this links 7,921 of 8,250 references (96%). A known limit: "Ham or Chicken Stock" splits into "Ham" and "Chicken Stock"; the line still displays as written, and matching options to canonical ingredients will need to catch a shared final word.
 
 ## Sign-in
 

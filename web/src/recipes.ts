@@ -13,7 +13,19 @@ export interface Recipe {
   title: string;
   book: { id: string; title: string };
   pages: RecipePage[];
+  // As typed, for the edit form.
   ingredients: string[];
+  // The same lines read into their options, page references linked.
+  lines: {
+    text: string;
+    options: {
+      name: string;
+      page: string | null;
+      recipe: { id: string; title: string } | null;
+    }[];
+  }[];
+  // Recipes in the book that use this one.
+  used_in: { id: string; title: string }[];
 }
 
 export interface RecipeIn {

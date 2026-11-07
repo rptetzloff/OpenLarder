@@ -15,11 +15,19 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from openlarder import books as books_module
-from openlarder import isbn, linking, openlibrary
+from openlarder import isbn, linking, openlibrary, references
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
-from openlarder.models import Author, Edition, Recipe, RecipePage, Work, WorkCredit
+from openlarder.models import (
+    Author,
+    Edition,
+    IngredientOption,
+    Recipe,
+    RecipePage,
+    Work,
+    WorkCredit,
+)
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/books", tags=["books"])
@@ -390,3 +398,25 @@ async def link(
     await session.commit()
     log.info("%s linked %s to Open Library %s", admin.id, work.id, plan.found.work_id)
     return Added(id=work.id)
+
+
+class Relinked(BaseModel):
+    # Options in the book now linked to the recipe they cite.
+    linked: int
+
+
+@router.post("/{work_id}/references", response_model=Relinked, dependencies=[SameOrigin])
+async def relink_references(work_id: uuid.UUID, admin: AdminUser, session: Session) -> Relinked:
+    """Link a book's page references again: for recipes stored before linking
+    existed, which the Admin page runs over every book."""
+    if await session.get(Work, work_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    await references.relink(session, work_id)
+    await session.commit()
+    linked = await session.scalar(
+        select(func.count())
+        .select_from(IngredientOption)
+        .join(Recipe, Recipe.id == IngredientOption.recipe_id)
+        .where(Recipe.work_id == work_id, IngredientOption.sub_recipe_id.is_not(None))
+    )
+    return Relinked(linked=linked or 0)
