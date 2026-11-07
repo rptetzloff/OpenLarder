@@ -6,6 +6,7 @@ import AccountPage from "./pages/AccountPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
+import FlagsPage from "./pages/FlagsPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
@@ -25,6 +26,7 @@ const onBooks = path === "/books";
 const onAdmin = path === "/admin";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
+const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
 const bookId = match(`/books/${UUID}`);
@@ -92,6 +94,7 @@ onMounted(async () => {
     <AdminPage v-else-if="onAdmin" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
     <AdminImportsPage v-else-if="onImports" :user="user" />
+    <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
@@ -378,6 +381,42 @@ button.primary:disabled {
 progress {
   width: 100%;
   accent-color: var(--accent);
+}
+.flag-list {
+  list-style: none;
+  padding: 0;
+}
+.flag {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.flag p {
+  margin: 0.25rem 0;
+}
+.flag-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.flag-filters select,
+.dismiss input {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.dismiss {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-width: 24rem;
+}
+.recipe-flags .admin-actions,
+.flag .admin-actions {
+  margin-top: 0.25rem;
 }
 .run-list > li {
   margin-bottom: 1.5rem;

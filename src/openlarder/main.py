@@ -18,7 +18,7 @@ from openlarder import __version__
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine
-from openlarder.routers import account, auth, books, covers, health, imports, recipes
+from openlarder.routers import account, auth, books, covers, flags, health, imports, recipes
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -61,6 +61,7 @@ app.include_router(books.router)
 app.include_router(recipes.router)
 app.include_router(imports.router)
 app.include_router(covers.router)
+app.include_router(flags.router)
 
 
 def spa_response(web_dir: Path, path: str) -> FileResponse:

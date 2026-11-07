@@ -12,6 +12,7 @@ document.title = "Admin · OpenLarder";
     <ul v-else>
       <li><a href="/admin/import">Import</a>: add books and recipes from a book list and a recipe list.</li>
       <li><a href="/admin/imports">Import history</a>: every import, with its totals and report.</li>
+      <li><a href="/admin/flags">Flagged recipes</a>: everything an entry or import flagged for a look.</li>
     </ul>
   </article>
 </template>
