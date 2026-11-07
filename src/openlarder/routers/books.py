@@ -18,7 +18,7 @@ from openlarder import isbn, openlibrary
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
-from openlarder.models import Author, Edition, Recipe, Work, WorkCredit
+from openlarder.models import Author, Edition, Recipe, RecipePage, Work, WorkCredit
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/books", tags=["books"])
@@ -60,6 +60,8 @@ class EditionOut(BaseModel):
 class RecipeSummary(BaseModel):
     id: uuid.UUID
     title: str
+    # One per edition it is in, newest edition first; None = page not recorded.
+    pages: list[str | None]
 
 
 class Book(BaseModel):
@@ -151,6 +153,16 @@ async def get_book(work_id: uuid.UUID, session: Session) -> Book:
             select(Recipe).where(Recipe.work_id == work_id).order_by(func.lower(Recipe.title))
         )
     ).all()
+    edition_order = {e.id: i for i, e in enumerate(editions)}
+    pages: dict[uuid.UUID, list[tuple[int, str | None]]] = {}
+    for recipe_id, edition_id, page in (
+        await session.execute(
+            select(RecipePage.recipe_id, RecipePage.edition_id, RecipePage.page).where(
+                RecipePage.work_id == work_id
+            )
+        )
+    ).all():
+        pages.setdefault(recipe_id, []).append((edition_order.get(edition_id, 0), page))
     return Book(
         id=work.id,
         title=work.title,
@@ -175,7 +187,10 @@ async def get_book(work_id: uuid.UUID, session: Session) -> Book:
             )
             for e in editions
         ],
-        recipes=[RecipeSummary(id=r.id, title=r.title) for r in recipes],
+        recipes=[
+            RecipeSummary(id=r.id, title=r.title, pages=[p for _, p in sorted(pages.get(r.id, []))])
+            for r in recipes
+        ],
     )
 
 

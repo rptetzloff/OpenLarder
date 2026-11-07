@@ -25,7 +25,8 @@ export interface Book {
   subtitle: string | null;
   credits: { author_id: string; credited_as: string; role: string }[];
   editions: Edition[];
-  recipes: { id: string; title: string }[];
+  // pages: one per edition it is in, newest first; null = not recorded.
+  recipes: { id: string; title: string; pages: (string | null)[] }[];
 }
 
 // Resolves to the book's ID, whether it was added now or was already here

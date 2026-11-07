@@ -269,7 +269,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 - Book catalog with works and editions (ISBN lookup, Open Library metadata). *Started 2026-11-07 (migration 0010): admins add books by ISBN; anyone can browse the list and each book's page.*
 - Authors and credits, and author pages with Wikidata facts, links, books and co-authors. *MVP because Open Library supplies authors with every book anyway, so the cross-links cost little. Phase chosen by Claude, on Ray's delegation of phases.*
-- Recipe entries with page numbers per edition
+- Recipe entries with page numbers per edition. *Started 2026-11-07: admins add, edit and remove a recipe's title, its page in each edition, and its ingredient lines as printed; matching lines to canonical ingredients comes with search.*
 - Ranked ingredient options (fallbacks) on recipe entries
 - Substitutions, entered by hand or printed in a book. Suggesting them automatically for a diet waits on allergen data. *MVP, because the first import's books print their own swaps and would otherwise need entering twice. Ray left the phase to Claude on 2026-11-06, asking only that it be logical.*
 - Ingredient normalization with seeded data and the matching flow
@@ -330,7 +330,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Which phase substitutions ship in: MVP (see the MVP list)
 - [x] Allergen data on ingredients: yes, presented as crowdsourced (see Allergen data)
 - [ ] Grocery partner and its API terms
-- [ ] Edition handling when a recipe's page is unknown for an edition
+- [x] Edition handling when a recipe's page is unknown for an edition: a recipe_pages row with no page means "in this edition, page not recorded"; no row means not in it. The entry form starts a new recipe in every edition, with a page box each. *Chosen by Claude, 2026-11-07, following the model's existing rule.*
 - [ ] Seeding plan: start from the existing 125-cookbook household index (self-built CSV; first bulk import target)
 - [ ] USPTO check on "Open Larder" (Classes 9 and 42)
 
