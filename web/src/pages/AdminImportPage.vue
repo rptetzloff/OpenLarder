@@ -32,7 +32,7 @@ const withIsbn = computed(() => parsed.value?.books.filter((b) => b.isbn13).leng
 const recipeTotal = computed(() => parsed.value?.recipes.length ?? 0);
 
 const KINDS: Record<string, string> = {
-  duplicate_title: "Same title on another page",
+  duplicate_title: "Same title as another recipe",
   no_ingredients: "No ingredients",
   no_page: "No page",
   line_removed: "Line removed",

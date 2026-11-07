@@ -18,7 +18,7 @@ from openlarder.models.base import Base, uuid_pk
 
 
 class FlagKind(enum.StrEnum):
-    # Another recipe in the same book has this title, on a different page.
+    # Another recipe in the same book has this title: a confirmation, not a fault.
     DUPLICATE_TITLE = "duplicate_title"
     NO_INGREDIENTS = "no_ingredients"
     NO_PAGE = "no_page"
