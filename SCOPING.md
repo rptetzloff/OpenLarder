@@ -66,6 +66,42 @@ The site stores facts about recipes, never the recipes themselves. Book text sta
 
 **Risk:** users will paste headnotes or instructions from books. Moderation and a report button handle this; a similarity check against known book text is a later option.
 
+## Entry rules
+
+What goes into a recipe's ingredient list, and what is left out. These are the rules the household index was built with, adopted for the whole catalog. *Adopted by Ray, 2026-11-07.* They are what the form asks for, what the bulk import checks, and what the detector in issue #26 will enforce.
+
+**Leave out**
+
+- Quantities, measurements and directions: "salt", never "1 tsp salt".
+- Items marked "optional" or "if desired".
+- Salt, pepper, sugar and water, except for:
+  - special kinds: non-black peppers, whole peppercorns, special salts, and sugars other than white granulated;
+  - a recipe where one of them is the whole point, such as a flavoured salt;
+  - sugar in candies, jams and jellies, or wherever a large amount is the point.
+- Prep and direction words ("chopped", "sliced", "peeled"), except that canned or frozen is kept (see below).
+- Brands, unless the brand matters.
+- A whole recipe whose ingredients are a free choice ("Vegetable Rice", "Build-Your-Own Salad"). With that many interchangeable options it is no help to someone searching by ingredient.
+
+**Write it like this**
+
+- Each ingredient once per recipe, even when the recipe uses it twice.
+- Minimal descriptors: "milk", not "whole milk", unless whole milk matters.
+- Singular where it reads naturally ("egg"), plural where nobody would use one ("blueberries").
+- Canned or frozen named when the fresh food also exists: "crushed tomato (canned)". This is the form that lives in the canonical ingredient rather than a column (migration 0011).
+- When a recipe offers a choice, as many do: list the options in order, as ranked fallbacks ("grapeseed oil or olive oil"); or name the kind of thing ("fat", "meat") when the book says any will do; or, where the method makes it clear, the one it actually uses. Which one is a judgement call per recipe. A kind of thing is a canonical ingredient with children in the hierarchy (fat → butter, oil).
+
+**Known aliases**, seeded with the ingredients:
+
+- Chinese cooking wine = Shaoxing wine
+- Won bok cabbage = napa cabbage
+
+**Still to settle** (from the same rules, under "looking at altering or fixing"):
+
+- Molasses: say "blackstrap" wherever it is needed.
+- Ground versus whole spices, and fresh versus dried.
+- Rice: name the grain where it definitely matters (sushi, risotto).
+- Yogurt: say "Greek" where it is.
+
 ## Data model
 
 A Recipe belongs to one Work (the book); its page number lives on Recipe Page, one row per Edition it appears in, so one recipe entry covers every printing.
