@@ -202,6 +202,7 @@ class Recipe(Timestamps, Base):
         # Not unique: one book can have two recipes called "Vinaigrette".
         # Duplicate detection warns on title + work; it does not refuse.
         Index("ix_recipes_work_id_title", "work_id", "title"),
+        Index("ix_recipes_created_by", "created_by"),
         _trgm("recipes", "title"),
     )
 
@@ -210,6 +211,9 @@ class Recipe(Timestamps, Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     # Only where the publisher posted the recipe itself.
     online_url: Mapped[str | None] = mapped_column(Text)
+    # Who added it, so they can see its flags. Null for recipes added before
+    # migration 0012, or whose account was deleted.
+    created_by: Mapped[uuid.UUID | None] = _fk("users.id", ondelete="SET NULL", nullable=True)
 
 
 class RecipePage(Timestamps, Base):

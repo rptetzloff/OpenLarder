@@ -11,7 +11,9 @@ than by ISBN, which is limited to 100 per 5 minutes.
 This returns what Open Library says. Deciding what to store is books.py's.
 """
 
+import asyncio
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -74,7 +76,26 @@ def _text(value: Any) -> str | None:
     return value.strip() or None if isinstance(value, str) else None
 
 
+# At most one request per MIN_INTERVAL across the whole process, which keeps
+# under Open Library's 3 a second for identified callers however the
+# requests arrive: a bulk import adds books one after another. Tests set it
+# to 0.
+MIN_INTERVAL = 0.35
+_pace = asyncio.Lock()
+_last = 0.0
+
+
+async def _wait_turn() -> None:
+    global _last
+    async with _pace:
+        delay = _last + MIN_INTERVAL - time.monotonic()
+        if delay > 0:
+            await asyncio.sleep(delay)
+        _last = time.monotonic()
+
+
 async def _get(client: httpx2.AsyncClient, path: str) -> dict[str, Any]:
+    await _wait_turn()
     try:
         response = await client.get(BASE + path)
     except httpx2.HTTPError as exc:

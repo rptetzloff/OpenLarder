@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
+from openlarder import books as books_module
 from openlarder import isbn, openlibrary
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
@@ -238,3 +239,30 @@ async def add_by_isbn(
     await session.commit()
     log.info("%s added %s (%s)", admin.id, isbn13, found.title)
     return Added(id=work_id)
+
+
+class WithoutIsbn(BaseModel):
+    title: str
+    authors: list[str] = []
+    year: int | None = None
+
+
+class AddedManually(BaseModel):
+    id: uuid.UUID
+    existing: bool
+
+
+@router.post("/manual", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_without_isbn(body: WithoutIsbn, admin: AdminUser, session: Session) -> AddedManually:
+    """A book with no ISBN, which Open Library can't be asked about."""
+    title = " ".join(body.title.split())
+    authors = [a for a in (" ".join(x.split()) for x in body.authors) if a]
+    if not title:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give the book its title.")
+    if body.year is not None and not 1400 <= body.year <= 2200:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That year can't be right.")
+    work_id, existed = await books_module.add_without_isbn(session, title, authors, body.year)
+    await session.commit()
+    if not existed:
+        log.info("%s added %s without an ISBN", admin.id, title)
+    return AddedManually(id=work_id, existing=existed)

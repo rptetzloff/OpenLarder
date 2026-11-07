@@ -19,20 +19,24 @@ from openlarder.models.catalog import (
     WorkCredit,
     WorkTag,
 )
+from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 
 __all__ = [
     "Author",
     "AuthorLink",
     "Base",
     "Edition",
+    "FlagKind",
     "Ingredient",
     "IngredientAlias",
     "IngredientOption",
     "PurchaseLink",
     "Recipe",
+    "RecipeFlag",
     "RecipeIngredient",
     "RecipePage",
     "RecipeTag",
+    "Resolution",
     "Substitution",
     "Tag",
     "TagKind",

@@ -150,3 +150,11 @@ async def client(configure) -> AsyncIterator[httpx2.AsyncClient]:
         transport=httpx2.ASGITransport(app=app), base_url="http://testserver"
     ) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _open_library_unpaced(monkeypatch):
+    """The fake Open Library needs no pacing; test_books tests the pacing itself."""
+    from openlarder import openlibrary
+
+    monkeypatch.setattr(openlibrary, "MIN_INTERVAL", 0.0)
