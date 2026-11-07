@@ -16,13 +16,22 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "pydantic-settings>=2.6",
+    # Sign-in. Authlib implements the OpenID Connect client: PKCE, state,
+    # nonce, and checking the ID token's signature, issuer, audience and
+    # expiry against the broker's published keys. That is the standard we
+    # would otherwise get subtly wrong. httpx2 is what it talks to the broker
+    # with (Authlib 1.9 deprecates plain httpx); itsdangerous signs the
+    # short-lived cookie holding state and nonce between the redirect and the
+    # callback.
+    "authlib>=1.9",
+    "httpx2>=2.16",
+    "itsdangerous>=2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "httpx>=0.28",
     "ruff>=0.8",
 ]
 
