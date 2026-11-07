@@ -34,6 +34,14 @@ Free for everyone; revenue comes from affiliate commissions on books and groceri
 
 Hosting cost should stay low enough that affiliate revenue only needs to cover infrastructure early on.
 
+**Tracking and disclosure** (talked through by Ray and Claude, 2026-11-07; recorded as the plan, not yet built)
+
+- **Affiliate links say so.** Each set of buy links carries a short disclosure next to it that OpenLarder earns from purchases, as the FTC requires, plus the wording each programme demands ("As an Amazon Associate I earn from qualifying purchases"). The privacy policy says the links go to outside shops, which track the purchase under their own policies. Both arrive in the same PR as the links.
+- **OpenLarder counts its own clicks.** Buy links go through `/go/<link-id>`, which records the link, the time and the page it was clicked on, then redirects with the affiliate ID. It records no user, IP address or cookie, and skips known bots. The shops' reports show sales but not which OpenLarder page sent them; this does. One small table of clicks on Purchase Link, and one line in the privacy policy.
+- **Analytics: Google Analytics and Tag Manager are likely, not decided.** Whatever is chosen arrives with its privacy-policy wording and, for anything that sets cookies or recognises a visitor again, a consent banner for EU and UK visitors. Cookie-free aggregate counters (Plausible, Umami) need no banner and still need disclosing; fingerprinting does not escape consent and is not used.
+- **Google Ads, someday.** It brings advertising cookies to OpenLarder's own pages, so it brings the banner and fuller disclosure with it.
+- **Sign-in cookies need no consent**, being strictly necessary for something the visitor asked for. They are listed on the privacy page.
+
 ## Content rules
 
 The site stores facts about recipes, never the recipes themselves. Book text stays in the book.
