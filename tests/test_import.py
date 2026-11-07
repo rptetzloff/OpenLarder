@@ -84,6 +84,28 @@ def test_a_fragment_of_a_split_page_reference_is_flagged_and_dropped() -> None:
     assert prepared.flags == [(FlagKind.LINE_FRAGMENT, "269)"), (FlagKind.LINE_FRAGMENT, "p. 42)")]
 
 
+@pytest.mark.parametrize(
+    "lines, kept",
+    [
+        # The household index's two, split where a semicolon was typed for ".".
+        (["Garlic", "Chicken Bone Broth (p", "42)"], ["Garlic", "Chicken Bone Broth (p. 42)"]),
+        (["Basic Cauli-Rice (p", "269)", "Asparagus"], ["Basic Cauli-Rice (p. 269)", "Asparagus"]),
+        (["Stock (pg.", "6)"], ["Stock (pg. 6)"]),
+        (["Stock (pp", "xii)"], ["Stock (pp. xii)"]),
+    ],
+)
+def test_a_page_reference_split_by_a_semicolon_is_put_back(lines, kept) -> None:
+    prepared = importer.prepare("Cake", E, "1", lines)
+    assert prepared.entry.lines == kept
+    assert prepared.flags == []
+
+
+def test_a_lone_page_tail_with_nothing_open_before_it_is_still_a_fragment() -> None:
+    prepared = importer.prepare("Cake", E, "1", ["Flour (fine)", "42)"])
+    assert prepared.entry.lines == ["Flour (fine)"]
+    assert prepared.flags == [(FlagKind.LINE_FRAGMENT, "42)")]
+
+
 def test_a_line_with_an_amount_is_flagged_and_dropped() -> None:
     prepared = importer.prepare("Cake", E, "1", ["Flour", "200g Butter"])
     assert prepared.entry.lines == ["Flour"]
@@ -201,6 +223,51 @@ async def test_the_same_title_on_another_page_is_flagged(admin, pink_cake) -> No
     assert result["created"] == 1
     assert [(f["kind"], f["detail"]) for f in result["flags"]] == [
         ("duplicate_title", "also on page 112")
+    ]
+
+
+async def test_the_same_title_on_the_same_page_is_kept_and_flagged(admin, pink_cake, adb) -> None:
+    """Charcuterie prints two "Basil Cream Sauce I"s on page 291; both are recipes."""
+    first = _item(pink_cake, ingredients=["Basic Mayonnaise (p. 277)", "Fresh Basil"])
+    second = _item(pink_cake, row=3, ingredients=["Fresh Basil", "Heavy Cream"])
+    result = (await admin.post("/api/import/recipes", json={"items": [first, second]})).json()
+    assert (result["created"], result["skipped"]) == (2, 0)
+    assert [(f["row"], f["kind"], f["detail"]) for f in result["flags"]] == [
+        (3, "duplicate_title", "also on page 112")
+    ]
+    assert await adb.scalar(text("SELECT count(*) FROM recipes")) == 2
+
+
+async def test_running_again_skips_each_of_two_same_titled_recipes(admin, pink_cake, adb) -> None:
+    batch = {
+        "items": [
+            _item(pink_cake, ingredients=["Fresh Basil", "White Pepper"]),
+            _item(pink_cake, row=3, ingredients=["Fresh Basil", "Heavy Cream"]),
+        ]
+    }
+    await admin.post("/api/import/recipes", json=batch)
+    again = (await admin.post("/api/import/recipes", json=batch)).json()
+    assert (again["created"], again["skipped"]) == (0, 2)
+    assert await adb.scalar(text("SELECT count(*) FROM recipes")) == 2
+
+
+async def test_ingredients_in_another_order_are_another_recipe(admin, pink_cake, adb) -> None:
+    await admin.post("/api/import/recipes", json={"items": [_item(pink_cake)]})
+    swapped = _item(pink_cake, ingredients=["Caster Sugar", "Rhubarb"])
+    result = (await admin.post("/api/import/recipes", json={"items": [swapped]})).json()
+    assert (result["created"], result["skipped"]) == (1, 0)
+
+
+async def test_a_title_repeated_on_two_pages_names_each_once(admin, pink_cake) -> None:
+    items = [
+        _item(pink_cake, ingredients=["Rhubarb"]),
+        _item(pink_cake, row=3, ingredients=["Sugar"]),
+        _item(pink_cake, row=4, page="140"),
+    ]
+    result = (await admin.post("/api/import/recipes", json={"items": items})).json()
+    assert [(f["row"], f["detail"]) for f in result["flags"]] == [
+        (3, "also on page 112"),
+        (4, "also on page 112"),
     ]
 
 

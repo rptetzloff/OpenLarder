@@ -18,7 +18,7 @@ export interface FlagPage {
 }
 
 export const KIND_LABELS: Record<string, string> = {
-  duplicate_title: "Same title on another page",
+  duplicate_title: "Same title as another recipe",
   no_ingredients: "No ingredients",
   no_page: "No page",
   line_removed: "Line removed",

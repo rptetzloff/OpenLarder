@@ -7,8 +7,12 @@ batches. Nothing here stores the files themselves.
 
 Bulk imports were to go through review; there is none yet, so an admin's
 import publishes at once and anything doubtful is flagged on its recipe
-instead. *Ray, 2026-11-07.* An import can be run again: a recipe already
-there, by book, title and page, is skipped.
+instead. *Ray, 2026-11-07.* An import can be run again: a row matching a
+recipe already there in book, title, page and ingredients is skipped.
+Anything less is a different recipe, imported and flagged if its title is
+repeated: a book can print two recipes of one name, even on one page.
+*Ray, 2026-11-07: "nothing wrong with flagging them as confirmation, but
+not drop them".*
 
 The column names are the household index's (an Apple Numbers export). The
 Tag column is not imported for now. *Ray, 2026-11-07: tags to come later.*
@@ -31,6 +35,7 @@ from openlarder.models import (
     ImportRunLine,
     Recipe,
     RecipeFlag,
+    RecipeIngredient,
     RecipePage,
 )
 
@@ -40,6 +45,24 @@ MAX_BATCH = 250
 
 # What is left of a page reference split at a semicolon: "269)", "p. 42)".
 _FRAGMENT = re.compile(r"^\(?\s*(?:pp?\.?|pg\.?)?\s*[\dixvlc]+\s*\)$", re.IGNORECASE)
+# "Chicken Bone Broth (p; 42)": a semicolon typed for the full stop, which
+# splits the line at the page reference. The head ends in an open "(p" and
+# the tail is the bare number.
+_OPEN_PAGE = re.compile(r"\((pp?|pg)\.?\s*$", re.IGNORECASE)
+_PAGE_TAIL = re.compile(r"^\s*([\dixvlc]+)\s*\)$", re.IGNORECASE)
+
+
+def _rejoin(lines: list[str]) -> list[str]:
+    """Put a page reference split by a stray semicolon back together."""
+    joined: list[str] = []
+    for line in lines:
+        tail = _PAGE_TAIL.match(line)
+        if tail and joined and _OPEN_PAGE.search(joined[-1]):
+            head = _OPEN_PAGE.sub(lambda m: f"({m.group(1)}. ", joined[-1])
+            joined[-1] = f"{head}{tail.group(1)})"
+        else:
+            joined.append(line)
+    return joined
 
 
 class UnreadableFile(ValueError):
@@ -144,7 +167,7 @@ def prepare(title: str, edition_id: uuid.UUID, page: str | None, lines: list[str
     """
     flags: list[tuple[FlagKind, str | None]] = []
     kept = []
-    for line in (x for x in lines if x):
+    for line in _rejoin([x for x in lines if x]):
         if _FRAGMENT.match(line):
             flags.append((FlagKind.LINE_FRAGMENT, line))
         elif recipes.AMOUNT.match(line):
@@ -190,6 +213,20 @@ async def _edition(session: AsyncSession, item: Item) -> uuid.UUID | None:
     return ids[0] if len(ids) == 1 else None
 
 
+async def _ingredients(session: AsyncSession, recipe_ids: list[uuid.UUID]) -> list[list[str]]:
+    """Each recipe's ingredient lines, in order."""
+    lines: dict[uuid.UUID, list[str]] = {r: [] for r in recipe_ids}
+    for recipe_id, text in (
+        await session.execute(
+            select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
+            .where(RecipeIngredient.recipe_id.in_(recipe_ids))
+            .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
+        )
+    ).all():
+        lines[recipe_id].append(text)
+    return list(lines.values())
+
+
 async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[Item]) -> Outcome:
     outcome = Outcome()
     for item in items:
@@ -204,8 +241,9 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
             continue
         entry = prepared.entry
 
-        # Run again, an import skips what it already added: same book, title
-        # and page in this edition.
+        # Run again, an import skips what it already added: same book, title,
+        # page in this edition and ingredients. A repeated title alone is
+        # another recipe, kept and flagged.
         same_title = (
             await session.execute(
                 select(Recipe.id, RecipePage.page)
@@ -217,7 +255,8 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
                 )
             )
         ).all()
-        if any(page == entry.pages[edition_id] for _, page in same_title):
+        same_page = [rid for rid, page in same_title if page == entry.pages[edition_id]]
+        if same_page and entry.lines in await _ingredients(session, same_page):
             outcome.skipped += 1
             continue
 
@@ -225,7 +264,7 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
         recipe.created_by = admin_id
         flags = list(prepared.flags)
         if same_title:
-            others = ", ".join(sorted(p or "no page" for _, p in same_title))
+            others = ", ".join(sorted({p or "no page" for _, p in same_title}))
             flags.append((FlagKind.DUPLICATE_TITLE, f"also on page {others}"))
         for kind, detail in flags:
             session.add(RecipeFlag(recipe_id=recipe.id, kind=kind.value, detail=detail))
