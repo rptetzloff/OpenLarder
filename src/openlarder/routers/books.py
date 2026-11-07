@@ -1,4 +1,4 @@
-"""Books: the list, one book, and adding one by ISBN.
+"""Books: the list, one book, adding one by ISBN, and linking one to Open Library.
 
 Reading is public, because the catalog is open data. Adding is for admins
 until review exists (migration 0010); it looks the ISBN up on Open Library
@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from openlarder import books as books_module
-from openlarder import isbn, openlibrary
+from openlarder import isbn, linking, openlibrary
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
@@ -69,6 +69,7 @@ class Book(BaseModel):
     id: uuid.UUID
     title: str
     subtitle: str | None
+    open_library_url: str | None
     credits: list[Credit]
     editions: list[EditionOut]
     recipes: list[RecipeSummary]
@@ -168,6 +169,9 @@ async def get_book(work_id: uuid.UUID, session: Session) -> Book:
         id=work.id,
         title=work.title,
         subtitle=work.subtitle,
+        open_library_url=(
+            openlibrary.work_url(work.open_library_work_id) if work.open_library_work_id else None
+        ),
         credits=[
             Credit(author_id=author_id, credited_as=credit.credited_as, role=credit.role)
             for credit, author_id in credits
@@ -274,3 +278,115 @@ async def add_without_isbn(body: WithoutIsbn, admin: AdminUser, session: Session
     if not existed:
         log.info("%s added %s without an ISBN", admin.id, title)
     return AddedManually(id=work_id, existing=existed)
+
+
+class LinkIn(BaseModel):
+    reference: str
+
+
+class LinkAuthor(BaseModel):
+    name: str
+    open_library_url: str
+    outcome: str  # linked | link | add | unmatched; see linking.AuthorStep
+    credited_as: str | None
+
+
+class LinkEdition(BaseModel):
+    title: str | None
+    isbn13: str | None
+    publisher: str | None
+    published_year: int | None
+    cover_url: str | None
+    open_library_url: str
+    # "fill" when it is this book's edition, with its blanks filled; "add"
+    # when it becomes another edition.
+    step: str
+    fills_isbn13: str | None
+
+
+class LinkPreview(BaseModel):
+    open_library_url: str | None
+    title: str
+    subtitle: str | None
+    edition: LinkEdition | None
+    authors: list[LinkAuthor]
+    # Why it can't be linked; nothing is linked while there is one.
+    problem: str | None
+
+
+async def _plan(
+    work_id: uuid.UUID, body: LinkIn, session: Session, transport: Transport
+) -> tuple[Work, linking.Plan]:
+    work = await session.get(Work, work_id)
+    if work is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    try:
+        reference = openlibrary.parse_reference(body.reference)
+    except openlibrary.BadReference as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    try:
+        found = await openlibrary.find(reference, transport)
+    except openlibrary.NotFound:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "Open Library has nothing under that."
+        ) from None
+    except openlibrary.Unavailable as exc:
+        log.warning("Open Library lookup failed for %s: %s", reference, exc)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "Open Library didn't answer. Try again in a minute."
+        ) from None
+    return work, await linking.plan(session, work, found)
+
+
+@router.post(
+    "/{work_id}/open-library/preview", response_model=LinkPreview, dependencies=[SameOrigin]
+)
+async def preview_link(
+    work_id: uuid.UUID, body: LinkIn, admin: AdminUser, session: Session, transport: Transport
+) -> LinkPreview:
+    """What linking would do, for the admin to check it's the same book."""
+    _, plan = await _plan(work_id, body, session, transport)
+    found = plan.found
+    return LinkPreview(
+        open_library_url=openlibrary.work_url(found.work_id) if found.work_id else None,
+        title=found.title,
+        subtitle=found.subtitle,
+        edition=(
+            LinkEdition(
+                title=found.edition_title,
+                isbn13=found.isbn13,
+                publisher=found.publisher,
+                published_year=found.published_year,
+                cover_url=_cover(found.cover_id),
+                open_library_url=openlibrary.book_url(found.edition_id),
+                step=plan.edition_step,
+                fills_isbn13=plan.edition.isbn13 if plan.edition else None,
+            )
+            if found.edition_id and plan.edition_step
+            else None
+        ),
+        authors=[
+            LinkAuthor(
+                name=step.found.name,
+                open_library_url=openlibrary.author_url(step.found.open_library_id),
+                outcome=step.outcome,
+                credited_as=step.credit.credited_as if step.credit else None,
+            )
+            for step in plan.authors
+        ],
+        problem=plan.problem,
+    )
+
+
+@router.post("/{work_id}/open-library", response_model=Added, dependencies=[SameOrigin])
+async def link(
+    work_id: uuid.UUID, body: LinkIn, admin: AdminUser, session: Session, transport: Transport
+) -> Added:
+    """Link the book, looking the record up again rather than trusting the preview's."""
+    work, plan = await _plan(work_id, body, session, transport)
+    if plan.problem:
+        raise HTTPException(status.HTTP_409_CONFLICT, plan.problem)
+    await linking.apply(session, work, plan)
+    await session.commit()
+    log.info("%s linked %s to Open Library %s", admin.id, work.id, plan.found.work_id)
+    return Added(id=work.id)

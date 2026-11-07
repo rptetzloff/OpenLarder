@@ -228,6 +228,8 @@ Modeled on OpenStreetMap and Wikipedia: anyone can contribute, everything is ver
 
 Covers are served from OpenLarder's own path (`/covers/<id>-M.jpg`), fetched from Open Library by cover ID, which is not rate-limited, on a cache miss, and sent with a year-long immutable cache header so Cloudflare keeps them at the edge. A cover straight from Open Library took 1.3–1.7 s through two redirects to archive.org, measured 2026-11-07, and every visitor's browser contacted the Internet Archive; now neither happens after the first fetch. Only covers of editions in the catalog are served, so the route can't relay arbitrary images. Each book page links back to Open Library, as it asks. *Ray, 2026-11-07.* Cloudflare's cache isn't permanent; storing covers ourselves (`cover_key`) waits until there is storage for other reasons too.
 
+A book added without an Open Library match can be linked to its record later: an admin gives an ISBN or an Open Library link on the book's page, sees what Open Library has and what linking would change, and confirms. Linking sets the work, fills in the blanks on the matching edition or adds Open Library's printing as another edition, and ties credited authors to Open Library's records, matching names however they're written ("Moore, Russell (Chef)" is Russell Moore). What is here already wins: titles, credits and filled-in fields aren't rewritten, Open Library authors the book doesn't credit aren't added, and a work or edition that is already another book here is refused, since that needs a merge. *Issue #32, raised by Ray, 2026-11-07, after he added The Heritage Cookbook's self-published printing to Open Library.*
+
 *Superseded 2026-11-07: covers were shown straight from Open Library's address.*
 
 **What users can submit**

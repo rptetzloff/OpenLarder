@@ -23,10 +23,12 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from fake_broker import CLIENT_ID, CLIENT_SECRET, ISSUER, FakeBroker, _settings
+from fake_openlibrary import FakeOpenLibrary
 from openlarder.auth import build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
 from openlarder.main import app
+from openlarder.routers.books import openlibrary_transport
 
 if sys.platform == "win32":
     # Psycopg's async mode refuses Windows' default proactor loop. Linux, where
@@ -158,3 +160,10 @@ def _open_library_unpaced(monkeypatch):
     from openlarder import openlibrary
 
     monkeypatch.setattr(openlibrary, "MIN_INTERVAL", 0.0)
+
+
+@pytest.fixture
+def openlib(configure) -> FakeOpenLibrary:
+    fake = FakeOpenLibrary()
+    app.dependency_overrides[openlibrary_transport] = lambda: httpx2.MockTransport(fake.handle)
+    return fake

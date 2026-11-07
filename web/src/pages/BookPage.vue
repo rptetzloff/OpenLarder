@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import type { Book } from "../books";
+import OpenLibraryLink from "../components/OpenLibraryLink.vue";
 import type { Me } from "../me";
 
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
@@ -48,6 +49,9 @@ onMounted(async () => {
           <h1>{{ book.title }}</h1>
           <p v-if="book.subtitle" class="subtitle">{{ book.subtitle }}</p>
           <p v-if="byline" class="byline">{{ byline }}</p>
+          <p v-if="book.open_library_url" class="byline">
+            <a :href="book.open_library_url">On Open Library</a>
+          </p>
         </div>
       </div>
 
@@ -74,6 +78,8 @@ onMounted(async () => {
           </span>
         </li>
       </ul>
+      <OpenLibraryLink v-if="user?.is_admin && !book.open_library_url" :book="book" />
+
       <!-- Open Library asks for a courtesy link back where its data is shown. -->
       <p class="status">
         Book details and covers from <a href="https://openlibrary.org">Open Library</a>.

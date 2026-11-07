@@ -9,7 +9,7 @@ is created and left alone after, so adding an edition never rewrites them.
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder.models import Author, Edition, Work, WorkCredit
@@ -26,8 +26,12 @@ async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
     """Store the edition, and its work and authors if new; return the work's ID."""
     existing = await session.scalar(
         select(Edition.work_id).where(
-            (Edition.isbn13 == found.isbn13)
-            | (Edition.open_library_edition_id == (found.edition_id or None))
+            ((Edition.isbn13 == found.isbn13) if found.isbn13 else false())
+            | (
+                (Edition.open_library_edition_id == found.edition_id)
+                if found.edition_id
+                else false()
+            )
         )
     )
     if existing is not None:
