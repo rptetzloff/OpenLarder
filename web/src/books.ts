@@ -23,6 +23,7 @@ export interface Book {
   id: string;
   title: string;
   subtitle: string | null;
+  open_library_url: string | null;
   credits: { author_id: string; credited_as: string; role: string }[];
   editions: Edition[];
   // pages: one per edition it is in, newest first; null = not recorded.
@@ -42,4 +43,47 @@ export async function addByIsbn(isbn: string): Promise<{ id: string; existing: b
   if (res.status === 409 && body.detail?.work_id) return { id: body.detail.work_id, existing: true };
   const detail = typeof body.detail === "string" ? body.detail : "That didn't work. Try again.";
   throw new Error(detail);
+}
+
+// What linking a book to Open Library would do; see routers/books.py.
+export interface LinkPreview {
+  open_library_url: string | null;
+  title: string;
+  subtitle: string | null;
+  edition: {
+    title: string | null;
+    isbn13: string | null;
+    publisher: string | null;
+    published_year: number | null;
+    cover_url: string | null;
+    open_library_url: string;
+    step: "fill" | "add";
+    fills_isbn13: string | null;
+  } | null;
+  authors: {
+    name: string;
+    open_library_url: string;
+    outcome: "linked" | "link" | "add" | "unmatched";
+    credited_as: string | null;
+  }[];
+  problem: string | null;
+}
+
+async function post(path: string, reference: string) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reference }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
+export async function previewLink(bookId: string, reference: string): Promise<LinkPreview> {
+  return post(`/api/books/${bookId}/open-library/preview`, reference);
+}
+
+export async function linkToOpenLibrary(bookId: string, reference: string): Promise<void> {
+  await post(`/api/books/${bookId}/open-library`, reference);
 }

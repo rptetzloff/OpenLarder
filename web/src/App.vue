@@ -323,6 +323,21 @@ button.primary:disabled {
   color: var(--muted);
   font-size: 0.875rem;
 }
+.ol-link {
+  margin-top: 2rem;
+}
+.ol-link .isbn-form {
+  margin-bottom: 1rem;
+}
+.ol-preview ul {
+  padding-left: 1.25rem;
+}
+.ol-preview li {
+  margin-bottom: 0.25rem;
+}
+.ol-link .error {
+  color: var(--error);
+}
 .recipe-form {
   display: flex;
   flex-direction: column;

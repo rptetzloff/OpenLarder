@@ -1,4 +1,4 @@
-"""Looking a book up on Open Library by ISBN.
+"""Looking a book up on Open Library by ISBN, edition or work.
 
 Open Library's catalog is public domain (CC0), so what comes from it can go
 into the ODbL catalog without conditions. Its API asks callers to identify
@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx2
+
+from openlarder import isbn
 
 BASE = "https://openlibrary.org"
 COVERS = "https://covers.openlibrary.org/b/id"
@@ -41,12 +43,12 @@ class FoundAuthor:
 
 @dataclass
 class FoundBook:
-    isbn13: str
+    isbn13: str | None  # None only for an edition without one, or a work alone
     title: str  # the work's, or the edition's when it has no work
     edition_title: str | None
     subtitle: str | None
     work_id: str | None  # "OL29227890W"
-    edition_id: str  # "OL40203348M"
+    edition_id: str  # "OL40203348M", or "" for a work alone
     publisher: str | None
     published_year: int | None
     cover_id: int | None
@@ -97,6 +99,14 @@ def book_url(open_library_edition_id: str) -> str:
     return f"{BASE}/books/{open_library_edition_id}"
 
 
+def work_url(open_library_work_id: str) -> str:
+    return f"{BASE}/works/{open_library_work_id}"
+
+
+def author_url(open_library_author_id: str) -> str:
+    return f"{BASE}/authors/{open_library_author_id}"
+
+
 def _key_id(key: str | None) -> str | None:
     """'/works/OL29227890W' -> 'OL29227890W'."""
     return key.rsplit("/", 1)[-1] if key else None
@@ -143,41 +153,101 @@ async def _get(client: httpx2.AsyncClient, path: str) -> dict[str, Any]:
     return response.json()
 
 
-async def find_by_isbn(
-    isbn13: str, transport: httpx2.AsyncBaseTransport | None = None
-) -> FoundBook:
-    """The edition with this ISBN, its work, and the work's authors in order."""
-    async with httpx2.AsyncClient(
+def _client(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
+    return httpx2.AsyncClient(
         transport=transport,
         headers={"User-Agent": USER_AGENT},
         timeout=TIMEOUT,
         follow_redirects=True,
-    ) as client:
-        edition = await _get(client, f"/isbn/{isbn13}.json")
-        work_id = _key_id((edition.get("works") or [{}])[0].get("key"))
-        work = await _get(client, f"/works/{work_id}.json") if work_id else {}
+    )
 
-        # The work's authors are the book's; an edition's list is a fallback
-        # for editions not attached to a work.
-        keys = [a.get("author", {}).get("key") for a in work.get("authors") or []] or [
-            a.get("key") for a in edition.get("authors") or []
-        ]
-        authors = []
-        for key in keys:
-            author_id = _key_id(key)
-            if not author_id or any(a.open_library_id == author_id for a in authors):
-                continue
-            record = await _get(client, f"/authors/{author_id}.json")
-            if name := _text(record.get("name")):
-                authors.append(FoundAuthor(author_id, name))
+
+class BadReference(ValueError):
+    pass
+
+
+def parse_reference(raw: str) -> tuple[str, str]:
+    """An ISBN, or an Open Library edition or work ID or link.
+
+    Returns ("isbn", isbn13), ("edition", "OL28936410M") or ("work",
+    "OL21362065W"). A link may carry a slug after the ID, as Open Library's
+    own pages do.
+    """
+    found = re.search(r"(?<![A-Z0-9])OL[1-9][0-9]*[MW](?![A-Z0-9])", raw.strip().upper())
+    if found:
+        key = found.group(0)
+        return ("edition" if key.endswith("M") else "work"), key
+    try:
+        return "isbn", isbn.normalise(raw)
+    except isbn.InvalidIsbn:
+        raise BadReference(
+            "Give an ISBN, or an Open Library link to the book or the edition."
+        ) from None
+
+
+async def find_by_isbn(
+    isbn13: str, transport: httpx2.AsyncBaseTransport | None = None
+) -> FoundBook:
+    """The edition with this ISBN, its work, and the work's authors in order."""
+    async with _client(transport) as client:
+        edition = await _get(client, f"/isbn/{isbn13}.json")
+        return await _read(client, edition, isbn13)
+
+
+async def find(
+    reference: tuple[str, str], transport: httpx2.AsyncBaseTransport | None = None
+) -> FoundBook:
+    """What parse_reference named. A work alone has no edition: its
+    edition_id is "" and its isbn13 None."""
+    kind, key = reference
+    if kind == "isbn":
+        return await find_by_isbn(key, transport)
+    async with _client(transport) as client:
+        if kind == "edition":
+            edition = await _get(client, f"/books/{key}.json")
+            return await _read(client, edition, None)
+        return await _read(client, {}, None, work_id=key)
+
+
+def _edition_isbn(edition: dict[str, Any]) -> str | None:
+    for raw in (edition.get("isbn_13") or []) + (edition.get("isbn_10") or []):
+        try:
+            return isbn.normalise(raw)
+        except (isbn.InvalidIsbn, TypeError):
+            continue
+    return None
+
+
+async def _read(
+    client: httpx2.AsyncClient,
+    edition: dict[str, Any],
+    isbn13: str | None,
+    work_id: str | None = None,
+) -> FoundBook:
+    work_id = work_id or _key_id((edition.get("works") or [{}])[0].get("key"))
+    work = await _get(client, f"/works/{work_id}.json") if work_id else {}
+
+    # The work's authors are the book's; an edition's list is a fallback
+    # for editions not attached to a work.
+    keys = [a.get("author", {}).get("key") for a in work.get("authors") or []] or [
+        a.get("key") for a in edition.get("authors") or []
+    ]
+    authors = []
+    for key in keys:
+        author_id = _key_id(key)
+        if not author_id or any(a.open_library_id == author_id for a in authors):
+            continue
+        record = await _get(client, f"/authors/{author_id}.json")
+        if name := _text(record.get("name")):
+            authors.append(FoundAuthor(author_id, name))
 
     title = _text(work.get("title")) or _text(edition.get("title"))
     if not title:
-        raise NotFound(f"/isbn/{isbn13}.json has no title")
+        raise NotFound(f"{work_id or isbn13} has no title")
     publishers = edition.get("publishers") or []
     covers = [c for c in (edition.get("covers") or work.get("covers") or []) if c and c > 0]
     return FoundBook(
-        isbn13=isbn13,
+        isbn13=isbn13 or _edition_isbn(edition),
         title=title,
         edition_title=_text(edition.get("title")),
         subtitle=_text(work.get("subtitle")) or _text(edition.get("subtitle")),
