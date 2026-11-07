@@ -44,12 +44,13 @@ Hosting cost should stay low enough that affiliate revenue only needs to cover i
 
 ## Content rules
 
-The site stores facts about recipes, never the recipes themselves. Book text stays in the book.
+The site stores facts about recipes, never the recipes themselves. Book text stays in the book. OpenLarder is a cookbook reference: it says which book and page a recipe is on and what goes in it, so you can find it, not how to make it. *Ray, 2026-11-07.*
 
 | Stored | Not stored |
 | --- | --- |
 | Recipe title, page number per edition | Instructions or method |
-| Ingredient list (normalized) | Headnotes, intros, the book's own author bio |
+| Ingredients by name, without amounts (normalized) | Headnotes, intros, the book's own author bio |
+| | Amounts, units and preparation ("200g", "diced") |
 | Tags: course, cuisine, diet, technique | Photos from the book |
 | Link to the recipe if the publisher posted it online | Scanned pages |
 
@@ -71,13 +72,15 @@ A Recipe belongs to one Work (the book); its page number lives on Recipe Page, o
 
 ![OpenLarder data model: 11 catalog entities, 3 community](DATA_MODEL.svg)
 
-Ingredient lines keep the book's original text, and each of a line's options points to one canonical Ingredient, which carries the shopping term and a parent for broader search. On the book page, editions show as tabs or subpages with their own page numbers and purchase links.
+Ingredient lines name the ingredient as the book does, without an amount ("caster sugar", not "200g caster sugar"), and each of a line's options points to one canonical Ingredient, which carries the shopping term and a parent for broader search. On the book page, editions show as tabs or subpages with their own page numbers and purchase links.
 
 Tags set on a Work (such as a diet focus like Gluten-Free) are inherited by every recipe in it, in addition to any tags set on the recipe itself.
 
 A Recipe Ingredient holds one or more ranked Ingredient Options. Each option points to either a canonical Ingredient or another Recipe (a sub-recipe, such as a flour blend used throughout a gluten-free book). Sub-recipe links let users jump to the component recipe and its page, and shopping lists expand them into their own ingredients.
 
-Most lines have a single option. A line the book prints as "grapeseed oil or olive oil" has two: grapeseed oil first, then olive oil as the fallback. "Cheddar or any cheese" works the same way, even though cheddar sits under cheese in the hierarchy. When the book gives each option its own quantity, the option carries it. Shopping lists use the first option. *Decided by Ray, 2026-11-06, because books print lines like this often.*
+Most lines have a single option. A line the book prints as "grapeseed oil or olive oil" has two: grapeseed oil first, then olive oil as the fallback. "Cheddar or any cheese" works the same way, even though cheddar sits under cheese in the hierarchy. Shopping lists use the first option. *Decided by Ray, 2026-11-06, because books print lines like this often.*
+
+*Superseded 2026-11-07: "When the book gives each option its own quantity, the option carries it." No amounts are stored at all (migration 0011, Ray: "it's literally not a recipe site, it's cookbook reference").*
 
 *Superseded 2026-11-06: a Recipe Ingredient used to point at one target directly. Migration 0002 moved each line's target onto a single first-choice option.*
 
@@ -121,14 +124,16 @@ How an author proves who they are is not designed yet.
 
 ## Ingredient normalization
 
-Every ingredient line resolves to one canonical ingredient plus optional form, prep, and quantity. Search, shopping, and the API all depend on this.
+Every ingredient line resolves to one canonical ingredient. Search, shopping, and the API all depend on this.
+
+*Superseded 2026-11-07: "plus optional form, prep, and quantity". Amounts and prep are the recipe's, which stays in the book; form is part of what the ingredient is ("canned tomatoes"), so it lives in the canonical ingredient. Migration 0011 dropped the columns. Dropping form and prep as well as amounts is Claude's reading of Ray's decision.*
 
 **Structure**
 
 - **Canonical ingredient:** one record per real thing ("green onion")
 - **Aliases:** names that resolve to it ("scallion", "spring onion"), with optional region (US/UK/AU)
 - **Hierarchy:** parent links for broad search ("aged cheddar" → cheddar → cheese)
-- **Form and prep:** stored on the recipe line, not the ingredient ("diced", "canned", "toasted")
+- **Form:** part of the canonical ingredient ("canned tomatoes", "dried chickpeas"), since it changes what you buy. Prep ("diced", "toasted") is not stored.
 - **Shopping term:** what to search for at the grocer, which can differ from the name
 
 **Seeding**
@@ -143,11 +148,10 @@ Start from an existing dataset rather than an empty table.
 
 **Matching flow**
 
-1. Contributor types an ingredient line as written in the book
-2. Parser splits quantity, unit, prep, and name
-3. Fuzzy match suggests canonical ingredients as they type
-4. Contributor picks one, or flags it as new
-5. New ingredients go to a moderation queue to be approved, merged, or mapped as an alias
+1. Contributor types the ingredient as the book names it, without the amount
+2. Fuzzy match suggests canonical ingredients as they type
+3. Contributor picks one, or flags it as new
+4. New ingredients go to a moderation queue to be approved, merged, or mapped as an alias
 
 The original text line is kept alongside the match, so mappings can be corrected later without re-entry.
 
@@ -269,7 +273,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 - Book catalog with works and editions (ISBN lookup, Open Library metadata). *Started 2026-11-07 (migration 0010): admins add books by ISBN; anyone can browse the list and each book's page.*
 - Authors and credits, and author pages with Wikidata facts, links, books and co-authors. *MVP because Open Library supplies authors with every book anyway, so the cross-links cost little. Phase chosen by Claude, on Ray's delegation of phases.*
-- Recipe entries with page numbers per edition
+- Recipe entries with page numbers per edition. *Started 2026-11-07: admins add, edit and remove a recipe's title, its page in each edition, and its ingredients by name without amounts; matching them to canonical ingredients comes with search.*
 - Ranked ingredient options (fallbacks) on recipe entries
 - Substitutions, entered by hand or printed in a book. Suggesting them automatically for a diet waits on allergen data. *MVP, because the first import's books print their own swaps and would otherwise need entering twice. Ray left the phase to Claude on 2026-11-06, asking only that it be logical.*
 - Ingredient normalization with seeded data and the matching flow
@@ -330,7 +334,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Which phase substitutions ship in: MVP (see the MVP list)
 - [x] Allergen data on ingredients: yes, presented as crowdsourced (see Allergen data)
 - [ ] Grocery partner and its API terms
-- [ ] Edition handling when a recipe's page is unknown for an edition
+- [x] Edition handling when a recipe's page is unknown for an edition: a recipe_pages row with no page means "in this edition, page not recorded"; no row means not in it. The entry form starts a new recipe in every edition, with a page box each. *Chosen by Claude, 2026-11-07, following the model's existing rule.*
 - [ ] Seeding plan: start from the existing 125-cookbook household index (self-built CSV; first bulk import target)
 - [ ] USPTO check on "Open Larder" (Classes 9 and 42)
 

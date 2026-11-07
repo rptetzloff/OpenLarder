@@ -79,8 +79,8 @@
     <text x="286" y="266">absent if not in edition</text>
     <text x="528" y="250">person or organisation</text>
     <text x="528" y="266">bio, links, curation</text>
-    <text x="44" y="362">original text line</text>
-    <text x="44" y="378">quantity, unit, prep</text>
+    <text x="44" y="362">ingredient as the book names it</text>
+    <text x="44" y="378">no amounts: those stay in the book</text>
     <text x="286" y="362">ranked: first choice, fallbacks</text>
     <text x="286" y="378">ingredient OR sub-recipe</text>
     <text x="44" y="474">stand-in for a diet</text>

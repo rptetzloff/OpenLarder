@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import type { Book } from "../books";
+import type { Me } from "../me";
 
-const props = defineProps<{ id: string }>();
+const props = defineProps<{ id: string; user: Me | null | undefined }>();
 const book = ref<Book | null>(null);
 const missing = ref(false);
 const failed = ref(false);
@@ -12,6 +13,11 @@ const byline = computed(() =>
     .map((c) => (c.role === "author" ? c.credited_as : `${c.credited_as} (${c.role})`))
     .join(", "),
 );
+// "p. 112", or "p. 112 / 120" when editions differ; blank pages don't show.
+function pages(list: (string | null)[]) {
+  const known = [...new Set(list.filter((p): p is string => !!p))];
+  return known.length ? `p. ${known.join(" / ")}` : "";
+}
 const cover = computed(() => book.value?.editions.find((e) => e.cover_url)?.cover_url ?? null);
 
 onMounted(async () => {
@@ -46,8 +52,12 @@ onMounted(async () => {
       </div>
 
       <h2>Recipes</h2>
-      <ul v-if="book.recipes.length">
-        <li v-for="r in book.recipes" :key="r.id">{{ r.title }}</li>
+      <p v-if="user?.is_admin"><a :href="`/books/${book.id}/recipes/new`">Add a recipe</a></p>
+      <ul v-if="book.recipes.length" class="recipe-list">
+        <li v-for="r in book.recipes" :key="r.id">
+          <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
+          <span v-if="pages(r.pages)" class="page-ref">{{ pages(r.pages) }}</span>
+        </li>
       </ul>
       <p v-else class="status">No recipes indexed yet.</p>
 

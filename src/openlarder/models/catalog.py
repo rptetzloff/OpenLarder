@@ -282,10 +282,12 @@ class IngredientAlias(Timestamps, Base):
 
 
 class RecipeIngredient(Timestamps, Base):
-    """One ingredient line of a recipe, as the book printed it.
+    """One ingredient of a recipe, named as the book names it, without an amount.
 
-    What the line names lives on its options: one for most lines, more for a
-    line like "grapeseed oil or olive oil".
+    OpenLarder records what goes in a recipe so it can be found by
+    ingredient, not how much or what to do with it (migration 0011). What the
+    line names lives on its options: one for most lines, more for a line like
+    "grapeseed oil or olive oil".
     """
 
     __tablename__ = "recipe_ingredients"
@@ -299,13 +301,9 @@ class RecipeIngredient(Timestamps, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     recipe_id: Mapped[uuid.UUID] = _fk("recipes.id", ondelete="CASCADE")
     position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    # Kept verbatim, so a mapping can be corrected later without re-entry.
+    # The ingredient as the book names it ("caster sugar"), kept as typed so
+    # a mapping can be corrected later without re-entry.
     original_text: Mapped[str] = mapped_column(Text, nullable=False)
-    # As parsed from original_text. Text, not numbers: "1 1/2", "a pinch".
-    quantity: Mapped[str | None] = mapped_column(Text)
-    unit: Mapped[str | None] = mapped_column(Text)
-    form: Mapped[str | None] = mapped_column(Text)  # canned, dried
-    prep: Mapped[str | None] = mapped_column(Text)  # diced, toasted
 
 
 class IngredientOption(Timestamps, Base):
@@ -339,9 +337,6 @@ class IngredientOption(Timestamps, Base):
     # This option as the line names it ("Olive Oil"), so an option nothing
     # matched yet can still be matched later.
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # Only when the book gives this option its own amount; otherwise the line's.
-    quantity: Mapped[str | None] = mapped_column(Text)
-    unit: Mapped[str | None] = mapped_column(Text)
     # RESTRICT on both: an ingredient in use is merged, and a recipe used as a
     # component cannot vanish from the recipes that use it.
     ingredient_id: Mapped[uuid.UUID | None] = _fk(

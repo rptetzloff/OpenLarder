@@ -5,6 +5,8 @@ import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
+import RecipeFormPage from "./pages/RecipeFormPage.vue";
+import RecipePage from "./pages/RecipePage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
 
@@ -17,7 +19,12 @@ const path = location.pathname.replace(/\/+$/, "");
 const page = pages[path];
 const onAccount = path === "/account";
 const onBooks = path === "/books";
-const bookId = path.match(/^\/books\/([0-9a-f-]{36})$/i)?.[1] ?? null;
+const UUID = "([0-9a-f-]{36})";
+const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
+const bookId = match(`/books/${UUID}`);
+const newRecipeFor = match(`/books/${UUID}/recipes/new`);
+const recipeId = match(`/recipes/${UUID}`);
+const editRecipeId = match(`/recipes/${UUID}/edit`);
 
 // A placeholder until there is a catalog to show: proves the SPA reaches the
 // API through whichever path it is served from, and that sign-in works.
@@ -75,7 +82,10 @@ onMounted(async () => {
     </section>
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
-    <BookPage v-else-if="bookId" :id="bookId" />
+    <BookPage v-else-if="bookId" :id="bookId" :user="user" />
+    <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" />
+    <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
+    <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
     <template v-else>
       <h1>OpenLarder</h1>
       <p>A free, open index of the recipes in your cookbooks.</p>
@@ -288,8 +298,87 @@ button.primary:disabled {
     flex-direction: column;
   }
 }
-.editions li {
+.editions li,
+.recipe-list li {
   margin-bottom: 0.5rem;
+}
+.recipe-list a {
+  color: var(--fg);
+}
+.page-ref {
+  margin-left: 0.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.recipe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 32rem;
+}
+.recipe-form > label {
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+.recipe-form input:not([type="checkbox"]),
+.recipe-form textarea {
+  font: inherit;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.recipe-form fieldset {
+  border: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+.recipe-form legend {
+  font-weight: 600;
+  padding: 0;
+}
+.recipe-form .help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.recipe-form .error {
+  color: var(--error);
+}
+.edition-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+.edition-row .check,
+.edition-row .only-edition {
+  flex: 1;
+  min-width: 0;
+}
+.recipe-form .page-input {
+  width: 6rem;
+  flex: none;
+}
+.recipe-form .page-input:disabled {
+  opacity: 0.5;
+}
+.admin-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.admin-actions a,
+button.link {
+  color: var(--fg);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
 }
 footer {
   display: flex;

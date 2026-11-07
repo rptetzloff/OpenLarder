@@ -18,7 +18,7 @@ from openlarder import __version__
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine
-from openlarder.routers import account, auth, books, health
+from openlarder.routers import account, auth, books, health, recipes
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -58,6 +58,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(account.router)
 app.include_router(books.router)
+app.include_router(recipes.router)
 
 if WEB_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
