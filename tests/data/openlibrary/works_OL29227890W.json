@@ -1,0 +1,30 @@
+{
+ "authors": [
+  {
+   "author": {
+    "key": "/authors/OL7106535A"
+   },
+   "type": {
+    "key": "/type/author_role"
+   }
+  }
+ ],
+ "covers": [
+  14125211
+ ],
+ "created": {
+  "type": "/type/datetime",
+  "value": "2022-10-20T06:03:58.008668"
+ },
+ "key": "/works/OL29227890W",
+ "last_modified": {
+  "type": "/type/datetime",
+  "value": "2023-04-18T09:23:47.663235"
+ },
+ "latest_revision": 2,
+ "revision": 2,
+ "title": "Love Is a Pink Cake",
+ "type": {
+  "key": "/type/work"
+ }
+}

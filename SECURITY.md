@@ -35,6 +35,8 @@ branches and no backports: the fix lands on `main` and deploys.
   requests from other subdomains of openlarder.com.
 - **Taking a display name someone already has**, in any letter case or
   compatibility form (full-width letters, for instance).
+- **Adding to the catalog without being an admin.** Until review exists, only
+  admins can, and what they add publishes at once.
 - **Acting above one's trust level**, as those features arrive: publishing
   without review, reverting or merging without the right level, reaching
   another user's private lists, or curating an author page without being

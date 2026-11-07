@@ -29,6 +29,11 @@ document.title = "Privacy policy · OpenLarder";
       server keeps ordinary logs of requests for troubleshooting and security. They are not used
       to build profiles of anyone.
     </p>
+    <p>
+      Book covers are shown from <a href="https://openlibrary.org">Open Library</a>, run by the
+      Internet Archive, so your browser fetches each cover from it, and it sees your IP address
+      when it does.
+    </p>
 
     <h2>Accounts</h2>
     <p>
@@ -42,6 +47,7 @@ document.title = "Privacy policy · OpenLarder";
       <li>
         the identifier Authgear gives your account, which is how OpenLarder recognises you;
       </li>
+      <li>whether your account may add books, which only an admin can for now;</li>
       <li>
         the display name you choose, which is public: it is shown beside anything you add to
         the catalog;

@@ -1,0 +1,18 @@
+{
+ "created": {
+  "type": "/type/datetime",
+  "value": "2012-04-13T06:21:29.573634"
+ },
+ "key": "/authors/OL7106535A",
+ "last_modified": {
+  "type": "/type/datetime",
+  "value": "2012-04-13T06:21:29.573634"
+ },
+ "latest_revision": 1,
+ "name": "Claire Ptak",
+ "personal_name": "Claire Ptak",
+ "revision": 1,
+ "type": {
+  "key": "/type/author"
+ }
+}

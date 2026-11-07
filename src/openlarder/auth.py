@@ -177,6 +177,15 @@ async def require_user(user: Annotated[User | None, Depends(current_user)]) -> U
 CurrentUser = Annotated[User, Depends(require_user)]
 
 
+async def require_admin(user: CurrentUser) -> User:
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an admin can do that yet.")
+    return user
+
+
+AdminUser = Annotated[User, Depends(require_admin)]
+
+
 def require_same_origin(
     request: Request, settings: Annotated[Settings, Depends(get_settings)]
 ) -> None:

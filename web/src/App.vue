@@ -3,16 +3,21 @@ import { computed, onMounted, ref } from "vue";
 import NameForm from "./components/NameForm.vue";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
+import BookPage from "./pages/BookPage.vue";
+import BooksPage from "./pages/BooksPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
 
 // The server returns this app for any path it has no file for, so the page
-// is chosen from the address. Two fixed pages don't need a router library;
-// the catalog's pages will bring one.
+// is chosen from the address. A handful of pages, one with an ID in it,
+// still don't need a router library; that changes when pages need nested
+// routes or navigation without a full load.
 const pages: Record<string, unknown> = { "/privacy": PrivacyPage, "/terms": TermsPage };
 const path = location.pathname.replace(/\/+$/, "");
 const page = pages[path];
 const onAccount = path === "/account";
+const onBooks = path === "/books";
+const bookId = path.match(/^\/books\/([0-9a-f-]{36})$/i)?.[1] ?? null;
 
 // A placeholder until there is a catalog to show: proves the SPA reaches the
 // API through whichever path it is served from, and that sign-in works.
@@ -45,6 +50,7 @@ onMounted(async () => {
 
 <template>
   <header>
+    <a href="/books" class="nav">Books</a>
     <template v-if="user">
       <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
       <!-- A form, not fetch: signing out ends at the broker, which ends the
@@ -68,9 +74,12 @@ onMounted(async () => {
       />
     </section>
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
+    <BooksPage v-else-if="onBooks" :user="user" />
+    <BookPage v-else-if="bookId" :id="bookId" />
     <template v-else>
       <h1>OpenLarder</h1>
       <p>A free, open index of the recipes in your cookbooks.</p>
+      <p><a href="/books">Browse the books</a></p>
       <p v-if="signInFailed" role="alert">Sign-in didn't work. Please try again.</p>
       <p class="status">{{ status }}</p>
     </template>
@@ -125,6 +134,9 @@ header {
 }
 header form {
   margin: 0;
+}
+header .nav {
+  margin-right: auto;
 }
 header a,
 header button,
@@ -200,6 +212,84 @@ button.primary:hover {
 button.primary:disabled {
   opacity: 0.6;
   cursor: default;
+}
+.isbn-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+.isbn-form label {
+  font-weight: 600;
+}
+.isbn-form .row {
+  display: flex;
+  gap: 0.5rem;
+}
+.isbn-form input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.isbn-form .error {
+  margin: 0;
+  color: var(--error);
+}
+.book-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.book-card {
+  display: flex;
+  gap: 0.875rem;
+  align-items: center;
+  color: var(--fg);
+  text-decoration: none;
+}
+.book-card:hover strong {
+  text-decoration: underline;
+}
+.book-card img,
+.book-card .no-cover {
+  width: 48px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
+  background: var(--border);
+}
+.byline,
+.subtitle {
+  display: block;
+  color: var(--muted);
+}
+.book-head {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+.book-head img {
+  width: 120px;
+  border-radius: 4px;
+  flex: none;
+}
+.book-head h1 {
+  margin-top: 0;
+}
+@media (max-width: 480px) {
+  .book-head {
+    flex-direction: column;
+  }
+}
+.editions li {
+  margin-bottom: 0.5rem;
 }
 footer {
   display: flex;
