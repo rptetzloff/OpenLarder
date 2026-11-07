@@ -80,7 +80,9 @@ async def callback(
         log.warning("sign-in refused: no usable ID token")
         return RedirectResponse("/?sign-in=failed", status.HTTP_303_SEE_OTHER)
 
-    raw = await sign_in(session, claims["iss"], claims["sub"], display_name_from(claims))
+    raw = await sign_in(
+        session, claims["iss"], claims["sub"], display_name_from(claims), token.get("id_token")
+    )
     await session.commit()
 
     response = RedirectResponse("/", status.HTTP_303_SEE_OTHER)
@@ -111,20 +113,26 @@ async def logout(
 ) -> Response:
     # The session here ends first, whatever happens next: a broker that
     # cannot be reached leaves someone signed in there, never here.
-    if token:
-        await sign_out(session, token)
+    ended = await sign_out(session, token) if token else None
+    if ended is not None:
         await session.commit()
 
     target = "/"
-    if broker is not None:
+    # No session here means nothing to end at the broker either: sending the
+    # browser on anyway would land a signed-out person on its login page.
+    if broker is not None and ended is not None and ended.found:
         try:
-            # client_id rather than an id_token_hint, so no ID token has to be
-            # kept. The broker only returns people to a post-logout redirect
-            # URI registered for this client.
-            logout_url = await broker.create_logout_url(
-                post_logout_redirect_uri=home_url(request, settings),
-                client_id=settings.oidc_client_id,
-            )
+            if ended.id_token:
+                # Authentik refuses a post_logout_redirect_uri that comes
+                # without id_token_hint ("The request is otherwise malformed").
+                logout_url = await broker.create_logout_url(
+                    post_logout_redirect_uri=home_url(request, settings),
+                    id_token_hint=ended.id_token,
+                )
+            else:
+                # A session from before ID tokens were kept: the broker can
+                # still end its session, but will not send anyone back.
+                logout_url = await broker.create_logout_url()
             target = logout_url["url"]
         except (httpx2.HTTPError, RuntimeError) as exc:
             log.warning("signed out here only; broker end-session unavailable: %r", exc)

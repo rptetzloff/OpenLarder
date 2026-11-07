@@ -14,7 +14,11 @@ yet. *Chosen by Claude, 2026-11-06: keep personal data out until a feature
 needs it.*
 
 A session stores only the SHA-256 of its token, so a copy of this table does
-not let anyone sign in as the people in it.
+not let anyone sign in as the people in it. It also keeps the ID token the
+broker issued at sign-in, because Authentik will only send someone back
+here after signing out if the request carries it as id_token_hint. An ID
+token says who someone is to this client; OpenLarder never accepts one as a
+way in, so holding it does not let anyone sign in either.
 """
 
 import uuid
@@ -52,6 +56,7 @@ class UserSession(Base):
         # or a different hash than the one the lookup computes.
         CheckConstraint("octet_length(token_hash) = 32", name="token_hash_is_sha256"),
         CheckConstraint("expires_at > created_at", name="expires_after_created"),
+        CheckConstraint("id_token <> ''", name="id_token_not_empty"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -63,3 +68,5 @@ class UserSession(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Null for sessions started before migration 0007.
+    id_token: Mapped[str | None] = mapped_column(Text)
