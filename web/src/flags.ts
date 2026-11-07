@@ -23,6 +23,8 @@ export const KIND_LABELS: Record<string, string> = {
   no_page: "No page",
   line_removed: "Line removed",
   line_fragment: "Fragment of a page reference",
+  reference_page: "Reference to the wrong page",
+  unknown_reference: "Reference to a missing recipe",
 };
 
 export async function fetchFlags(params: {

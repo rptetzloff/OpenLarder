@@ -12,10 +12,18 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from openlarder import recipes
+from openlarder import lines as line_reading
+from openlarder import recipes, references
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Edition, Recipe, RecipeIngredient, RecipePage, Work
+from openlarder.models import (
+    Edition,
+    IngredientOption,
+    Recipe,
+    RecipeIngredient,
+    RecipePage,
+    Work,
+)
 
 router = APIRouter(tags=["recipes"])
 
@@ -44,12 +52,35 @@ class BookRef(BaseModel):
     title: str
 
 
+class RecipeLink(BaseModel):
+    id: uuid.UUID
+    title: str
+
+
+class OptionOut(BaseModel):
+    name: str
+    # The page the line cites, as written; the linked recipe's own page can
+    # differ, when the line has it wrong.
+    page: str | None
+    recipe: RecipeLink | None
+
+
+class LineOut(BaseModel):
+    text: str
+    options: list[OptionOut]
+
+
 class RecipeOut(BaseModel):
     id: uuid.UUID
     title: str
     book: BookRef
     pages: list[PageOut]
+    # The lines as typed, which is what the edit form edits.
     ingredients: list[str]
+    # The same lines read into their options, with page references linked.
+    lines: list[LineOut]
+    # Recipes in the book that use this one as a component.
+    used_in: list[RecipeLink]
 
 
 class Created(BaseModel):
@@ -83,10 +114,31 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
         )
     ).all()
     lines = (
-        await session.scalars(
-            select(RecipeIngredient.original_text)
+        await session.execute(
+            select(RecipeIngredient.id, RecipeIngredient.original_text)
             .where(RecipeIngredient.recipe_id == recipe.id)
             .order_by(RecipeIngredient.position)
+        )
+    ).all()
+    linked: dict[uuid.UUID, dict[int, RecipeLink]] = {}
+    for line_id, rank, sub_id, sub_title in await session.execute(
+        select(
+            IngredientOption.recipe_ingredient_id,
+            IngredientOption.rank,
+            Recipe.id,
+            Recipe.title,
+        )
+        .join(Recipe, Recipe.id == IngredientOption.sub_recipe_id)
+        .where(IngredientOption.recipe_id == recipe.id)
+    ):
+        linked.setdefault(line_id, {})[rank] = RecipeLink(id=sub_id, title=sub_title)
+    used_in = (
+        await session.execute(
+            select(Recipe.id, Recipe.title)
+            .join(IngredientOption, IngredientOption.recipe_id == Recipe.id)
+            .where(IngredientOption.sub_recipe_id == recipe.id)
+            .distinct()
+            .order_by(Recipe.title)
         )
     ).all()
     return RecipeOut(
@@ -103,7 +155,22 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
             )
             for page, e in pages
         ],
-        ingredients=list(lines),
+        ingredients=[text for _, text in lines],
+        lines=[
+            LineOut(
+                text=text,
+                options=[
+                    OptionOut(
+                        name=option.name,
+                        page=option.page,
+                        recipe=linked.get(line_id, {}).get(rank),
+                    )
+                    for rank, option in enumerate(line_reading.options(text), start=1)
+                ],
+            )
+            for line_id, text in lines
+        ],
+        used_in=[RecipeLink(id=i, title=t) for i, t in used_in],
     )
 
 
@@ -128,6 +195,7 @@ async def add_recipe(
         recipe = await recipes.create(session, work_id, entry)
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await references.relink(session, work_id)
     await session.commit()
     return Created(id=recipe.id)
 
@@ -142,6 +210,7 @@ async def change_recipe(
         await recipes.replace(session, recipe, entry)
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await references.relink(session, recipe.work_id)
     await session.commit()
     return await _out(session, recipe)
 
@@ -153,6 +222,10 @@ async def change_recipe(
 )
 async def remove_recipe(recipe_id: uuid.UUID, admin: AdminUser, session: Session) -> Response:
     recipe = await _recipe_or_404(session, recipe_id)
+    work_id = recipe.work_id
+    await references.release(session, recipe.id)
     await session.delete(recipe)
+    await session.flush()
+    await references.relink(session, work_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

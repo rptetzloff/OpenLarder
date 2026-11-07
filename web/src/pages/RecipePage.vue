@@ -59,11 +59,27 @@ async function remove() {
       </p>
 
       <h2>Ingredients</h2>
-      <ul v-if="recipe.ingredients.length">
-        <li v-for="(line, i) in recipe.ingredients" :key="i">{{ line }}</li>
+      <ul v-if="recipe.lines.length">
+        <li v-for="(line, i) in recipe.lines" :key="i">
+          <template v-for="(o, j) in line.options" :key="j">
+            <template v-if="j > 0">{{ j < line.options.length - 1 ? ", " : line.options.length > 2 ? ", or " : " or " }}</template>
+            <a v-if="o.recipe" :href="`/recipes/${o.recipe.id}`">{{ o.name }}</a>
+            <template v-else>{{ o.name }}</template>
+            <span v-if="o.page" class="page-ref">p. {{ o.page }}</span>
+          </template>
+        </li>
       </ul>
       <p v-else class="status">No ingredients recorded yet.</p>
       <p class="status">The amounts and the method are in the book.</p>
+
+      <template v-if="recipe.used_in.length">
+        <h2>Used in</h2>
+        <ul class="recipe-list">
+          <li v-for="r in recipe.used_in" :key="r.id">
+            <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
+          </li>
+        </ul>
+      </template>
 
       <section v-if="flags.some((f) => !f.resolution)" class="recipe-flags">
         <h2>Flags</h2>

@@ -26,6 +26,10 @@ class FlagKind(enum.StrEnum):
     LINE_REMOVED = "line_removed"
     # A line that looks like the tail of something split apart ("269)").
     LINE_FRAGMENT = "line_fragment"
+    # A page reference names a recipe the book has on another page.
+    REFERENCE_PAGE = "reference_page"
+    # A page reference to a page the book has no recipe on.
+    UNKNOWN_REFERENCE = "unknown_reference"
 
 
 class Resolution(enum.StrEnum):
