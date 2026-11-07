@@ -148,7 +148,8 @@ The original text line is kept alongside the match, so mappings can be corrected
 OpenLarder signs people in through an identity broker, and talks to the broker with one OpenID Connect integration. The broker handles each provider, links one person's accounts across providers, and has an admin screen for adding providers. *Decided by Ray, 2026-11-06.*
 
 - **Google and GitHub first**, more later. GitHub's sign-in is plain OAuth, not OpenID Connect: a site gets a token and asks GitHub's API who the user is. That is why a broker rather than generic OIDC in the app: the app would otherwise need separate code for GitHub.
-- **Email accounts too**, by password or sign-in link, for people who use neither Google nor GitHub. *Decided by Ray, 2026-11-06.*
+- **Email accounts too**, for people who use neither Google nor GitHub. *Decided by Ray, 2026-11-06.*
+- **Email accounts sign in by an emailed link, not a password**, and can add a passkey to skip the email. No passwords means none to leak, reuse or reset; with 30-day sessions, waiting for an email is rare. *Decided by Ray, 2026-11-06, superseding "by password or sign-in link".* The link works for 15 minutes, can be opened more than once in that time, and signs in whichever browser opens it. All of this is Authentik configuration; OpenLarder's code is unchanged.
 - **Authentik first.** Coolify offers it as a ready-made service, so Ray is trying it first. Keycloak is the fallback if Authentik doesn't work out. *Decided by Ray, 2026-11-06.*
 
 *Superseded 2026-11-06: the stack table named "generic OIDC (e.g. Zitadel)". Zitadel was weighed and not chosen.*
