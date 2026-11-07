@@ -47,6 +47,7 @@ class FakeBroker:
         self.overrides: dict[str, Any] = {}
         self.signing_key = self.key
         self.token_requests = 0
+        self.last_id_token = ""
         self.issuer = ISSUER
         self.end_session = True
 
@@ -101,6 +102,7 @@ class FakeBroker:
             **self.overrides,
         }
         id_token = jwt.encode({"alg": "RS256", "kid": "k1"}, claims, self.signing_key)
+        self.last_id_token = id_token
         return httpx2.Response(
             200,
             json={
@@ -350,13 +352,45 @@ async def test_signing_out_goes_on_to_end_the_brokers_session(client, broker) ->
 
     assert location.startswith("https://broker.test/end-session/?")
     query = _query(location)
-    assert query["client_id"] == CLIENT_ID
+    # Authentik returns people only when the hint comes with the redirect.
+    assert query["id_token_hint"] == broker.last_id_token
     assert query["post_logout_redirect_uri"] == "http://testserver/"
 
 
-async def test_signing_out_returns_to_the_public_url(client, broker, configure) -> None:
-    configure(_settings(public_url="https://openlarder.test"))
+async def test_the_session_keeps_the_id_token_it_was_issued(client, broker, adb) -> None:
+    await _sign_in(client, broker)
+    assert await adb.scalar(text("SELECT id_token FROM user_sessions")) == broker.last_id_token
+
+
+async def test_a_session_without_an_id_token_still_ends_at_the_broker(client, broker, adb) -> None:
+    await _sign_in(client, broker)
+    await adb.execute(text("UPDATE user_sessions SET id_token = NULL"))
     location = (await client.post("/api/auth/logout")).headers["location"]
+
+    assert location.startswith("https://broker.test/end-session/")
+    # Without the hint the redirect would be refused, so it is not asked for.
+    assert "post_logout_redirect_uri" not in _query(location)
+    assert "id_token_hint" not in _query(location)
+
+
+async def test_signing_out_with_no_session_goes_home(client) -> None:
+    response = await client.post("/api/auth/logout")
+    assert (response.status_code, response.headers["location"]) == (303, "/")
+    client.cookies.set(SESSION_COOKIE, "made-up")
+    response = await client.post("/api/auth/logout")
+    assert (response.status_code, response.headers["location"]) == (303, "/")
+
+
+async def test_signing_out_returns_to_the_public_url(broker, configure) -> None:
+    configure(_settings(public_url="https://openlarder.test"))
+    # https, because an https public URL makes the session cookie Secure and
+    # a plain-http client would never send it back. And another host, as
+    # behind the proxy, so the request alone cannot produce the right answer.
+    async with httpx2.AsyncClient(
+        transport=httpx2.ASGITransport(app=app), base_url="https://internal.test"
+    ) as secure:
+        await _sign_in(secure, broker)
+        location = (await secure.post("/api/auth/logout")).headers["location"]
     assert _query(location)["post_logout_redirect_uri"] == "https://openlarder.test/"
 
 
@@ -464,6 +498,13 @@ def test_a_session_stores_a_sha256_and_dies_with_its_user(db: Connection) -> Non
         u=user,
         h=hash_token("t"),
     )
+    _refused(
+        db,
+        "INSERT INTO user_sessions (user_id, token_hash, expires_at, id_token)"
+        " VALUES (:u, :h, now() + interval '1 day', '')",
+        u=user,
+        h=hash_token("t"),
+    )
     db.execute(text(insert), {"u": user, "h": hash_token("t")})
     db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user})
     assert db.execute(text("SELECT count(*) FROM user_sessions")).scalar_one() == 0
@@ -475,7 +516,7 @@ def test_downgrade_refuses_while_users_exist(engine, alembic_config) -> None:
     try:
         engine.dispose()
         with pytest.raises(RuntimeError, match="1 user"):
-            command.downgrade(alembic_config, "0005")
+            command.downgrade(alembic_config, "0005")  # through 0007
     finally:
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM users WHERE subject = 'downgrade-test'"))

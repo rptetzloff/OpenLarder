@@ -3,9 +3,10 @@
 A session is a random token in an HttpOnly cookie; the database keeps only
 its SHA-256. Sessions last 30 days from sign-in and are not extended by use.
 Signing out deletes the session here, then sends the browser to the
-broker's end-session endpoint so the broker's session ends too. Whether it
-does is the broker's configuration, not this code's: in Authentik, the
-provider's invalidation flow needs a User Logout stage.
+broker's end-session endpoint so the broker's session ends too, with the
+session's ID token as id_token_hint so the broker will send them back.
+Whether the broker's session ends is its configuration, not this code's: in
+Authentik, the provider's invalidation flow needs a User Logout stage.
 """
 
 import hashlib
@@ -94,7 +95,9 @@ def get_oidc_client(
     return client
 
 
-async def sign_in(session: AsyncSession, issuer: str, subject: str, name: str) -> str:
+async def sign_in(
+    session: AsyncSession, issuer: str, subject: str, name: str, id_token: str | None
+) -> str:
     """Find or create the user, start a session, and return its raw token."""
     user_id = await session.scalar(
         insert(User)
@@ -117,14 +120,29 @@ async def sign_in(session: AsyncSession, issuer: str, subject: str, name: str) -
             user_id=user_id,
             token_hash=hash_token(token),
             expires_at=func.now() + SESSION_LIFETIME,
+            id_token=id_token or None,
         )
     )
     await session.flush()
     return token
 
 
-async def sign_out(session: AsyncSession, token: str) -> None:
-    await session.execute(delete(UserSession).where(UserSession.token_hash == hash_token(token)))
+class Ended:
+    """What signing out found: whether there was a session, and its ID token."""
+
+    def __init__(self, found: bool, id_token: str | None) -> None:
+        self.found = found
+        self.id_token = id_token
+
+
+async def sign_out(session: AsyncSession, token: str) -> Ended:
+    result = await session.execute(
+        delete(UserSession)
+        .where(UserSession.token_hash == hash_token(token))
+        .returning(UserSession.id_token)
+    )
+    row = result.first()
+    return Ended(found=row is not None, id_token=row[0] if row else None)
 
 
 async def current_user(
