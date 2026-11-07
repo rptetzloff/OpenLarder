@@ -5,13 +5,17 @@ through /api/books (by ISBN) and /api/books/manual (without one).
 """
 
 import uuid
+from datetime import datetime
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
 from openlarder import importer, isbn
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
+from openlarder.models import ImportRun, ImportRunLine, Recipe, User, Work
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -58,6 +62,50 @@ class ItemIn(BaseModel):
 
 class Batch(BaseModel):
     items: list[ItemIn] = Field(max_length=importer.MAX_BATCH)
+    # The run to record this batch in (Import history); none for a batch
+    # sent outside a run.
+    run_id: uuid.UUID | None = None
+
+
+class RunStart(BaseModel):
+    books_in_list: int = Field(ge=0)
+    recipes_in_file: int = Field(ge=0)
+    untitled_rows: list[int] = []
+
+
+class LineIn(BaseModel):
+    row: int | None = None
+    book: str = ""
+    recipe: str = ""
+    kind: Literal["not_imported", "book_not_added"]
+    detail: str = ""
+
+
+class Lines(BaseModel):
+    lines: list[LineIn] = Field(max_length=1000)
+
+
+class RunFinish(BaseModel):
+    books_added: int = Field(ge=0)
+    books_existing: int = Field(ge=0)
+    books_failed: int = Field(ge=0)
+
+
+class RunOut(BaseModel):
+    id: uuid.UUID
+    started_by: str | None
+    started_at: datetime
+    finished_at: datetime | None
+    books_in_list: int
+    recipes_in_file: int
+    books_added: int
+    books_existing: int
+    books_failed: int
+    recipes_created: int
+    recipes_skipped: int
+    recipes_not_imported: int
+    flags_raised: int
+    lines: int
 
 
 class FlagOut(BaseModel):
@@ -130,11 +178,123 @@ async def import_recipes(batch: Batch, admin: AdminUser, session: Session) -> Ba
                 lines=i.ingredients,
             )
         )
+    run = await _open_run(session, batch.run_id) if batch.run_id else None
     outcome = await importer.import_batch(session, admin.id, items)
+    if run is not None:
+        importer.record_batch(session, run, items, outcome)
     await session.commit()
     return BatchResult(
         created=outcome.created,
         skipped=outcome.skipped,
         errors=[ErrorOut(row=r, reason=why) for r, why in outcome.errors],
         flags=[FlagOut(row=r, recipe_id=rid, kind=k, detail=d) for r, rid, k, d in outcome.flags],
+    )
+
+
+async def _open_run(session, run_id: uuid.UUID) -> ImportRun:
+    run = await session.get(ImportRun, run_id)
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such import run.")
+    if run.finished_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That import run has finished.")
+    return run
+
+
+@router.post("/runs", status_code=status.HTTP_201_CREATED, dependencies=[SameOrigin])
+async def start_run(body: RunStart, admin: AdminUser, session: Session) -> dict[str, uuid.UUID]:
+    run = await importer.start_run(
+        session, admin.id, body.books_in_list, body.recipes_in_file, body.untitled_rows
+    )
+    await session.commit()
+    return {"id": run.id}
+
+
+@router.post("/runs/{run_id}/lines", dependencies=[SameOrigin])
+async def add_lines(
+    run_id: uuid.UUID, body: Lines, admin: AdminUser, session: Session
+) -> dict[str, int]:
+    """Report lines only the browser knows: books not added, recipes it couldn't place."""
+    run = await _open_run(session, run_id)
+    for line in body.lines:
+        session.add(ImportRunLine(run_id=run.id, **line.model_dump()))
+        if line.kind == "not_imported":
+            run.recipes_not_imported += 1
+    await session.commit()
+    return {"added": len(body.lines)}
+
+
+@router.post("/runs/{run_id}/finish", dependencies=[SameOrigin])
+async def finish_run(
+    run_id: uuid.UUID, body: RunFinish, admin: AdminUser, session: Session
+) -> dict[str, bool]:
+    run = await _open_run(session, run_id)
+    run.books_added, run.books_existing, run.books_failed = (
+        body.books_added,
+        body.books_existing,
+        body.books_failed,
+    )
+    run.finished_at = func.now()
+    await session.commit()
+    return {"finished": True}
+
+
+@router.get("/runs", response_model=list[RunOut])
+async def list_runs(admin: AdminUser, session: Session) -> list[RunOut]:
+    line_counts = (
+        select(ImportRunLine.run_id, func.count().label("n"))
+        .group_by(ImportRunLine.run_id)
+        .subquery()
+    )
+    rows = (
+        await session.execute(
+            select(ImportRun, User.display_name, line_counts.c.n)
+            .outerjoin(User, User.id == ImportRun.started_by)
+            .outerjoin(line_counts, line_counts.c.run_id == ImportRun.id)
+            .order_by(ImportRun.started_at.desc())
+        )
+    ).all()
+    return [
+        RunOut(
+            id=run.id,
+            started_by=name,
+            started_at=run.started_at,
+            finished_at=run.finished_at,
+            lines=n or 0,
+            **{c: getattr(run, c) for c in importer.RUN_COUNTS},
+        )
+        for run, name, n in rows
+    ]
+
+
+@router.get("/runs/{run_id}/report.csv")
+async def run_report(run_id: uuid.UUID, admin: AdminUser, session: Session) -> Response:
+    run = await session.get(ImportRun, run_id)
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such import run.")
+    lines = (
+        await session.scalars(
+            select(ImportRunLine)
+            .where(ImportRunLine.run_id == run_id)
+            .order_by(ImportRunLine.row.nulls_first(), ImportRunLine.kind)
+        )
+    ).all()
+    recipe_ids = [line.recipe_id for line in lines if line.recipe_id]
+    books = (
+        dict(
+            (
+                await session.execute(
+                    select(Recipe.id, Work.title)
+                    .join(Work, Work.id == Recipe.work_id)
+                    .where(Recipe.id.in_(recipe_ids))
+                )
+            ).all()
+        )
+        if recipe_ids
+        else {}
+    )
+    stamp = run.started_at.strftime("%Y-%m-%d-%H%M")
+    return Response(
+        importer.report_csv(list(lines), books),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="openlarder-import-{stamp}.csv"'},
     )

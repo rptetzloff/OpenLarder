@@ -87,7 +87,36 @@ export async function addBook(book: ParsedBook): Promise<{ id: string; how: stri
   return { id: body.id, how: body.existing ? "already here" : "added from the book list" };
 }
 
+// Import history: a run is opened before importing and closed after, and
+// the server records each batch in it, so the history survives a closed tab.
+export async function startRun(books: number, recipes: number, untitled: number[]): Promise<string> {
+  const { status, body } = await post("/api/import/runs", {
+    books_in_list: books,
+    recipes_in_file: recipes,
+    untitled_rows: untitled,
+  });
+  if (status !== 201) throw new Error(reason(body, "The import couldn't be started."));
+  return body.id;
+}
+
+export async function addRunLines(
+  runId: string,
+  lines: { row: number | null; book: string; recipe: string; kind: "not_imported" | "book_not_added"; detail: string }[],
+): Promise<void> {
+  for (let i = 0; i < lines.length; i += 1000) {
+    await post(`/api/import/runs/${runId}/lines`, { lines: lines.slice(i, i + 1000) });
+  }
+}
+
+export async function finishRun(
+  runId: string,
+  books: { books_added: number; books_existing: number; books_failed: number },
+): Promise<void> {
+  await post(`/api/import/runs/${runId}/finish`, books);
+}
+
 export async function importBatch(
+  runId: string | null,
   items: {
     row: number;
     work_id: string;
@@ -102,7 +131,7 @@ export async function importBatch(
   errors: { row: number; reason: string }[];
   flags: { row: number; recipe_id: string; kind: string; detail: string | null }[];
 }> {
-  const { status, body } = await post("/api/import/recipes", { items });
+  const { status, body } = await post("/api/import/recipes", { run_id: runId, items });
   if (status !== 200) throw new Error(reason(body, `A batch failed (${status}).`));
   return body;
 }

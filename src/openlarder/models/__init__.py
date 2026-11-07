@@ -20,6 +20,7 @@ from openlarder.models.catalog import (
     WorkTag,
 )
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
+from openlarder.models.imports import ImportRun, ImportRunLine
 
 __all__ = [
     "Author",
@@ -27,6 +28,8 @@ __all__ = [
     "Base",
     "Edition",
     "FlagKind",
+    "ImportRun",
+    "ImportRunLine",
     "Ingredient",
     "IngredientAlias",
     "IngredientOption",

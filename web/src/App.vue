@@ -4,6 +4,7 @@ import NameForm from "./components/NameForm.vue";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
+import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
@@ -23,6 +24,7 @@ const onAccount = path === "/account";
 const onBooks = path === "/books";
 const onAdmin = path === "/admin";
 const onImport = path === "/admin/import";
+const onImports = path === "/admin/imports";
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
 const bookId = match(`/books/${UUID}`);
@@ -89,6 +91,7 @@ onMounted(async () => {
     <BooksPage v-else-if="onBooks" :user="user" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
+    <AdminImportsPage v-else-if="onImports" :user="user" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
@@ -375,6 +378,9 @@ button.primary:disabled {
 progress {
   width: 100%;
   accent-color: var(--accent);
+}
+.run-list > li {
+  margin-bottom: 1.5rem;
 }
 .admin-actions {
   display: flex;
