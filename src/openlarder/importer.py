@@ -24,7 +24,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import isbn, recipes
-from openlarder.models import Edition, FlagKind, Recipe, RecipeFlag, RecipePage
+from openlarder.models import (
+    Edition,
+    FlagKind,
+    ImportRun,
+    ImportRunLine,
+    Recipe,
+    RecipeFlag,
+    RecipePage,
+)
 
 BOOK_COLUMNS = ("Source Title", "Author(s)", "ISBN", "Year Published")
 RECIPE_COLUMNS = ("Source", "Recipe Name", "Pg #", "Ingredients")
@@ -225,3 +233,96 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
         outcome.created += 1
     await session.flush()
     return outcome
+
+
+# Import history (migration 0013). A run is opened when an import starts,
+# recorded batch by batch, and closed with the book totals at the end.
+
+RUN_COUNTS = (
+    "books_in_list",
+    "recipes_in_file",
+    "books_added",
+    "books_existing",
+    "books_failed",
+    "recipes_created",
+    "recipes_skipped",
+    "recipes_not_imported",
+    "flags_raised",
+)
+
+KIND_LABELS = {
+    "not_imported": "Not imported",
+    "book_not_added": "Book not added",
+    **{k.value: k.value.replace("_", " ") for k in FlagKind},
+}
+
+
+async def start_run(
+    session: AsyncSession, admin_id: uuid.UUID, books: int, recipes: int, untitled: list[int]
+) -> ImportRun:
+    run = ImportRun(started_by=admin_id, books_in_list=books, recipes_in_file=recipes)
+    session.add(run)
+    await session.flush()
+    for row in untitled:
+        session.add(
+            ImportRunLine(
+                run_id=run.id,
+                row=row,
+                kind="not_imported",
+                detail="No title or no book on this row",
+            )
+        )
+    run.recipes_not_imported = len(untitled)
+    await session.flush()
+    return run
+
+
+def record_batch(
+    session: AsyncSession, run: ImportRun, items: list[Item], outcome: Outcome
+) -> None:
+    """Add a batch's totals and report lines to its run."""
+    titles = {i.row: i.title for i in items}
+    run.recipes_created += outcome.created
+    run.recipes_skipped += outcome.skipped
+    run.recipes_not_imported += len(outcome.errors)
+    run.flags_raised += len(outcome.flags)
+    for row, reason in outcome.errors:
+        session.add(
+            ImportRunLine(
+                run_id=run.id,
+                row=row,
+                recipe=titles.get(row, ""),
+                kind="not_imported",
+                detail=reason,
+            )
+        )
+    for row, recipe_id, kind, detail in outcome.flags:
+        session.add(
+            ImportRunLine(
+                run_id=run.id,
+                row=row,
+                recipe=titles.get(row, ""),
+                kind=kind,
+                detail=detail or "",
+                recipe_id=recipe_id,
+            )
+        )
+
+
+def report_csv(lines: list[ImportRunLine], books: dict[uuid.UUID, str]) -> str:
+    """A run's report as CSV, the same columns the import page offers."""
+    out = io.StringIO()
+    writer = csv.writer(out, quoting=csv.QUOTE_ALL, lineterminator="\r\n")
+    writer.writerow(["Row", "Book", "Recipe", "What", "Detail"])
+    for line in lines:
+        book = line.book or (books.get(line.recipe_id, "") if line.recipe_id else "")
+        writer.writerow(
+            [
+                "" if line.row is None else line.row,
+                book,
+                line.recipe,
+                KIND_LABELS.get(line.kind, line.kind),
+                line.detail,
+            ]
+        )
+    return out.getvalue()

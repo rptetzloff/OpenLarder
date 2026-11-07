@@ -4,7 +4,10 @@ import type { Me } from "../me";
 import {
   BATCH,
   addBook,
+  addRunLines,
+  finishRun,
   importBatch,
+  startRun,
   parseFiles,
   type Parsed,
   type ReportLine,
@@ -21,7 +24,8 @@ const error = ref("");
 const busy = ref(false);
 const stage = ref<"pick" | "review" | "running" | "done">("pick");
 const progress = ref({ books: 0, recipes: 0 });
-const totals = ref({ created: 0, skipped: 0, errors: 0, flags: 0, booksFailed: 0 });
+const totals = ref({ created: 0, skipped: 0, errors: 0, flags: 0, booksFailed: 0, booksAdded: 0, booksExisting: 0 });
+const runId = ref<string | null>(null);
 const report = ref<ReportLine[]>([]);
 
 const withIsbn = computed(() => parsed.value?.books.filter((b) => b.isbn13).length ?? 0);
@@ -52,6 +56,13 @@ async function read() {
 async function run() {
   const p = parsed.value!;
   stage.value = "running";
+  try {
+    runId.value = await startRun(p.books.length, p.recipes.length, p.untitled_rows);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    stage.value = "review";
+    return;
+  }
   report.value = p.untitled_rows.map((row) => ({
     row,
     book: "",
@@ -65,17 +76,15 @@ async function run() {
   const works = new Map<string, { id: string; isbn13: string | null }>();
   for (const book of p.books) {
     try {
-      const { id } = await addBook(book);
+      const { id, how } = await addBook(book);
       works.set(book.source_title.toLowerCase(), { id, isbn13: book.isbn13 });
+      if (how === "already here") totals.value.booksExisting++;
+      else totals.value.booksAdded++;
     } catch (e) {
       totals.value.booksFailed++;
-      report.value.push({
-        row: null,
-        book: book.source_title,
-        recipe: "",
-        kind: "Book not added",
-        detail: e instanceof Error ? e.message : String(e),
-      });
+      const detail = e instanceof Error ? e.message : String(e);
+      report.value.push({ row: null, book: book.source_title, recipe: "", kind: "Book not added", detail });
+      await addRunLines(runId.value!, [{ row: null, book: book.source_title, recipe: "", kind: "book_not_added", detail }]);
     }
     progress.value.books++;
   }
@@ -96,6 +105,7 @@ async function run() {
     const batch = placed.slice(i, i + BATCH);
     try {
       const result = await importBatch(
+        runId.value,
         batch.map((r) => ({
           row: r.row,
           work_id: r.work_id,
@@ -124,6 +134,15 @@ async function run() {
     }
     progress.value.recipes += batch.length;
   }
+  const unplaced = report.value
+    .filter((l) => l.kind === "Not imported" && l.row !== null && !p.untitled_rows.includes(l.row) && l.detail.startsWith("Its book isn't in the book list"))
+    .map((l) => ({ row: l.row, book: l.book, recipe: l.recipe, kind: "not_imported" as const, detail: l.detail }));
+  if (unplaced.length) await addRunLines(runId.value!, unplaced);
+  await finishRun(runId.value!, {
+    books_added: totals.value.booksAdded,
+    books_existing: totals.value.booksExisting,
+    books_failed: totals.value.booksFailed,
+  });
   stage.value = "done";
 }
 
@@ -187,12 +206,13 @@ function download() {
       <template v-if="stage === 'done'">
         <h2>Done</h2>
         <ul>
-          <li>{{ totals.created.toLocaleString() }} recipes added, {{ totals.skipped }} already there.</li>
+          <li>{{ totals.created.toLocaleString() }} recipes added, {{ totals.skipped.toLocaleString() }} already there.</li>
           <li>{{ totals.flags.toLocaleString() }} flags raised, to look at in the report.</li>
           <li v-if="totals.errors">{{ totals.errors.toLocaleString() }} recipes not imported.</li>
           <li v-if="totals.booksFailed">{{ totals.booksFailed }} books not added.</li>
         </ul>
         <button v-if="report.length" type="button" class="primary" @click="download">Download the report (CSV)</button>
+        <p>This run, and its report, are kept in the <a href="/admin/imports">import history</a>.</p>
       </template>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
     </template>
