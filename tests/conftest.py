@@ -11,15 +11,22 @@ import os
 import selectors
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from typing import Any
 
+import httpx2
 import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
-from openlarder.config import get_settings
+from fake_broker import CLIENT_ID, CLIENT_SECRET, ISSUER, FakeBroker, _settings
+from openlarder.auth import build_oidc_client, optional_oidc_client
+from openlarder.config import Settings, get_settings
+from openlarder.db import get_session
+from openlarder.main import app
 
 if sys.platform == "win32":
     # Psycopg's async mode refuses Windows' default proactor loop. Linux, where
@@ -80,3 +87,66 @@ def db(engine: Engine) -> Iterator[Connection]:
     finally:
         trans.rollback()
         conn.close()
+
+
+# Signing in, through the fake broker in fake_broker.py.
+
+
+@pytest.fixture(scope="session")
+async def async_engine(database_url: str, engine) -> AsyncIterator[AsyncEngine]:
+    eng = create_async_engine(database_url)
+    yield eng
+    await eng.dispose()
+
+
+@pytest.fixture
+async def adb(async_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    """A session whose commits land in a savepoint and are rolled back after the test."""
+    async with async_engine.connect() as conn:
+        trans = await conn.begin()
+        session = AsyncSession(
+            bind=conn, join_transaction_mode="create_savepoint", expire_on_commit=False
+        )
+        try:
+            yield session
+        finally:
+            await session.close()
+            await trans.rollback()
+
+
+@pytest.fixture
+def broker() -> FakeBroker:
+    return FakeBroker()
+
+
+@pytest.fixture
+def configure(adb: AsyncSession, broker: FakeBroker) -> Iterator[Any]:
+    def apply(settings: Settings) -> None:
+        app.dependency_overrides[get_settings] = lambda: settings
+        if settings.sign_in_configured:
+            # Built once per configuration, as in production, so the metadata
+            # and keys are fetched once.
+            client = build_oidc_client(
+                ISSUER, CLIENT_ID, CLIENT_SECRET, httpx2.MockTransport(broker.handle)
+            )
+            app.dependency_overrides[optional_oidc_client] = lambda: client
+        else:
+            app.dependency_overrides.pop(optional_oidc_client, None)
+
+    async def session_override() -> AsyncIterator[AsyncSession]:
+        yield adb
+
+    app.dependency_overrides[get_session] = session_override
+    apply(_settings())
+    try:
+        yield apply
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def client(configure) -> AsyncIterator[httpx2.AsyncClient]:
+    async with httpx2.AsyncClient(
+        transport=httpx2.ASGITransport(app=app), base_url="http://testserver"
+    ) as c:
+        yield c

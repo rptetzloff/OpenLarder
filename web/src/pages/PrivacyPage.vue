@@ -42,7 +42,14 @@ document.title = "Privacy policy · OpenLarder";
       <li>
         the identifier Authgear gives your account, which is how OpenLarder recognises you;
       </li>
-      <li>your display name, as Authgear provides it, refreshed each time you sign in;</li>
+      <li>
+        the display name you choose, which is public: it is shown beside anything you add to
+        the catalog;
+      </li>
+      <li>
+        until you choose one, the name Google, GitHub or Authgear has for you, used only to
+        suggest a display name and deleted once you have chosen;
+      </li>
       <li>
         for each signed-in browser, a scrambled (hashed) copy of the session token, when the
         session started and when it ends, and the sign-in token Authgear issued, which is needed

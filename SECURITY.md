@@ -30,6 +30,11 @@ branches and no backports: the fix lands on `main` and deploys.
 - **Anything that lets one person act as another**: signing in as someone
   else, or a session that can be guessed, forged, stolen through the page, or
   still works after signing out.
+- **Changing someone's account from another site's page.** Account changes
+  check the request's Origin, because SameSite cookies still travel with
+  requests from other subdomains of openlarder.com.
+- **Taking a display name someone already has**, in any letter case or
+  compatibility form (full-width letters, for instance).
 - **Acting above one's trust level**, as those features arrive: publishing
   without review, reverting or merging without the right level, reaching
   another user's private lists, or curating an author page without being
@@ -50,6 +55,9 @@ branches and no backports: the fix lands on `main` and deploys.
   signing out of any site does.
 - **An emailed sign-in link or code signs in whoever uses it**, so it is as
   sensitive as the inbox it was sent to.
+- **Display names can be impersonated with look-alike letters from another
+  script**, such as Cyrillic "а" for Latin "a". Uniqueness ignores case and
+  compatibility forms, not cross-script look-alikes; moderation handles those.
 - **A failed sign-in tells the browser only that it failed.** The reason is
   logged on the server.
 - **`/readyz` reports the database's reachability and the schema revision.**

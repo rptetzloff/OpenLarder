@@ -24,10 +24,11 @@ way in, so holding it does not let anyone sign in either.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, LargeBinary, Text, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, LargeBinary, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.schema import UniqueConstraint
+from sqlalchemy.sql import text
 
 from openlarder.models.base import Base, Timestamps, uuid_pk
 
@@ -38,15 +39,24 @@ class User(Timestamps, Base):
         UniqueConstraint("issuer", "subject"),
         CheckConstraint("issuer <> ''", name="issuer_not_empty"),
         CheckConstraint("subject <> ''", name="subject_not_empty"),
-        CheckConstraint("display_name <> ''", name="display_name_not_empty"),
+        CheckConstraint(
+            "char_length(display_name) BETWEEN 2 AND 32 AND display_name = btrim(display_name)",
+            name="display_name_shape",
+        ),
+        CheckConstraint("suggested_name <> ''", name="suggested_name_not_empty"),
+        # Unique ignoring case, so "Sarah" and "sarah" are one name. The rest
+        # of the rules (allowed characters, reserved names) live in names.py.
+        Index("uq_users_display_name_lower", func.lower(text("display_name")), unique=True),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     issuer: Mapped[str] = mapped_column(Text, nullable=False)
     subject: Mapped[str] = mapped_column(Text, nullable=False)
-    # Refreshed from the broker at each sign-in, until OpenLarder has a
-    # profile page of its own to edit it on.
-    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Chosen in OpenLarder and public; empty until chosen. See names.py.
+    display_name: Mapped[str | None] = mapped_column(Text)
+    # The sign-in provider's name, kept only to pre-fill that choice:
+    # refreshed at each sign-in until a name is chosen, then cleared.
+    suggested_name: Mapped[str | None] = mapped_column(Text)
 
 
 class UserSession(Base):

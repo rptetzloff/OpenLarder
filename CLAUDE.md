@@ -167,8 +167,10 @@ All colour goes through tokens, never a literal in a component. Every intended
 pair is verified by test, 4.5:1 for text and 3.0:1 for control boundaries,
 across both themes, because a pair that passes in one can fail in the other.
 
-Not true here yet: the placeholder page defines tokens for both themes, but no
-contrast test exists. The first real page brings one.
+`tests/test_colour_tokens.py` reads the tokens out of `web/src/App.vue` and
+checks each intended pair in both themes. It cannot see a component using a
+pair it doesn't list; adding a pair means adding it there. Its first catch,
+before it was even committed: the logo's amber with white text is 2.2:1.
 
 ## Dependencies default to none
 

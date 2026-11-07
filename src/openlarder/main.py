@@ -18,7 +18,7 @@ from openlarder import __version__
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine
-from openlarder.routers import auth, health
+from openlarder.routers import account, auth, health
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -56,6 +56,7 @@ app.add_middleware(
 # Health checks stay at the root: probes should not depend on the API prefix.
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(account.router)
 
 if WEB_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
