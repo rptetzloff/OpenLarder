@@ -68,16 +68,26 @@ def test_entries_are_tidied() -> None:
         ("Cake", [], [], "edition"),
         ("Cake", [(E1, "1"), (E1, "2")], [], "once"),
         ("Cake", [(E1, "1" * 21)], [], "page"),
-        ("Cake", [(E1, None)], ["x" * 101], "method"),
+        ("Cake", [(E1, None)], ["x" * 151], "method"),
         ("Cake", [(E1, None)], ["200g rhubarb"], "amount"),
         ("Cake", [(E1, None)], ["½ cup milk"], "amount"),
         ("Cake", [(E1, None)], ["rhubarb", "2 cups milk"], "2 cups milk"),
-        ("Cake", [(E1, None)], ["x"] * 151, "150"),
+        ("Cake", [(E1, None)], [f"ingredient {i}" for i in range(151)], "150"),
     ],
 )
 def test_entries_that_break_a_rule_say_which(title, pages, lines, reason) -> None:
     with pytest.raises(recipes.InvalidRecipe, match=reason):
         recipes.clean(title, pages, lines)
+
+
+def test_each_ingredient_is_kept_once_ignoring_case() -> None:
+    entry = recipes.clean("Cake", [(E1, None)], ["butter", "sugar", "Butter", "eggs", "BUTTER"])
+    assert entry.lines == ["butter", "sugar", "eggs"]
+
+
+def test_a_long_choice_of_ingredients_fits() -> None:
+    line = "x" * 150
+    assert recipes.clean("Cake", [(E1, None)], [line]).lines == [line]
 
 
 @pytest.mark.parametrize(

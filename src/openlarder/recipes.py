@@ -33,7 +33,9 @@ from openlarder.models import Edition, Recipe, RecipeIngredient, RecipePage
 MAX_TITLE = 200
 MAX_PAGE = 20
 # An ingredient's name, not a line of method: "grapeseed oil or olive oil".
-MAX_LINE = 100
+# 150, not 100: the household index's longest lines, long "A or B" choices,
+# run to 116 characters.
+MAX_LINE = 150
 MAX_LINES = 150
 # An amount at the start: a vulgar fraction ("½ cup"), or a number followed by
 # a unit ("200g", "2 cups", "1-2 tsp", "1/2 lb"). A number alone is not one:
@@ -91,7 +93,12 @@ def clean(title: str, pages: list[tuple[uuid.UUID, str | None]], lines: list[str
         cleaned_pages[edition_id] = page
 
     kept = [_squash(line) for line in lines]
-    kept = [line for line in kept if line]
+    # Each ingredient once per recipe (the entry rules), keeping the first;
+    # the household index lists one twice in 288 recipes.
+    seen: set[str] = set()
+    kept = [
+        line for line in kept if line and not (line.casefold() in seen or seen.add(line.casefold()))
+    ]
     if len(kept) > MAX_LINES:
         raise InvalidRecipe(f"A recipe can have at most {MAX_LINES} ingredient lines.")
     for line in kept:
