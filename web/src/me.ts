@@ -5,6 +5,8 @@ export interface Me {
   display_name: string | null;
   suggested_name: string | null;
   account_url: string | null;
+  // May add books directly, until review exists.
+  is_admin: boolean;
 }
 
 // Sends the chosen name; resolves to the updated account, or rejects with

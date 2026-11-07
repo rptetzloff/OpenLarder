@@ -24,7 +24,17 @@ way in, so holding it does not let anyone sign in either.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, LargeBinary, Text, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    Text,
+    false,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.schema import UniqueConstraint
@@ -57,6 +67,8 @@ class User(Timestamps, Base):
     # The sign-in provider's name, kept only to pre-fill that choice:
     # refreshed at each sign-in until a name is chosen, then cleared.
     suggested_name: Mapped[str | None] = mapped_column(Text)
+    # May add to the catalog directly, until review exists (migration 0010).
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
 
 
 class UserSession(Base):

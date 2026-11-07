@@ -1,0 +1,50 @@
+{
+ "authors": [
+  {
+   "key": "/authors/OL7106535A"
+  }
+ ],
+ "covers": [
+  14125211
+ ],
+ "created": {
+  "type": "/type/datetime",
+  "value": "2022-10-20T06:03:58.008668"
+ },
+ "isbn_13": [
+  "9780393541113"
+ ],
+ "key": "/books/OL40203348M",
+ "languages": [
+  {
+   "key": "/languages/eng"
+  }
+ ],
+ "last_modified": {
+  "type": "/type/datetime",
+  "value": "2023-04-18T09:23:47.663235"
+ },
+ "latest_revision": 2,
+ "number_of_pages": 288,
+ "pagination": "288",
+ "publish_date": "2023",
+ "publishers": [
+  "Norton & Company, Incorporated, W. W.",
+  "W. W. Norton & Company"
+ ],
+ "revision": 2,
+ "source_records": [
+  "bwb:9780393541113",
+  "amazon:0393541118"
+ ],
+ "subtitle": "Irresistible Bakes and Treats for Morning, Noon, and Night",
+ "title": "Love Is a Pink Cake",
+ "type": {
+  "key": "/type/edition"
+ },
+ "works": [
+  {
+   "key": "/works/OL29227890W"
+  }
+ ]
+}

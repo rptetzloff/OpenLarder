@@ -34,6 +34,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    Integer,
     PrimaryKeyConstraint,
     SmallInteger,
     Text,
@@ -163,6 +164,7 @@ class Edition(Timestamps, Base):
         # older books have none. The checksum is checked by the application.
         CheckConstraint("isbn13 ~ '^97[89][0-9]{10}$'", name="isbn13_format"),
         CheckConstraint("published_year BETWEEN 1400 AND 2200", name="published_year_range"),
+        CheckConstraint("open_library_cover_id > 0", name="open_library_cover_id_positive"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -173,8 +175,10 @@ class Edition(Timestamps, Base):
     publisher: Mapped[str | None] = mapped_column(Text)
     published_year: Mapped[int | None] = mapped_column(SmallInteger)
     open_library_edition_id: Mapped[str | None] = mapped_column(Text, unique=True)
-    # An object-store key, not a URL, so the bucket can move.
+    # An object-store key, not a URL, so the bucket can move. Unused until
+    # covers are stored; until then they are shown from Open Library.
     cover_key: Mapped[str | None] = mapped_column(Text)
+    open_library_cover_id: Mapped[int | None] = mapped_column(Integer)
 
 
 class PurchaseLink(Timestamps, Base):

@@ -49,6 +49,8 @@ class Me(BaseModel):
     suggested_name: str | None
     # Where to manage sign-in methods and passkeys: Authgear's own page.
     account_url: str | None
+    # May add to the catalog directly, until review exists.
+    is_admin: bool
 
 
 def me_for(user: User, settings: Settings) -> Me:
@@ -58,6 +60,7 @@ def me_for(user: User, settings: Settings) -> Me:
         display_name=user.display_name,
         suggested_name=user.suggested_name if user.display_name is None else None,
         account_url=issuer.rstrip("/") + "/settings" if issuer else None,
+        is_admin=user.is_admin,
     )
 
 
