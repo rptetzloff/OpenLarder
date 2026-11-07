@@ -41,7 +41,7 @@ def _body(**changes):
     body = {
         "title": "  Rhubarb   Cake ",
         "editions": [{"edition_id": str(E1), "page": " 112 "}, {"edition_id": str(E2)}],
-        "ingredients": ["200g rhubarb", "", "  1 tsp   vanilla ", "100g sugar"],
+        "ingredients": ["rhubarb", "", "  vanilla   pod ", "caster sugar"],
     }
     return {**body, **changes}
 
@@ -68,7 +68,10 @@ def test_entries_are_tidied() -> None:
         ("Cake", [], [], "edition"),
         ("Cake", [(E1, "1"), (E1, "2")], [], "once"),
         ("Cake", [(E1, "1" * 21)], [], "page"),
-        ("Cake", [(E1, None)], ["x" * 301], "method"),
+        ("Cake", [(E1, None)], ["x" * 101], "method"),
+        ("Cake", [(E1, None)], ["200g rhubarb"], "amount"),
+        ("Cake", [(E1, None)], ["½ cup milk"], "amount"),
+        ("Cake", [(E1, None)], ["rhubarb", "3 eggs"], "3 eggs"),
         ("Cake", [(E1, None)], ["x"] * 151, "150"),
     ],
 )
@@ -87,7 +90,7 @@ async def test_adding_a_recipe_stores_pages_and_lines_in_order(admin, book, adb)
 
     assert recipe["title"] == "Rhubarb Cake"
     assert recipe["book"]["title"] == "Pink Cake"
-    assert recipe["ingredients"] == ["200g rhubarb", "1 tsp vanilla", "100g sugar"]
+    assert recipe["ingredients"] == ["rhubarb", "vanilla pod", "caster sugar"]
     # Newest edition first; a blank page means in it, page not recorded.
     assert [(p["published_year"], p["page"]) for p in recipe["pages"]] == [
         (2024, None),
@@ -152,6 +155,13 @@ async def test_removing_a_recipe_removes_its_pages_and_lines(admin, book, adb) -
         assert await adb.scalar(text(f"SELECT count(*) FROM {table}")) == 0
 
 
+async def test_an_amount_is_refused_and_nothing_is_stored(admin, book, adb) -> None:
+    response = await _add(admin, book["work"], ingredients=["rhubarb", "200g caster sugar"])
+    assert response.status_code == 422
+    assert "Leave out the amount" in response.json()["detail"]
+    assert await adb.scalar(text("SELECT count(*) FROM recipes")) == 0
+
+
 async def test_an_invalid_entry_says_why(admin, book) -> None:
     response = await _add(admin, book["work"], title=" ")
     assert response.status_code == 422
@@ -191,3 +201,32 @@ async def test_reading_is_public(admin, client, book) -> None:
     recipe_id = (await _add(admin, book["work"])).json()["id"]
     await admin.post("/api/auth/logout")
     assert (await client.get(f"/api/recipes/{recipe_id}")).status_code == 200
+
+
+def test_migration_0011_refuses_to_drop_an_amount(engine, alembic_config) -> None:
+    from alembic import command
+
+    engine.dispose()
+    command.downgrade(alembic_config, "0010")
+    try:
+        with engine.begin() as conn:
+            work = conn.execute(
+                text("INSERT INTO works (title) VALUES ('Amounts') RETURNING id")
+            ).scalar_one()
+            recipe = conn.execute(
+                text("INSERT INTO recipes (work_id, title) VALUES (:w, 'Cake') RETURNING id"),
+                {"w": work},
+            ).scalar_one()
+            conn.execute(
+                text(
+                    "INSERT INTO recipe_ingredients (recipe_id, position, original_text, quantity)"
+                    " VALUES (:r, 1, 'rhubarb', '200g')"
+                ),
+                {"r": recipe},
+            )
+        with pytest.raises(RuntimeError, match="amount"):
+            command.upgrade(alembic_config, "head")
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM works WHERE title = 'Amounts'"))
+        command.upgrade(alembic_config, "head")

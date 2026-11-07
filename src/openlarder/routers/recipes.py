@@ -1,5 +1,8 @@
 """Recipe entries: read one, and add, change or remove one (admins only).
 
+An entry is where a recipe is and what goes in it, never how much or how;
+see recipes.py.
+
 Reading is public. Writing is for admins until review exists, like books.
 """
 

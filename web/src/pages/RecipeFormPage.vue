@@ -15,6 +15,7 @@ const error = ref("");
 const saving = ref(false);
 const loadFailed = ref(false);
 
+const example = ["rhubarb", "caster sugar", "vanilla pod"].join("\n");
 const heading = computed(() => (props.recipeId ? "Edit recipe" : "Add a recipe"));
 
 function label(e: { title: string | null; published_year: number | null; isbn13: string | null }) {
@@ -105,10 +106,18 @@ async function save() {
         </div>
       </fieldset>
 
-      <label for="recipe-ingredients">Ingredients, one line each, as printed</label>
-      <textarea id="recipe-ingredients" v-model="ingredients" rows="10" spellcheck="false" />
-      <p class="help">
-        Only the ingredient list. The method and the book's other text stay in the book.
+      <label for="recipe-ingredients">Ingredients, one per line, without amounts</label>
+      <textarea
+        id="recipe-ingredients"
+        v-model="ingredients"
+        rows="10"
+        spellcheck="false"
+        :placeholder="example"
+        aria-describedby="recipe-ingredients-help"
+      />
+      <p id="recipe-ingredients-help" class="help">
+        Just what goes in, as the book names it: “rhubarb”, not “200g rhubarb”. Amounts and
+        the method stay in the book.
       </p>
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>

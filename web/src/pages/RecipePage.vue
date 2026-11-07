@@ -58,7 +58,7 @@ async function remove() {
         <li v-for="(line, i) in recipe.ingredients" :key="i">{{ line }}</li>
       </ul>
       <p v-else class="status">No ingredients recorded yet.</p>
-      <p class="status">The method is in the book.</p>
+      <p class="status">The amounts and the method are in the book.</p>
 
       <div v-if="user?.is_admin" class="admin-actions">
         <a :href="`/recipes/${recipe.id}/edit`">Edit</a>

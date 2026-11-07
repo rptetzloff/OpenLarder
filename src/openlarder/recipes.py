@@ -1,9 +1,16 @@
-"""Recipe entries: a title, a page per edition, and ingredient lines as printed.
+"""Recipe entries: a title, a page per edition, and the ingredients it uses.
 
-What a recipe entry may hold is the content rule's: facts, never the
-method or the headnote. So there is no free-text field beyond the
-ingredient lines, which are kept exactly as the book prints them; matching
-them to canonical ingredients is a later step and changes nothing typed.
+OpenLarder is a reference to what is in cookbooks, not a recipe site. An
+entry says where a recipe is and what goes in it, so it can be found by
+ingredient; the amounts, the method and the headnote stay in the book.
+*Ray, 2026-11-07.* So the only free text is the ingredients, each named as
+the book names it ("caster sugar") with no amount; matching them to
+canonical ingredients is a later step and changes nothing typed.
+
+A line that starts with a number or a fraction ("200g rhubarb", "½ cup
+milk") is refused, since that is an amount. Amounts written in words ("a
+pinch of salt") get past it; the form's wording asks for the ingredient
+alone, and review is the backstop.
 
 A recipe appears in the editions listed for it. A page left blank means it
 is in that edition but the page isn't recorded yet; an edition not listed
@@ -12,6 +19,7 @@ of an edition whose page is unknown; chosen by Claude, 2026-11-07, as the
 model's docstring already described.*
 """
 
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -22,8 +30,11 @@ from openlarder.models import Edition, Recipe, RecipeIngredient, RecipePage
 
 MAX_TITLE = 200
 MAX_PAGE = 20
-MAX_LINE = 300
+# An ingredient's name, not a line of method: "grapeseed oil or olive oil".
+MAX_LINE = 100
 MAX_LINES = 150
+# Digits or a vulgar fraction at the start: an amount, not an ingredient.
+_AMOUNT = re.compile(r"^[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]")
 
 
 class InvalidRecipe(ValueError):
@@ -65,10 +76,15 @@ def clean(title: str, pages: list[tuple[uuid.UUID, str | None]], lines: list[str
     kept = [line for line in kept if line]
     if len(kept) > MAX_LINES:
         raise InvalidRecipe(f"A recipe can have at most {MAX_LINES} ingredient lines.")
-    if any(len(line) > MAX_LINE for line in kept):
-        raise InvalidRecipe(
-            f"An ingredient line is at most {MAX_LINE} characters. The method doesn't go here."
-        )
+    for line in kept:
+        if _AMOUNT.match(line):
+            raise InvalidRecipe(
+                f"Leave out the amount in “{line}”. Just the ingredient, like “rhubarb”."
+            )
+        if len(line) > MAX_LINE:
+            raise InvalidRecipe(
+                f"An ingredient is at most {MAX_LINE} characters: its name, not the method."
+            )
     return RecipeEntry(title=title, pages=cleaned_pages, lines=kept)
 
 
