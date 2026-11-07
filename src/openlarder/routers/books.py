@@ -245,6 +245,8 @@ class WithoutIsbn(BaseModel):
     title: str
     authors: list[str] = []
     year: int | None = None
+    # For a book Open Library doesn't know, which still has an ISBN.
+    isbn: str | None = None
 
 
 class AddedManually(BaseModel):
@@ -254,14 +256,20 @@ class AddedManually(BaseModel):
 
 @router.post("/manual", response_model=AddedManually, dependencies=[SameOrigin])
 async def add_without_isbn(body: WithoutIsbn, admin: AdminUser, session: Session) -> AddedManually:
-    """A book with no ISBN, which Open Library can't be asked about."""
+    """A book Open Library can't supply: no ISBN, or one Open Library doesn't know."""
     title = " ".join(body.title.split())
     authors = [a for a in (" ".join(x.split()) for x in body.authors) if a]
     if not title:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give the book its title.")
     if body.year is not None and not 1400 <= body.year <= 2200:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That year can't be right.")
-    work_id, existed = await books_module.add_without_isbn(session, title, authors, body.year)
+    try:
+        isbn13 = isbn.normalise(body.isbn) if body.isbn and body.isbn.strip() else None
+    except isbn.InvalidIsbn as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    work_id, existed = await books_module.add_without_isbn(
+        session, title, authors, body.year, isbn13
+    )
     await session.commit()
     if not existed:
         log.info("%s added %s without an ISBN", admin.id, title)

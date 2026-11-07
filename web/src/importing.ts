@@ -75,10 +75,13 @@ export async function addBook(book: ParsedBook): Promise<{ id: string; how: stri
       await sleep(2000 * attempt); // Open Library didn't answer; give it a moment
     }
   }
+  // Keeps the ISBN when Open Library doesn't know it: the recipes name
+  // their book by ISBN, and would find no edition without it.
   const { status, body } = await post("/api/books/manual", {
     title: book.source_title,
     authors: book.authors,
     year: book.year,
+    isbn: book.isbn13,
   });
   if (status !== 200) throw new Error(reason(body, `Adding it failed (${status}).`));
   return { id: body.id, how: body.existing ? "already here" : "added from the book list" };

@@ -261,6 +261,47 @@ async def test_a_book_without_an_isbn_needs_a_title_and_a_sane_year(admin) -> No
     assert response.status_code == 422
 
 
+async def test_a_book_open_library_lacks_keeps_its_isbn(admin, adb) -> None:
+    body = {"title": "Heritage", "authors": ["Ann Lee"], "isbn": "978-0-306-40615-7"}
+    work = (await admin.post("/api/books/manual", json=body)).json()["id"]
+    assert await adb.scalar(text("SELECT isbn13 FROM editions")) == "9780306406157"
+    result = (
+        await admin.post(
+            "/api/import/recipes",
+            json={"items": [_item(work, isbn13="9780306406157", title="Stew", page="4")]},
+        )
+    ).json()
+    assert (result["created"], result["errors"]) == (1, [])
+
+
+async def test_running_again_gives_an_earlier_isbn_less_book_its_isbn(admin, adb) -> None:
+    """What the first household import left: the book, with no ISBN on its edition."""
+    first = (await admin.post("/api/books/manual", json={"title": "Heritage"})).json()["id"]
+    again = await admin.post(
+        "/api/books/manual", json={"title": "Heritage", "isbn": "9780306406157"}
+    )
+    assert again.json() == {"id": first, "existing": True}
+    assert await adb.scalar(text("SELECT isbn13 FROM editions")) == "9780306406157"
+
+
+async def test_a_known_isbn_finds_its_book_whatever_the_title(admin, adb) -> None:
+    first = (
+        await admin.post("/api/books/manual", json={"title": "Heritage", "isbn": "9780306406157"})
+    ).json()["id"]
+    again = await admin.post(
+        "/api/books/manual", json={"title": "Heritage Cookbook", "isbn": "9780306406157"}
+    )
+    assert again.json() == {"id": first, "existing": True}
+    assert await adb.scalar(text("SELECT count(*) FROM works")) == 1
+
+
+async def test_a_bad_isbn_for_a_book_without_open_library_is_refused(admin) -> None:
+    response = await admin.post(
+        "/api/books/manual", json={"title": "Heritage", "isbn": "9780306406158"}
+    )
+    assert response.status_code == 422
+
+
 async def test_recipes_import_into_a_book_without_an_isbn(admin, adb) -> None:
     work = (await admin.post("/api/books/manual", json={"title": "Family Recipes"})).json()["id"]
     result = (
