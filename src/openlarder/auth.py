@@ -5,8 +5,8 @@ its SHA-256. Sessions last 30 days from sign-in and are not extended by use.
 Signing out deletes the session here, then sends the browser to the
 broker's end-session endpoint so the broker's session ends too, with the
 session's ID token as id_token_hint so the broker will send them back.
-Whether the broker's session ends is its configuration, not this code's: in
-Authentik, the provider's invalidation flow needs a User Logout stage.
+Whether the broker's session ends is its configuration, not this code's
+(Authentik, used before Authgear, needed a User Logout stage for it).
 """
 
 import hashlib

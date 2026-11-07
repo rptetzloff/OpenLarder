@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     database_echo: bool = False
     environment: str = "development"
 
-    # Sign-in through the identity broker (Authentik). All three or none:
+    # Sign-in through the identity broker (Authgear). All three or none:
     # with none, the site runs without sign-in and /api/auth/login says so.
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None

@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import PrivacyPage from "./pages/PrivacyPage.vue";
+import TermsPage from "./pages/TermsPage.vue";
+
+// The server returns this app for any path it has no file for, so the page
+// is chosen from the address. Two fixed pages don't need a router library;
+// the catalog's pages will bring one.
+const pages: Record<string, unknown> = { "/privacy": PrivacyPage, "/terms": TermsPage };
+const page = pages[location.pathname.replace(/\/+$/, "")];
 
 // A placeholder until there is a catalog to show: proves the SPA reaches the
 // API through whichever path it is served from, and that sign-in works.
@@ -41,11 +49,19 @@ onMounted(async () => {
     <a v-else-if="user === null" href="/api/auth/login">Sign in</a>
   </header>
   <main>
-    <h1>OpenLarder</h1>
-    <p>A free, open index of the recipes in your cookbooks.</p>
-    <p v-if="signInFailed" role="alert">Sign-in didn't work. Please try again.</p>
-    <p class="status">{{ status }}</p>
+    <component :is="page" v-if="page" />
+    <template v-else>
+      <h1>OpenLarder</h1>
+      <p>A free, open index of the recipes in your cookbooks.</p>
+      <p v-if="signInFailed" role="alert">Sign-in didn't work. Please try again.</p>
+      <p class="status">{{ status }}</p>
+    </template>
   </main>
+  <footer>
+    <a href="/">OpenLarder</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </footer>
 </template>
 
 <style>
@@ -82,7 +98,8 @@ header form {
   margin: 0;
 }
 header a,
-header button {
+header button,
+footer a {
   color: var(--fg);
   text-decoration: underline;
   background: none;
@@ -96,8 +113,27 @@ main {
   margin: 0 auto;
   padding: 2rem 1rem 3rem;
 }
-.status {
+.status,
+.updated {
   color: var(--muted);
+  font-size: 0.875rem;
+}
+main a {
+  color: var(--fg);
+}
+main li {
+  margin-bottom: 0.5rem;
+}
+main h2 {
+  margin-top: 2rem;
+  font-size: 1.125rem;
+}
+footer {
+  display: flex;
+  gap: 1rem;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
   font-size: 0.875rem;
 }
 </style>
