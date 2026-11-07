@@ -217,6 +217,11 @@ permanent; a work branch is deleted when its PR merges. (`anagrimoire` and
 `sederunt` and `are-they-sports`: a work branch buys a reviewable unit and
 somewhere to abandon work without rewriting shared history.)
 
+**For now, openlarder.com deploys from `dev`, so a merge into `dev` is a
+release.** `main` waits until there is a separate dev site for `dev` to deploy
+to. Until then, "merged" means "live", and changes are checked on
+openlarder.com after they merge. *Decided by Ray, 2026-11-06.*
+
 - **Merge commits, never squash.** A squashed release left `are-they-sports`
   with 220 commits on `main` that `dev` did not have, and every later release
   PR diffed against the wrong base.
