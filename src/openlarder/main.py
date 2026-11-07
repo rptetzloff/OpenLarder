@@ -62,12 +62,26 @@ app.include_router(recipes.router)
 app.include_router(imports.router)
 app.include_router(covers.router)
 
+
+def spa_response(web_dir: Path, path: str) -> FileResponse:
+    """A file from the built SPA, or its index.html for any other path.
+
+    index.html is sent with no-cache: it names the build's hashed scripts, and
+    a browser that reused an old copy would ask for scripts a new deploy has
+    removed and show a blank page, which happened on 2026-11-07. The hashed
+    files under /assets keep ordinary caching, since a new build never reuses
+    their names.
+    """
+    candidate = (web_dir / path).resolve()
+    if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
+        if candidate.name != "index.html":
+            return FileResponse(candidate)
+    return FileResponse(web_dir / "index.html", headers={"Cache-Control": "no-cache"})
+
+
 if WEB_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
     async def spa(path: str) -> FileResponse:
-        candidate = (WEB_DIR / path).resolve()
-        if path and candidate.is_file() and WEB_DIR.resolve() in candidate.parents:
-            return FileResponse(candidate)
-        return FileResponse(WEB_DIR / "index.html")
+        return spa_response(WEB_DIR, path)
