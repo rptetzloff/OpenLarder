@@ -12,6 +12,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 NAMING = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+    # Applied to whatever name is given, so models give bare names
+    # ("issuer_not_empty") and migrations give op.f("ck_users_issuer_not_empty").
+    # A full name without op.f() comes out as ck_users_ck_users_... (see 0009).
     "ck": "ck_%(table_name)s_%(constraint_name)s",
     "fk": "fk_%(table_name)s_%(column_0_N_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",

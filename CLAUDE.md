@@ -121,6 +121,13 @@ or expression indexes. Those are covered by tests that insert what the database
 should refuse. When one constraint was removed from the migration, its test
 went red.
 
+The same blindness hid that every CHECK constraint had been created with its
+prefix twice, `ck_users_ck_users_issuer_not_empty`, for eight migrations:
+the naming convention applies `ck_<table>_` to whatever name it is given.
+`tests/test_constraint_names.py` now compares CHECK constraint names in the
+database with the models'. In a migration, name a CHECK constraint with
+`op.f("ck_<table>_<name>")`, which marks the name as final.
+
 **A mutation harness needs a control.** The first mutation run in
 `are-they-sports` used a command the runner rejected, so every mutant "died" to
 an error and it reported a perfect score. Run the unmutated suite under the
