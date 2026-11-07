@@ -49,6 +49,10 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>whether your account may add books, which only an admin can for now;</li>
       <li>
+        which account added each recipe, so that its flags can be shown to you, and who dealt
+        with a flag;
+      </li>
+      <li>
         the display name you choose, which is public: it is shown beside anything you add to
         the catalog;
       </li>

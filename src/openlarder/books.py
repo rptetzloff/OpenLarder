@@ -9,7 +9,7 @@ is created and left alone after, so adding an edition never rewrites them.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder.models import Author, Edition, Work, WorkCredit
@@ -77,3 +77,41 @@ async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
     )
     await session.flush()
     return work.id
+
+
+async def add_without_isbn(
+    session: AsyncSession, title: str, authors: list[str], year: int | None
+) -> tuple[uuid.UUID, bool]:
+    """A book with no ISBN, from what the person adding it says; (work ID, existed).
+
+    Matched by title among books that didn't come from Open Library, so a
+    second import finds the first's. Authors are matched by exact name among
+    those without an Open Library ID, the nearest thing to identity there is
+    without one; two people sharing a name is a merge for review.
+    """
+    existing = await session.scalar(
+        select(Work.id).where(
+            func.lower(Work.title) == title.lower(), Work.open_library_work_id.is_(None)
+        )
+    )
+    if existing is not None:
+        return existing, True
+    work = Work(title=title)
+    session.add(work)
+    await session.flush()
+    for position, name in enumerate(authors, start=1):
+        author = await session.scalar(
+            select(Author).where(
+                func.lower(Author.name) == name.lower(), Author.open_library_author_id.is_(None)
+            )
+        )
+        if author is None:
+            author = Author(name=name)
+            session.add(author)
+            await session.flush()
+        session.add(
+            WorkCredit(work_id=work.id, author_id=author.id, position=position, credited_as=name)
+        )
+    session.add(Edition(work_id=work.id, published_year=year))
+    await session.flush()
+    return work.id, False

@@ -248,6 +248,10 @@ Covers are shown from Open Library by cover ID, which is not rate-limited (by IS
 
 Flags go to the review queue with the reason attached. Bulk imports go through review whatever the contributor's trust level.
 
+**Until review exists**, an admin's bulk import publishes at once, and anything doubtful is flagged on its recipe instead of held back: a title repeated on another page, no ingredients, a line removed for breaking an entry rule, a fragment of a split page reference. *Decided by Ray, 2026-11-07, for the household index.* Admins see every open flag on a "Flagged recipes" page, and each person sees the flags on recipes they added; dealing with one records whether it was fixed or dismissed, by whom, and why, so review can take the flags over. *Ray, 2026-11-07; the pages follow the importer.* The import does not bring in the index's Tag column for now, since its values are the books' own sections rather than course, cuisine or diet. *Ray, 2026-11-07.*
+
+The importer is built (migration 0012): an admin chooses the book list and the recipe list in the browser, which reads them and drives the import in short requests. Books go through the add-by-ISBN lookup, paced to Open Library's limit, or are added from the list's own title and authors when they have no ISBN or Open Library doesn't know them; recipes follow in batches. Run again, it skips what it already added. A dry run over the household index found 18,859 recipes to import and 213 to flag (181 with no ingredients, 28 repeated titles, 2 fragments), with 31 rows holding only an ingredient list and nothing to attach it to.
+
 **Trust levels**
 
 | Level | How earned | Edits |
@@ -260,7 +264,7 @@ Flags go to the review queue with the reason attached. Bulk imports go through r
 **Safeguards**
 
 - Full edit history on every record, one-click revert
-- Bulk imports always go through review, regardless of trust level
+- Bulk imports always go through review, regardless of trust level (until review exists, they publish with flags; see above)
 - Duplicate detection on books (ISBN) and recipes (title + work)
 - Report button on all user content
 
@@ -320,7 +324,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 **Phase 2**
 
-- Bulk CSV import
+- Bulk CSV import. *Built early, 2026-11-07, for the household index; admins only until review exists.*
 - Ingredient shopping links (Instacart or similar)
 - Saves, likes, "want to cook" lists, reviews, user descriptions
 - Contributor-written author bios, with the other user-written text, and top-ranked recipes on author pages, once ratings exist
@@ -371,7 +375,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Allergen data on ingredients: yes, presented as crowdsourced (see Allergen data)
 - [ ] Grocery partner and its API terms
 - [x] Edition handling when a recipe's page is unknown for an edition: a recipe_pages row with no page means "in this edition, page not recorded"; no row means not in it. The entry form starts a new recipe in every edition, with a page box each. *Chosen by Claude, 2026-11-07, following the model's existing rule.*
-- [ ] Seeding plan: start from the existing 125-cookbook household index (self-built CSV; first bulk import target)
+- [x] Seeding plan: start from the household index (122 books, 18,859 recipes), imported through the bulk importer
 - [ ] USPTO check on "Open Larder" (Classes 9 and 42)
 
 Not legal advice: have a lawyer review the content rules, the license, and the allergen notice before launch.

@@ -50,7 +50,7 @@ _UNITS = (
     "|quarts?|qts?|gallons?|pinch(?:es)?|dash(?:es)?|handfuls?|sticks?|cans?|tins?|jars?"
     "|packages?|pkgs?|packets?|sachets?|slices?|sprigs?|bunch(?:es)?|cloves?|heads?|knobs?"
 )
-_AMOUNT = re.compile(
+AMOUNT = re.compile(
     rf"^(?:[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+(?:[.,/]\d+)?(?:\s*(?:-|–|to)\s*\d+(?:[.,/]\d+)?)?"
     rf"\s*(?:{_UNITS})\b\.?)",
     re.IGNORECASE,
@@ -102,7 +102,7 @@ def clean(title: str, pages: list[tuple[uuid.UUID, str | None]], lines: list[str
     if len(kept) > MAX_LINES:
         raise InvalidRecipe(f"A recipe can have at most {MAX_LINES} ingredient lines.")
     for line in kept:
-        if _AMOUNT.match(line):
+        if AMOUNT.match(line):
             raise InvalidRecipe(
                 f"Leave out the amount in “{line}”. Just the ingredient, like “rhubarb”."
             )

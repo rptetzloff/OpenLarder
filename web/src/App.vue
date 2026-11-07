@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from "vue";
 import NameForm from "./components/NameForm.vue";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
+import AdminImportPage from "./pages/AdminImportPage.vue";
+import AdminPage from "./pages/AdminPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
@@ -19,6 +21,8 @@ const path = location.pathname.replace(/\/+$/, "");
 const page = pages[path];
 const onAccount = path === "/account";
 const onBooks = path === "/books";
+const onAdmin = path === "/admin";
+const onImport = path === "/admin/import";
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
 const bookId = match(`/books/${UUID}`);
@@ -59,6 +63,7 @@ onMounted(async () => {
   <header>
     <a href="/books" class="nav">Books</a>
     <template v-if="user">
+      <a v-if="user.is_admin" href="/admin">Admin</a>
       <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
       <!-- A form, not fetch: signing out ends at the broker, which ends the
            session there and sends the browser back here. -->
@@ -82,6 +87,8 @@ onMounted(async () => {
     </section>
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
+    <AdminPage v-else-if="onAdmin" :user="user" />
+    <AdminImportPage v-else-if="onImport" :user="user" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
@@ -364,6 +371,10 @@ button.primary:disabled {
 }
 .recipe-form .page-input:disabled {
   opacity: 0.5;
+}
+progress {
+  width: 100%;
+  accent-color: var(--accent);
 }
 .admin-actions {
   display: flex;
