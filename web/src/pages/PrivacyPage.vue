@@ -30,9 +30,9 @@ document.title = "Privacy policy · OpenLarder";
       to build profiles of anyone.
     </p>
     <p>
-      Book covers are shown from <a href="https://openlibrary.org">Open Library</a>, run by the
-      Internet Archive, so your browser fetches each cover from it, and it sees your IP address
-      when it does.
+      Book covers come from <a href="https://openlibrary.org">Open Library</a>, run by the
+      Internet Archive. OpenLarder fetches each one and serves it itself, so your browser
+      doesn't contact Open Library to show a cover.
     </p>
 
     <h2>Accounts</h2>

@@ -137,7 +137,7 @@ async def test_adding_a_book_stores_work_edition_and_author(admin, adb) -> None:
     (edition,) = book["editions"]
     assert edition["isbn13"] == PINK_CAKE
     assert edition["title"] is None  # same as the work's
-    assert edition["cover_url"] == "https://covers.openlibrary.org/b/id/14125211-M.jpg"
+    assert edition["cover_url"] == "/covers/14125211-M.jpg"
     assert edition["open_library_url"] == "https://openlibrary.org/books/OL40203348M"
     assert book["recipes"] == []
 
@@ -224,7 +224,7 @@ async def test_the_list_is_public_and_alphabetical(admin, client, openlib) -> No
 
     books = (await client.get("/api/books")).json()
     assert [b["title"] for b in books] == ["apple pies", "Love Is a Pink Cake"]
-    assert books[0]["cover_url"] == "https://covers.openlibrary.org/b/id/14125211-M.jpg"
+    assert books[0]["cover_url"] == "/covers/14125211-M.jpg"
     assert books[1]["authors"] == ["Claire Ptak"]
     assert books[1]["editions"] == 1
 
