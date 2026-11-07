@@ -6,7 +6,10 @@ throwaway database beside the configured one, migrates it with the real
 migration, and drops it at the end.
 """
 
+import asyncio
 import os
+import selectors
+import sys
 import uuid
 from collections.abc import Iterator
 
@@ -17,6 +20,12 @@ from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.engine import make_url
 
 from openlarder.config import get_settings
+
+if sys.platform == "win32":
+    # Psycopg's async mode refuses Windows' default proactor loop. Linux, where
+    # CI and production run, needs nothing, so the hook exists only here.
+    def pytest_asyncio_loop_factories(config, item):
+        return {"selector": lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())}
 
 
 @pytest.fixture(scope="session")

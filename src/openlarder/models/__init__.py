@@ -1,3 +1,4 @@
+from openlarder.models.accounts import User, UserSession
 from openlarder.models.base import Base
 from openlarder.models.catalog import (
     Author,
@@ -35,6 +36,8 @@ __all__ = [
     "Substitution",
     "Tag",
     "TagKind",
+    "User",
+    "UserSession",
     "Work",
     "WorkCredit",
     "WorkTag",

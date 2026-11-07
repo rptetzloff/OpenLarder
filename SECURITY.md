@@ -1,9 +1,9 @@
 # Security policy
 
 OpenLarder is a public index of the recipes in cookbooks: a FastAPI service on
-Postgres with a Vue front end. Today it serves a health check and nothing else;
-accounts, contributions, moderation and the public API are being built. This
-policy will grow with them.
+Postgres with a Vue front end. Today it serves a health check and sign-in;
+contributions, moderation and the public API are being built. This policy will
+grow with them.
 
 ## Reporting a vulnerability
 
@@ -27,10 +27,13 @@ branches and no backports: the fix lands on `main` and deploys.
 
 ## In scope
 
-- **Anything that lets one person act as another**, or act above their trust
-  level, once accounts exist: publishing without review, reverting or merging
-  without the right level, reaching another user's private lists, or curating
-  an author page without being verified as that author.
+- **Anything that lets one person act as another**: signing in as someone
+  else, or a session that can be guessed, forged, stolen through the page, or
+  still works after signing out.
+- **Acting above one's trust level**, as those features arrive: publishing
+  without review, reverting or merging without the right level, reaching
+  another user's private lists, or curating an author page without being
+  verified as that author.
 - **Edit history.** Every change to the catalog is meant to be recorded and
   revertible. A way to change a record without leaving a revision is a finding.
 - **Cross-site scripting**, anywhere user-written text is shown: reviews,
@@ -42,5 +45,10 @@ branches and no backports: the fix lands on `main` and deploys.
 - **The catalog is public on purpose.** Books, recipes, page numbers and
   ingredients are open data under the ODbL, and reading or bulk-downloading
   them is the point.
+- **Signing out of OpenLarder does not sign you out of the broker**
+  (Authentik). Signing back in may go straight through without a password.
+  Signing out there is done at `auth.openlarder.com`.
+- **A failed sign-in tells the browser only that it failed.** The reason is
+  logged on the server.
 - **`/readyz` reports the database's reachability and the schema revision.**
   Both are operational facts with no secret in them.
