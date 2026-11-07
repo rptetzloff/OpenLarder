@@ -24,14 +24,15 @@ from openlarder.auth import (
     SESSION_COOKIE,
     SESSION_LIFETIME,
     CurrentUser,
-    display_name_from,
     get_oidc_client,
     optional_oidc_client,
     sign_in,
     sign_out,
+    suggested_name_from,
 )
 from openlarder.config import Settings, get_settings
 from openlarder.db import Session
+from openlarder.models import User
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -43,7 +44,21 @@ Config = Annotated[Settings, Depends(get_settings)]
 
 class Me(BaseModel):
     id: str
-    display_name: str
+    # None until the person chooses one; the SPA then asks for it.
+    display_name: str | None
+    suggested_name: str | None
+    # Where to manage sign-in methods and passkeys: Authgear's own page.
+    account_url: str | None
+
+
+def me_for(user: User, settings: Settings) -> Me:
+    issuer = settings.oidc_issuer
+    return Me(
+        id=str(user.id),
+        display_name=user.display_name,
+        suggested_name=user.suggested_name if user.display_name is None else None,
+        account_url=issuer.rstrip("/") + "/settings" if issuer else None,
+    )
 
 
 def callback_url(request: Request, settings: Settings) -> str:
@@ -81,7 +96,7 @@ async def callback(
         return RedirectResponse("/?sign-in=failed", status.HTTP_303_SEE_OTHER)
 
     raw = await sign_in(
-        session, claims["iss"], claims["sub"], display_name_from(claims), token.get("id_token")
+        session, claims["iss"], claims["sub"], suggested_name_from(claims), token.get("id_token")
     )
     await session.commit()
 
@@ -99,8 +114,8 @@ async def callback(
 
 
 @router.get("/me", response_model=Me)
-async def me(user: CurrentUser) -> Me:
-    return Me(id=str(user.id), display_name=user.display_name)
+async def me(user: CurrentUser, settings: Config) -> Me:
+    return me_for(user, settings)
 
 
 @router.post("/logout")

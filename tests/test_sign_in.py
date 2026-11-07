@@ -1,220 +1,34 @@
 """Sign-in, against a fake broker and the real database.
 
-The broker is faked at the HTTP layer, below Authlib: it publishes discovery
-metadata and a key set, and its token endpoint checks the client secret, the
-PKCE verifier and the redirect URI before handing back an RS256 ID token. So
-these tests exercise Authlib's real checks and the app's real routes; what
-they cannot show is that Authentik behaves like the fake. That is checked by
-signing in on the deployed site.
+The fake broker, and what it can and cannot show, is described in
+fake_broker.py; the fixtures that use it are in conftest.py.
 """
 
-import base64
-import hashlib
-import secrets
 import time
-from collections.abc import AsyncIterator, Iterator
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import httpx2
 import pytest
 from alembic import command
-from joserfc import jwt
-from joserfc.jwk import KeySet, RSAKey
+from joserfc.jwk import RSAKey
 from pydantic import ValidationError
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
-from openlarder.auth import SESSION_COOKIE, build_oidc_client, hash_token, optional_oidc_client
-from openlarder.config import Settings, get_settings
-from openlarder.db import get_session
+from fake_broker import (
+    CLIENT_ID,
+    ISSUER,
+    _count,
+    _failed,
+    _session_cookie,
+    _settings,
+    _sign_in,
+    _start,
+)
+from openlarder.auth import SESSION_COOKIE, hash_token
+from openlarder.config import Settings
 from openlarder.main import app
-
-ISSUER = "https://broker.test/application/o/openlarder/"
-CLIENT_ID = "openlarder-test"
-CLIENT_SECRET = "s3cret"
-
-
-class FakeBroker:
-    """Just enough of an OpenID provider to sign someone in."""
-
-    def __init__(self) -> None:
-        self.key = RSAKey.generate_key(2048, parameters={"kid": "k1"})
-        self.codes: dict[str, dict[str, str]] = {}
-        self.subject = "subject-1"
-        self.name = "Test Cook"
-        self.overrides: dict[str, Any] = {}
-        self.signing_key = self.key
-        self.token_requests = 0
-        self.last_id_token = ""
-        self.issuer = ISSUER
-        self.end_session = True
-
-    def approve(self, authorize_url: str) -> tuple[str, str]:
-        """The person signs in at the broker; returns the code and state it redirects with."""
-        query = {k: v[0] for k, v in parse_qs(urlsplit(authorize_url).query).items()}
-        code = secrets.token_urlsafe(8)
-        self.codes[code] = query
-        return code, query["state"]
-
-    def handle(self, request: httpx2.Request) -> httpx2.Response:
-        path = request.url.path
-        if path.endswith("/.well-known/openid-configuration"):
-            metadata = {
-                "issuer": self.issuer,
-                "authorization_endpoint": "https://broker.test/authorize/",
-                "token_endpoint": "https://broker.test/token/",
-                "jwks_uri": "https://broker.test/jwks/",
-                "id_token_signing_alg_values_supported": ["RS256"],
-            }
-            if self.end_session:
-                metadata["end_session_endpoint"] = "https://broker.test/end-session/"
-            return httpx2.Response(200, json=metadata)
-        if path == "/jwks/":
-            return httpx2.Response(200, json=KeySet([self.key]).as_dict(private=False))
-        if path == "/token/":
-            self.token_requests += 1
-            return self._token(request)
-        return httpx2.Response(404)
-
-    def _token(self, request: httpx2.Request) -> httpx2.Response:
-        basic = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
-        if request.headers.get("authorization") != f"Basic {basic}":
-            return httpx2.Response(401, json={"error": "invalid_client"})
-        form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
-        issued = self.codes.pop(form.get("code", ""), None)
-        if issued is None or form.get("redirect_uri") != issued["redirect_uri"]:
-            return httpx2.Response(400, json={"error": "invalid_grant"})
-        verifier = form.get("code_verifier", "")
-        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
-        if challenge.rstrip(b"=").decode() != issued["code_challenge"]:
-            return httpx2.Response(400, json={"error": "invalid_grant"})
-        now = int(time.time())
-        claims = {
-            "iss": self.issuer,
-            "sub": self.subject,
-            "aud": CLIENT_ID,
-            "iat": now,
-            "exp": now + 300,
-            "nonce": issued["nonce"],
-            "name": self.name,
-            **self.overrides,
-        }
-        id_token = jwt.encode({"alg": "RS256", "kid": "k1"}, claims, self.signing_key)
-        self.last_id_token = id_token
-        return httpx2.Response(
-            200,
-            json={
-                "access_token": "access",
-                "token_type": "Bearer",
-                "expires_in": 300,
-                "id_token": id_token,
-            },
-        )
-
-
-@pytest.fixture(scope="session")
-async def async_engine(database_url: str, engine) -> AsyncIterator[AsyncEngine]:
-    eng = create_async_engine(database_url)
-    yield eng
-    await eng.dispose()
-
-
-@pytest.fixture
-async def adb(async_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    """A session whose commits land in a savepoint and are rolled back after the test."""
-    async with async_engine.connect() as conn:
-        trans = await conn.begin()
-        session = AsyncSession(
-            bind=conn, join_transaction_mode="create_savepoint", expire_on_commit=False
-        )
-        try:
-            yield session
-        finally:
-            await session.close()
-            await trans.rollback()
-
-
-@pytest.fixture
-def broker() -> FakeBroker:
-    return FakeBroker()
-
-
-def _settings(**changes: Any) -> Settings:
-    values: dict[str, Any] = {
-        "oidc_issuer": ISSUER,
-        "oidc_client_id": CLIENT_ID,
-        "oidc_client_secret": CLIENT_SECRET,
-        "session_secret": "test-session-secret",
-        "public_url": None,
-    }
-    return Settings(**{**values, **changes})
-
-
-@pytest.fixture
-def configure(adb: AsyncSession, broker: FakeBroker) -> Iterator[Any]:
-    def apply(settings: Settings) -> None:
-        app.dependency_overrides[get_settings] = lambda: settings
-        if settings.sign_in_configured:
-            # Built once per configuration, as in production, so the metadata
-            # and keys are fetched once.
-            client = build_oidc_client(
-                ISSUER, CLIENT_ID, CLIENT_SECRET, httpx2.MockTransport(broker.handle)
-            )
-            app.dependency_overrides[optional_oidc_client] = lambda: client
-        else:
-            app.dependency_overrides.pop(optional_oidc_client, None)
-
-    async def session_override() -> AsyncIterator[AsyncSession]:
-        yield adb
-
-    app.dependency_overrides[get_session] = session_override
-    apply(_settings())
-    try:
-        yield apply
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.fixture
-async def client(configure) -> AsyncIterator[httpx2.AsyncClient]:
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="http://testserver"
-    ) as c:
-        yield c
-
-
-async def _start(client: httpx2.AsyncClient, broker: FakeBroker) -> tuple[str, str]:
-    response = await client.get("/api/auth/login")
-    assert response.status_code == 302
-    return broker.approve(response.headers["location"])
-
-
-async def _sign_in(client: httpx2.AsyncClient, broker: FakeBroker) -> httpx2.Response:
-    code, state = await _start(client, broker)
-    return await client.get("/api/auth/callback", params={"code": code, "state": state})
-
-
-async def _count(adb: AsyncSession, table: str) -> int:
-    return await adb.scalar(text(f"SELECT count(*) FROM {table}"))
-
-
-def _session_cookie(response: httpx2.Response) -> str:
-    """The session cookie's own Set-Cookie header, lowercased. The callback
-    also clears the sign-in cookie, whose attributes must not stand in."""
-    (header,) = [
-        h for h in response.headers.get_list("set-cookie") if h.startswith(f"{SESSION_COOKIE}=")
-    ]
-    return header.lower()
-
-
-def _failed(response: httpx2.Response) -> bool:
-    return (
-        response.status_code == 303
-        and response.headers["location"] == "/?sign-in=failed"
-        and SESSION_COOKIE not in response.cookies
-    )
 
 
 async def test_sign_in_creates_a_user_and_a_session(client, broker, adb) -> None:
@@ -226,7 +40,9 @@ async def test_sign_in_creates_a_user_and_a_session(client, broker, adb) -> None
     assert "httponly" in cookie and "samesite=lax" in cookie and "path=/" in cookie
     me = await client.get("/api/auth/me")
     assert me.status_code == 200
-    assert me.json()["display_name"] == "Test Cook"
+    # A first sign-in has chosen nothing yet; the provider's name is only a suggestion.
+    assert me.json()["display_name"] is None
+    assert me.json()["suggested_name"] == "Test Cook"
     row = (await adb.execute(text("SELECT issuer, subject FROM users"))).one()
     assert tuple(row) == (ISSUER, "subject-1")
 
@@ -320,7 +136,7 @@ async def test_signing_in_again_is_the_same_user(client, broker, adb) -> None:
 
     assert await _count(adb, "users") == 1
     assert await _count(adb, "user_sessions") == 2
-    assert (await client.get("/api/auth/me")).json()["display_name"] == "Renamed Cook"
+    assert (await client.get("/api/auth/me")).json()["suggested_name"] == "Renamed Cook"
 
 
 async def test_only_the_tokens_hash_is_stored(client, broker, adb) -> None:
@@ -465,7 +281,7 @@ def test_half_configured_sign_in_refuses_to_start(given, missing) -> None:
 
 def _user(db: Connection, subject: str = "s") -> Any:
     return db.execute(
-        text("INSERT INTO users (issuer, subject, display_name) VALUES (:i, :s, 'n') RETURNING id"),
+        text("INSERT INTO users (issuer, subject) VALUES (:i, :s) RETURNING id"),
         {"i": ISSUER, "s": subject},
     ).scalar_one()
 
@@ -480,7 +296,7 @@ def test_one_user_per_identity(db: Connection) -> None:
     _user(db, "same")
     _refused(
         db,
-        "INSERT INTO users (issuer, subject, display_name) VALUES (:i, 'same', 'other')",
+        "INSERT INTO users (issuer, subject) VALUES (:i, 'same')",
         i=ISSUER,
     )
 
