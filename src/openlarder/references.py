@@ -4,7 +4,8 @@ lines.py works out a line's options and what a reference resolves to; this
 writes that for a whole book at once. A book is the unit because a
 reference can point at any recipe in it, including one added after the
 recipe that cites it: adding, changing or removing a recipe, or importing a
-batch, relinks the recipe's whole book.
+batch, relinks the recipe's whole book. Relinking ends by matching the
+book's options to canonical ingredients (ingredients.py).
 
 Relinking is idempotent. An option already right is left as it is, so a
 canonical ingredient matched to it later survives. Reference flags are
@@ -18,7 +19,7 @@ from collections import defaultdict
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import lines
+from openlarder import ingredients, lines
 from openlarder.models import (
     FlagKind,
     IngredientOption,
@@ -105,6 +106,8 @@ async def relink(session: AsyncSession, work_id: uuid.UUID) -> None:
     for recipe_id, kind, detail in wanted_flags - seen:
         session.add(RecipeFlag(recipe_id=recipe_id, kind=kind, detail=detail))
     await session.flush()
+    # Options just written, and any never matched, get their ingredients.
+    await ingredients.match_book(session, work_id)
 
 
 async def release(session: AsyncSession, recipe_id: uuid.UUID) -> None:

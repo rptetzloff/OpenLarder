@@ -7,6 +7,8 @@ import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import FlagsPage from "./pages/FlagsPage.vue";
+import IngredientPage from "./pages/IngredientPage.vue";
+import IngredientsPage from "./pages/IngredientsPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
@@ -23,6 +25,7 @@ const path = location.pathname.replace(/\/+$/, "");
 const page = pages[path];
 const onAccount = path === "/account";
 const onBooks = path === "/books";
+const onIngredients = path === "/ingredients";
 const onAdmin = path === "/admin";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
@@ -32,6 +35,7 @@ const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.
 const bookId = match(`/books/${UUID}`);
 const newRecipeFor = match(`/books/${UUID}/recipes/new`);
 const recipeId = match(`/recipes/${UUID}`);
+const ingredientId = match(`/ingredients/${UUID}`);
 const editRecipeId = match(`/recipes/${UUID}/edit`);
 
 // A placeholder until there is a catalog to show: proves the SPA reaches the
@@ -65,7 +69,8 @@ onMounted(async () => {
 
 <template>
   <header>
-    <a href="/books" class="nav">Books</a>
+    <a href="/books">Books</a>
+    <a href="/ingredients" class="nav">Ingredients</a>
     <template v-if="user">
       <a v-if="user.is_admin" href="/admin">Admin</a>
       <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
@@ -91,6 +96,8 @@ onMounted(async () => {
     </section>
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
+    <IngredientsPage v-else-if="onIngredients" />
+    <IngredientPage v-else-if="ingredientId" :id="ingredientId" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
     <AdminImportsPage v-else-if="onImports" :user="user" />

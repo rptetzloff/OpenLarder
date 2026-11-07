@@ -113,7 +113,9 @@ def _option(
 def test_option_has_at_most_one_target(db: Connection) -> None:
     work = _work(db)
     recipe, blend = _recipe(db, work), _recipe(db, work, "Flour Blend")
-    flour = _insert(db, "INSERT INTO ingredients (name) VALUES ('rice flour')")
+    flour = _insert(
+        db, "INSERT INTO ingredients (name, match_key) VALUES ('rice flour', 'rice flour')"
+    )
     line = _line(db, recipe, 1, "2 cups flour")
     _option(db, line, recipe, 1, "flour")  # not matched yet
     _option(db, line, recipe, 2, "rice flour", ingredient=flour)
@@ -124,8 +126,12 @@ def test_option_has_at_most_one_target(db: Connection) -> None:
 def test_line_ranks_a_first_choice_and_fallbacks(db: Connection) -> None:
     work = _work(db)
     recipe = _recipe(db, work, "Cottage Cheese Pancakes")
-    grapeseed = _insert(db, "INSERT INTO ingredients (name) VALUES ('grapeseed oil')")
-    olive = _insert(db, "INSERT INTO ingredients (name) VALUES ('olive oil')")
+    grapeseed = _insert(
+        db, "INSERT INTO ingredients (name, match_key) VALUES ('grapeseed oil', 'grapeseed oil')"
+    )
+    olive = _insert(
+        db, "INSERT INTO ingredients (name, match_key) VALUES ('olive oil', 'olive oil')"
+    )
     line = _line(db, recipe, 1, "Grapeseed Oil or Olive Oil")
     _option(db, line, recipe, 2, "Olive Oil", ingredient=olive)
     _option(db, line, recipe, 1, "Grapeseed Oil", ingredient=grapeseed)
@@ -153,12 +159,19 @@ def test_option_cannot_list_its_own_recipe_or_claim_another_recipes_line(
 
 
 def test_ingredient_names_are_unique_ignoring_case(db: Connection) -> None:
-    _insert(db, "INSERT INTO ingredients (name) VALUES ('Green Onion')")
-    _refused(db, lambda: _insert(db, "INSERT INTO ingredients (name) VALUES ('green onion')"))
+    _insert(db, "INSERT INTO ingredients (name, match_key) VALUES ('Green Onion', 'Green Onion')")
+    _refused(
+        db,
+        lambda: _insert(
+            db, "INSERT INTO ingredients (name, match_key) VALUES ('green onion', 'other key')"
+        ),
+    )
 
 
 def test_alias_unique_per_region_including_unmarked(db: Connection) -> None:
-    onion = _insert(db, "INSERT INTO ingredients (name) VALUES ('green onion')")
+    onion = _insert(
+        db, "INSERT INTO ingredients (name, match_key) VALUES ('green onion', 'green onion')"
+    )
     alias = "INSERT INTO ingredient_aliases (ingredient_id, name, region) VALUES (:i, :n, :r)"
     _insert(db, alias, i=onion, n="scallion", r=None)
     _insert(db, alias, i=onion, n="spring onion", r="UK")
@@ -171,7 +184,7 @@ def test_alias_unique_per_region_including_unmarked(db: Connection) -> None:
 def test_ingredient_in_use_cannot_be_deleted(db: Connection) -> None:
     work = _work(db)
     recipe = _recipe(db, work)
-    egg = _insert(db, "INSERT INTO ingredients (name) VALUES ('egg')")
+    egg = _insert(db, "INSERT INTO ingredients (name, match_key) VALUES ('egg', 'egg')")
     _option(db, _line(db, recipe, 1, "1 egg"), recipe, 1, "egg", ingredient=egg)
     _refused(db, lambda: db.execute(text("DELETE FROM ingredients WHERE id = :i"), {"i": egg}))
 
@@ -412,7 +425,7 @@ def _swap(db: Connection, **cols) -> uuid.UUID:
 
 
 def _ingredient(db: Connection, name: str) -> uuid.UUID:
-    return _insert(db, "INSERT INTO ingredients (name) VALUES (:n)", n=name)
+    return _insert(db, "INSERT INTO ingredients (name, match_key) VALUES (:n, :n)", n=name)
 
 
 def test_substitution_from_a_book_and_between_blends(db: Connection) -> None:

@@ -22,6 +22,7 @@ export interface Recipe {
       name: string;
       page: string | null;
       recipe: { id: string; title: string } | null;
+      ingredient: { id: string; name: string } | null;
     }[];
   }[];
   // Recipes in the book that use this one.

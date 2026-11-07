@@ -18,6 +18,7 @@ from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
+    Ingredient,
     IngredientOption,
     Recipe,
     RecipeIngredient,
@@ -57,12 +58,18 @@ class RecipeLink(BaseModel):
     title: str
 
 
+class IngredientLink(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class OptionOut(BaseModel):
     name: str
     # The page the line cites, as written; the linked recipe's own page can
     # differ, when the line has it wrong.
     page: str | None
     recipe: RecipeLink | None
+    ingredient: IngredientLink | None
 
 
 class LineOut(BaseModel):
@@ -121,6 +128,18 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
         )
     ).all()
     linked: dict[uuid.UUID, dict[int, RecipeLink]] = {}
+    matched: dict[uuid.UUID, dict[int, IngredientLink]] = {}
+    for line_id, rank, ingredient_id, name in await session.execute(
+        select(
+            IngredientOption.recipe_ingredient_id,
+            IngredientOption.rank,
+            Ingredient.id,
+            Ingredient.name,
+        )
+        .join(Ingredient, Ingredient.id == IngredientOption.ingredient_id)
+        .where(IngredientOption.recipe_id == recipe.id)
+    ):
+        matched.setdefault(line_id, {})[rank] = IngredientLink(id=ingredient_id, name=name)
     for line_id, rank, sub_id, sub_title in await session.execute(
         select(
             IngredientOption.recipe_ingredient_id,
@@ -164,6 +183,7 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
                         name=option.name,
                         page=option.page,
                         recipe=linked.get(line_id, {}).get(rank),
+                        ingredient=matched.get(line_id, {}).get(rank),
                     )
                     for rank, option in enumerate(line_reading.options(text), start=1)
                 ],
