@@ -64,6 +64,9 @@ async function remove() {
           <template v-for="(o, j) in line.options" :key="j">
             <template v-if="j > 0">{{ j < line.options.length - 1 ? ", " : line.options.length > 2 ? ", or " : " or " }}</template>
             <a v-if="o.recipe" :href="`/recipes/${o.recipe.id}`">{{ o.name }}</a>
+            <a v-else-if="o.ingredient" :href="`/ingredients/${o.ingredient.id}`">{{
+              o.name
+            }}</a>
             <template v-else>{{ o.name }}</template>
             <span v-if="o.page" class="page-ref">p. {{ o.page }}</span>
           </template>

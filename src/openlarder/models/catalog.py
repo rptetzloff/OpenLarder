@@ -245,6 +245,7 @@ class Ingredient(Timestamps, Base):
     __table_args__ = (
         CheckConstraint("name <> ''", name="name_not_empty"),
         CheckConstraint("parent_id <> id", name="not_own_parent"),
+        CheckConstraint("match_key <> ''", name="match_key_not_empty"),
         Index("uq_ingredients_name", text("lower(name)"), unique=True),
         Index("ix_ingredients_parent_id", "parent_id"),
         _trgm("ingredients", "name"),
@@ -252,6 +253,9 @@ class Ingredient(Timestamps, Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # What lines are matched by: the name without case, plurals or
+    # punctuation (migration 0015). ingredients.match_key makes it.
+    match_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     # What to search for at a grocer, when it differs from the name.
     shopping_term: Mapped[str | None] = mapped_column(Text)
     # Broader ingredient, for search: aged cheddar -> cheddar -> cheese.

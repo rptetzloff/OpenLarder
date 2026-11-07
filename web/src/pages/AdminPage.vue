@@ -6,7 +6,8 @@ import type { Me } from "../me";
 defineProps<{ user: Me | null | undefined }>();
 document.title = "Admin · OpenLarder";
 
-// Links page references in recipes stored before linking existed. One
+// Links page references and matches ingredients in recipes stored before
+// either existed. One
 // request a book, so none runs long; running it again changes nothing.
 const linking = ref(false);
 const progress = ref("");
@@ -45,14 +46,14 @@ async function linkAll() {
         <li><a href="/admin/imports">Import history</a>: every import, with its totals and report.</li>
         <li><a href="/admin/flags">Flagged recipes</a>: everything an entry or import flagged for a look.</li>
       </ul>
-      <h2>Recipe references</h2>
+      <h2>References and ingredients</h2>
       <p class="status">
-        Links each “(p. 269)” in an ingredient list to the recipe on that page, in every book.
-        New and edited recipes are linked as they're saved; this catches up the ones stored
-        before.
+        Links each “(p. 269)” in an ingredient list to the recipe on that page, and matches every
+        other ingredient to its canonical ingredient, in every book. New and edited recipes are
+        done as they're saved; this catches up the ones stored before.
       </p>
       <button type="button" class="primary" :disabled="linking" @click="linkAll">
-        {{ linking ? "Linking…" : "Link references in every book" }}
+        {{ linking ? "Linking…" : "Link references and ingredients" }}
       </button>
       <p v-if="progress" class="status" aria-live="polite">{{ progress }}</p>
       <p v-if="linkError" class="error" role="alert">{{ linkError }}</p>

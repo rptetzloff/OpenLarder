@@ -249,10 +249,13 @@ async def test_a_reference_links_once_its_recipe_is_added(admin, work, adb) -> N
                 "name": "Basic Cauli-Rice",
                 "page": "269",
                 "recipe": {"id": rice, "title": "Basic Cauli-Rice"},
+                "ingredient": None,
             }
         ],
     }
-    assert shown["lines"][0]["options"] == [{"name": "Chicken", "page": None, "recipe": None}]
+    (chicken,) = shown["lines"][0]["options"]
+    assert (chicken["name"], chicken["recipe"]) == ("Chicken", None)
+    assert chicken["ingredient"]["name"] == "Chicken"
     # The flag no longer applies, so it went.
     assert await _flags(adb) == []
     used = (await admin.get(f"/api/recipes/{rice}")).json()["used_in"]
@@ -324,10 +327,10 @@ async def test_a_wrong_page_is_linked_and_flagged(admin, work, adb) -> None:
 
 
 async def test_relinking_leaves_a_matched_option_alone(admin, work, adb) -> None:
-    """An option already right keeps what was hung off it, like a canonical match."""
+    """An option already right keeps what was hung off it, like a corrected match."""
     await _add(admin, work, "Curry", "101", ["Garlic"])
     ingredient = await adb.scalar(
-        text("INSERT INTO ingredients (name) VALUES ('garlic') RETURNING id")
+        text("INSERT INTO ingredients (name, match_key) VALUES ('Ail', 'ail') RETURNING id")
     )
     await adb.execute(text("UPDATE ingredient_options SET ingredient_id = :i"), {"i": ingredient})
     await _add(admin, work, "Tacos", "300", ["Tortilla"])
