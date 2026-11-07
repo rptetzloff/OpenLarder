@@ -45,9 +45,9 @@ branches and no backports: the fix lands on `main` and deploys.
 - **The catalog is public on purpose.** Books, recipes, page numbers and
   ingredients are open data under the ODbL, and reading or bulk-downloading
   them is the point.
-- **Signing out of OpenLarder does not sign you out of the broker**
-  (Authentik). Signing back in may go straight through without a password.
-  Signing out there is done at `auth.openlarder.com`.
+- **Signing out does not sign you out of Google or GitHub.** It ends the
+  OpenLarder session and then the broker's (Authentik's), and stops there, as
+  signing out of any site does.
 - **A failed sign-in tells the browser only that it failed.** The reason is
   logged on the server.
 - **`/readyz` reports the database's reachability and the schema revision.**

@@ -58,6 +58,12 @@ Authentik, which matches redirect URIs exactly, would refuse it. Authentik
 accepts three: `/api/auth/callback` on `localhost:5173`, `localhost:8000` and
 `openlarder.com`. A new address needs adding there first.
 
+Signing out goes on to Authentik's end-session endpoint, which returns people
+to `https://openlarder.com/`. That address is registered in Authentik as a
+**Post Logout** redirect URI. The OpenLarder provider's invalidation flow
+needs a **User Logout** stage, or Authentik keeps its own session and the next
+sign-in goes straight through.
+
 `/healthz` answers when the process is up; `/readyz` when it can reach the
 database, with the schema revision it is on. The API docs are at `/api/docs`.
 

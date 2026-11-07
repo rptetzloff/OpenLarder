@@ -26,7 +26,7 @@ from sqlalchemy import Connection, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
-from openlarder.auth import SESSION_COOKIE, build_oidc_client, get_oidc_client, hash_token
+from openlarder.auth import SESSION_COOKIE, build_oidc_client, hash_token, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
 from openlarder.main import app
@@ -48,6 +48,7 @@ class FakeBroker:
         self.signing_key = self.key
         self.token_requests = 0
         self.issuer = ISSUER
+        self.end_session = True
 
     def approve(self, authorize_url: str) -> tuple[str, str]:
         """The person signs in at the broker; returns the code and state it redirects with."""
@@ -59,16 +60,16 @@ class FakeBroker:
     def handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
         if path.endswith("/.well-known/openid-configuration"):
-            return httpx2.Response(
-                200,
-                json={
-                    "issuer": self.issuer,
-                    "authorization_endpoint": "https://broker.test/authorize/",
-                    "token_endpoint": "https://broker.test/token/",
-                    "jwks_uri": "https://broker.test/jwks/",
-                    "id_token_signing_alg_values_supported": ["RS256"],
-                },
-            )
+            metadata = {
+                "issuer": self.issuer,
+                "authorization_endpoint": "https://broker.test/authorize/",
+                "token_endpoint": "https://broker.test/token/",
+                "jwks_uri": "https://broker.test/jwks/",
+                "id_token_signing_alg_values_supported": ["RS256"],
+            }
+            if self.end_session:
+                metadata["end_session_endpoint"] = "https://broker.test/end-session/"
+            return httpx2.Response(200, json=metadata)
         if path == "/jwks/":
             return httpx2.Response(200, json=KeySet([self.key]).as_dict(private=False))
         if path == "/token/":
@@ -159,9 +160,9 @@ def configure(adb: AsyncSession, broker: FakeBroker) -> Iterator[Any]:
             client = build_oidc_client(
                 ISSUER, CLIENT_ID, CLIENT_SECRET, httpx2.MockTransport(broker.handle)
             )
-            app.dependency_overrides[get_oidc_client] = lambda: client
+            app.dependency_overrides[optional_oidc_client] = lambda: client
         else:
-            app.dependency_overrides.pop(get_oidc_client, None)
+            app.dependency_overrides.pop(optional_oidc_client, None)
 
     async def session_override() -> AsyncIterator[AsyncSession]:
         yield adb
@@ -327,15 +328,53 @@ async def test_only_the_tokens_hash_is_stored(client, broker, adb) -> None:
     assert token.encode() not in stored
 
 
+def _query(url: str) -> dict[str, str]:
+    return {k: v[0] for k, v in parse_qs(urlsplit(url).query).items()}
+
+
 async def test_signing_out_ends_the_session(client, broker, adb) -> None:
     token = (await _sign_in(client, broker)).cookies[SESSION_COOKIE]
     response = await client.post("/api/auth/logout")
 
-    assert response.status_code == 204
+    assert response.status_code == 303
     assert await _count(adb, "user_sessions") == 0
+    assert "max-age=0" in _session_cookie(response)
     # The old token is dead, not merely forgotten by this browser.
     client.cookies.set(SESSION_COOKIE, token)
     assert (await client.get("/api/auth/me")).status_code == 401
+
+
+async def test_signing_out_goes_on_to_end_the_brokers_session(client, broker) -> None:
+    await _sign_in(client, broker)
+    location = (await client.post("/api/auth/logout")).headers["location"]
+
+    assert location.startswith("https://broker.test/end-session/?")
+    query = _query(location)
+    assert query["client_id"] == CLIENT_ID
+    assert query["post_logout_redirect_uri"] == "http://testserver/"
+
+
+async def test_signing_out_returns_to_the_public_url(client, broker, configure) -> None:
+    configure(_settings(public_url="https://openlarder.test"))
+    location = (await client.post("/api/auth/logout")).headers["location"]
+    assert _query(location)["post_logout_redirect_uri"] == "https://openlarder.test/"
+
+
+async def test_without_a_broker_end_session_signing_out_still_ends_it_here(
+    client, broker, adb
+) -> None:
+    broker.end_session = False
+    await _sign_in(client, broker)
+    response = await client.post("/api/auth/logout")
+
+    assert (response.status_code, response.headers["location"]) == (303, "/")
+    assert await _count(adb, "user_sessions") == 0
+
+
+async def test_signing_out_with_sign_in_unconfigured_goes_home(client, configure) -> None:
+    configure(Settings(oidc_issuer=None, oidc_client_id=None, oidc_client_secret=None))
+    response = await client.post("/api/auth/logout")
+    assert (response.status_code, response.headers["location"]) == (303, "/")
 
 
 async def test_an_expired_session_is_not_signed_in(client, broker, adb) -> None:
