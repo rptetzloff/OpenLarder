@@ -64,7 +64,7 @@ jobs:
         # as more than it is.
         run: |
           echo "Covered: schema constraints, migration up and down, models vs migration."
-          echo "NOT covered: CHECK constraints and expression indexes by alembic check (tests cover them)."
+          echo "NOT covered: CHECK constraints and expression indexes by alembic check (tests cover their behaviour, and CHECK names against the models)."
 
   web:
     runs-on: ubuntu-latest
