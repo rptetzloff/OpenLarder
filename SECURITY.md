@@ -46,12 +46,10 @@ branches and no backports: the fix lands on `main` and deploys.
   ingredients are open data under the ODbL, and reading or bulk-downloading
   them is the point.
 - **Signing out does not sign you out of Google or GitHub.** It ends the
-  OpenLarder session and then the broker's (Authentik's), and stops there, as
+  OpenLarder session and then the broker's (Authgear's), and stops there, as
   signing out of any site does.
-- **An emailed sign-in link works for 15 minutes and can be used more than
-  once in that time.** Whoever opens it is signed in, so it is as sensitive
-  as the inbox it was sent to. Authentik enforces the expiry; reuse within
-  the window is how its email stage works.
+- **An emailed sign-in link or code signs in whoever uses it**, so it is as
+  sensitive as the inbox it was sent to.
 - **A failed sign-in tells the browser only that it failed.** The reason is
   logged on the server.
 - **`/readyz` reports the database's reachability and the schema revision.**

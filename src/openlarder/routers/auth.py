@@ -123,8 +123,9 @@ async def logout(
     if broker is not None and ended is not None and ended.found:
         try:
             if ended.id_token:
-                # Authentik refuses a post_logout_redirect_uri that comes
-                # without id_token_hint ("The request is otherwise malformed").
+                # Authentik, used before Authgear, refuses a post_logout_redirect_uri
+                # that comes without id_token_hint ("The request is otherwise
+                # malformed"). Authgear accepts either.
                 logout_url = await broker.create_logout_url(
                     post_logout_redirect_uri=home_url(request, settings),
                     id_token_hint=ended.id_token,

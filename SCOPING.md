@@ -81,7 +81,7 @@ Built in migration 0004. A substitution goes one way: the reverse is its own ent
 
 **Allergen data**
 
-Ingredients carry allergen data (contains dairy, gluten, egg). This lets the site offer substitutions for a diet automatically, not only where someone has entered one. *Decided by Ray, 2026-11-06, on the condition that it is presented as crowdsourced information.*
+Ingredients carry allergen data (contains dairy, gluten, egg). This lets the site offer substitutions for a diet automatically, not only where someone has entered one. *Decided by Ray, 2026-11-06, on the condition that it is presented as crowdsourced information.* It can come from contributors or from the ingredient data source, where that source records it. *Ray, 2026-11-07.*
 
 - Wherever allergen data or a diet-based suggestion appears, a notice says it is crowdsourced and unverified, and that it is not a guarantee a recipe is safe for anyone.
 - The site never labels a recipe "safe for" an allergy. It can say what the catalog records about the ingredients, and nothing more.
@@ -149,14 +149,22 @@ OpenLarder signs people in through an identity broker, and talks to the broker w
 
 - **Google and GitHub first**, more later. GitHub's sign-in is plain OAuth, not OpenID Connect: a site gets a token and asks GitHub's API who the user is. That is why a broker rather than generic OIDC in the app: the app would otherwise need separate code for GitHub.
 - **Email accounts too**, for people who use neither Google nor GitHub. *Decided by Ray, 2026-11-06.*
-- **Email accounts sign in by an emailed link, not a password**, and can add a passkey to skip the email. No passwords means none to leak, reuse or reset; with 30-day sessions, waiting for an email is rare. *Decided by Ray, 2026-11-06, superseding "by password or sign-in link".* The link works for 15 minutes, can be opened more than once in that time, and signs in whichever browser opens it. All of this is Authentik configuration; OpenLarder's code is unchanged.
-- **Authentik first.** Coolify offers it as a ready-made service, so Ray is trying it first. Keycloak is the fallback if Authentik doesn't work out. *Decided by Ray, 2026-11-06.*
+- **Email accounts sign in by an emailed link, not a password**, and can add a passkey to skip the email. No passwords means none to leak, reuse or reset; with 30-day sessions, waiting for an email is rare. *Decided by Ray, 2026-11-06, superseding "by password or sign-in link".* A six-digit emailed code is acceptable too. *Ray, 2026-11-07.* Under Authentik the link lasted 15 minutes and could be reused within them; Authgear's limits are not yet checked (see Open decisions). All of this is broker configuration; OpenLarder's code is unchanged.
+- **Authgear Cloud**, on its free plan, at `auth.openlarder.com` (a custom domain on top of `openlarder.authgear.cloud`). *Decided by Ray, 2026-11-07.* It does every method above, speaks standard OpenID Connect, and answers in about 0.2 s. Self-hosted Authgear needs about nine containers and recommends Kubernetes, so it waits until there is a reason for it; moving there later is a change of settings, not code. Passkeys are tied to the sign-in domain, which is why the custom domain went on before anyone added one: changing it later breaks every passkey.
+
+*Superseded 2026-11-07: "Authentik first, Keycloak the fallback" (Ray, 2026-11-06). Authentik worked, but every request took 5–7× longer than on a modern core, because coolify-prod1's CPUs are 2014 Haswell Xeons (issue #18). Also weighed: ZITADEL, which cannot sign in by email alone; Keycloak, Ory and WorkOS, which lack an emailed link or need add-ons; Auth0 and Clerk, hosted but with more lock-in; SuperTokens, the most code; Supabase, whose passkeys are beta.*
 
 *Superseded 2026-11-06: the stack table named "generic OIDC (e.g. Zitadel)". Zitadel was weighed and not chosen.*
 
-**Built** (migration 0006). Signing in creates a user keyed by the broker's issuer and subject, so OpenLarder never learns which provider someone used. It stores a display name, refreshed from the broker at each sign-in, and no email address: nothing sends mail yet. *Chosen by Claude, 2026-11-06: keep personal data out until a feature needs it.* A session is a random token in an HttpOnly cookie, kept 30 days, with only its hash stored. It also keeps the ID token from sign-in, which Authentik needs before it will send someone back after signing out (migration 0007). Signing out ends the OpenLarder session, then sends the browser to the broker to end its session too, and back to the front page. *Superseded 2026-11-06: it first ended only the OpenLarder session, so the next sign-in went straight through. Ray asked for a real sign-out.*
+**Built** (migration 0006). Signing in creates a user keyed by the broker's issuer and subject, so OpenLarder never learns which provider someone used. It stores a display name, refreshed from the broker at each sign-in, and no email address: nothing sends mail yet. *Chosen by Claude, 2026-11-06: keep personal data out until a feature needs it.* A session is a random token in an HttpOnly cookie, kept 30 days, with only its hash stored. It also keeps the ID token from sign-in, which Authentik needed before it would send someone back after signing out (migration 0007). Authgear does not require it but accepts it. Signing out ends the OpenLarder session, then sends the browser to the broker to end its session too, and back to the front page. *Superseded 2026-11-06: it first ended only the OpenLarder session, so the next sign-in went straight through. Ray asked for a real sign-out.*
 
-Not built yet: trust levels, agreeing to the ODbL before the first contribution, and the Google, GitHub and email sign-up flows, which are configured in Authentik rather than here.
+Not built yet: trust levels, agreeing to the ODbL before the first contribution, and the Google, GitHub and email sign-up flows, which are configured in Authgear rather than here. Google sign-in stays in Google's testing mode until the privacy policy and terms are published (see Privacy and terms).
+
+## Privacy and terms
+
+`/privacy` and `/terms` on the site. OpenLarder is run by Ray personally, contact is privacy@openlarder.com, and the terms are under Wisconsin law. *Decided by Ray, 2026-11-07.*
+
+Both pages are written from what the code actually does: what is stored, which services handle it, which cookies are set. They change in the same pull request as any change to those. They are not a template and not legal advice; the lawyer review planned for the content rules and the allergen notice covers them too.
 
 ## Contributions and moderation
 
@@ -230,7 +238,7 @@ Python and Vue, matching the structure of Sederunt and Sennight, self-hosted on 
 | Database | PostgreSQL | pg\_trgm for fuzzy ingredient matching, built-in full-text search |
 | Jobs and cache | Redis + Python worker (arq or RQ) | Bulk imports, Open Library lookups |
 | File storage | S3 (existing) | Covers, import files, Postgres backups; separate buckets or credentials for public assets vs backups |
-| Auth | Identity broker: Authentik (Keycloak as fallback) | Google and GitHub first, more providers later, plus email sign-up. See Sign-in |
+| Auth | Identity broker: Authgear Cloud | Google and GitHub first, more providers later, plus email sign-up. See Sign-in |
 | Hosting | Coolify (prod), Rancher Desktop with dockerd (dev) | One docker-compose.yml for both; Cloudflare Tunnel for public access |
 
 No multi-tenancy: one public catalog.
@@ -293,7 +301,10 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
 - [x] Base ingredient dataset: USDA FoodData Central, Wikidata as backup (see Ingredient normalization)
-- [x] Authentik or Keycloak: Authentik first, since Coolify offers it as a service; Keycloak if it doesn't work out
+- [x] Authentik or Keycloak: Authentik first, since Coolify offers it as a service; Keycloak if it doesn't work out. *Superseded 2026-11-07 by Authgear Cloud (see Sign-in).*
+- [x] A custom sign-in domain for Authgear, before anyone adds a passkey: `auth.openlarder.com`, set by Ray 2026-11-07
+- [ ] Authgear's sign-in link and code: how long they last and whether they can be reused
+- [ ] Lawyer review of the privacy policy and terms
 - [x] Whether a substitution records an amount or ratio: only as a free-text note
 - [ ] How an author is verified
 - [ ] Licence for bios: contributor-written bios sit with other user content, and author-written ones belong to the author, so neither is automatically ODbL
