@@ -254,6 +254,10 @@ Flags go to the review queue with the reason attached. Bulk imports go through r
 
 The importer is built (migration 0012): an admin chooses the book list and the recipe list in the browser, which reads them and drives the import in short requests. Books go through the add-by-ISBN lookup, paced to Open Library's limit, or are added from the list's own title and authors when they have no ISBN or Open Library doesn't know them; recipes follow in batches. Run again, it skips what it already added. Each run is recorded in an import history (migration 0013): who ran it, when, its totals, and its report lines, written by the server batch by batch so a run whose browser closed halfway still shows how far it got, with no finish time. Admins see the runs on Admin → Import history and download any run's report. *Ray, 2026-11-07: "there probably needs to be a logging of imports and results".* A dry run over the household index found 18,859 recipes to import and 213 to flag (181 with no ingredients, 28 repeated titles, 2 fragments), with 31 rows holding only an ingredient list and nothing to attach it to.
 
+The flag pages are built: Admin → Flagged recipes lists every open flag, filtered by reason, and Your account → My flagged recipes lists the flags on recipes you added. A recipe's page shows its open flags to whoever may deal with them. Marking one fixed needs nothing more; dismissing one needs a reason.
+
+**Catalog data is experimental until launch.** What is in the database now, the household index included, is there to work things out against. Before launch a script in the repository empties the catalog tables and the index is imported again through whatever the importer has become; the schema and the accounts stay. *Ray, 2026-11-07: "we'll start over, so this is just all experimental".*
+
 **Trust levels**
 
 | Level | How earned | Edits |

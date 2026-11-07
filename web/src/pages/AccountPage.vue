@@ -19,6 +19,11 @@ document.title = "Your account · OpenLarder";
         submit-label="Save"
         @saved="(me) => emit('saved', me)"
       />
+      <h2>Flagged recipes</h2>
+      <p>
+        <a href="/account/flags">My flagged recipes</a>: anything about a recipe you added that
+        needs a look.
+      </p>
       <h2>Signing in</h2>
       <p>
         Your email address, Google or GitHub link and passkeys are kept by Authgear, which

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import FlagItem from "../components/FlagItem.vue";
+import { type Flag, recipeFlags } from "../flags";
 import type { Me } from "../me";
 import { type Recipe, removeRecipe } from "../recipes";
 
@@ -8,6 +10,8 @@ const recipe = ref<Recipe | null>(null);
 const missing = ref(false);
 const failed = ref(false);
 const error = ref("");
+// Only whoever may deal with them gets any back: an admin, or who added it.
+const flags = ref<Flag[]>([]);
 
 onMounted(async () => {
   try {
@@ -16,6 +20,7 @@ onMounted(async () => {
     else if (!res.ok) failed.value = true;
     else {
       recipe.value = await res.json();
+      if (props.user !== null) flags.value = await recipeFlags(props.id);
       document.title = `${recipe.value!.title} · ${recipe.value!.book.title} · OpenLarder`;
     }
   } catch {
@@ -59,6 +64,19 @@ async function remove() {
       </ul>
       <p v-else class="status">No ingredients recorded yet.</p>
       <p class="status">The amounts and the method are in the book.</p>
+
+      <section v-if="flags.some((f) => !f.resolution)" class="recipe-flags">
+        <h2>Flags</h2>
+        <ul class="flag-list">
+          <FlagItem
+            v-for="f in flags.filter((f) => !f.resolution)"
+            :key="f.id"
+            :flag="f"
+            :show-recipe="false"
+            @resolved="(u) => (flags = flags.map((x) => (x.id === u.id ? u : x)))"
+          />
+        </ul>
+      </section>
 
       <div v-if="user?.is_admin" class="admin-actions">
         <a :href="`/recipes/${recipe.id}/edit`">Edit</a>
