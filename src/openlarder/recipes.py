@@ -7,10 +7,12 @@ ingredient; the amounts, the method and the headnote stay in the book.
 the book names it ("caster sugar") with no amount; matching them to
 canonical ingredients is a later step and changes nothing typed.
 
-A line that starts with a number or a fraction ("200g rhubarb", "½ cup
-milk") is refused, since that is an amount. Amounts written in words ("a
-pinch of salt") get past it; the form's wording asks for the ingredient
-alone, and review is the backstop.
+A line that starts with an amount ("200g rhubarb", "2 cups milk", "½ cup
+milk") is refused: a number with a unit after it, or a fraction. A number
+alone is not an amount ("00 flour", "2% milk"). Counts ("3 eggs") and
+amounts in words ("a pinch of salt") get past it; the form's wording asks
+for the ingredient alone, issue #26's detector will catch them, and review
+is the backstop.
 
 A recipe appears in the editions listed for it. A page left blank means it
 is in that edition but the page isn't recorded yet; an edition not listed
@@ -33,8 +35,24 @@ MAX_PAGE = 20
 # An ingredient's name, not a line of method: "grapeseed oil or olive oil".
 MAX_LINE = 100
 MAX_LINES = 150
-# Digits or a vulgar fraction at the start: an amount, not an ingredient.
-_AMOUNT = re.compile(r"^[\d½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]")
+# An amount at the start: a vulgar fraction ("½ cup"), or a number followed by
+# a unit ("200g", "2 cups", "1-2 tsp", "1/2 lb"). A number alone is not one:
+# "00 flour", "2% milk", "160 bloom gelatin", "7-minute frosting" and
+# "80-proof vodka" are ingredients, which the household index showed a
+# digit-only rule refusing. Counts without a unit ("3 eggs") get past this;
+# issue #26's detector is for those. "c" for cup is left out, since it would
+# catch temperatures ("63.5C eggs").
+_UNITS = (
+    "g|gr|grams?|kg|kilos?|kilograms?|mg|ml|millilitres?|milliliters?|cl|dl|l|litres?|liters?"
+    "|oz|ounces?|lbs?|pounds?|cups?|tbsps?|tbs|tablespoons?|tsps?|teaspoons?|pints?|pt"
+    "|quarts?|qts?|gallons?|pinch(?:es)?|dash(?:es)?|handfuls?|sticks?|cans?|tins?|jars?"
+    "|packages?|pkgs?|packets?|sachets?|slices?|sprigs?|bunch(?:es)?|cloves?|heads?|knobs?"
+)
+_AMOUNT = re.compile(
+    rf"^(?:[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+(?:[.,/]\d+)?(?:\s*(?:-|–|to)\s*\d+(?:[.,/]\d+)?)?"
+    rf"\s*(?:{_UNITS})\b\.?)",
+    re.IGNORECASE,
+)
 
 
 class InvalidRecipe(ValueError):

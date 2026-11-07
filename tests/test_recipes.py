@@ -71,13 +71,55 @@ def test_entries_are_tidied() -> None:
         ("Cake", [(E1, None)], ["x" * 101], "method"),
         ("Cake", [(E1, None)], ["200g rhubarb"], "amount"),
         ("Cake", [(E1, None)], ["½ cup milk"], "amount"),
-        ("Cake", [(E1, None)], ["rhubarb", "3 eggs"], "3 eggs"),
+        ("Cake", [(E1, None)], ["rhubarb", "2 cups milk"], "2 cups milk"),
         ("Cake", [(E1, None)], ["x"] * 151, "150"),
     ],
 )
 def test_entries_that_break_a_rule_say_which(title, pages, lines, reason) -> None:
     with pytest.raises(recipes.InvalidRecipe, match=reason):
         recipes.clean(title, pages, lines)
+
+
+@pytest.mark.parametrize(
+    "amount",
+    [
+        "200g rhubarb",
+        "200 g rhubarb",
+        "2 cups milk",
+        "1 tsp vanilla",
+        "1-2 tsp salt",
+        "1/2 lb butter",
+        "1.5 kg flour",
+        "2 to 3 cups stock",
+        "4oz chocolate",
+        "1 can tomatoes",
+        "2 Cloves Garlic",
+    ],
+)
+def test_a_number_with_a_unit_is_an_amount(amount) -> None:
+    with pytest.raises(recipes.InvalidRecipe, match="amount"):
+        recipes.clean("Cake", [(E1, None)], [amount])
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "00 flour",
+        "2% milk",
+        "160 bloom gelatin",
+        "7-minute frosting",
+        "80-proof vodka",
+        "5-spice powder",
+        "70% dark chocolate",
+        "15-bean soup mix",
+        "63.5C eggs",
+        "1-2-3 cookie dough",
+        "cloves",
+        "garlic",
+    ],
+)
+def test_a_number_without_a_unit_can_be_part_of_a_name(name) -> None:
+    assert recipes.clean("Cake", [(E1, None)], [name]).lines == [name]
 
 
 # Adding, reading, changing, removing
