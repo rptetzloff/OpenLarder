@@ -53,8 +53,44 @@ class FoundBook:
     authors: list[FoundAuthor] = field(default_factory=list)
 
 
+COVER_SIZES = ("S", "M", "L")
+
+
 def cover_url(cover_id: int, size: str = "M") -> str:
-    return f"{COVERS}/{cover_id}-{size}.jpg"
+    """Where the site serves a cover: its own path, which Cloudflare caches.
+
+    Not Open Library's address: a cover fetched from there takes 1.3-1.7 s
+    through two redirects, and each visitor's browser would contact the
+    Internet Archive. routers/covers.py fetches it once per Cloudflare cache.
+    """
+    return f"/covers/{cover_id}-{size}.jpg"
+
+
+async def fetch_cover(
+    cover_id: int, size: str, transport: httpx2.AsyncBaseTransport | None = None
+) -> bytes:
+    """The cover image from Open Library, or NotFound.
+
+    ?default=false makes an unknown ID a 404 rather than a blank placeholder.
+    By cover ID is not rate-limited, so this is not paced with the API calls.
+    """
+    async with httpx2.AsyncClient(
+        transport=transport,
+        headers={"User-Agent": USER_AGENT},
+        timeout=15.0,
+        follow_redirects=True,
+    ) as client:
+        try:
+            response = await client.get(f"{COVERS}/{cover_id}-{size}.jpg?default=false")
+        except httpx2.HTTPError as exc:
+            raise Unavailable(f"Open Library covers could not be reached: {exc!r}") from exc
+    if response.status_code == 404:
+        raise NotFound(f"cover {cover_id}")
+    if response.status_code >= 400 or not response.headers.get("content-type", "").startswith(
+        "image/"
+    ):
+        raise Unavailable(f"Open Library covers answered {response.status_code} for {cover_id}")
+    return response.content
 
 
 def book_url(open_library_edition_id: str) -> str:

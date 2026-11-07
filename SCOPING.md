@@ -226,7 +226,9 @@ Modeled on OpenStreetMap and Wikipedia: anyone can contribute, everything is ver
 
 **Books come from Open Library.** Its catalog is public domain (CC0), so it fits the ODbL without conditions. Adding a book looks up its ISBN: the edition, its work, and the work's authors. A second ISBN of a book already here joins it as another edition, matched by Open Library's work ID, and authors are matched by Open Library's author ID. Open Library asks callers to identify themselves with a contact address, to make requests on behalf of a person rather than in bulk, and to cache results; OpenLarder sends `OpenLarder/0.1 (https://openlarder.com; privacy@openlarder.com)`, makes three or four requests per book, and stores the result. Its author names come as it has them ("Moore, Russell (Chef)"), and fixing one waits for editing.
 
-Covers are shown from Open Library by cover ID, which is not rate-limited (by ISBN is limited to 100 per five minutes), with a link back on each book page as it asks. Each cover takes 1.3–1.7 s to arrive through two redirects to archive.org, measured 2026-11-07; that delay, and visitors' browsers contacting the Internet Archive, are the reasons to store covers ourselves later (`cover_key`).
+Covers are served from OpenLarder's own path (`/covers/<id>-M.jpg`), fetched from Open Library by cover ID, which is not rate-limited, on a cache miss, and sent with a year-long immutable cache header so Cloudflare keeps them at the edge. A cover straight from Open Library took 1.3–1.7 s through two redirects to archive.org, measured 2026-11-07, and every visitor's browser contacted the Internet Archive; now neither happens after the first fetch. Only covers of editions in the catalog are served, so the route can't relay arbitrary images. Each book page links back to Open Library, as it asks. *Ray, 2026-11-07.* Cloudflare's cache isn't permanent; storing covers ourselves (`cover_key`) waits until there is storage for other reasons too.
+
+*Superseded 2026-11-07: covers were shown straight from Open Library's address.*
 
 **What users can submit**
 
