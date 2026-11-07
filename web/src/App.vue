@@ -25,18 +25,17 @@ onMounted(async () => {
     user.value = null;
   }
 });
-
-async function signOut() {
-  await fetch("/api/auth/logout", { method: "POST" });
-  user.value = null;
-}
 </script>
 
 <template>
   <header>
     <template v-if="user">
       <span>Signed in as {{ user.display_name }}</span>
-      <button type="button" @click="signOut">Sign out</button>
+      <!-- A form, not fetch: signing out ends at the broker, which ends the
+           session there and sends the browser back here. -->
+      <form method="post" action="/api/auth/logout">
+        <button type="submit">Sign out</button>
+      </form>
     </template>
     <!-- A full page load, not fetch: the broker's sign-in page is a redirect. -->
     <a v-else-if="user === null" href="/api/auth/login">Sign in</a>
@@ -78,6 +77,9 @@ header {
   margin: 0 auto;
   padding: 1rem 1rem 0;
   font-size: 0.875rem;
+}
+header form {
+  margin: 0;
 }
 header a,
 header button {

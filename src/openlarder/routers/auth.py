@@ -2,7 +2,8 @@
 
 /login redirects to the broker with state, a nonce and a PKCE challenge.
 /callback checks all three, checks the ID token's signature, issuer, audience
-and expiry, then starts a session. A failure of any kind sends the browser
+and expiry, then starts a session. /logout ends the session here and sends
+the browser on to the broker to end its session there. A failure of any kind sends the browser
 back to the front page with ?sign-in=failed and logs why; it never says why
 to the browser, which is the party that might be forging it.
 """
@@ -25,6 +26,7 @@ from openlarder.auth import (
     CurrentUser,
     display_name_from,
     get_oidc_client,
+    optional_oidc_client,
     sign_in,
     sign_out,
 )
@@ -35,6 +37,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 Broker = Annotated[StarletteOAuth2App, Depends(get_oidc_client)]
+OptionalBroker = Annotated[StarletteOAuth2App | None, Depends(optional_oidc_client)]
 Config = Annotated[Settings, Depends(get_settings)]
 
 
@@ -47,6 +50,11 @@ def callback_url(request: Request, settings: Settings) -> str:
     if settings.public_url:
         return settings.public_url + CALLBACK_PATH
     return str(request.url_for("auth_callback"))
+
+
+def home_url(request: Request, settings: Settings) -> str:
+    """The front page, absolute, for the broker to send people back to."""
+    return (settings.public_url or str(request.base_url).rstrip("/")) + "/"
 
 
 @router.get("/login")
@@ -93,14 +101,35 @@ async def me(user: CurrentUser) -> Me:
     return Me(id=str(user.id), display_name=user.display_name)
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/logout")
 async def logout(
+    request: Request,
     session: Session,
+    settings: Config,
+    broker: OptionalBroker,
     token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> Response:
+    # The session here ends first, whatever happens next: a broker that
+    # cannot be reached leaves someone signed in there, never here.
     if token:
         await sign_out(session, token)
         await session.commit()
-    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    target = "/"
+    if broker is not None:
+        try:
+            # client_id rather than an id_token_hint, so no ID token has to be
+            # kept. The broker only returns people to a post-logout redirect
+            # URI registered for this client.
+            logout_url = await broker.create_logout_url(
+                post_logout_redirect_uri=home_url(request, settings),
+                client_id=settings.oidc_client_id,
+            )
+            target = logout_url["url"]
+        except (httpx2.HTTPError, RuntimeError) as exc:
+            log.warning("signed out here only; broker end-session unavailable: %r", exc)
+
+    # 303 so the browser follows with a GET, not a repeat of this POST.
+    response = RedirectResponse(target, status.HTTP_303_SEE_OTHER)
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response

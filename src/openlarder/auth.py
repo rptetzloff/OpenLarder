@@ -2,8 +2,10 @@
 
 A session is a random token in an HttpOnly cookie; the database keeps only
 its SHA-256. Sessions last 30 days from sign-in and are not extended by use.
-Signing out deletes the session here. It does not sign anyone out of the
-broker, so the next "Sign in" may go straight through without a password.
+Signing out deletes the session here, then sends the browser to the
+broker's end-session endpoint so the broker's session ends too. Whether it
+does is the broker's configuration, not this code's: in Authentik, the
+provider's invalidation flow needs a User Logout stage.
 """
 
 import hashlib
@@ -73,13 +75,23 @@ def build_oidc_client(
 _cached_client = lru_cache(build_oidc_client)
 
 
-def get_oidc_client(settings: Annotated[Settings, Depends(get_settings)]) -> StarletteOAuth2App:
+def optional_oidc_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> StarletteOAuth2App | None:
     if not settings.sign_in_configured:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sign-in is not configured.")
+        return None
     assert settings.oidc_client_id and settings.oidc_client_secret and settings.oidc_issuer
     return _cached_client(
         settings.oidc_issuer, settings.oidc_client_id, settings.oidc_client_secret
     )
+
+
+def get_oidc_client(
+    client: Annotated[StarletteOAuth2App | None, Depends(optional_oidc_client)],
+) -> StarletteOAuth2App:
+    if client is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sign-in is not configured.")
+    return client
 
 
 async def sign_in(session: AsyncSession, issuer: str, subject: str, name: str) -> str:
