@@ -125,7 +125,13 @@ Every ingredient line resolves to one canonical ingredient plus optional form, p
 
 **Seeding**
 
-Start from an existing dataset rather than an empty table. Candidates: USDA FoodData Central, the FoodOn ontology, Wikidata food items. Pick one as the base and map the others to it over time.
+Start from an existing dataset rather than an empty table.
+
+- **Base: USDA FoodData Central.** Public domain (CC0), so it fits the ODbL with no conditions. It is seeded from the bulk download (CSV or JSON, updated each April and October), not the API, so the API's default of 1,000 requests an hour only limits later lookups. Branded products are left out: the catalog wants "butter", not one company's butter.
+- **Backup: Wikidata.** Also CC0. It fills what FoodData Central lacks: other names for an ingredient (aliases, including regional ones) and "is a kind of" links for the hierarchy (cheddar under cheese).
+- **FoodOn: not used for now.** It is CC BY 4.0, which carries an attribution condition, and its strength is the same kind of hierarchy Wikidata provides.
+
+*Decided by Ray, 2026-11-06: FoodData Central as the base and Wikidata as the backup. Leaving FoodOn out, and the reasons for it, are Claude's recommendation; Ray was unsure about FoodOn.*
 
 **Matching flow**
 
@@ -136,6 +142,16 @@ Start from an existing dataset rather than an empty table. Candidates: USDA Food
 5. New ingredients go to a moderation queue to be approved, merged, or mapped as an alias
 
 The original text line is kept alongside the match, so mappings can be corrected later without re-entry.
+
+## Sign-in
+
+OpenLarder signs people in through an identity broker, and talks to the broker with one OpenID Connect integration. The broker handles each provider, links one person's accounts across providers, and has an admin screen for adding providers. *Decided by Ray, 2026-11-06.*
+
+- **Google and GitHub first**, more later. GitHub's sign-in is plain OAuth, not OpenID Connect: a site gets a token and asks GitHub's API who the user is. That is why a broker rather than generic OIDC in the app: the app would otherwise need separate code for GitHub.
+- **Email accounts too**, by password or sign-in link, for people who use neither Google nor GitHub. *Decided by Ray, 2026-11-06.*
+- **Authentik first.** Coolify offers it as a ready-made service, so Ray is trying it first. Keycloak is the fallback if Authentik doesn't work out. *Decided by Ray, 2026-11-06.*
+
+*Superseded 2026-11-06: the stack table named "generic OIDC (e.g. Zitadel)". Zitadel was weighed and not chosen.*
 
 ## Contributions and moderation
 
@@ -209,7 +225,7 @@ Python and Vue, matching the structure of Sederunt and Sennight, self-hosted on 
 | Database | PostgreSQL | pg\_trgm for fuzzy ingredient matching, built-in full-text search |
 | Jobs and cache | Redis + Python worker (arq or RQ) | Bulk imports, Open Library lookups |
 | File storage | S3 (existing) | Covers, import files, Postgres backups; separate buckets or credentials for public assets vs backups |
-| Auth | Generic OIDC (e.g. Zitadel) | Needs public self-registration and social login |
+| Auth | Identity broker: Authentik (Keycloak as fallback) | Google and GitHub first, more providers later, plus email sign-up. See Sign-in |
 | Hosting | Coolify (prod), Rancher Desktop with dockerd (dev) | One docker-compose.yml for both; Cloudflare Tunnel for public access |
 
 No multi-tenancy: one public catalog.
@@ -271,7 +287,8 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Name and domain: OpenLarder
 - [x] Tech stack: Python/FastAPI, Vue, Postgres, Redis, S3 on Coolify
 - [x] Data license: ODbL
-- [ ] Base ingredient dataset
+- [x] Base ingredient dataset: USDA FoodData Central, Wikidata as backup (see Ingredient normalization)
+- [x] Authentik or Keycloak: Authentik first, since Coolify offers it as a service; Keycloak if it doesn't work out
 - [x] Whether a substitution records an amount or ratio: only as a free-text note
 - [ ] How an author is verified
 - [ ] Licence for bios: contributor-written bios sit with other user content, and author-written ones belong to the author, so neither is automatically ODbL
