@@ -160,6 +160,8 @@ A verified author is linked to a user account and can change their page's presen
 
 How an author proves who they are is not designed yet.
 
+**Built** (2026-11-08): each author has a page with their books (and their role, when it isn't author, and the name the book prints when it differs), the people credited with them on those books, most shared first, their links and Open Library. Names on a book page link there, and there's an authors list. An admin fixes an author's own name and kind on the page, Open Library authors included, since its names come as it files them ("Moore, Russell (Chef)"); editing a book changes only how that book prints the name. Links must be http or https. Wikidata facts, bios and photos wait (TODO.md).
+
 ## Ingredient normalization
 
 Every ingredient line resolves to one canonical ingredient. Search, shopping, and the API all depend on this.

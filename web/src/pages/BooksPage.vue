@@ -59,6 +59,7 @@ async function add() {
 <template>
   <article>
     <h1>Books</h1>
+    <p class="status"><a href="/authors">Browse by author</a></p>
 
     <form v-if="user?.is_admin" class="isbn-form" @submit.prevent="add">
       <label for="isbn">Add a book by ISBN</label>

@@ -9,10 +9,12 @@ const book = ref<Book | null>(null);
 const missing = ref(false);
 const failed = ref(false);
 
-const byline = computed(() =>
-  (book.value?.credits ?? [])
-    .map((c) => (c.role === "author" ? c.credited_as : `${c.credited_as} (${c.role})`))
-    .join(", "),
+// Each name links to its author; a role other than author is said.
+const credits = computed(() =>
+  (book.value?.credits ?? []).map((c) => ({
+    ...c,
+    role: c.role === "author" ? "" : ` (${c.role})`,
+  })),
 );
 // "p. 112", or "p. 112 / 120" when editions differ; blank pages don't show.
 function pages(list: (string | null)[]) {
@@ -48,7 +50,12 @@ onMounted(async () => {
         <div>
           <h1>{{ book.title }}</h1>
           <p v-if="book.subtitle" class="subtitle">{{ book.subtitle }}</p>
-          <p v-if="byline" class="byline">{{ byline }}</p>
+          <p v-if="credits.length" class="byline">
+            <template v-for="(c, i) in credits" :key="i"
+              ><template v-if="i > 0">, </template
+              ><a :href="`/authors/${c.author_id}`">{{ c.credited_as }}</a>{{ c.role }}</template
+            >
+          </p>
           <p v-if="book.open_library_url" class="byline">
             <a :href="book.open_library_url">On Open Library</a>
           </p>
