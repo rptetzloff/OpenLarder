@@ -12,6 +12,11 @@ from sqlalchemy.exc import IntegrityError
 from openlarder.models import Base
 
 
+def _diet(db: Connection, name: str) -> uuid.UUID:
+    """One of the diets migration 0018 seeds."""
+    return db.scalar(text("SELECT id FROM tags WHERE kind = 'diet' AND name = :n"), {"n": name})
+
+
 def _insert(db: Connection, sql: str, **params) -> uuid.UUID:
     return db.execute(text(sql + " RETURNING id"), params).scalar_one()
 
@@ -209,7 +214,7 @@ def test_ingredient_in_use_cannot_be_deleted(db: Connection) -> None:
 def test_recipes_inherit_their_books_tags_once(db: Connection) -> None:
     work = _work(db)
     recipe = _recipe(db, work)
-    gf = _insert(db, "INSERT INTO tags (kind, name) VALUES ('diet', 'Gluten-Free')")
+    gf = _diet(db, "Gluten-Free")
     salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Salad')")
     db.execute(text("INSERT INTO work_tags VALUES (:w, :t)"), {"w": work, "t": gf})
     db.execute(text("INSERT INTO recipe_tags VALUES (:r, :t)"), {"r": recipe, "t": salad})
@@ -449,7 +454,7 @@ def test_substitution_from_a_book_and_between_blends(db: Connection) -> None:
     book = _work(db, "The How Can It Be Gluten Free Cookbook Vol. 2")
     edition = _edition(db, book)
     butter, vegan = _ingredient(db, "butter"), _ingredient(db, "vegan butter")
-    dairy_free = _insert(db, "INSERT INTO tags (kind, name) VALUES ('diet', 'Dairy-Free')")
+    dairy_free = _diet(db, "Dairy-Free")
     _swap(
         db,
         from_ingredient_id=butter,

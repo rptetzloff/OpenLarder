@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, exists, func, select
 
-from openlarder import ingredients
+from openlarder import ingredients, substitutions
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -21,8 +21,10 @@ from openlarder.models import (
     IngredientOption,
     Recipe,
     RecipePage,
+    Substitution,
     Work,
 )
+from openlarder.routers.substitutions import SwapOut, swap_out
 
 router = APIRouter(prefix="/api/ingredients", tags=["ingredients"])
 
@@ -70,6 +72,8 @@ class IngredientOut(BaseModel):
     total: int
     # Recipes using it or anything under it, as search counts them.
     family_total: int
+    # What can stand in for it.
+    swaps: list[SwapOut]
 
 
 def contains_pattern(q: str) -> str:
@@ -189,6 +193,12 @@ async def get_ingredient(
         recipes=recipes,
         total=total,
         family_total=family_total or 0,
+        swaps=[
+            swap_out(s)
+            for s in await substitutions.listed(
+                session, Substitution.from_ingredient_id == ingredient_id
+            )
+        ],
     )
 
 

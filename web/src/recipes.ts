@@ -1,5 +1,7 @@
 // What /api/recipes returns, and saving one.
 
+import type { Swap } from "./substitutions";
+
 export interface RecipePage {
   edition_id: string;
   edition_title: string | null;
@@ -27,6 +29,8 @@ export interface Recipe {
   }[];
   // Recipes in the book that use this one.
   used_in: { id: string; title: string }[];
+  // What can stand in for its ingredients, the recipes it cites, or itself.
+  swaps: Swap[];
 }
 
 export interface RecipeIn {
