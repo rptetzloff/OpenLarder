@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { BookSummary } from "../books";
+import { archiveMissing } from "../recipes";
 import type { Me } from "../me";
 
 defineProps<{ user: Me | null | undefined }>();
@@ -34,6 +35,20 @@ async function linkAll() {
     linking.value = false;
   }
 }
+
+// Web recipes' pages with no Internet Archive copy yet, as when the Archive
+// was down when they were added.
+const archiveNote = ref("");
+async function archiveAll() {
+  try {
+    const pages = await archiveMissing();
+    archiveNote.value = pages
+      ? `Asked the Internet Archive for ${pages} ${pages === 1 ? "page" : "pages"}, one at a time.`
+      : "Every web page has a copy already.";
+  } catch (e) {
+    archiveNote.value = e instanceof Error ? e.message : String(e);
+  }
+}
 </script>
 
 <template>
@@ -57,6 +72,14 @@ async function linkAll() {
       </button>
       <p v-if="progress" class="status" aria-live="polite">{{ progress }}</p>
       <p v-if="linkError" class="error" role="alert">{{ linkError }}</p>
+
+      <h2>Internet Archive</h2>
+      <p class="status">
+        Each web recipe's page is copied to the Internet Archive when it's added, so a page that
+        disappears can still be read. This asks again for the pages with no copy yet.
+      </p>
+      <button type="button" class="primary" @click="archiveAll">Archive pages without a copy</button>
+      <p v-if="archiveNote" class="status" aria-live="polite">{{ archiveNote }}</p>
     </template>
   </article>
 </template>

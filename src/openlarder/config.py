@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # URL exactly. Unset, it is taken from the request, which is right for
     # localhost and wrong behind Coolify's proxy, where the app sees http.
     public_url: str | None = None
+    # An archive.org account's API keys, for saving web recipes' pages to the
+    # Internet Archive (archive.py). Optional: without them it asks as an
+    # anonymous visitor, with lower limits.
+    archive_access_key: str | None = None
+    archive_secret_key: str | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -62,6 +67,12 @@ class Settings(BaseSettings):
     @property
     def sign_in_configured(self) -> bool:
         return bool(self.oidc_issuer)
+
+    @property
+    def archive_keys(self) -> tuple[str, str] | None:
+        if self.archive_access_key and self.archive_secret_key:
+            return self.archive_access_key, self.archive_secret_key
+        return None
 
 
 @lru_cache

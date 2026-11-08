@@ -5,7 +5,7 @@ import SwapForm from "../components/SwapForm.vue";
 import SwapList from "../components/SwapList.vue";
 import { type Flag, recipeFlags } from "../flags";
 import type { Me } from "../me";
-import { type Recipe, removeRecipe } from "../recipes";
+import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
 import type { Thing } from "../substitutions";
 
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
@@ -50,6 +50,34 @@ const swapChoices = computed<Thing[]>(() => {
 const firstPage = computed(() => recipe.value?.pages.find((p) => p.page) ?? recipe.value?.pages[0]);
 const addingSwap = ref(false);
 
+// "8 November 2026", for an archived copy's date.
+function day(iso: string | null) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "long" }) : "";
+}
+
+// The page's copy, and whether it's gone, for admins.
+const pageNote = ref("");
+async function archiveNow() {
+  const page = recipe.value?.web_page;
+  if (!page) return;
+  try {
+    await archivePage(page.id);
+    pageNote.value = "Asked the Internet Archive for a copy. Reload in a minute or two to see it.";
+  } catch (e) {
+    pageNote.value = e instanceof Error ? e.message : String(e);
+  }
+}
+async function setGone(gone: boolean) {
+  const page = recipe.value?.web_page;
+  if (!page) return;
+  try {
+    await markGone(page.id, gone);
+    page.gone = gone;
+  } catch (e) {
+    pageNote.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
 function where(p: Recipe["pages"][number]) {
   const edition = [p.edition_title, p.published_year].filter(Boolean).join(", ");
   const page = p.page ? `page ${p.page}` : "page not recorded yet";
@@ -75,12 +103,25 @@ async function remove() {
     <template v-else>
       <p><a :href="`/sources/${recipe.source.id}`">← {{ recipe.source.title }}</a></p>
       <h1>{{ recipe.title }}</h1>
-      <p v-if="recipe.web_address" class="byline">
-        On <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>:
-        <a :href="recipe.web_address" rel="nofollow noopener" class="web-address">{{
-          recipe.web_address
-        }}</a>
-      </p>
+      <template v-if="recipe.web_page">
+        <p class="byline">
+          On <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>:
+          <a :href="recipe.web_page.url" rel="nofollow noopener" class="web-address">{{
+            recipe.web_page.url
+          }}</a>
+        </p>
+        <p v-if="recipe.web_page.gone" class="byline">
+          This page no longer has the recipe.
+          <a v-if="recipe.web_page.archive_url" :href="recipe.web_page.archive_url" rel="nofollow noopener"
+            >The Internet Archive's copy, from {{ day(recipe.web_page.archived_at) }}</a
+          >
+        </p>
+        <p v-else-if="recipe.web_page.archive_url" class="byline">
+          <a :href="recipe.web_page.archive_url" rel="nofollow noopener"
+            >Archived copy, {{ day(recipe.web_page.archived_at) }}</a
+          >
+        </p>
+      </template>
       <p v-else class="byline">
         In <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>,
         {{ recipe.pages.map(where).join("; ") }}
@@ -153,8 +194,17 @@ async function remove() {
 
       <div v-if="user?.is_admin" class="admin-actions">
         <a :href="`/recipes/${recipe.id}/edit`">Edit</a>
+        <template v-if="recipe.web_page">
+          <button v-if="!recipe.web_page.archive_url" type="button" class="link" @click="archiveNow">
+            Archive now
+          </button>
+          <button type="button" class="link" @click="setGone(!recipe.web_page.gone)">
+            {{ recipe.web_page.gone ? "The page is back" : "The page is gone" }}
+          </button>
+        </template>
         <button type="button" class="link" @click="remove">Remove</button>
       </div>
+      <p v-if="pageNote" class="status" role="status">{{ pageNote }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
     </template>
   </article>

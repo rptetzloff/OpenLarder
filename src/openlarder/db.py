@@ -27,11 +27,16 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
-async def get_session() -> AsyncIterator[AsyncSession]:
+def session_factory() -> async_sessionmaker[AsyncSession]:
+    """Sessions outside a request, as for work done after the response."""
     global _session_factory
     if _session_factory is None:
         _session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
-    async with _session_factory() as session:
+    return _session_factory
+
+
+async def get_session() -> AsyncIterator[AsyncSession]:
+    async with session_factory()() as session:
         yield session
 
 

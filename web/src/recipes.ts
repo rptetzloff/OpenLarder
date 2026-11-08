@@ -17,6 +17,15 @@ export interface Recipe {
   pages: RecipePage[];
   // A website's recipe: the page it's on.
   web_address: string | null;
+  // That page, with the Internet Archive's copy when there is one.
+  web_page: {
+    id: string;
+    url: string;
+    archive_url: string | null;
+    archived_at: string | null;
+    // Marked when the page no longer has the recipe.
+    gone: boolean;
+  } | null;
   // As typed, for the edit form.
   ingredients: string[];
   // The same lines read into their options, page references linked.
@@ -88,4 +97,29 @@ export async function checkLines(lines: string[]): Promise<LineReview[]> {
   });
   if (!res.ok) throw new Error("The lines couldn't be checked.");
   return (await res.json()).lines;
+}
+
+async function webPageCall(path: string, method: string, body?: unknown) {
+  const res = await fetch(`/api/web-pages/${path}`, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof out.detail === "string" ? out.detail : "That didn't work.");
+  return out;
+}
+
+// Asks the Internet Archive for a copy; it arrives after a minute or two.
+export async function archivePage(pageId: string): Promise<void> {
+  await webPageCall(`${pageId}/archive`, "POST");
+}
+
+// Every web page without a copy yet; resolves to how many were asked for.
+export async function archiveMissing(): Promise<number> {
+  return (await webPageCall("archive-missing", "POST")).pages;
+}
+
+export async function markGone(pageId: string, gone: boolean): Promise<void> {
+  await webPageCall(`${pageId}/gone`, "PUT", { gone });
 }

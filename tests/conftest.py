@@ -12,6 +12,7 @@ import selectors
 import sys
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx2
@@ -22,8 +23,10 @@ from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
+from fake_archive import FakeArchive
 from fake_broker import CLIENT_ID, CLIENT_SECRET, ISSUER, FakeBroker, _settings
 from fake_openlibrary import FakeOpenLibrary
+from openlarder.archiving import Archiver, get_archiver
 from openlarder.auth import build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
@@ -127,7 +130,17 @@ def broker() -> FakeBroker:
 
 
 @pytest.fixture
-def configure(adb: AsyncSession, broker: FakeBroker) -> Iterator[Any]:
+def ia(monkeypatch) -> FakeArchive:
+    """The Internet Archive every test gets: a fake, so nothing reaches the
+    real one, refusing everything unless the test says otherwise."""
+    from openlarder import archive
+
+    monkeypatch.setattr(archive, "POLL_EVERY", 0.0)
+    return FakeArchive()
+
+
+@pytest.fixture
+def configure(adb: AsyncSession, broker: FakeBroker, ia: FakeArchive) -> Iterator[Any]:
     def apply(settings: Settings) -> None:
         app.dependency_overrides[get_settings] = lambda: settings
         if settings.sign_in_configured:
@@ -144,6 +157,15 @@ def configure(adb: AsyncSession, broker: FakeBroker) -> Iterator[Any]:
         yield adb
 
     app.dependency_overrides[get_session] = session_override
+
+    # Archiving after the response uses the test's session, and the fake.
+    @asynccontextmanager
+    async def same_session() -> AsyncIterator[AsyncSession]:
+        yield adb
+
+    app.dependency_overrides[get_archiver] = lambda: Archiver(
+        same_session, None, httpx2.MockTransport(ia.handle)
+    )
     apply(_settings())
     try:
         yield apply

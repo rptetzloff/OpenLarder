@@ -7,13 +7,15 @@ Reading is public. Writing is for admins until review exists, like books.
 """
 
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from openlarder import detector, recipes, references, substitutions
+from openlarder import archiving, detector, recipes, references, substitutions
 from openlarder import lines as line_reading
+from openlarder.archiving import ArchiverDep
 from openlarder.auth import AdminUser, CurrentUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -80,6 +82,16 @@ class PageOut(BaseModel):
     page: str | None
 
 
+class WebPageOut(BaseModel):
+    id: uuid.UUID
+    url: str
+    # The Internet Archive's copy, when there is one.
+    archive_url: str | None
+    archived_at: datetime | None
+    # Marked when the page no longer has the recipe.
+    gone: bool
+
+
 class SourceRef(BaseModel):
     id: uuid.UUID
     title: str
@@ -116,8 +128,9 @@ class RecipeOut(BaseModel):
     source: SourceRef
     # A book's recipe: where it is in each edition.
     pages: list[PageOut]
-    # A website's recipe: the page it's on.
+    # A website's recipe: the page it's on, and that page's archived copy.
     web_address: str | None
+    web_page: WebPageOut | None
     # The lines as typed, which is what the edit form edits.
     ingredients: list[str]
     # The same lines read into their options, with page references linked.
@@ -161,8 +174,8 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
             .order_by(Edition.published_year.desc().nulls_last(), Edition.isbn13)
         )
     ).all()
-    web_address = await session.scalar(
-        select(WebPage.url)
+    page = await session.scalar(
+        select(WebPage)
         .join(RecipeLocation, RecipeLocation.web_page_id == WebPage.id)
         .where(RecipeLocation.recipe_id == recipe.id)
     )
@@ -210,7 +223,16 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
         id=recipe.id,
         title=recipe.title,
         source=SourceRef(id=work.id, title=work.title, kind=work.kind),
-        web_address=web_address,
+        web_address=page.url if page else None,
+        web_page=WebPageOut(
+            id=page.id,
+            url=page.url,
+            archive_url=page.archive_url,
+            archived_at=page.archived_at,
+            gone=page.gone,
+        )
+        if page
+        else None,
         pages=[
             PageOut(
                 edition_id=e.id,
@@ -257,7 +279,12 @@ async def get_recipe(recipe_id: uuid.UUID, session: Session) -> RecipeOut:
     dependencies=[SameOrigin],
 )
 async def add_recipe(
-    source_id: uuid.UUID, body: RecipeIn, admin: AdminUser, session: Session
+    source_id: uuid.UUID,
+    body: RecipeIn,
+    admin: AdminUser,
+    session: Session,
+    background: BackgroundTasks,
+    archiver: ArchiverDep,
 ) -> Created:
     if await session.get(Source, source_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
@@ -268,12 +295,19 @@ async def add_recipe(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     await references.relink(session, source_id)
     await session.commit()
+    if pages := await archiving.uncopied(session, recipe.id):
+        background.add_task(archiver.run, pages)
     return Created(id=recipe.id)
 
 
 @router.put("/api/recipes/{recipe_id}", response_model=RecipeOut, dependencies=[SameOrigin])
 async def change_recipe(
-    recipe_id: uuid.UUID, body: RecipeIn, admin: AdminUser, session: Session
+    recipe_id: uuid.UUID,
+    body: RecipeIn,
+    admin: AdminUser,
+    session: Session,
+    background: BackgroundTasks,
+    archiver: ArchiverDep,
 ) -> RecipeOut:
     recipe = await _recipe_or_404(session, recipe_id)
     entry = _clean(body)
@@ -283,6 +317,8 @@ async def change_recipe(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     await references.relink(session, recipe.source_id)
     await session.commit()
+    if pages := await archiving.uncopied(session, recipe.id):
+        background.add_task(archiver.run, pages)
     return await _out(session, recipe)
 
 
