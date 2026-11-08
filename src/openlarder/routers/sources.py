@@ -15,14 +15,14 @@ from datetime import date
 from typing import Annotated, Literal
 
 import httpx2
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import exists, func, select
 
 from openlarder import books as books_module
-from openlarder import isbn, linking, openlibrary, references, refresh, web
+from openlarder import isbn, linking, openlibrary, references, refresh, visibility, web
 from openlarder import recipes as recipes_module
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder.auth import AdminUser, CurrentUser, SameOrigin, Viewer
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
 from openlarder.models import (
@@ -61,6 +61,8 @@ class BookSummary(BaseModel):
     authors: list[str]
     cover_url: str | None
     editions: int
+    # A family collection only its owner sees.
+    private: bool = False
 
 
 class Credit(BaseModel):
@@ -132,6 +134,10 @@ class Book(BaseModel):
     ingredients: list[TopIngredient]
     # A magazine's or newspaper's issues, newest first.
     issues: list[IssueSummary]
+    # A family collection only its owner sees; and whether the viewer may
+    # add to and change this source.
+    private: bool
+    editable: bool
     # A TV show's, podcast's or video channel's episodes, in order.
     episodes: list[EpisodeSummary]
 
@@ -163,6 +169,7 @@ PAGE = 100
 @router.get("", response_model=SourceList)
 async def list_books(
     session: Session,
+    viewer: Viewer,
     q: str = Query("", max_length=200),
     offset: int = Query(0, ge=0),
     limit: int = Query(PAGE, ge=1, le=PAGE),
@@ -172,7 +179,7 @@ async def list_books(
     ignoring case. Pickers ask for a handful (limit) as someone types; the
     Sources page a hundred at a time, since the whole catalog won't fit
     one answer."""
-    query = select(Source)
+    query = select(Source).where(visibility.sources_seen_by(viewer))
     for word in q.casefold().split()[:10]:
         like = contains_pattern(word)
         query = query.where(
@@ -231,15 +238,16 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
             authors=names.get(w.id, []),
             cover_url=_cover(covers.get(w.id)),
             editions=counts.get(w.id, 0),
+            private=w.private,
         )
         for w in works
     ]
 
 
 @router.get("/{source_id}", response_model=Book)
-async def get_book(source_id: uuid.UUID, session: Session) -> Book:
+async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Book:
     work = await session.get(Source, source_id)
-    if work is None:
+    if work is None or not visibility.can_see(viewer, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     credits = (
         await session.execute(
@@ -326,6 +334,8 @@ async def get_book(source_id: uuid.UUID, session: Session) -> Book:
         kind=work.kind,
         host=work.host,
         paywalled=work.paywalled,
+        private=work.private,
+        editable=viewer is not None and visibility.may_edit(viewer, work),
         title=work.title,
         subtitle=work.subtitle,
         open_library_url=(
@@ -585,7 +595,8 @@ class Relinked(BaseModel):
 async def relink_references(source_id: uuid.UUID, admin: AdminUser, session: Session) -> Relinked:
     """Link a book's page references again: for recipes stored before linking
     existed, which the Admin page runs over every book."""
-    if await session.get(Source, source_id) is None:
+    work = await session.get(Source, source_id)
+    if work is None or not visibility.can_see(admin, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     await references.relink(session, source_id)
     await session.commit()
@@ -628,7 +639,7 @@ async def edit_book(
 ) -> Added:
     """Fix what a book says about itself (books.edit_book)."""
     work = await session.get(Source, source_id)
-    if work is None:
+    if work is None or not visibility.can_see(admin, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     try:
         await books_module.edit_book(
@@ -853,3 +864,99 @@ async def _add_named(
     await session.commit()
     log.info("%s added the %s %s", admin.id, kind, title)
     return AddedManually(id=source.id, existing=False)
+
+
+class FamilyIn(BaseModel):
+    title: str = Field(max_length=300)
+    # Only its owner sees it. Until contributions are reviewed, only an
+    # admin can add a public one.
+    private: bool = True
+    # The form's tick box: they understand what the site keeps, and who
+    # sees it. Required; when it was ticked is kept.
+    acknowledged: bool = False
+
+
+class FamilyChange(BaseModel):
+    title: str | None = Field(default=None, max_length=300)
+    private: bool | None = None
+
+
+def _check_public(user: CurrentUser, private: bool) -> None:
+    if not private and not user.is_admin:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "A family collection stays private until OpenLarder reviews what people add.",
+        )
+
+
+@router.post("/family", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_family(body: FamilyIn, user: CurrentUser, session: Session) -> AddedManually:
+    """A family collection of the signed-in person's: one of theirs already
+    of that name, or a new one. Anyone signed in can add one."""
+    title = " ".join(body.title.split())
+    if not title:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give it its name.")
+    if not body.acknowledged:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Tick that you understand what OpenLarder keeps and who sees it.",
+        )
+    _check_public(user, body.private)
+    existing = await session.scalar(
+        select(Source).where(
+            Source.kind == "family",
+            Source.owner_id == user.id,
+            func.lower(Source.title) == title.lower(),
+        )
+    )
+    if existing is not None:
+        return AddedManually(id=existing.id, existing=True)
+    collection = Source(
+        kind="family",
+        title=title,
+        owner_id=user.id,
+        private=body.private,
+        acknowledged_at=func.now(),
+    )
+    session.add(collection)
+    await session.commit()
+    return AddedManually(id=collection.id, existing=False)
+
+
+async def _family_or_404(session: Session, source_id: uuid.UUID, user: CurrentUser) -> Source:
+    collection = await session.get(Source, source_id)
+    if collection is None or not visibility.can_see(user, collection):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
+    if collection.kind != "family":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only a family collection is changed here.")
+    if not visibility.may_edit(user, collection):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only its owner can change it.")
+    return collection
+
+
+@router.patch("/{source_id}/family", response_model=Added, dependencies=[SameOrigin])
+async def change_family(
+    source_id: uuid.UUID, body: FamilyChange, user: CurrentUser, session: Session
+) -> Added:
+    """Rename a family collection, or make it private or public."""
+    collection = await _family_or_404(session, source_id, user)
+    if body.title is not None:
+        title = " ".join(body.title.split())
+        if not title:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give it its name.")
+        collection.title = title
+    if body.private is not None:
+        _check_public(user, body.private)
+        collection.private = body.private
+    await session.commit()
+    return Added(id=collection.id)
+
+
+@router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[SameOrigin])
+async def remove_family(source_id: uuid.UUID, user: CurrentUser, session: Session) -> Response:
+    """Delete a family collection and its recipes. Only a family collection
+    can be deleted, by whoever may change it."""
+    collection = await _family_or_404(session, source_id, user)
+    await session.delete(collection)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

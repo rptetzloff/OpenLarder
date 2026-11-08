@@ -13,10 +13,10 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from openlarder import archiving, detector, recipes, references, substitutions
+from openlarder import archiving, detector, recipes, references, substitutions, visibility
 from openlarder import lines as line_reading
 from openlarder.archiving import ArchiverDep
-from openlarder.auth import AdminUser, CurrentUser, SameOrigin
+from openlarder.auth import CurrentUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
@@ -185,6 +185,8 @@ class RecipeOut(BaseModel):
     used_in: list[RecipeLink]
     # What can stand in for its ingredients, the recipes it cites, or itself.
     swaps: list[SwapOut]
+    # Whether the viewer may change or remove it.
+    editable: bool
 
 
 class Created(BaseModel):
@@ -233,15 +235,28 @@ def _episode_out(episode: Episode, at: int | None) -> EpisodeOut:
     )
 
 
-async def _recipe_or_404(session, recipe_id: uuid.UUID) -> Recipe:
+async def _recipe_or_404(session, recipe_id: uuid.UUID, viewer) -> Recipe:
     recipe = await session.get(Recipe, recipe_id)
-    if recipe is None:
+    if recipe is None or not visibility.can_see(
+        viewer, await session.get_one(Source, recipe.source_id)
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     return recipe
 
 
-async def _out(session, recipe: Recipe) -> RecipeOut:
-    work = await session.get(Source, recipe.source_id)
+async def _editable_source(session, source_id: uuid.UUID, user) -> Source:
+    """The source, when the user may add to and change it: 404 when they
+    can't see it, 403 when they can but it isn't theirs to change."""
+    source = await session.get(Source, source_id)
+    if source is None or not visibility.can_see(user, source):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
+    if not visibility.may_edit(user, source):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an admin can change that.")
+    return source
+
+
+async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
+    work = await session.get_one(Source, recipe.source_id)
     pages = (
         await session.execute(
             select(RecipeLocation.page, Edition)
@@ -363,12 +378,13 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
             swap_out(x)
             for x in await substitutions.listed(session, substitutions.for_recipe(recipe.id))
         ],
+        editable=viewer is not None and visibility.may_edit(viewer, work),
     )
 
 
 @router.get("/api/recipes/{recipe_id}", response_model=RecipeOut)
-async def get_recipe(recipe_id: uuid.UUID, session: Session) -> RecipeOut:
-    return await _out(session, await _recipe_or_404(session, recipe_id))
+async def get_recipe(recipe_id: uuid.UUID, session: Session, viewer: Viewer) -> RecipeOut:
+    return await _out(session, await _recipe_or_404(session, recipe_id, viewer), viewer)
 
 
 @router.post(
@@ -380,18 +396,19 @@ async def get_recipe(recipe_id: uuid.UUID, session: Session) -> RecipeOut:
 async def add_recipe(
     source_id: uuid.UUID,
     body: RecipeIn,
-    admin: AdminUser,
+    user: CurrentUser,
     session: Session,
     background: BackgroundTasks,
     archiver: ArchiverDep,
 ) -> Created:
-    if await session.get(Source, source_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    await _editable_source(session, source_id, user)
     entry = _clean(body)
     try:
         recipe = await recipes.create(session, source_id, entry)
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    # Whoever added it deals with its flags (routers/flags.py).
+    recipe.created_by = user.id
     await references.relink(session, source_id)
     await session.commit()
     if pages := await archiving.uncopied(session, recipe.id):
@@ -403,12 +420,13 @@ async def add_recipe(
 async def change_recipe(
     recipe_id: uuid.UUID,
     body: RecipeIn,
-    admin: AdminUser,
+    user: CurrentUser,
     session: Session,
     background: BackgroundTasks,
     archiver: ArchiverDep,
 ) -> RecipeOut:
-    recipe = await _recipe_or_404(session, recipe_id)
+    recipe = await _recipe_or_404(session, recipe_id, user)
+    await _editable_source(session, recipe.source_id, user)
     entry = _clean(body)
     try:
         await recipes.replace(session, recipe, entry)
@@ -418,7 +436,7 @@ async def change_recipe(
     await session.commit()
     if pages := await archiving.uncopied(session, recipe.id):
         background.add_task(archiver.run, pages)
-    return await _out(session, recipe)
+    return await _out(session, recipe, user)
 
 
 @router.delete(
@@ -426,8 +444,9 @@ async def change_recipe(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[SameOrigin],
 )
-async def remove_recipe(recipe_id: uuid.UUID, admin: AdminUser, session: Session) -> Response:
-    recipe = await _recipe_or_404(session, recipe_id)
+async def remove_recipe(recipe_id: uuid.UUID, user: CurrentUser, session: Session) -> Response:
+    recipe = await _recipe_or_404(session, recipe_id, user)
+    await _editable_source(session, recipe.source_id, user)
     source_id = recipe.source_id
     await references.release(session, recipe.id)
     await session.delete(recipe)

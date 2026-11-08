@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from openlarder import visibility
 from openlarder.auth import CurrentUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import FlagKind, Recipe, RecipeFlag, Source, User
@@ -91,13 +92,14 @@ async def list_flags(
         select(RecipeFlag, Recipe, Source)
         .join(Recipe, Recipe.id == RecipeFlag.recipe_id)
         .join(Source, Source.id == Recipe.source_id)
+        .where(visibility.recipes_seen_by(user))
     )
     if mine is not None:
         base = base.where(mine)
     counts_query = (
         select(RecipeFlag.kind, func.count())
         .join(Recipe, Recipe.id == RecipeFlag.recipe_id)
-        .where(RecipeFlag.resolved_at.is_(None))
+        .where(RecipeFlag.resolved_at.is_(None), visibility.recipes_seen_by(user))
         .group_by(RecipeFlag.kind)
     )
     if mine is not None:
@@ -126,7 +128,9 @@ async def list_flags(
 async def recipe_flags(recipe_id: uuid.UUID, user: CurrentUser, session: Session) -> list[FlagOut]:
     """A recipe's flags, open first, for whoever may deal with them; others see none."""
     recipe = await session.get(Recipe, recipe_id)
-    if recipe is None:
+    if recipe is None or not visibility.can_see(
+        user, await session.get_one(Source, recipe.source_id)
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     if not (user.is_admin or recipe.created_by == user.id):
         return []
@@ -146,9 +150,11 @@ async def resolve(
     flag_id: uuid.UUID, body: Resolve, user: CurrentUser, session: Session
 ) -> FlagOut:
     flag = await session.get(RecipeFlag, flag_id)
-    if flag is None:
+    recipe = await session.get(Recipe, flag.recipe_id) if flag else None
+    if recipe is None or not visibility.can_see(
+        user, await session.get_one(Source, recipe.source_id)
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such flag.")
-    recipe = await session.get(Recipe, flag.recipe_id)
     if not (user.is_admin or recipe.created_by == user.id):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Only an admin or whoever added the recipe can do that."

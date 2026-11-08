@@ -175,6 +175,9 @@ async def require_user(user: Annotated[User | None, Depends(current_user)]) -> U
 
 
 CurrentUser = Annotated[User, Depends(require_user)]
+# Whoever is asking, signed in or not: what they see depends on it
+# (visibility.py).
+Viewer = Annotated[User | None, Depends(current_user)]
 
 
 async def require_admin(user: CurrentUser) -> User:

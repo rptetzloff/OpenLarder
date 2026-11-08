@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { type Book, issueName, KIND_NAMES } from "../books";
+import { type Book, issueName, KIND_NAMES, removeFamily, renameFamily } from "../books";
 import OpenLibraryCheck from "../components/OpenLibraryCheck.vue";
 import OpenLibraryLink from "../components/OpenLibraryLink.vue";
 import type { Me } from "../me";
@@ -38,14 +38,40 @@ async function load() {
   }
 }
 
+// A family collection's owner renames or deletes it here.
+const newName = ref("");
+const renaming = ref(false);
+const actionError = ref("");
+async function rename() {
+  actionError.value = "";
+  try {
+    await renameFamily(book.value!.id, newName.value);
+    renaming.value = false;
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+async function remove() {
+  const count = book.value!.recipes.length;
+  const recipes = count === 1 ? "its recipe" : `its ${count} recipes`;
+  if (!confirm(`Delete ${book.value!.title} and ${recipes}? This can't be undone.`)) return;
+  try {
+    await removeFamily(book.value!.id);
+    location.href = "/sources";
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
 onMounted(load);
 </script>
 
 <template>
   <article>
     <p><a href="/sources">← All sources</a></p>
-    <p v-if="missing">There's no book here. It may have been removed, or the link is wrong.</p>
-    <p v-else-if="failed" role="alert">This book couldn't be loaded. Try reloading the page.</p>
+    <p v-if="missing">There's nothing here. It may have been removed, or the link is wrong.</p>
+    <p v-else-if="failed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!book" class="status">Loading…</p>
     <template v-else>
       <div class="book-head">
@@ -66,9 +92,34 @@ onMounted(load);
           <p v-if="book.open_library_url" class="byline">
             <a :href="book.open_library_url">On Open Library</a>
           </p>
-          <p v-if="user?.is_admin" class="byline">
+          <p v-if="book.private" class="byline">
+            A private family collection: only you see it.
+          </p>
+          <p v-if="user?.is_admin && book.kind !== 'family'" class="byline">
             <a :href="`/sources/${book.id}/edit`">Edit {{ KIND_NAMES[book.kind] }}</a>
           </p>
+          <template v-if="book.kind === 'family' && book.editable">
+            <form v-if="renaming" class="inline-form" @submit.prevent="rename">
+              <label for="family-rename" class="visually-hidden">New name</label>
+              <input id="family-rename" v-model="newName" required maxlength="300" />
+              <button type="submit" class="primary">Rename</button>
+              <button type="button" class="link" @click="renaming = false">Cancel</button>
+            </form>
+            <p v-else class="byline">
+              <button
+                type="button"
+                class="link"
+                @click="
+                  newName = book.title;
+                  renaming = true;
+                "
+              >
+                Rename</button
+              >&nbsp;
+              <button type="button" class="link" @click="remove">Delete</button>
+            </p>
+            <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
+          </template>
         </div>
       </div>
 
@@ -89,7 +140,7 @@ onMounted(load);
       </template>
 
       <h2>Recipes</h2>
-      <p v-if="user?.is_admin"><a :href="`/sources/${book.id}/recipes/new`">Add a recipe</a></p>
+      <p v-if="book.editable"><a :href="`/sources/${book.id}/recipes/new`">Add a recipe</a></p>
       <ul v-if="book.recipes.length" class="recipe-list">
         <li v-for="r in book.recipes" :key="r.id">
           <a :href="`/recipes/${r.id}`">{{ r.title }}</a>

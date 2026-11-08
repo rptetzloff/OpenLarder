@@ -419,6 +419,54 @@ button.primary:disabled {
   color: var(--muted);
   font-size: 0.875rem;
 }
+.recipe-form > label.check {
+  font-weight: normal;
+}
+.family-add {
+  margin: 1rem 0 1.5rem;
+}
+.family-add summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.family-add .recipe-form {
+  margin-top: 0.75rem;
+}
+/* What a family collection keeps and who sees it, before the tick box. */
+.notice {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.25rem 0.875rem;
+  font-size: 0.9375rem;
+}
+.notice p {
+  margin: 0.5rem 0;
+}
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.5rem 0;
+}
+.inline-form input {
+  font: inherit;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .recipe-form .error {
   color: var(--error);
 }
