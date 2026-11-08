@@ -58,6 +58,18 @@ Authgear, which matches redirect URIs exactly, would refuse it. Authgear
 accepts three: `/api/auth/callback` on `localhost:5173`, `localhost:8000` and
 `openlarder.com`. A new address needs adding there first.
 
+### Internet Archive
+
+Each web recipe's page is copied to the Internet Archive when it's added
+(`archive.py`). That works without these, as an anonymous visitor with lower
+limits; set both to use an archive.org account's API keys instead. Both or
+neither: with one alone, they're ignored.
+
+| Variable | Value |
+| --- | --- |
+| `OPENLARDER_ARCHIVE_ACCESS_KEY` | From https://archive.org/account/s3.php, signed in to the account |
+| `OPENLARDER_ARCHIVE_SECRET_KEY` | From the same page. Never committed |
+
 Signing out goes on to Authgear's end-session endpoint, which returns people
 to `https://openlarder.com/`. That address is registered in Authgear as a
 post-logout redirect URI; an address that isn't is sent to Authgear's own page

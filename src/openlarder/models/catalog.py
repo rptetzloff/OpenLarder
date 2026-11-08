@@ -28,9 +28,11 @@ rank and treat the lowest as first.
 
 import enum
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -240,11 +242,21 @@ class WebPage(Timestamps, Base):
         # The target of recipe_locations' composite key.
         UniqueConstraint("source_id", "id"),
         CheckConstraint("url <> ''", name="url_not_empty"),
+        CheckConstraint("archive_url <> ''", name="archive_url_not_empty"),
+        CheckConstraint("(archive_url IS NULL) = (archived_at IS NULL)", name="archived_together"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
     url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    # The Internet Archive's copy, and when it was made (archive.py;
+    # migration 0021). archive_tried_at: the last time one was asked for.
+    archive_url: Mapped[str | None] = mapped_column(Text)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archive_tried_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Marked by an admin when the page no longer has the recipe; its copy
+    # is offered instead.
+    gone: Mapped[bool] = mapped_column(nullable=False, server_default=false())
 
 
 class RecipeLocation(Timestamps, Base):

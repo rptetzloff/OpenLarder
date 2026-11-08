@@ -36,9 +36,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       book or a blog or an instagram post or a tv episode or a magazine
       article".* **Step 1 done (#55):** books are sources. **Step 2, websites
       (#56):** a website is a source, one per site, optionally a
-      subscription site, with recipes on its pages by address. Next: the
-      Internet Archive link for a page that disappears; then the other
-      kinds; then private recipes and sharing. Decided (Ray, 2026-11-08):
+      subscription site, with recipes on its pages by address. The
+      Internet Archive copy of each web page (#57). Next: the other kinds;
+      then private recipes and sharing. Decided (Ray, 2026-11-08):
       - **Every kind people document is offered**: books, magazines, blogs
         and websites, social media posts, TV and video. Social media is one
         generic kind, an account's post by address, not a kind per
@@ -128,6 +128,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       close enough, otherwise suggest and flag, with a measured threshold.
 - [ ] **#17**: sign-in and account screens that look like OpenLarder.
 - [ ] **Ray**: publish the Google sign-in consent screen.
+- [ ] **Ray**: an archive.org account for OpenLarder, and its API keys in
+      Coolify (`OPENLARDER_ARCHIVE_ACCESS_KEY`, `OPENLARDER_ARCHIVE_SECRET_KEY`;
+      README). Copies work without them, with lower limits.
 - [ ] **Ray**: Cloudflare Browser Cache TTL to "Respect Existing Headers".
 
 ## Open decisions
@@ -153,6 +156,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Web recipes' pages copied to the Internet Archive when added; a page
+      marked gone offers its copy (#57)
 - [x] Websites as sources: add a site, recipes on its pages by address,
       subscription sites (#56)
 - [x] Books become sources: tables, API (`/api/sources`) and pages
