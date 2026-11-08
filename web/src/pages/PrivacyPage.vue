@@ -95,6 +95,11 @@ document.title = "Privacy policy · OpenLarder";
       Authgear sets its own cookies on its sign-in pages, and Cloudflare may set a security
       cookie. OpenLarder sets no cookies for advertising or analytics.
     </p>
+    <p>
+      Your browser also keeps two things for this site, which are never sent to OpenLarder: the
+      theme you choose (light or dark), and, while you sign in from an invite link, that link, so
+      you come back to it.
+    </p>
 
     <h2>Contributions</h2>
     <p>

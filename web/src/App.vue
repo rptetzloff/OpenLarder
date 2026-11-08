@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import NameForm from "./components/NameForm.vue";
 import { takeRememberedInvite } from "./groups";
+import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
@@ -60,6 +61,8 @@ const groupId = match(`/groups/${UUID}`);
 // An invite link's token (secrets.token_urlsafe).
 const inviteCode = match("/invite/([A-Za-z0-9_-]+)");
 
+const theme = ref<ThemeChoice>(savedTheme());
+
 // The main sections, so the header can mark the one you're in.
 const SECTIONS = [
   { href: "/search", label: "Search" },
@@ -94,11 +97,10 @@ onMounted(async () => {
   <header class="site-header">
     <div class="bar">
       <a href="/" class="brand">
-        <!-- The full logo, in the version for the page's light or dark. -->
-        <picture>
-          <source srcset="/logo-dark.svg" media="(prefers-color-scheme: dark)" />
-          <img src="/logo-light.svg" alt="OpenLarder" width="140" height="36" />
-        </picture>
+        <!-- The full logo, in the version for the page's light or dark; CSS
+             shows the one that matches data-theme. -->
+        <img class="for-light" src="/logo-light.svg" alt="OpenLarder" width="140" height="36" />
+        <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="140" height="36" />
       </a>
       <nav class="primary-nav" aria-label="Main">
         <a
@@ -171,13 +173,23 @@ onMounted(async () => {
       <a href="/api/docs">API</a>
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
+      <span class="theme-choice">
+        <label for="theme">Theme</label>
+        <select id="theme" v-model="theme" @change="chooseTheme(theme)">
+          <option value="system">Same as device</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </span>
     </div>
   </footer>
 </template>
 
 <style>
 /* The design's colours, once (Ray's wireframes, 2026-11-08): light as
-   drawn, and dark when the device asks for it. --accent is the primary
+   drawn, and dark when chosen in the footer or, by default, when the device
+   is set to dark. data-theme on <html> is always "light" or "dark" (see
+   index.html and theme.ts). --accent is the primary
    action (the blue Search button); --line is a divider, lighter than
    --border, which input edges use and which keeps 3:1 against --bg. */
 :root {
@@ -196,26 +208,25 @@ onMounted(async () => {
   --admin-line: #ecd58a;
   --error: #b3261e;
   --page: 72rem;
-  color-scheme: light dark;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161615;
-    --surface: #22211f;
-    --fg: #ecebe6;
-    --muted: #a8a59c;
-    --link: #8ab4f8;
-    /* Light blue with dark text: white on it would be under 3:1. */
-    --accent: #8ab4f8;
-    --accent-hover: #a8c7fa;
-    --on-accent: #0b1f3a;
-    --border: #77746c;
-    --line: #34332f;
-    --chip: #1f2c40;
-    --admin-bg: #3a3016;
-    --admin-line: #5c4c1f;
-    --error: #f2a8a2;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #161615;
+  --surface: #22211f;
+  --fg: #ecebe6;
+  --muted: #a8a59c;
+  --link: #8ab4f8;
+  /* Light blue with dark text: white on it would be under 3:1. */
+  --accent: #8ab4f8;
+  --accent-hover: #a8c7fa;
+  --on-accent: #0b1f3a;
+  --border: #77746c;
+  --line: #34332f;
+  --chip: #1f2c40;
+  --admin-bg: #3a3016;
+  --admin-line: #5c4c1f;
+  --error: #f2a8a2;
 }
 body {
   margin: 0;
@@ -236,6 +247,25 @@ body {
   max-width: var(--page);
   margin: 0 auto;
   padding: 0.75rem 1.5rem;
+}
+/* One logo per theme; the other is hidden. */
+:root[data-theme="dark"] .brand .for-light,
+:root:not([data-theme="dark"]) .brand .for-dark {
+  display: none !important;
+}
+.theme-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.theme-choice select {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
 }
 .brand img {
   display: block;

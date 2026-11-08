@@ -205,6 +205,7 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] A light, dark or same-as-device theme choice in the footer (#67)
 - [x] Site design, part 1: the shell (colours, logo, header, footer) and
       the home page, light and dark (#66)
 - [x] Household groups: invites by link, view, edit and admin roles, and
