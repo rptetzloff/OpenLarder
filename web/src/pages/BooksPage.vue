@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { addByIsbn, type BookSummary } from "../books";
 import type { Me } from "../me";
 
@@ -11,6 +11,26 @@ const failed = ref(false);
 const isbn = ref("");
 const adding = ref(false);
 const error = ref("");
+
+// Narrowing the list as someone types: by title, subtitle or author,
+// ignoring case and accents. The whole list is here already.
+const filter = ref(new URLSearchParams(location.search).get("q") ?? "");
+const fold = (s: string) =>
+  s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase();
+const shown = computed(() => {
+  const words = fold(filter.value).split(/\s+/).filter(Boolean);
+  if (!books.value || !words.length) return books.value;
+  return books.value.filter((b) => {
+    const text = fold([b.title, b.subtitle ?? "", ...b.authors].join(" "));
+    return words.every((w) => text.includes(w));
+  });
+});
+watch(filter, () => {
+  const url = new URL(location.href);
+  if (filter.value.trim()) url.searchParams.set("q", filter.value.trim());
+  else url.searchParams.delete("q");
+  history.replaceState(null, "", url);
+});
 
 onMounted(async () => {
   try {
@@ -63,8 +83,28 @@ async function add() {
     <p v-if="failed" role="alert">The books couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="books === null" class="status">Loading…</p>
     <p v-else-if="books.length === 0">No books yet.</p>
-    <ul v-else class="book-list">
-      <li v-for="book in books" :key="book.id">
+    <template v-else>
+      <div class="isbn-form">
+        <label for="book-filter">Find a book</label>
+        <div class="row">
+          <input
+            id="book-filter"
+            v-model="filter"
+            type="search"
+            autocomplete="off"
+            placeholder="title or author"
+          />
+        </div>
+      </div>
+      <p v-if="filter.trim()" class="status">
+        {{ shown!.length }} of {{ books.length }} books.
+        <a v-if="shown!.length === 0" :href="`/search?q=${encodeURIComponent(filter.trim())}`"
+          >Look for recipes with “{{ filter.trim() }}” in the title instead</a
+        >
+      </p>
+    </template>
+    <ul v-if="shown?.length" class="book-list">
+      <li v-for="book in shown" :key="book.id">
         <a :href="`/books/${book.id}`" class="book-card">
           <img v-if="book.cover_url" :src="book.cover_url" alt="" loading="lazy" />
           <span v-else class="no-cover" aria-hidden="true"></span>

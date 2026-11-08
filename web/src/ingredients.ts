@@ -93,6 +93,8 @@ export interface SearchResult {
   ingredients: Named[];
   // IDs in the search that name no ingredient now, as after a merge.
   missing: string[];
+  // The title words searched for.
+  q: string;
   recipes: Ingredient["recipes"];
   total: number;
 }
@@ -100,10 +102,10 @@ export interface SearchResult {
 // The recipes that use every one of the ingredients.
 export async function searchRecipes(
   ids: string[],
-  offset = 0,
-  book: string | null = null,
+  { offset = 0, book = null, q = "" }: { offset?: number; book?: string | null; q?: string } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
+  if (q.trim()) query.set("q", q.trim());
   if (book) query.set("book", book);
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);

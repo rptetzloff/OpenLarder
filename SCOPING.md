@@ -337,7 +337,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Ranked ingredient options (fallbacks) on recipe entries
 - Substitutions, entered by hand or printed in a book. Suggesting them automatically for a diet waits on allergen data. *MVP, because the first import's books print their own swaps and would otherwise need entering twice. Ray left the phase to Claude on 2026-11-06, asking only that it be logical.*
 - Ingredient normalization with seeded data and the matching flow
-- Search by ingredient, by book, by recipe title
+- Search by ingredient, by book, by recipe title. *Built 2026-11-08: the Search page takes ingredients and words of a title, alone or together, within one book or all; the book list narrows by title, subtitle or author as someone types.*
 - User accounts, submissions, review queue, edit history
 - Bookshop.org affiliate links
 - Read-only public API

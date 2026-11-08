@@ -225,3 +225,60 @@ async def test_a_book_shows_its_thirty_most_used(admin, work, client) -> None:
     await _add(admin, work, "A", "1", [f"Spice {n:02}" for n in range(35)])
     book = (await client.get(f"/api/books/{work}")).json()
     assert [i["name"] for i in book["ingredients"]] == [f"Spice {n:02}" for n in range(30)]
+
+
+# By title
+
+
+async def test_every_title_word_must_appear(admin, work, client) -> None:
+    await _add(admin, work, "Rhubarb and Ginger Cake", "1", ["Rhubarb"])
+    await _add(admin, work, "Rhubarb Fool", "2", ["Rhubarb"])
+    await _add(admin, work, "Carrot Cake", "3", ["Carrot"])
+    found = await _search(client, q="  CAKE rhubarb ")
+    assert (_titles(found), found["q"]) == (["Rhubarb and Ginger Cake"], "CAKE rhubarb")
+    assert _titles(await _search(client, q="cake")) == ["Carrot Cake", "Rhubarb and Ginger Cake"]
+
+
+async def test_title_words_narrow_an_ingredient_search(admin, work, adb, client) -> None:
+    await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb", "Egg"])
+    await _add(admin, work, "Rhubarb Fool", "2", ["Rhubarb", "Cream"])
+    await _add(admin, work, "Lemon Cake", "3", ["Egg"])
+    egg = await _id(adb, "Egg")
+    assert _titles(await _search(client, egg, q="rhubarb")) == ["Rhubarb Cake"]
+
+
+async def test_title_words_within_a_book(admin, work, adb, client) -> None:
+    other, edition = await _other_book(adb)
+    await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb"])
+    await admin.post(
+        f"/api/books/{other}/recipes",
+        json={
+            "title": "Rhubarb Salad",
+            "editions": [{"edition_id": str(edition)}],
+            "ingredients": ["Rhubarb"],
+        },
+    )
+    assert _titles(await _search(client, q="rhubarb", book=str(other))) == ["Rhubarb Salad"]
+
+
+async def test_wildcards_in_a_title_are_typed_characters(admin, work, client) -> None:
+    await _add(admin, work, "100% Rye Bread", "1", ["Rye Flour"])
+    await _add(admin, work, "Rye_Crackers", "2", ["Rye Flour"])
+    await _add(admin, work, "Seeded Bread", "3", ["Seeds"])
+    assert _titles(await _search(client, q="%")) == ["100% Rye Bread"]
+    assert _titles(await _search(client, q="_")) == ["Rye_Crackers"]
+
+
+async def test_title_words_still_search_when_the_ingredient_is_gone(admin, work, client) -> None:
+    await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb"])
+    found = await _search(client, uuid.uuid4(), q="cake")
+    assert (_titles(found), len(found["missing"])) == (["Rhubarb Cake"], 1)
+
+
+async def test_a_title_search_has_at_most_ten_words(client) -> None:
+    assert (
+        await client.get("/api/search", params={"q": " ".join("abcdefghij")})
+    ).status_code == 200
+    assert (
+        await client.get("/api/search", params={"q": " ".join("abcdefghijk")})
+    ).status_code == 422
