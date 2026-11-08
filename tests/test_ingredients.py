@@ -475,3 +475,64 @@ async def test_only_admins_fix_ingredients(admin, work, adb, method, path, body)
     response = await admin.request(method, f"/api/ingredients/{lime}{path}", json=body)
     assert response.status_code == 403
     assert await _ingredients(adb) == ["Lime"]
+
+
+# Broader and narrower
+
+
+async def _parent(client, child, parent):
+    body = {"parent": str(parent) if parent else None}
+    return await client.put(f"/api/ingredients/{child}/parent", json=body)
+
+
+async def test_an_ingredient_goes_under_another(admin, work, adb, client) -> None:
+    await _add(admin, work, "Stir-Fry", "1", ["Fresh Ginger", "Garlic"])
+    await _add(admin, work, "Cake", "2", ["Ground Ginger", "Fresh Ginger"])
+    await _add(admin, work, "Tea", "3", ["Ginger"])
+    ginger, fresh, ground = [await _id(adb, n) for n in ("Ginger", "Fresh Ginger", "Ground Ginger")]
+    for child in (ground, fresh):
+        response = await _parent(admin, child, ginger)
+        assert response.status_code == 200, response.text
+    shown = (await client.get(f"/api/ingredients/{ginger}")).json()
+    assert shown["parent"] is None
+    assert [c["name"] for c in shown["children"]] == ["Fresh Ginger", "Ground Ginger"]
+    # Its own recipe, and the two of its children's, each once.
+    assert (shown["total"], shown["family_total"]) == (1, 3)
+    child = (await client.get(f"/api/ingredients/{fresh}")).json()
+    assert child["parent"] == {"id": str(ginger), "name": "Ginger"}
+    assert child["children"] == []
+    assert child["family_total"] == child["total"] == 2
+
+
+async def test_an_ingredient_can_come_out_from_under(admin, work, adb, client) -> None:
+    await _add(admin, work, "Tea", "1", ["Ginger", "Fresh Ginger"])
+    ginger, fresh = await _id(adb, "Ginger"), await _id(adb, "Fresh Ginger")
+    await _parent(admin, fresh, ginger)
+    assert (await _parent(admin, fresh, None)).status_code == 200
+    assert (await client.get(f"/api/ingredients/{fresh}")).json()["parent"] is None
+
+
+async def test_no_loops(admin, work, adb) -> None:
+    await _add(admin, work, "Plate", "1", ["Cheese", "Cheddar", "Aged Cheddar"])
+    cheese, cheddar, aged = [await _id(adb, n) for n in ("Cheese", "Cheddar", "Aged Cheddar")]
+    await _parent(admin, cheddar, cheese)
+    await _parent(admin, aged, cheddar)
+    for child, parent in [(cheese, cheese), (cheese, cheddar), (cheese, aged)]:
+        response = await _parent(admin, child, parent)
+        assert response.status_code == 422
+    assert await adb.scalar(text("SELECT parent_id FROM ingredients WHERE name = 'Cheese'")) is None
+    # Moving a branch elsewhere is fine.
+    assert (await _parent(admin, aged, cheese)).status_code == 200
+
+
+async def test_an_unknown_parent_is_a_404(admin, work, adb) -> None:
+    await _add(admin, work, "Tea", "1", ["Ginger"])
+    response = await _parent(admin, await _id(adb, "Ginger"), uuid.uuid4())
+    assert response.status_code == 404
+
+
+async def test_only_admins_set_a_parent(admin, work, adb) -> None:
+    await _add(admin, work, "Tea", "1", ["Ginger", "Fresh Ginger"])
+    await adb.execute(text("UPDATE users SET is_admin = false"))
+    response = await _parent(admin, await _id(adb, "Fresh Ginger"), await _id(adb, "Ginger"))
+    assert response.status_code == 403

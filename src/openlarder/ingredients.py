@@ -219,6 +219,34 @@ _SWAP_KEY = (
 )
 
 
+def family(ingredient_id: uuid.UUID, name: str = "family"):
+    """The ingredient and everything under it, as a select of IDs. UNION,
+    not UNION ALL, so a loop in the hierarchy still ends; set_parent makes
+    none, but rows written another way could."""
+    tree = (
+        select(Ingredient.id).where(Ingredient.id == ingredient_id).cte(name=name, recursive=True)
+    )
+    tree = tree.union(select(Ingredient.id).where(Ingredient.parent_id == tree.c.id))
+    return select(tree.c.id)
+
+
+async def set_parent(
+    session: AsyncSession, ingredient: Ingredient, parent: Ingredient | None
+) -> None:
+    """Put an ingredient under another (cheddar under cheese), or under
+    nothing. Refused if that would make a loop."""
+    if parent is not None:
+        below = set(await session.scalars(family(ingredient.id)))
+        if parent.id == ingredient.id:
+            raise ValueError("An ingredient can't go under itself.")
+        if parent.id in below:
+            raise ValueError(
+                f"“{parent.name}” comes under “{ingredient.name}”, so it can't go above it."
+            )
+    ingredient.parent_id = parent.id if parent else None
+    await session.flush()
+
+
 async def remove(session: AsyncSession, ingredient: Ingredient) -> None:
     """Delete an ingredient nothing uses; its aliases go with it."""
     i = ingredient.id
