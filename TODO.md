@@ -6,6 +6,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## MVP
 
+- [ ] **Site design.** *Ray, 2026-11-08: "not most important for
+      development, but definitely part of MVP".* The pages work but aren't
+      designed: a real home page (it still shows the placeholder's database
+      status), the look (type, colour, logo use, light and dark), navigation
+      as sources, search and the larder arrive, and the phone layout. #17's
+      sign-in screens should match it.
 - [ ] **Wikidata facts on author pages** (born, nationality, website). The
       pages themselves are built (#52).
 - [ ] **Merge two authors**: the same person can end up as two records (a
@@ -23,6 +29,80 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       agreement, together, then trust levels and a report button. Until then
       only admins add to the catalog. The ingredient matching flow's
       suggestions and "new ingredient" step wait on this too.
+
+## Planned features
+
+- [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
+      book or a blog or an instagram post or a tv episode or a magazine
+      article".* Decided (Ray, 2026-11-08):
+      - **Every kind people document is offered**: books, magazines, blogs
+        and websites, social media posts, TV and video. Social media is one
+        generic kind, an account's post by address, not a kind per
+        platform; nothing is built for TikTok in particular (Ray). Also,
+        all agreed (Ray, 2026-11-08): video channels (a channel's videos,
+        maybe a time), podcasts (a show's episodes), newspaper food sections
+        (a paper's dates and pages), subscription recipe sites (websites
+        behind a paywall, linked, never copied), packaging (a product's
+        label), and **family recipes** (cards, community cookbooks, class
+        handouts), which **can be marked private**: seen only by the person
+        who added them and whoever they share with, as with the larder.
+        Adding one is voluntary, and only its title and ingredient names
+        are kept, never amounts or method, so the realistic exposure is a
+        "secret ingredient". So the form says plainly what the site keeps
+        and who sees it, public unless marked private, and asks the person
+        to tick that they understand before it saves (Ray, 2026-11-08,
+        between a warning and a tick box; the tick box is Claude's pick, as
+        it records the choice).
+      - **Each kind has its own shape**, in levels: a book's editions and
+        pages; a magazine's issues and pages; a website's posts, by address;
+        a social media account's posts; **a TV show's episodes, where the recipe
+        belongs** (Ray), maybe with a time in it.
+      - **A web page that disappears** is marked archived and links to the
+        Internet Archive's copy from when it was added. Adding a web source
+        asks the Archive to save the page then (its Save Page Now service),
+        and keeps the snapshot's address; if that fails, the Archive's
+        nearest earlier copy is looked up instead. To check when built:
+        the Archive's current terms and limits, and which social media
+        pages archive at all.
+
+      *Claude's recommendation on storage:* real columns and tables per
+      kind, not a JSON blob. A source (kind, title, credits) has parts (an
+      edition, issue, episode or post, each with its own fields), and a
+      recipe sits in a part at a page, a time or an address. JSON only for
+      the odd field a kind needs and nothing searches by. Columns keep
+      search, constraints and the API documentation honest; a JSON field
+      hides typos and can't be indexed cheaply. Settle it before launch:
+      renaming Work to Source after would change the public API and every
+      `/books/…` link. Books stay first-class: Open Library, ISBNs and
+      affiliate links are theirs alone.
+
+      Only books come from Open Library, and only books have affiliate
+      links. Everything else stays as it is: the entry rules, ingredient
+      lines, search, substitutions and the larder all hang off the recipe,
+      not the source. The content rules matter more for web sources: an
+      entry links to the recipe and never copies it. *Claude's
+      recommendation:* settle the model before launch, renaming Work to
+      Source with a kind and Edition to a printing (or issue), even if only
+      books are offered at first. Renaming after launch would change the
+      public API and every `/books/…` link. Open: which kinds to start with,
+      what to store for a web page that disappears, and whether a TV recipe
+      is the episode or the show.
+- [ ] **Personal larder: your own inventory lists.** *Ray, 2026-11-08.* Each
+      person keeps lists named and arranged their own way ("Pantry", "Spice
+      drawer", "Refrigerator", "Freezer", or whatever they like). An item is
+      a name of their own ("Cholula Chipotle") and the canonical ingredient
+      it matches ("Hot Sauce"), so 34 hot sauces are still hot sauce. It
+      feeds Search's "what can I make with what I have": your larder becomes
+      the ingredients you have. Private by default; shareable with friends
+      and family; public if someone wants it. To settle when it's built:
+      - whether an item can match a specific kind ("Chipotle Hot Sauce")
+        with the broader one counting through the hierarchy, or only the
+        top-level ingredient;
+      - "out of" or "running low" on an item, with no amounts (amounts stay
+        out, as for recipes);
+      - how friends and family link: invite by account, a shared household
+        larder, or both; and whether shared means view or edit;
+      - whether a book shelf ("books I own", Phase 2) lives alongside it.
 
 ## Found along the way
 
