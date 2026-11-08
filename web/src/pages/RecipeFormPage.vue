@@ -12,6 +12,11 @@ const ingredients = ref("");
 // A website's recipe: the page it's on.
 const webAddress = ref("");
 const onWeb = computed(() => book.value?.kind === "website");
+// A magazine's or newspaper's recipe: its issue (name or date) and page.
+const inIssue = computed(() => ["magazine", "newspaper"].includes(book.value?.kind ?? ""));
+const issue = ref("");
+const issueDate = ref("");
+const issuePage = ref("");
 // Per edition: is the recipe in it, and on which page.
 const editions = ref<{ id: string; label: string; included: boolean; page: string }[]>([]);
 const error = ref("");
@@ -51,6 +56,9 @@ onMounted(async () => {
     if (existing) {
       title.value = existing.title;
       webAddress.value = existing.web_address ?? "";
+      issue.value = existing.issue?.label ?? "";
+      issueDate.value = existing.issue?.published_on ?? "";
+      issuePage.value = existing.issue?.page ?? "";
       ingredients.value = existing.ingredients.join("\n");
     }
     document.title = `${heading.value} · ${book.value!.title} · OpenLarder`;
@@ -97,12 +105,15 @@ async function save() {
     const id = await saveRecipe(
       {
         title: title.value,
-        editions: onWeb.value
+        editions: onWeb.value || inIssue.value
           ? []
           : editions.value
               .filter((e) => e.included)
               .map((e) => ({ edition_id: e.id, page: e.page.trim() || null })),
         web_address: onWeb.value ? webAddress.value : null,
+        issue: inIssue.value ? issue.value : null,
+        issue_date: inIssue.value && issueDate.value ? issueDate.value : null,
+        issue_page: inIssue.value ? issuePage.value : null,
         ingredients: ingredients.value.split("\n"),
       },
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
@@ -135,6 +146,24 @@ async function save() {
           :placeholder="`https://${book.host}/…`"
         />
         <p class="help">A page on {{ book.host }}. OpenLarder links to it; it never copies it.</p>
+      </template>
+      <template v-else-if="inIssue">
+        <label for="recipe-issue">Issue, as the cover names it</label>
+        <input
+          id="recipe-issue"
+          v-model="issue"
+          list="known-issues"
+          maxlength="200"
+          :required="!issueDate"
+          :placeholder="book.kind === 'newspaper' ? 'or leave blank and give the date' : 'May 2024'"
+        />
+        <datalist id="known-issues">
+          <option v-for="i in book.issues" :key="i.id" :value="i.label" />
+        </datalist>
+        <label for="recipe-issue-date">Date of the issue (optional for a magazine)</label>
+        <input id="recipe-issue-date" v-model="issueDate" type="date" class="page-input" />
+        <label for="recipe-issue-page">Page</label>
+        <input id="recipe-issue-page" v-model="issuePage" maxlength="20" class="page-input" placeholder="42" />
       </template>
       <fieldset v-else>
         <legend>Page</legend>

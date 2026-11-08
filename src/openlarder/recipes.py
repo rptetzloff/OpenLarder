@@ -24,12 +24,21 @@ model's docstring already described.*
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import date
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import web
-from openlarder.models import Edition, Recipe, RecipeIngredient, RecipeLocation, Source, WebPage
+from openlarder.models import (
+    Edition,
+    Issue,
+    Recipe,
+    RecipeIngredient,
+    RecipeLocation,
+    Source,
+    WebPage,
+)
 
 MAX_TITLE = 200
 MAX_PAGE = 20
@@ -70,6 +79,11 @@ class RecipeEntry:
     lines: list[str]
     # For a website's recipe instead: the page's address, as web.page keeps it.
     web_address: str | None = None
+    # For a magazine's or newspaper's: the issue, named as the cover names it
+    # or by its date, and the page in it.
+    issue: str | None = None
+    issue_date: date | None = None
+    issue_page: str | None = None
 
 
 def _squash(text: str) -> str:
@@ -81,6 +95,9 @@ def clean(
     pages: list[tuple[uuid.UUID, str | None]],
     lines: list[str],
     web_address: str | None = None,
+    issue: str | None = None,
+    issue_date: date | None = None,
+    issue_page: str | None = None,
 ) -> RecipeEntry:
     """Normalise what was typed, or raise InvalidRecipe. Which of pages or
     web_address the recipe needs depends on its source (create, replace)."""
@@ -90,6 +107,14 @@ def clean(
     if len(title) > MAX_TITLE:
         raise InvalidRecipe(f"Titles are at most {MAX_TITLE} characters.")
 
+    label = _squash(issue or "") or (issue_date.isoformat() if issue_date else None)
+    if label and len(label) > MAX_TITLE:
+        raise InvalidRecipe(f"An issue's name is at most {MAX_TITLE} characters.")
+    in_issue = _squash(issue_page or "") or None
+    if in_issue and len(in_issue) > MAX_PAGE:
+        raise InvalidRecipe(f"A page is at most {MAX_PAGE} characters, like 112 or xii.")
+    if label and (pages or (web_address and web_address.strip())):
+        raise InvalidRecipe("A recipe is in one place: an edition, a web page or an issue.")
     url = None
     if web_address and web_address.strip():
         if pages:
@@ -125,7 +150,15 @@ def clean(
             raise InvalidRecipe(
                 f"An ingredient is at most {MAX_LINE} characters: its name, not the method."
             )
-    return RecipeEntry(title=title, pages=cleaned_pages, lines=kept, web_address=url)
+    return RecipeEntry(
+        title=title,
+        pages=cleaned_pages,
+        lines=kept,
+        web_address=url,
+        issue=label,
+        issue_date=issue_date,
+        issue_page=in_issue if label else None,
+    )
 
 
 async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: RecipeEntry) -> None:
@@ -134,6 +167,12 @@ async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: Recip
     composite keys on recipe_locations; checking here turns that into a
     message rather than a 500."""
     source = await session.get_one(Source, source_id)
+    if source.kind in ("magazine", "newspaper"):
+        if not entry.issue:
+            raise InvalidRecipe("Say which issue the recipe is in: its name or its date.")
+        return
+    if entry.issue:
+        raise InvalidRecipe("Only a magazine or newspaper has issues.")
     if source.kind == "website":
         if not entry.web_address:
             raise InvalidRecipe("Give the web address of the recipe.")
@@ -152,6 +191,30 @@ async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: Recip
 
 
 async def _write_parts(session: AsyncSession, recipe: Recipe, entry: RecipeEntry) -> None:
+    if entry.issue:
+        # One row per issue: a recipe names it, and the first names it.
+        found_issue = await session.scalar(
+            select(Issue).where(
+                Issue.source_id == recipe.source_id,
+                func.lower(Issue.label) == entry.issue.lower(),
+            )
+        )
+        if found_issue is None:
+            found_issue = Issue(
+                source_id=recipe.source_id, label=entry.issue, published_on=entry.issue_date
+            )
+            session.add(found_issue)
+            await session.flush()
+        elif found_issue.published_on is None and entry.issue_date:
+            found_issue.published_on = entry.issue_date
+        session.add(
+            RecipeLocation(
+                recipe_id=recipe.id,
+                issue_id=found_issue.id,
+                source_id=recipe.source_id,
+                page=entry.issue_page,
+            )
+        )
     if entry.web_address:
         # One row per address: several recipes can share a page.
         found = await session.scalar(select(WebPage).where(WebPage.url == entry.web_address))

@@ -13,11 +13,13 @@ export interface RecipePage {
 export interface Recipe {
   id: string;
   title: string;
-  source: { id: string; title: string; kind: "book" | "website" };
+  source: { id: string; title: string; kind: "book" | "website" | "magazine" | "newspaper" };
   pages: RecipePage[];
   // A website's recipe: the page it's on.
   web_address: string | null;
   // That page, with the Internet Archive's copy when there is one.
+  // A magazine's or newspaper's recipe: its issue, at its page.
+  issue: { id: string; label: string; published_on: string | null; page: string | null } | null;
   web_page: {
     id: string;
     url: string;
@@ -50,6 +52,10 @@ export interface RecipeIn {
   editions: { edition_id: string; page: string | null }[];
   // A website's recipe instead: the page's address.
   web_address?: string | null;
+  // A magazine's or newspaper's: the issue (its name, or its date) and page.
+  issue?: string | null;
+  issue_date?: string | null;
+  issue_page?: string | null;
   ingredients: string[];
 }
 

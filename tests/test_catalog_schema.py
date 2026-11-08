@@ -617,3 +617,26 @@ def test_a_location_is_an_edition_or_a_web_page_never_both(db: Connection) -> No
     ]:
         values = {"r": r, "s": s, "e": e, "w": w, "p": p}
         _refused(db, lambda v=values: _insert(db, place, **v))
+
+
+def test_a_location_in_an_issue_takes_a_page_and_nothing_else(db: Connection) -> None:
+    magazine = _insert(db, "INSERT INTO sources (kind, title) VALUES ('magazine', 'Saveur')")
+    issue = _insert(db, "INSERT INTO issues (source_id, label) VALUES (:s, 'May 2024')", s=magazine)
+    _refused(
+        db,
+        lambda: _insert(
+            db, "INSERT INTO issues (source_id, label) VALUES (:s, 'MAY 2024')", s=magazine
+        ),
+    )
+    page = _insert(
+        db,
+        "INSERT INTO web_pages (source_id, url) VALUES (:s, 'https://saveur.example/a')",
+        s=magazine,
+    )
+    recipe = _recipe(db, magazine)
+    place = (
+        "INSERT INTO recipe_locations (recipe_id, source_id, issue_id, web_page_id, page)"
+        " VALUES (:r, :s, :i, :w, :p)"
+    )
+    _refused(db, lambda: _insert(db, place, r=recipe, s=magazine, i=issue, w=page, p=None))
+    _insert(db, place, r=recipe, s=magazine, i=issue, w=None, p="42")

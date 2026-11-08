@@ -76,7 +76,7 @@
     <text x="44" y="250">title, tags (+ inherited)</text>
     <text x="44" y="266">online URL if published</text>
     <text x="286" y="250">for a book, page per edition</text>
-    <text x="286" y="266">or a website's web page</text>
+    <text x="286" y="266">or a web page, or an issue</text>
     <text x="528" y="250">person or organisation</text>
     <text x="528" y="266">bio, links, curation</text>
     <text x="44" y="362">ingredient as the book names it</text>

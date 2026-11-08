@@ -34,8 +34,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       article".* **Step 1 done (#55):** books are sources. **Step 2, websites
       (#56):** a website is a source, one per site, optionally a
       subscription site, with recipes on its pages by address. The
-      Internet Archive copy of each web page (#57). Next: the other kinds;
-      then private recipes and sharing. Decided (Ray, 2026-11-08):
+      Internet Archive copy of each web page (#57). **Magazines and
+      newspapers (#60):** recipes in issues, at a page. Next: TV shows,
+      podcasts and video channels (episodes); then social media posts and
+      packaging; then family recipes, with private recipes and sharing. Decided (Ray, 2026-11-08):
       - **Every kind people document is offered**: books, magazines, blogs
         and websites, social media posts, TV and video. Social media is one
         generic kind, an account's post by address, not a kind per
@@ -147,6 +149,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Magazines and newspapers as sources: recipes in issues, named as the
+      cover names them or by date, at a page (#60)
 - [x] Sources page at scale: searched on the server, a hundred at a time;
       the swap form's book list became a book finder (#59)
 - [x] Merge two authors from the author page, which lists others with the
