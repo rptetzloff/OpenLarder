@@ -69,6 +69,9 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Check Open Library: a book's differences from Open Library now, taking
+      only those ticked; Open Library's names cleaned on the way in; test
+      queries time out (#53)
 - [x] Author pages: books, co-authors, links, fixing an author; the
       authors list; names on book pages link to them (#52)
 - [x] TODO.md (#51); #26 and #32 closed

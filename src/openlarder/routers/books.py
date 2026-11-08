@@ -7,7 +7,7 @@ and stores what comes back.
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from typing import Annotated
 
 import httpx2
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import exists, func, select
 
 from openlarder import books as books_module
-from openlarder import isbn, linking, openlibrary, references
+from openlarder import isbn, linking, openlibrary, references, refresh
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
@@ -517,3 +517,83 @@ async def edit_book(work_id: uuid.UUID, body: BookIn, admin: AdminUser, session:
     await session.commit()
     log.info("%s edited book %s", admin.id, work_id)
     return Added(id=work.id)
+
+
+class DifferenceOut(BaseModel):
+    key: str
+    label: str
+    ours: str | None
+    theirs: str | None
+    # ours and theirs are cover image addresses.
+    cover: bool
+
+
+class Checked(BaseModel):
+    open_library_url: str
+    differences: list[DifferenceOut]
+
+
+class TakeIn(BaseModel):
+    keys: list[str] = Field(max_length=200)
+
+
+class Taken(BaseModel):
+    taken: int
+    # What still differs afterwards.
+    differences: list[DifferenceOut]
+
+
+async def _open_library[T](work: Work, call: Awaitable[T]) -> T:
+    """A call to Open Library, with its failures as HTTP answers."""
+    try:
+        return await call
+    except refresh.NotLinked as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    except openlibrary.NotFound:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "Open Library no longer has this book's record."
+        ) from None
+    except openlibrary.Unavailable as exc:
+        log.warning("Open Library check failed for %s: %s", work.id, exc)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "Open Library didn't answer. Try again in a minute."
+        ) from None
+
+
+def _out(differences: list[refresh.Difference]) -> list[DifferenceOut]:
+    return [
+        DifferenceOut(key=d.key, label=d.label, ours=d.ours, theirs=d.theirs, cover=d.cover)
+        for d in differences
+    ]
+
+
+@router.post("/{work_id}/open-library/check", response_model=Checked, dependencies=[SameOrigin])
+async def check_open_library(
+    work_id: uuid.UUID, admin: AdminUser, session: Session, transport: Transport
+) -> Checked:
+    """What differs between the book as stored and Open Library now. Changes
+    nothing (refresh.py)."""
+    work = await session.get(Work, work_id)
+    if work is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    differences = await _open_library(work, refresh.check(session, work, transport))
+    assert work.open_library_work_id is not None
+    return Checked(
+        open_library_url=openlibrary.work_url(work.open_library_work_id),
+        differences=_out(differences),
+    )
+
+
+@router.post("/{work_id}/open-library/take", response_model=Taken, dependencies=[SameOrigin])
+async def take_from_open_library(
+    work_id: uuid.UUID, body: TakeIn, admin: AdminUser, session: Session, transport: Transport
+) -> Taken:
+    """Take the ticked differences from Open Library, fetched again now."""
+    work = await session.get(Work, work_id)
+    if work is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    taken = await _open_library(work, refresh.apply(session, work, set(body.keys), transport))
+    await session.commit()
+    log.info("%s took %d changes from Open Library for %s", admin.id, taken, work_id)
+    left = await _open_library(work, refresh.check(session, work, transport))
+    return Taken(taken=taken, differences=_out(left))

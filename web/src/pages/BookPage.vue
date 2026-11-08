@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import type { Book } from "../books";
+import OpenLibraryCheck from "../components/OpenLibraryCheck.vue";
 import OpenLibraryLink from "../components/OpenLibraryLink.vue";
 import type { Me } from "../me";
 
@@ -23,7 +24,7 @@ function pages(list: (string | null)[]) {
 }
 const cover = computed(() => book.value?.editions.find((e) => e.cover_url)?.cover_url ?? null);
 
-onMounted(async () => {
+async function load() {
   try {
     const res = await fetch(`/api/books/${props.id}`);
     if (res.status === 404 || res.status === 422) missing.value = true;
@@ -35,7 +36,9 @@ onMounted(async () => {
   } catch {
     failed.value = true;
   }
-});
+}
+
+onMounted(load);
 </script>
 
 <template>
@@ -103,6 +106,7 @@ onMounted(async () => {
         </li>
       </ul>
       <OpenLibraryLink v-if="user?.is_admin && !book.open_library_url" :book="book" />
+      <OpenLibraryCheck v-if="user?.is_admin && book.open_library_url" :book-id="book.id" @taken="load" />
 
       <!-- Open Library asks for a courtesy link back where its data is shown. -->
       <p class="status">

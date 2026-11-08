@@ -38,7 +38,9 @@ class Unavailable(RuntimeError):
 @dataclass
 class FoundAuthor:
     open_library_id: str  # "OL7106535A"
+    # As a book would print it, by clean_name.
     name: str
+    kind: str = "person"
 
 
 @dataclass
@@ -116,6 +118,45 @@ def _year(publish_date: str | None) -> int | None:
     # Open Library dates are free text: "2023", "March 7, 2023", "c1998".
     found = re.search(r"(?<!\d)(1[4-9]\d\d|2[01]\d\d)(?!\d)", publish_date or "")
     return int(found.group(1)) if found else None
+
+
+# A bracketed note that says the name is an organisation's: "(Firm)".
+_ORGANISATION = {
+    "firm",
+    "organization",
+    "organisation",
+    "company",
+    "corporation",
+    "restaurant",
+    "society",
+    "association",
+}
+# A last part that is a suffix, not a first name: "King, Martin, Jr.".
+_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
+# A last part that is a company's, not a first name: "Sunset Books, Inc.".
+_COMPANY = {"inc", "ltd", "llc", "co"}
+
+
+def clean_name(name: str) -> tuple[str, str]:
+    """Open Library's catalogue form of a name, as a book would print it,
+    and whether it is a person's or an organisation's.
+
+    "Moore, Russell (Chef)" -> ("Russell Moore", "person");
+    "America's Test Kitchen (Firm)" -> ("America's Test Kitchen",
+    "organisation"). Bracketed notes go (roles, dates, fuller forms), and
+    "Last, First" turns round, as linking.name_key reads it for matching.
+    """
+    notes = [n.strip().casefold().rstrip(".") for n in re.findall(r"\(([^)]*)\)", name)]
+    kind = "organisation" if any(n in _ORGANISATION for n in notes) else "person"
+    bare = " ".join(re.sub(r"\([^)]*\)", " ", name).split())
+    parts = [p.strip() for p in bare.split(",")]
+    last = parts[-1].casefold().rstrip(".") if parts else ""
+    if kind == "person" and all(parts) and last not in _COMPANY:
+        if len(parts) == 2:
+            bare = f"{parts[1]} {parts[0]}"
+        elif len(parts) == 3 and last in _SUFFIXES:
+            bare = f"{parts[1]} {parts[0]} {parts[2]}"
+    return bare or " ".join(name.split()), kind
 
 
 def _text(value: Any) -> str | None:
@@ -239,7 +280,7 @@ async def _read(
             continue
         record = await _get(client, f"/authors/{author_id}.json")
         if name := _text(record.get("name")):
-            authors.append(FoundAuthor(author_id, name))
+            authors.append(FoundAuthor(author_id, *clean_name(name)))
 
     title = _text(work.get("title")) or _text(edition.get("title"))
     if not title:

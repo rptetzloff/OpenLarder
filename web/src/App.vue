@@ -355,6 +355,28 @@ button.primary:disabled {
 .ol-preview li {
   margin-bottom: 0.25rem;
 }
+.ol-differences {
+  list-style: none;
+  padding: 0;
+}
+.ol-differences li {
+  margin-bottom: 0.75rem;
+}
+.ol-values,
+.ol-covers {
+  display: block;
+  margin-left: 1.75rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ol-values .theirs {
+  color: var(--fg);
+}
+.ol-covers img {
+  width: 48px;
+  vertical-align: middle;
+  border-radius: 4px;
+}
 .ol-link .error {
   color: var(--error);
 }
