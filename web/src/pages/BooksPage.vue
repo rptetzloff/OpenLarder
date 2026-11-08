@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import {
   addByIsbn,
   addPeriodical,
+  addNamed,
   addShow,
   addWebsite,
   type BookSummary,
@@ -59,11 +60,18 @@ watch(filter, () => {
 onMounted(() => load());
 
 // Adding a source other than a book by ISBN: a website (any address on it
-// finds the site), or a magazine, newspaper, TV show, podcast or video
-// channel by name.
-type OtherKind = "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel";
+// finds the site), or a magazine, newspaper, TV show, podcast, video
+// channel, social media account or product by name.
+type OtherKind =
+  | "website"
+  | "magazine"
+  | "newspaper"
+  | "tv_show"
+  | "podcast"
+  | "video_channel"
+  | "social"
+  | "packaging";
 const siteKind = ref<OtherKind>("website");
-const isShow = computed(() => ["tv_show", "podcast", "video_channel"].includes(siteKind.value));
 const NAME_EXAMPLES: Record<OtherKind, string> = {
   website: "Smitten Kitchen",
   magazine: "Bon Appétit",
@@ -71,6 +79,16 @@ const NAME_EXAMPLES: Record<OtherKind, string> = {
   tv_show: "Salt Fat Acid Heat",
   podcast: "The Sporkful",
   video_channel: "Binging with Babish",
+  social: "Half Baked Harvest (Instagram)",
+  packaging: "Quaker Old Fashioned Oats",
+};
+// Who a source is by, as the form asks it.
+const WHO: Partial<Record<OtherKind, string>> = {
+  tv_show: "Who hosts it",
+  podcast: "Who hosts it",
+  video_channel: "Who hosts it",
+  social: "Whose account it is",
+  packaging: "Who makes it",
 };
 const siteAddress = ref("");
 const siteName = ref("");
@@ -87,7 +105,9 @@ async function addSite() {
         ? await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value, authors)
         : siteKind.value === "magazine" || siteKind.value === "newspaper"
           ? await addPeriodical(siteKind.value, siteName.value, authors)
-          : await addShow(siteKind.value, siteName.value, authors);
+          : siteKind.value === "social" || siteKind.value === "packaging"
+            ? await addNamed(siteKind.value, siteName.value, authors)
+            : await addShow(siteKind.value, siteName.value, authors);
     location.href = `/sources/${id}`;
   } catch (e) {
     siteError.value = e instanceof Error ? e.message : String(e);
@@ -143,6 +163,8 @@ async function add() {
         <option value="tv_show">A TV show</option>
         <option value="podcast">A podcast</option>
         <option value="video_channel">A video channel</option>
+        <option value="social">A social media account</option>
+        <option value="packaging">A product's packaging</option>
       </select>
       <template v-if="siteKind === 'website'">
         <label for="site-address">Any page on it</label>
@@ -167,7 +189,7 @@ async function add() {
         />
       </template>
       <label for="site-authors"
-        >{{ isShow ? "Who hosts it" : "Who writes it" }} (optional; separate names with
+        >{{ WHO[siteKind] ?? "Who writes it" }} (optional; separate names with
         commas)</label
       >
       <input id="site-authors" v-model="siteAuthors" maxlength="500" placeholder="Deb Perelman" />

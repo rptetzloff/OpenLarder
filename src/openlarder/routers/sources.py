@@ -806,6 +806,27 @@ async def add_show(body: ShowIn, admin: AdminUser, session: Session) -> AddedMan
     return await _add_named(session, admin, body.kind, body.title, body.authors)
 
 
+class NamedIn(BaseModel):
+    title: str = Field(max_length=300)
+    # Who it is, or who makes it, in order, credited as authors.
+    authors: list[str] = Field(default=[], max_length=30)
+
+
+@router.post("/social", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_social(body: NamedIn, admin: AdminUser, session: Session) -> AddedManually:
+    """A social media account as a source, on any platform: the one already
+    here by that name, or a new one. Its recipes are on its posts, by
+    address."""
+    return await _add_named(session, admin, "social", body.title, body.authors)
+
+
+@router.post("/packaging", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_packaging(body: NamedIn, admin: AdminUser, session: Session) -> AddedManually:
+    """A product whose packaging prints recipes: the one already here by that
+    name, or a new one."""
+    return await _add_named(session, admin, "packaging", body.title, body.authors)
+
+
 async def _add_named(
     session: Session, admin: AdminUser, kind: str, title: str, authors: list[str]
 ) -> AddedManually:

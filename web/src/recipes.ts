@@ -13,7 +13,7 @@ export interface RecipePage {
 export interface Recipe {
   id: string;
   title: string;
-  source: { id: string; title: string; kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" };
+  source: { id: string; title: string; kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" };
   pages: RecipePage[];
   // A website's recipe: the page it's on.
   web_address: string | null;

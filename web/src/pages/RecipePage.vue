@@ -136,6 +136,9 @@ async function remove() {
         >{{ recipe.episode.aired_on ? ` (${issueName(recipe.episode.aired_on)})` : ""
         }}{{ recipe.episode.at ? `, at ${recipe.episode.at}` : "" }}
       </p>
+      <p v-else-if="recipe.source.kind === 'packaging'" class="byline">
+        On the packaging of <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>
+      </p>
       <p v-else class="byline">
         In <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>,
         {{ recipe.pages.map(where).join("; ") }}
@@ -160,12 +163,16 @@ async function remove() {
         The amounts and the method are
         {{
           recipe.web_address
-            ? "on the page"
+            ? recipe.source.kind === "social"
+              ? "on the post"
+              : "on the page"
             : recipe.issue
               ? "in the issue"
               : recipe.episode
                 ? "in the episode"
-                : "in the book"
+                : recipe.source.kind === "packaging"
+                  ? "on the packaging"
+                  : "in the book"
         }}.
       </p>
 
