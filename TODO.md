@@ -149,6 +149,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] SCOPING.md caught up: site design, private family recipes and
+      sources beyond books in the MVP; the data model's kinds of place (#61)
 - [x] Magazines and newspapers as sources: recipes in issues, named as the
       cover names them or by date, at a page (#60)
 - [x] Sources page at scale: searched on the server, a hundred at a time;
