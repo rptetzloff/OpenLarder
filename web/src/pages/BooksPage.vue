@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
-import { addByIsbn, addPeriodical, addWebsite, type BookSummary, listSources } from "../books";
+import { computed, onMounted, ref, watch } from "vue";
+import {
+  addByIsbn,
+  addPeriodical,
+  addShow,
+  addWebsite,
+  type BookSummary,
+  KIND_NAMES,
+  listSources,
+} from "../books";
 import type { Me } from "../me";
 
 defineProps<{ user: Me | null | undefined }>();
@@ -51,8 +59,19 @@ watch(filter, () => {
 onMounted(() => load());
 
 // Adding a source other than a book by ISBN: a website (any address on it
-// finds the site), or a magazine or newspaper by name.
-const siteKind = ref<"website" | "magazine" | "newspaper">("website");
+// finds the site), or a magazine, newspaper, TV show, podcast or video
+// channel by name.
+type OtherKind = "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel";
+const siteKind = ref<OtherKind>("website");
+const isShow = computed(() => ["tv_show", "podcast", "video_channel"].includes(siteKind.value));
+const NAME_EXAMPLES: Record<OtherKind, string> = {
+  website: "Smitten Kitchen",
+  magazine: "Bon Appétit",
+  newspaper: "The New York Times",
+  tv_show: "Salt Fat Acid Heat",
+  podcast: "The Sporkful",
+  video_channel: "Binging with Babish",
+};
 const siteAddress = ref("");
 const siteName = ref("");
 const sitePaywalled = ref(false);
@@ -66,7 +85,9 @@ async function addSite() {
     const { id } =
       siteKind.value === "website"
         ? await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value, authors)
-        : await addPeriodical(siteKind.value, siteName.value, authors);
+        : siteKind.value === "magazine" || siteKind.value === "newspaper"
+          ? await addPeriodical(siteKind.value, siteName.value, authors)
+          : await addShow(siteKind.value, siteName.value, authors);
     location.href = `/sources/${id}`;
   } catch (e) {
     siteError.value = e instanceof Error ? e.message : String(e);
@@ -119,6 +140,9 @@ async function add() {
         <option value="website">A website</option>
         <option value="magazine">A magazine</option>
         <option value="newspaper">A newspaper</option>
+        <option value="tv_show">A TV show</option>
+        <option value="podcast">A podcast</option>
+        <option value="video_channel">A video channel</option>
       </select>
       <template v-if="siteKind === 'website'">
         <label for="site-address">Any page on it</label>
@@ -139,16 +163,19 @@ async function add() {
           v-model="siteName"
           required
           maxlength="300"
-          :placeholder="siteKind === 'magazine' ? 'Bon Appétit' : 'The New York Times'"
+          :placeholder="NAME_EXAMPLES[siteKind]"
         />
       </template>
-      <label for="site-authors">Who writes it (optional; separate names with commas)</label>
+      <label for="site-authors"
+        >{{ isShow ? "Who hosts it" : "Who writes it" }} (optional; separate names with
+        commas)</label
+      >
       <input id="site-authors" v-model="siteAuthors" maxlength="500" placeholder="Deb Perelman" />
       <label v-if="siteKind === 'website'" class="check"
         ><input v-model="sitePaywalled" type="checkbox" /> Behind a subscription</label
       >
       <p v-if="siteError" class="error" role="alert">{{ siteError }}</p>
-      <button type="submit" class="primary">Add the {{ siteKind }}</button>
+      <button type="submit" class="primary">Add the {{ KIND_NAMES[siteKind] }}</button>
     </form>
 
     <div class="isbn-form">

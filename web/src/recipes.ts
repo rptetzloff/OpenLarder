@@ -13,13 +13,26 @@ export interface RecipePage {
 export interface Recipe {
   id: string;
   title: string;
-  source: { id: string; title: string; kind: "book" | "website" | "magazine" | "newspaper" };
+  source: { id: string; title: string; kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" };
   pages: RecipePage[];
   // A website's recipe: the page it's on.
   web_address: string | null;
   // That page, with the Internet Archive's copy when there is one.
   // A magazine's or newspaper's recipe: its issue, at its page.
   issue: { id: string; label: string; published_on: string | null; page: string | null } | null;
+  // A TV show's, podcast's or video channel's recipe: its episode, at a time.
+  episode: {
+    id: string;
+    // How it reads: Season 2, episode 5, “Fat”.
+    name: string;
+    season: number | null;
+    number: number | null;
+    title: string | null;
+    url: string | null;
+    aired_on: string | null;
+    // 12:34, or 1:02:03.
+    at: string | null;
+  } | null;
   web_page: {
     id: string;
     url: string;
@@ -56,6 +69,15 @@ export interface RecipeIn {
   issue?: string | null;
   issue_date?: string | null;
   issue_page?: string | null;
+  // A show's: which episode (any of these), and the time in it.
+  episode?: {
+    season: number | null;
+    number: number | null;
+    title: string | null;
+    address: string | null;
+    aired_on: string | null;
+    at: string | null;
+  } | null;
   ingredients: string[];
 }
 

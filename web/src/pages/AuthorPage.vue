@@ -10,6 +10,7 @@ import {
   removeLink,
   saveAuthor,
 } from "../authors";
+import { KIND_NAMES } from "../books";
 import type { Me } from "../me";
 
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
@@ -104,11 +105,12 @@ const remove = (link: Author["links"][number]) =>
     author.value!.links = author.value!.links.filter((x) => x.id !== link.id);
   });
 
-// "Books", "Websites", or "Books and websites", by what they've made.
+// "Books", "Magazines", "TV shows", by what they've made; "Sources" for a mix.
 const sourcesHeading = computed(() => {
-  const kinds = new Set(author.value?.sources.map((s) => s.kind));
-  if (kinds.size > 1) return "Books and websites";
-  return kinds.has("website") ? "Websites" : "Books";
+  const kinds = [...new Set(author.value?.sources.map((s) => s.kind))];
+  if (kinds.length > 1) return "Sources";
+  const name = KIND_NAMES[kinds[0] ?? "book"] ?? "book";
+  return `${name[0].toUpperCase()}${name.slice(1)}s`;
 });
 
 // "photographer", or "author and photographer"; plain authorship goes unsaid.

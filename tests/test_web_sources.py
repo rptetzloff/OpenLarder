@@ -170,7 +170,7 @@ async def test_a_book_is_in_editions_not_on_pages(admin, adb) -> None:
         ({}, "edition"),
         (
             {"editions": [{"edition_id": str(E)}], "web_address": "https://example.com/cake/"},
-            "not both",
+            "one place",
         ),
     ]:
         response = await admin.post(

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import type { Book } from "../books";
+import { type Book, SHOWS } from "../books";
 import { checkLines, type LineReview, type Recipe, saveRecipe } from "../recipes";
 
 // New when bookId is given, editing when recipeId is.
@@ -17,6 +17,19 @@ const inIssue = computed(() => ["magazine", "newspaper"].includes(book.value?.ki
 const issue = ref("");
 const issueDate = ref("");
 const issuePage = ref("");
+// A TV show's, podcast's or video channel's: which episode, and the time in
+// it. Numbers are kept as typed, "" for none.
+const inEpisode = computed(() => SHOWS.includes(book.value?.kind ?? ""));
+const season = ref<number | "">("");
+const episodeNumber = ref<number | "">("");
+const episodeTitle = ref("");
+const episodeAddress = ref("");
+const airedOn = ref("");
+const at = ref("");
+// What the recipe is in, for the form's wording.
+const place = computed(() =>
+  onWeb.value ? "page" : inIssue.value ? "issue" : inEpisode.value ? "episode" : "book",
+);
 // Per edition: is the recipe in it, and on which page.
 const editions = ref<{ id: string; label: string; included: boolean; page: string }[]>([]);
 const error = ref("");
@@ -59,6 +72,12 @@ onMounted(async () => {
       issue.value = existing.issue?.label ?? "";
       issueDate.value = existing.issue?.published_on ?? "";
       issuePage.value = existing.issue?.page ?? "";
+      season.value = existing.episode?.season ?? "";
+      episodeNumber.value = existing.episode?.number ?? "";
+      episodeTitle.value = existing.episode?.title ?? "";
+      episodeAddress.value = existing.episode?.url ?? "";
+      airedOn.value = existing.episode?.aired_on ?? "";
+      at.value = existing.episode?.at ?? "";
       ingredients.value = existing.ingredients.join("\n");
     }
     document.title = `${heading.value} · ${book.value!.title} · OpenLarder`;
@@ -105,7 +124,7 @@ async function save() {
     const id = await saveRecipe(
       {
         title: title.value,
-        editions: onWeb.value || inIssue.value
+        editions: onWeb.value || inIssue.value || inEpisode.value
           ? []
           : editions.value
               .filter((e) => e.included)
@@ -114,6 +133,16 @@ async function save() {
         issue: inIssue.value ? issue.value : null,
         issue_date: inIssue.value && issueDate.value ? issueDate.value : null,
         issue_page: inIssue.value ? issuePage.value : null,
+        episode: inEpisode.value
+          ? {
+              season: season.value === "" ? null : season.value,
+              number: episodeNumber.value === "" ? null : episodeNumber.value,
+              title: episodeTitle.value || null,
+              address: episodeAddress.value || null,
+              aired_on: airedOn.value || null,
+              at: at.value || null,
+            }
+          : null,
         ingredients: ingredients.value.split("\n"),
       },
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
@@ -132,7 +161,9 @@ async function save() {
     <h1>{{ heading }}</h1>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="book" class="recipe-form" @submit.prevent="save">
-      <label for="recipe-title">{{ onWeb ? "Title, as the page gives it" : "Title, as the book prints it" }}</label>
+      <label for="recipe-title">{{
+        onWeb || inEpisode ? `Title, as the ${place} gives it` : `Title, as the ${place} prints it`
+      }}</label>
       <input id="recipe-title" v-model="title" required maxlength="200" />
 
       <template v-if="onWeb">
@@ -165,6 +196,81 @@ async function save() {
         <label for="recipe-issue-page">Page</label>
         <input id="recipe-issue-page" v-model="issuePage" maxlength="20" class="page-input" placeholder="42" />
       </template>
+      <template v-else-if="inEpisode">
+        <p class="form-heading">{{ book.kind === "video_channel" ? "Which video" : "Which episode" }}</p>
+        <p class="help">
+          {{
+            book.kind === "video_channel"
+              ? "The video's address, and its title if you like."
+              : "Its number, its title, or both."
+          }}
+        </p>
+        <template v-if="book.kind !== 'video_channel'">
+          <div class="episode-numbers">
+            <span v-if="book.kind === 'tv_show'">
+              <label for="recipe-season">Season</label>
+              <input
+                id="recipe-season"
+                v-model="season"
+                type="number"
+                min="0"
+                class="page-input"
+              />
+            </span>
+            <span>
+              <label for="recipe-episode-number">Episode</label>
+              <input
+                id="recipe-episode-number"
+                v-model="episodeNumber"
+                type="number"
+                min="0"
+                class="page-input"
+                :required="season !== ''"
+              />
+            </span>
+          </div>
+        </template>
+        <template v-if="book.kind !== 'tv_show'">
+          <label for="recipe-episode-address">{{
+            book.kind === "video_channel" ? "The video's address" : "Its address (optional)"
+          }}</label>
+          <input
+            id="recipe-episode-address"
+            v-model="episodeAddress"
+            type="url"
+            maxlength="2000"
+            :required="book.kind === 'video_channel'"
+            placeholder="https://…"
+          />
+        </template>
+        <label for="recipe-episode-title">{{
+          book.kind === "video_channel" ? "The video's title" : "The episode's title"
+        }}</label>
+        <input
+          id="recipe-episode-title"
+          v-model="episodeTitle"
+          list="known-episodes"
+          maxlength="200"
+          :required="book.kind !== 'video_channel' && episodeNumber === '' && !episodeAddress"
+        />
+        <datalist id="known-episodes">
+          <template v-for="e in book.episodes" :key="e.id">
+            <option v-if="e.title" :value="e.title" />
+          </template>
+        </datalist>
+        <label for="recipe-aired-on">When it aired (optional)</label>
+        <input id="recipe-aired-on" v-model="airedOn" type="date" class="page-input" />
+        <label for="recipe-at">Where in it the recipe starts (optional)</label>
+        <input
+          id="recipe-at"
+          v-model="at"
+          maxlength="8"
+          class="page-input"
+          placeholder="12:34"
+          pattern="(\d{1,2}:)?\d{1,3}:[0-5]\d"
+          title="Minutes and seconds, like 12:34, or 1:02:03"
+        />
+      </template>
       <fieldset v-else>
         <legend>Page</legend>
         <p class="help">Leave a page blank if you don't know it yet.</p>
@@ -195,8 +301,8 @@ async function save() {
         aria-describedby="recipe-ingredients-help"
       />
       <p id="recipe-ingredients-help" class="help">
-        Just what goes in, as the {{ onWeb ? "page" : "book" }} names it: “rhubarb”, not “200g
-        rhubarb”. Amounts and the method stay {{ onWeb ? "on the page" : "in the book" }}.
+        Just what goes in, as the {{ place }} names it: “rhubarb”, not “200g rhubarb”. Amounts
+        and the method stay {{ onWeb ? "on the page" : `in the ${place}` }}.
       </p>
       <ul v-if="reviews.length" class="line-hints" aria-live="polite">
         <li v-for="r in reviews" :key="`${r.index}:${r.line}`">

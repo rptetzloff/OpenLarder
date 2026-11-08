@@ -20,6 +20,7 @@ from openlarder.auth import AdminUser, CurrentUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
+    Episode,
     Ingredient,
     IngredientOption,
     Issue,
@@ -66,6 +67,18 @@ class PageIn(BaseModel):
     page: str | None = None
 
 
+class EpisodeIn(BaseModel):
+    # Any of these says which episode: its number (in its season), its
+    # title, or a video's or podcast episode's address.
+    season: int | None = None
+    number: int | None = None
+    title: str | None = Field(default=None, max_length=300)
+    address: str | None = Field(default=None, max_length=2000)
+    aired_on: date | None = None
+    # Where in it the recipe starts: 12:34, or 1:02:03.
+    at: str | None = Field(default=None, max_length=20)
+
+
 class RecipeIn(BaseModel):
     title: str
     # A book's recipe: the editions it's in, each with its page.
@@ -77,6 +90,8 @@ class RecipeIn(BaseModel):
     issue: str | None = Field(default=None, max_length=200)
     issue_date: date | None = None
     issue_page: str | None = Field(default=None, max_length=40)
+    # A TV show's, podcast's or video channel's: the episode.
+    episode: EpisodeIn | None = None
     ingredients: list[str] = []
 
 
@@ -104,6 +119,19 @@ class IssueOut(BaseModel):
     published_on: date | None
     # The recipe's page in it.
     page: str | None
+
+
+class EpisodeOut(BaseModel):
+    id: uuid.UUID
+    # How it reads: Season 2, episode 5, “Fat”.
+    name: str
+    season: int | None
+    number: int | None
+    title: str | None
+    url: str | None
+    aired_on: date | None
+    # Where in it the recipe starts, as 12:34.
+    at: str | None
 
 
 class SourceRef(BaseModel):
@@ -147,6 +175,8 @@ class RecipeOut(BaseModel):
     web_page: WebPageOut | None
     # A magazine's or newspaper's recipe: the issue it's in, at its page.
     issue: IssueOut | None
+    # A TV show's, podcast's or video channel's: the episode, at its time.
+    episode: EpisodeOut | None
     # The lines as typed, which is what the edit form edits.
     ingredients: list[str]
     # The same lines read into their options, with page references linked.
@@ -162,7 +192,20 @@ class Created(BaseModel):
 
 
 def _clean(body: RecipeIn) -> recipes.RecipeEntry:
+    given = body.episode
     try:
+        episode = (
+            recipes.EpisodeEntry(
+                season=given.season,
+                number=given.number,
+                title=given.title,
+                url=given.address,
+                aired_on=given.aired_on,
+                at_seconds=recipes.seconds(given.at),
+            )
+            if given
+            else None
+        )
         return recipes.clean(
             body.title,
             [(p.edition_id, p.page) for p in body.editions],
@@ -171,9 +214,23 @@ def _clean(body: RecipeIn) -> recipes.RecipeEntry:
             issue=body.issue,
             issue_date=body.issue_date,
             issue_page=body.issue_page,
+            episode=episode,
         )
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+
+
+def _episode_out(episode: Episode, at: int | None) -> EpisodeOut:
+    return EpisodeOut(
+        id=episode.id,
+        name=recipes.episode_name(episode.season, episode.number, episode.title),
+        season=episode.season,
+        number=episode.number,
+        title=episode.title,
+        url=episode.url,
+        aired_on=episode.aired_on,
+        at=recipes.clock(at) if at is not None else None,
+    )
 
 
 async def _recipe_or_404(session, recipe_id: uuid.UUID) -> Recipe:
@@ -197,6 +254,13 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
         await session.execute(
             select(Issue, RecipeLocation.page)
             .join(RecipeLocation, RecipeLocation.issue_id == Issue.id)
+            .where(RecipeLocation.recipe_id == recipe.id)
+        )
+    ).first()
+    in_episode = (
+        await session.execute(
+            select(Episode, RecipeLocation.at_seconds)
+            .join(RecipeLocation, RecipeLocation.episode_id == Episode.id)
             .where(RecipeLocation.recipe_id == recipe.id)
         )
     ).first()
@@ -258,6 +322,7 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
         )
         if in_issue
         else None,
+        episode=_episode_out(*in_episode) if in_episode else None,
         web_page=WebPageOut(
             id=page.id,
             url=page.url,

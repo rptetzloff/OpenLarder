@@ -68,15 +68,15 @@
     <text x="528" y="608">Revision</text>
   </g>
   <g fill="#5f5e5a" font-size="11.5">
-    <text x="44" y="138">kind (a book, so far), title, tags</text>
+    <text x="44" y="138">kind (book, site, show…), title</text>
     <text x="44" y="154">credits authors in order</text>
     <text x="286" y="138">ISBN, publisher, year</text>
     <text x="286" y="154">cover, Open Library ID</text>
     <text x="528" y="138">retailer, affiliate URL</text>
     <text x="44" y="250">title, tags (+ inherited)</text>
     <text x="44" y="266">online URL if published</text>
-    <text x="286" y="250">for a book, page per edition</text>
-    <text x="286" y="266">or a web page, or an issue</text>
+    <text x="286" y="250">page per edition, a web page,</text>
+    <text x="286" y="266">issue + page, or episode + time</text>
     <text x="528" y="250">person or organisation</text>
     <text x="528" y="266">bio, links, curation</text>
     <text x="44" y="362">ingredient as the book names it</text>
