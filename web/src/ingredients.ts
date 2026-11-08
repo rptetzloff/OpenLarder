@@ -16,8 +16,13 @@ export interface Ingredient {
   name: string;
   // Other names lines are matched by: names it had, and ingredients merged in.
   aliases: { id: string; name: string }[];
+  // Broader and narrower: cheese above cheddar, aged cheddar below it.
+  parent: { id: string; name: string } | null;
+  children: { id: string; name: string }[];
   recipes: { id: string; title: string; book_id: string; book_title: string; pages: string[] }[];
   total: number;
+  // Recipes using it or anything under it, as search counts them.
+  family_total: number;
 }
 
 export async function listIngredients(q: string, offset = 0): Promise<IngredientList> {
@@ -97,4 +102,9 @@ export async function searchRecipes(ids: string[], offset = 0): Promise<SearchRe
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");
   return res.json();
+}
+
+// Puts an ingredient under another, or (parent null) under nothing.
+export async function setParent(id: string, parent: string | null): Promise<void> {
+  await send(`/api/ingredients/${id}/parent`, "PUT", { parent });
 }

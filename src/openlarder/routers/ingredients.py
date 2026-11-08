@@ -53,13 +53,23 @@ class AliasOut(BaseModel):
     name: str
 
 
+class Related(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class IngredientOut(BaseModel):
     id: uuid.UUID
     name: str
     # Other names lines are matched by: names it had, and ingredients merged in.
     aliases: list[AliasOut]
+    # Broader and narrower: cheese above cheddar, aged cheddar below it.
+    parent: Related | None
+    children: list[Related]
     recipes: list[UsedBy]
     total: int
+    # Recipes using it or anything under it, as search counts them.
+    family_total: int
 
 
 def _like(q: str) -> str:
@@ -156,12 +166,29 @@ async def get_ingredient(
         .where(IngredientAlias.ingredient_id == ingredient_id)
         .order_by(func.lower(IngredientAlias.name))
     )
+    parent = await session.get(Ingredient, ingredient.parent_id) if ingredient.parent_id else None
+    children = await session.execute(
+        select(Ingredient.id, Ingredient.name)
+        .where(Ingredient.parent_id == ingredient_id)
+        .order_by(func.lower(Ingredient.name))
+    )
+    children = [Related(id=i, name=n) for i, n in children]
+    family_total = total
+    if children:
+        family_total = await session.scalar(
+            select(func.count(func.distinct(IngredientOption.recipe_id))).where(
+                IngredientOption.ingredient_id.in_(ingredients.family(ingredient_id))
+            )
+        )
     return IngredientOut(
         id=ingredient.id,
         name=ingredient.name,
         aliases=[AliasOut(id=a, name=n) for a, n in aliases],
+        parent=Related(id=parent.id, name=parent.name) if parent else None,
+        children=children,
         recipes=recipes,
         total=total,
+        family_total=family_total or 0,
     )
 
 
@@ -264,3 +291,24 @@ async def delete_alias(
     await session.delete(alias)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class ParentIn(BaseModel):
+    # None: under nothing.
+    parent: uuid.UUID | None
+
+
+@router.put("/{ingredient_id}/parent", response_model=Named, dependencies=[SameOrigin])
+async def set_parent(
+    ingredient_id: uuid.UUID, body: ParentIn, admin: AdminUser, session: Session
+) -> Named:
+    """Put this ingredient under another, or under nothing; answers with
+    the ingredient."""
+    ingredient = await _ingredient_or_404(session, ingredient_id)
+    parent = await _ingredient_or_404(session, body.parent) if body.parent else None
+    try:
+        await ingredients.set_parent(session, ingredient, parent)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await session.commit()
+    return Named(id=ingredient.id, name=ingredient.name)

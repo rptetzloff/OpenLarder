@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from openlarder.db import Session
+from openlarder.ingredients import family
 from openlarder.models import Ingredient, IngredientOption, Recipe
 from openlarder.routers.ingredients import UsedBy, recipes_where
 
@@ -38,18 +39,6 @@ class Found(BaseModel):
     missing: list[uuid.UUID]
     recipes: list[UsedBy]
     total: int
-
-
-def _family(ingredient_id: uuid.UUID, n: int):
-    """The ingredient and everything under it. UNION, not UNION ALL, so a
-    loop in the hierarchy, which isn't prevented, still ends."""
-    tree = (
-        select(Ingredient.id)
-        .where(Ingredient.id == ingredient_id)
-        .cte(name=f"family_{n}", recursive=True)
-    )
-    tree = tree.union(select(Ingredient.id).where(Ingredient.parent_id == tree.c.id))
-    return select(tree.c.id)
 
 
 @router.get("", response_model=Found)
@@ -82,7 +71,7 @@ async def search(
     conditions = [
         Recipe.id.in_(
             select(IngredientOption.recipe_id).where(
-                IngredientOption.ingredient_id.in_(_family(i, n))
+                IngredientOption.ingredient_id.in_(family(i, f"family_{n}"))
             )
         )
         for n, i in enumerate(known)

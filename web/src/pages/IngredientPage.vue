@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { onMounted, ref } from "vue";
+import IngredientPicker from "../components/IngredientPicker.vue";
 import {
   deleteAlias,
   deleteIngredient,
   fetchIngredient,
   type Ingredient,
-  type IngredientSummary,
-  listIngredients,
   mergeIngredient,
   type Named,
   renameIngredient,
+  setParent,
   Taken,
 } from "../ingredients";
 import type { Me } from "../me";
@@ -68,24 +68,20 @@ async function rename() {
   }
 }
 
-const mergeQuery = ref("");
-const candidates = ref<IngredientSummary[]>([]);
-// The search they answer, so "no match" waits for the answer.
-const answered = ref("");
-let asked = 0;
-let timer: ReturnType<typeof setTimeout> | undefined;
-watch(mergeQuery, () => {
-  clearTimeout(timer);
-  timer = setTimeout(async () => {
-    const mine = ++asked;
-    const q = mergeQuery.value.trim();
-    const found = q ? (await listIngredients(q).catch(() => null))?.ingredients : [];
-    if (mine === asked && found) {
-      candidates.value = found.filter((i) => i.id !== props.id).slice(0, 8);
-      answered.value = q;
-    }
-  }, 200);
-});
+// Puts one ingredient under another (or under nothing), then shows the
+// change here.
+async function placeUnder(child: string, parent: string | null) {
+  error.value = "";
+  busy.value = true;
+  try {
+    await setParent(child, parent);
+    await load();
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
 
 async function merge(into: Named) {
   const here = ingredient.value;
@@ -146,7 +142,18 @@ onMounted(() => load());
     <p v-else-if="failed" role="alert">This ingredient couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!ingredient" class="status">Loading…</p>
     <template v-else>
+      <p v-if="ingredient.parent" class="byline">
+        A kind of
+        <a :href="`/ingredients/${ingredient.parent.id}`">{{ ingredient.parent.name }}</a>
+      </p>
       <h1>{{ ingredient.name }}</h1>
+      <p v-if="ingredient.children.length">
+        Includes
+        <template v-for="(c, i) in ingredient.children" :key="c.id">
+          <template v-if="i > 0">, </template>
+          <a :href="`/ingredients/${c.id}`">{{ c.name }}</a>
+        </template>
+      </p>
       <p v-if="ingredient.aliases.length" class="aliases">
         Also written as
         <template v-for="(a, i) in ingredient.aliases" :key="a.id">
@@ -165,7 +172,13 @@ onMounted(() => load());
       </p>
       <p class="status">
         Used in {{ ingredient.total.toLocaleString() }}
-        {{ ingredient.total === 1 ? "recipe" : "recipes" }}.
+        {{ ingredient.total === 1 ? "recipe" : "recipes" }}<template
+          v-if="ingredient.family_total > ingredient.total"
+          >, or
+          <a :href="`/search?i=${ingredient.id}`"
+            >{{ ingredient.family_total.toLocaleString() }} with those under it</a
+          ></template
+        >.
         <a :href="`/search?i=${ingredient.id}`">Search with other ingredients too</a>
       </p>
       <ul class="recipe-list">
@@ -214,29 +227,63 @@ onMounted(() => load());
           </div>
         </form>
 
-        <div class="isbn-form">
-          <label for="merge-into">Merge into another ingredient</label>
-          <div class="row">
-            <input
-              id="merge-into"
-              v-model="mergeQuery"
-              type="search"
-              autocomplete="off"
-              placeholder="the one to keep"
-            />
-          </div>
-          <ul v-if="candidates.length" class="merge-candidates">
-            <li v-for="c in candidates" :key="c.id">
-              <button type="button" class="link" :disabled="busy" @click="merge(c)">
-                {{ c.name }}
-              </button>
-              <span class="page-ref">
-                {{ c.recipes.toLocaleString() }} {{ c.recipes === 1 ? "recipe" : "recipes" }}
-              </span>
-            </li>
-          </ul>
-          <p v-else-if="answered && answered === mergeQuery.trim()" class="status">No other ingredient matches.</p>
-        </div>
+        <IngredientPicker
+          input-id="merge-into"
+          label="Merge into another ingredient"
+          placeholder="the one to keep"
+          :exclude="[ingredient.id]"
+          :disabled="busy"
+          @pick="merge"
+        />
+
+        <h3>Broader and narrower</h3>
+        <p class="status">
+          A search for an ingredient also finds the ones under it: put Fresh Ginger and Ground
+          Ginger under Ginger.
+        </p>
+        <p v-if="ingredient.parent">
+          Under “{{ ingredient.parent.name }}”.
+          <button
+            type="button"
+            class="link"
+            :disabled="busy"
+            @click="placeUnder(ingredient.id, null)"
+          >
+            Take it out from under
+          </button>
+        </p>
+        <IngredientPicker
+          input-id="parent-of"
+          :label="ingredient.parent ? 'Move it under another ingredient' : 'Put it under'"
+          placeholder="ginger"
+          :exclude="[ingredient.id, ingredient.parent?.id ?? '']"
+          :disabled="busy"
+          @pick="(p) => placeUnder(ingredient!.id, p.id)"
+        />
+        <IngredientPicker
+          input-id="child-of"
+          label="Put another ingredient under this one"
+          placeholder="fresh ginger"
+          :exclude="[ingredient.id, ...ingredient.children.map((c) => c.id)]"
+          :disabled="busy"
+          @pick="(c) => placeUnder(c.id, ingredient!.id)"
+        />
+        <p v-if="ingredient.children.length" class="status">
+          Under it now:
+          <template v-for="(c, i) in ingredient.children" :key="c.id">
+            <template v-if="i > 0">, </template>
+            {{ c.name }}
+            <button
+              type="button"
+              class="link remove-alias"
+              :disabled="busy"
+              :aria-label="`Take ${c.name} out from under it`"
+              @click="placeUnder(c.id, null)"
+            >
+              ×
+            </button>
+          </template>
+        </p>
 
         <p v-if="ingredient.total === 0">
           <button type="button" class="link" @click="remove">Delete this ingredient</button>
