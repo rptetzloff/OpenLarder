@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from sqlalchemy import delete, exists, false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from openlarder.author_names import name_key
 from openlarder.models import Author, Edition, Source, SourceCredit
 from openlarder.openlibrary import FoundBook
 
@@ -289,17 +290,18 @@ async def drop_uncredited(session: AsyncSession, author_ids: list[uuid.UUID]) ->
 
 
 async def author_named(session: AsyncSession, name: str) -> Author:
-    """The author a typed name means: one by exactly that name among those
-    without an Open Library record, the nearest thing to identity there is
-    without one, or a new author. Two people sharing a name is a merge for
-    review."""
-    author = await session.scalar(
-        select(Author).where(
-            func.lower(Author.name) == name.lower(), Author.open_library_author_id.is_(None)
-        )
-    )
-    if author is None:
-        author = Author(name=name)
-        session.add(author)
-        await session.flush()
+    """The author a typed name means: the one author whose name has the same
+    key (author_names.name_key: case, accents, punctuation and "Last,
+    First" aside), Open Library's included, or a new author when none does,
+    or when several do, since which is meant can't be told. Duplicates are
+    merged by hand on the author's page. *Ray, 2026-11-08: Open Library's
+    "Katarina Cermelj" was left out of matching, and a second was made.*"""
+    matches = (
+        await session.scalars(select(Author).where(Author.name_key == name_key(name)).limit(2))
+    ).all()
+    if len(matches) == 1:
+        return matches[0]
+    author = Author(name=name)
+    session.add(author)
+    await session.flush()
     return author

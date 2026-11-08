@@ -262,16 +262,60 @@ async def test_an_author_open_library_has_that_the_book_does_not_is_left_off(adm
     assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
 
 
-async def test_an_author_already_here_from_another_book_is_merged(admin, adb) -> None:
-    # As if Crandall's other book came in from Open Library: his record has the ID.
+async def test_a_typed_name_finds_the_open_library_author_already_here(admin, adb) -> None:
+    """Typed "Crandall, Russ" is Open Library's Russ Crandall from the start
+    (books.author_named); there's no second record for linking to merge.
+    *Reversed 2026-11-08: Open Library's authors were left out of matching,
+    which made a second Katarina Cermelj.*"""
     await adb.execute(
-        text("INSERT INTO authors (name, open_library_author_id) VALUES ('Russ Crandall', :id)"),
+        text(
+            "INSERT INTO authors (name, name_key, open_library_author_id)"
+            " VALUES ('Russ Crandall', 'russ crandall', :id)"
+        ),
         {"id": CRANDALL},
     )
     book = await _manual(admin, authors=("Crandall, Russ",))
-    plain = await adb.scalar(text("SELECT author_id FROM source_credits"))
+    credited = await adb.scalar(
+        text(
+            "SELECT a.open_library_author_id"
+            " FROM source_credits c JOIN authors a ON a.id = c.author_id"
+        )
+    )
+    assert credited == CRANDALL
     assert (await _link(admin, book, HERITAGE)).status_code == 200
+    assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
 
+
+async def _plain_crandall(adb, *books) -> None:
+    """A record for him made before typed names matched Open Library's."""
+    plain = await adb.scalar(
+        text(
+            "INSERT INTO authors (name, name_key) VALUES ('Russ Crandall', 'russ crandall')"
+            " RETURNING id"
+        )
+    )
+    for book in books:
+        await adb.execute(
+            text(
+                "INSERT INTO source_credits (source_id, author_id, position, credited_as)"
+                " VALUES (:b, :a, 1, 'Crandall, Russ')"
+            ),
+            {"b": book, "a": plain},
+        )
+    return plain
+
+
+async def test_an_author_already_here_from_another_book_is_merged(admin, adb) -> None:
+    await adb.execute(
+        text(
+            "INSERT INTO authors (name, name_key, open_library_author_id)"
+            " VALUES ('Russ Crandall', 'russ crandall', :id)"
+        ),
+        {"id": CRANDALL},
+    )
+    book = await _manual(admin, authors=())
+    plain = await _plain_crandall(adb, book)
+    assert (await _link(admin, book, HERITAGE)).status_code == 200
     tied = await adb.scalar(
         text(
             "SELECT a.open_library_author_id"
@@ -295,11 +339,15 @@ async def test_an_author_tied_to_another_record_is_not_retied(admin, adb) -> Non
 
 async def test_a_shared_author_record_is_kept_when_merged(admin, adb) -> None:
     await adb.execute(
-        text("INSERT INTO authors (name, open_library_author_id) VALUES ('Russ Crandall', :id)"),
+        text(
+            "INSERT INTO authors (name, name_key, open_library_author_id)"
+            " VALUES ('Russ Crandall', 'russ crandall', :id)"
+        ),
         {"id": CRANDALL},
     )
-    book = await _manual(admin, authors=("Crandall, Russ",))
-    await _manual(admin, title="Another Book Of His", authors=("Crandall, Russ",), isbn=None)
+    book = await _manual(admin, authors=())
+    other = await _manual(admin, title="Another Book Of His", authors=(), isbn=None)
+    await _plain_crandall(adb, book, other)
     assert (await _link(admin, book, HERITAGE)).status_code == 200
     # The plain record is still credited on the other book, so it stays.
     assert await adb.scalar(text("SELECT count(*) FROM authors")) == 2

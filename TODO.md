@@ -14,9 +14,6 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       sign-in screens should match it.
 - [ ] **Wikidata facts on author pages** (born, nationality, website). The
       pages themselves are built (#52).
-- [ ] **Merge two authors**: the same person can end up as two records (a
-      book printing "Ottolenghi" gets a new author, not Yotam Ottolenghi's),
-      and nothing can merge them yet.
 - [ ] **Recipe tags** (course, cuisine, diet): the tables exist, with nothing
       to set or show them. Book-level tags are inherited by its recipes.
 - [ ] **Bookshop.org affiliate links**: the purchase_links table exists, with
@@ -128,9 +125,6 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       close enough, otherwise suggest and flag, with a measured threshold.
 - [ ] **#17**: sign-in and account screens that look like OpenLarder.
 - [ ] **Ray**: publish the Google sign-in consent screen.
-- [ ] **Ray**: an archive.org account for OpenLarder, and its API keys in
-      Coolify (`OPENLARDER_ARCHIVE_ACCESS_KEY`, `OPENLARDER_ARCHIVE_SECRET_KEY`;
-      README). Copies work without them, with lower limits.
 - [ ] **Ray**: Cloudflare Browser Cache TTL to "Respect Existing Headers".
 
 ## Open decisions
@@ -156,6 +150,9 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Merge two authors from the author page, which lists others with the
+      same name; a typed name now matches Open Library's authors too (#58)
+- [x] Ray: archive.org account and keys in Coolify
 - [x] Web recipes' pages copied to the Internet Archive when added; a page
       marked gone offers its copy (#57)
 - [x] Websites as sources: add a site, recipes on its pages by address,

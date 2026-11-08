@@ -564,6 +564,12 @@ button.link {
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
 }
+.merge-here {
+  margin-left: 0.5rem;
+}
+.author-merge {
+  margin-top: 1.5rem;
+}
 .author-link-form {
   margin-top: 1.5rem;
 }

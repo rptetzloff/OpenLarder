@@ -1,6 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { addLink, type Author, fetchAuthor, removeLink, saveAuthor } from "../authors";
+import { computed, onMounted, ref, watch } from "vue";
+import {
+  addLink,
+  type Author,
+  type AuthorSummary,
+  fetchAuthor,
+  listAuthors,
+  mergeAuthor,
+  removeLink,
+  saveAuthor,
+} from "../authors";
 import type { Me } from "../me";
 
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
@@ -56,6 +65,37 @@ const add = () =>
     linkUrl.value = "";
     linkLabel.value = "";
   });
+
+// Merging: another record of this person into this one, or this one into
+// another found by typing.
+async function merge(gone: AuthorSummary | Author, kept: AuthorSummary | Author) {
+  const message =
+    `Merge “${gone.name}” into “${kept.name}”?
+
+` +
+    `Everything credited to “${gone.name}” will be credited to “${kept.name}”. ` +
+    "Each book or site still prints the name it prints.";
+  if (!confirm(message)) return;
+  await act(async () => {
+    await mergeAuthor(gone.id, kept.id);
+    if (kept.id === props.id) await load();
+    else location.href = `/authors/${kept.id}`;
+  });
+}
+
+const mergeQuery = ref("");
+const candidates = ref<AuthorSummary[]>([]);
+let asked = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(mergeQuery, () => {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const mine = ++asked;
+    const q = mergeQuery.value.trim();
+    const found = q ? (await listAuthors(q).catch(() => null))?.authors : [];
+    if (mine === asked && found) candidates.value = found.filter((a) => a.id !== props.id).slice(0, 8);
+  }, 200);
+});
 
 const remove = (link: Author["links"][number]) =>
   act(async () => {
@@ -138,6 +178,18 @@ onMounted(load);
 
       <section v-if="user?.is_admin" class="fix-ingredient">
         <h2>Fix this author</h2>
+        <template v-if="author.same_name.length">
+          <h3>Possibly the same person</h3>
+          <ul class="recipe-list">
+            <li v-for="a in author.same_name" :key="a.id">
+              <a :href="`/authors/${a.id}`">{{ a.name }}</a>
+              <span class="page-ref">{{ a.sources }} {{ a.sources === 1 ? "source" : "sources" }}</span>
+              <button type="button" class="link merge-here" :disabled="busy" @click="merge(a, author)">
+                Merge into this one
+              </button>
+            </li>
+          </ul>
+        </template>
         <p class="status">
           The author's own name, wherever it's shown for them. To change how one book prints it,
           edit the book.
@@ -167,6 +219,26 @@ onMounted(load);
           <input id="link-label" v-model="linkLabel" maxlength="100" placeholder="Website" />
           <button type="submit" class="primary" :disabled="busy">Add the link</button>
         </form>
+        <div class="isbn-form author-merge">
+          <label for="merge-author">Merge this author into another</label>
+          <div class="row">
+            <input
+              id="merge-author"
+              v-model="mergeQuery"
+              type="search"
+              autocomplete="off"
+              placeholder="the one to keep"
+            />
+          </div>
+          <ul v-if="candidates.length" class="merge-candidates">
+            <li v-for="c in candidates" :key="c.id">
+              <button type="button" class="link" :disabled="busy" @click="merge(author, c)">
+                {{ c.name }}
+              </button>
+              <span class="page-ref">{{ c.sources }} {{ c.sources === 1 ? "source" : "sources" }}</span>
+            </li>
+          </ul>
+        </div>
       </section>
     </template>
   </article>

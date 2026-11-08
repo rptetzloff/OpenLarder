@@ -222,3 +222,111 @@ async def test_only_admins_fix_authors(admin, adb) -> None:
         await admin.post(f"/api/authors/{yotam}/links", json={"url": "https://b.example"})
     ).status_code == 403
     assert (await admin.delete(f"/api/authors/{yotam}/links/{link['id']}")).status_code == 403
+
+
+# Two records of one person
+
+
+async def _two_mclagans(admin, adb):
+    """Bones credits one record and Fat another, as Open Library had it."""
+    bones = await _book(admin, "Bones", [("Jennifer McLagan", "author")])
+    fat = await _book(admin, "Fat", [])
+    other = await adb.scalar(
+        text(
+            "INSERT INTO authors (name, name_key, open_library_author_id)"
+            " VALUES ('Jennifer Mclagan', 'jennifer mclagan', 'OL9A') RETURNING id"
+        )
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO source_credits (source_id, author_id, position, credited_as)"
+            " VALUES (:s, :a, 1, 'Jennifer Mclagan')"
+        ),
+        {"s": fat["id"], "a": other},
+    )
+    return _author(bones, "Jennifer McLagan"), str(other), bones, fat
+
+
+async def test_an_author_page_lists_the_same_name(admin, adb, client) -> None:
+    mine, theirs, _, _ = await _two_mclagans(admin, adb)
+    page = (await client.get(f"/api/authors/{mine}")).json()
+    assert page["same_name"] == [{"id": theirs, "name": "Jennifer Mclagan", "sources": 1}]
+
+
+async def test_merging_moves_sources_and_keeps_printed_names(admin, adb, client) -> None:
+    mine, theirs, bones, fat = await _two_mclagans(admin, adb)
+    response = await admin.post(f"/api/authors/{theirs}/merge", json={"into": mine})
+    assert response.json() == {"id": mine, "name": "Jennifer McLagan", "sources": 2}
+    assert (await client.get(f"/api/authors/{theirs}")).status_code == 404
+    page = (await client.get(f"/api/authors/{mine}")).json()
+    assert [s["title"] for s in page["sources"]] == ["Bones", "Fat"]
+    assert page["same_name"] == []
+    shown = (await client.get(f"/api/sources/{fat['id']}")).json()
+    assert [(c["author_id"], c["credited_as"]) for c in shown["credits"]] == [
+        (mine, "Jennifer Mclagan")
+    ]
+    # Open Library's record came along, since the one kept had none.
+    ol = await adb.scalar(
+        text("SELECT open_library_author_id FROM authors WHERE id = :a"), {"a": mine}
+    )
+    assert ol == "OL9A"
+
+
+async def test_merging_keeps_one_credit_and_one_of_each_link(admin, adb, client) -> None:
+    mine, theirs, bones, _ = await _two_mclagans(admin, adb)
+    await adb.execute(
+        text(
+            "INSERT INTO source_credits (source_id, author_id, position, credited_as, role)"
+            " VALUES (:s, :a, 2, 'J. McLagan', 'author'), (:s, :a, 3, 'J. McLagan', 'photographer')"
+        ),
+        {"s": bones["id"], "a": theirs},
+    )
+    for author, url in (
+        (mine, "https://jennifermclagan.com"),
+        (theirs, "https://jennifermclagan.com"),
+        (theirs, "https://instagram.com/jm"),
+    ):
+        await admin.post(f"/api/authors/{author}/links", json={"url": url})
+    await admin.post(f"/api/authors/{theirs}/merge", json={"into": mine})
+    shown = (await client.get(f"/api/sources/{bones['id']}")).json()
+    assert [(c["credited_as"], c["role"]) for c in shown["credits"]] == [
+        ("Jennifer McLagan", "author"),
+        ("J. McLagan", "photographer"),
+    ]
+    links = (await client.get(f"/api/authors/{mine}")).json()["links"]
+    assert sorted(x["url"] for x in links) == [
+        "https://instagram.com/jm",
+        "https://jennifermclagan.com",
+    ]
+
+
+async def test_when_both_have_an_outside_record_the_kept_ones_stays(admin, adb) -> None:
+    mine, theirs, _, _ = await _two_mclagans(admin, adb)
+    await adb.execute(
+        text(
+            "UPDATE authors SET open_library_author_id = 'OL1A', wikidata_id = 'Q5' WHERE id = :a"
+        ),
+        {"a": mine},
+    )
+    await adb.execute(text("UPDATE authors SET wikidata_id = 'Q7' WHERE id = :a"), {"a": theirs})
+    assert (
+        await admin.post(f"/api/authors/{theirs}/merge", json={"into": mine})
+    ).status_code == 200
+    row = (
+        await adb.execute(
+            text("SELECT open_library_author_id, wikidata_id FROM authors WHERE id = :a"),
+            {"a": mine},
+        )
+    ).one()
+    assert tuple(row) == ("OL1A", "Q5")
+
+
+async def test_a_merge_needs_two_authors_and_an_admin(admin, adb) -> None:
+    mine, theirs, _, _ = await _two_mclagans(admin, adb)
+    assert (await admin.post(f"/api/authors/{mine}/merge", json={"into": mine})).status_code == 422
+    missing = await admin.post(f"/api/authors/{mine}/merge", json={"into": str(uuid.uuid4())})
+    assert missing.status_code == 404
+    await adb.execute(text("UPDATE users SET is_admin = false"))
+    assert (
+        await admin.post(f"/api/authors/{theirs}/merge", json={"into": mine})
+    ).status_code == 403

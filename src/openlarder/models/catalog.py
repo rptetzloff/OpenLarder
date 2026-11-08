@@ -45,8 +45,9 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
+from openlarder.author_names import name_key
 from openlarder.models.base import Base, Timestamps, uuid_pk
 
 
@@ -116,12 +117,22 @@ class Author(Timestamps, Base):
         CheckConstraint("name <> ''", name="name_not_empty"),
         CheckConstraint("kind IN ('person', 'organisation')", name="kind_known"),
         CheckConstraint("wikidata_id ~ '^Q[1-9][0-9]*$'", name="wikidata_id_format"),
+        Index("ix_authors_name_key", "name_key"),
         _trgm("authors", "name"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     # Not unique: two cooks can share a name. Duplicates are merged by hand.
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # The name as compared (author_names.name_key), kept with it: "Katarina
+    # Čermelj" and "Cermelj, Katarina" share one (migration 0022).
+    name_key: Mapped[str] = mapped_column(Text, nullable=False)
+
+    @validates("name")
+    def _keep_key(self, _key: str, name: str) -> str:
+        self.name_key = name_key(name)
+        return name
+
     kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="person")
     open_library_author_id: Mapped[str | None] = mapped_column(Text, unique=True)
     wikidata_id: Mapped[str | None] = mapped_column(Text, unique=True)

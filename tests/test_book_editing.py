@@ -223,16 +223,28 @@ async def test_an_unknown_book_is_a_404(admin) -> None:
     assert response.status_code == 404
 
 
-async def test_a_new_name_is_not_matched_to_an_open_library_author(admin, adb) -> None:
-    """As when a book is added by hand: same name, no shared record, not
-    known to be the same person."""
+async def test_a_new_name_finds_an_open_library_author(admin, adb) -> None:
+    """*Reversed 2026-11-08 (Ray): Open Library's authors used to be left out
+    of matching, which made a second record of one person.*"""
     first = await _book(admin, title="Plenty", authors=["Yotam Ottolenghi"])
     await adb.execute(text("UPDATE authors SET open_library_author_id = 'OL1A'"))
     book = await _book(admin, title="Other", authors=[])
-    await _edit(admin, book, credits=[{"name": "Yotam Ottolenghi", "role": "author"}])
-    ids = (await adb.scalars(text("SELECT id FROM authors ORDER BY open_library_author_id"))).all()
-    assert len(ids) == 2
-    assert str(ids[0]) == first["credits"][0]["author_id"]
+    await _edit(admin, book, credits=[{"name": "Ottolenghi, Yotam", "role": "author"}])
+    assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
+    shown = (await admin.get(f"/api/sources/{book['id']}")).json()
+    assert shown["credits"][0]["author_id"] == first["credits"][0]["author_id"]
+
+
+async def test_a_name_two_authors_share_makes_a_new_one(admin, adb) -> None:
+    """Which of two Jennifer McLagans is meant can't be told: a new record,
+    for merging by hand."""
+    await _book(admin, title="Bones", authors=["Jennifer McLagan"])
+    await adb.execute(
+        text("INSERT INTO authors (name, name_key) VALUES ('Jennifer Mclagan', 'jennifer mclagan')")
+    )
+    book = await _book(admin, title="Fat", authors=[])
+    await _edit(admin, book, credits=[{"name": "Jennifer McLagan", "role": "author"}])
+    assert await adb.scalar(text("SELECT count(*) FROM authors")) == 3
 
 
 # Finding a book by name (the list's q and limit)
@@ -266,3 +278,11 @@ async def test_a_picker_asks_for_a_few(admin, client) -> None:
     found = await client.get("/api/sources", params={"q": "bread", "limit": 2})
     assert [b["title"] for b in found.json()] == ["Bread A", "Bread B"]
     assert (await client.get("/api/sources", params={"limit": 51})).status_code == 422
+
+
+async def test_accents_and_name_order_dont_make_a_second_author(admin, adb) -> None:
+    """Ray's case: Katarina Cermelj, credited three ways."""
+    await _book(admin, title="The Loopy Whisk", authors=["Čermelj, Katarina"])
+    await _book(admin, title="Baked to Perfection", authors=["Katarina Cermelj"])
+    await _book(admin, title="Elements of Baking", authors=["katarina čermelj"])
+    assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
