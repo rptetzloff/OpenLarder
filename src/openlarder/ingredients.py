@@ -52,7 +52,7 @@ def match_key(name: str) -> str:
     return " ".join(_stem(w) for w in words)
 
 
-async def match_book(session: AsyncSession, work_id: uuid.UUID) -> None:
+async def match_book(session: AsyncSession, source_id: uuid.UUID) -> None:
     """Match every unmatched option in the book to a canonical ingredient."""
     rows = (
         await session.execute(
@@ -60,7 +60,7 @@ async def match_book(session: AsyncSession, work_id: uuid.UUID) -> None:
             .join(RecipeIngredient, RecipeIngredient.id == IngredientOption.recipe_ingredient_id)
             .join(Recipe, Recipe.id == IngredientOption.recipe_id)
             .where(
-                Recipe.work_id == work_id,
+                Recipe.source_id == source_id,
                 IngredientOption.ingredient_id.is_(None),
             )
         )

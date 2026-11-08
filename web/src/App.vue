@@ -25,10 +25,15 @@ import TermsPage from "./pages/TermsPage.vue";
 // still don't need a router library; that changes when pages need nested
 // routes or navigation without a full load.
 const pages: Record<string, unknown> = { "/privacy": PrivacyPage, "/terms": TermsPage };
+// Books became sources (migration 0019): an old /books address, saved or
+// shared, goes to the same page under /sources.
+if (/^\/books(\/|$)/.test(location.pathname)) {
+  location.replace(location.pathname.replace(/^\/books/, "/sources") + location.search);
+}
 const path = location.pathname.replace(/\/+$/, "");
 const page = pages[path];
 const onAccount = path === "/account";
-const onBooks = path === "/books";
+const onBooks = path === "/sources";
 const onIngredients = path === "/ingredients";
 const onSearch = path === "/search";
 const onAuthors = path === "/authors";
@@ -38,9 +43,9 @@ const onImports = path === "/admin/imports";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
-const bookId = match(`/books/${UUID}`);
-const newRecipeFor = match(`/books/${UUID}/recipes/new`);
-const editBookId = match(`/books/${UUID}/edit`);
+const bookId = match(`/sources/${UUID}`);
+const newRecipeFor = match(`/sources/${UUID}/recipes/new`);
+const editBookId = match(`/sources/${UUID}/edit`);
 const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
 const authorId = match(`/authors/${UUID}`);
@@ -77,7 +82,7 @@ onMounted(async () => {
 
 <template>
   <header>
-    <a href="/books">Books</a>
+    <a href="/sources">Books</a>
     <a href="/ingredients">Ingredients</a>
     <a href="/search" class="nav">Search</a>
     <template v-if="user">
@@ -122,7 +127,7 @@ onMounted(async () => {
     <template v-else>
       <h1>OpenLarder</h1>
       <p>A free, open index of the recipes in your cookbooks.</p>
-      <p><a href="/books">Browse the books</a></p>
+      <p><a href="/sources">Browse the books</a></p>
       <p v-if="signInFailed" role="alert">Sign-in didn't work. Please try again.</p>
       <p class="status">{{ status }}</p>
     </template>

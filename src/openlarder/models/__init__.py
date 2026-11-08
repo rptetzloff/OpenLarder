@@ -10,14 +10,14 @@ from openlarder.models.catalog import (
     PurchaseLink,
     Recipe,
     RecipeIngredient,
-    RecipePage,
+    RecipeLocation,
     RecipeTag,
+    Source,
+    SourceCredit,
+    SourceTag,
     Substitution,
     Tag,
     TagKind,
-    Work,
-    WorkCredit,
-    WorkTag,
 )
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.imports import ImportRun, ImportRunLine
@@ -37,7 +37,7 @@ __all__ = [
     "Recipe",
     "RecipeFlag",
     "RecipeIngredient",
-    "RecipePage",
+    "RecipeLocation",
     "RecipeTag",
     "Resolution",
     "Substitution",
@@ -45,7 +45,7 @@ __all__ = [
     "TagKind",
     "User",
     "UserSession",
-    "Work",
-    "WorkCredit",
-    "WorkTag",
+    "Source",
+    "SourceCredit",
+    "SourceTag",
 ]

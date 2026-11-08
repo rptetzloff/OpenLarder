@@ -5,7 +5,7 @@ import type { BookSummary } from "./books";
 export interface AuthorSummary {
   id: string;
   name: string;
-  books: number;
+  sources: number;
 }
 
 export interface Author {
@@ -15,7 +15,7 @@ export interface Author {
   open_library_url: string | null;
   links: { id: string; url: string; label: string | null }[];
   // This author's roles on each book, and the name it prints for them.
-  books: (BookSummary & { roles: string[]; credited_as: string })[];
+  sources: (BookSummary & { roles: string[]; credited_as: string })[];
   // People credited on the same books, most shared first.
   coauthors: AuthorSummary[];
 }

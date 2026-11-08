@@ -6,10 +6,10 @@ See DATA_MODEL.svg for the shape.
 
 Rules the schema enforces rather than leaves to the application:
 
-- A recipe page joins a recipe to an edition *of the same work*. recipe_pages
-  carries work_id with composite foreign keys to both sides, so a page in the
+- A recipe page joins a recipe to an edition *of the same work*. recipe_locations
+  carries source_id with composite foreign keys to both sides, so a page in the
   wrong book cannot be written.
-- No recipe_pages row means the recipe is not in that edition. A row with a
+- No recipe_locations row means the recipe is not in that edition. A row with a
   null page means it is, but nobody has recorded where yet.
 - An ingredient option points at a canonical ingredient, a sub-recipe, or
   neither (not matched yet) -- never both. Ranks are unique within a line.
@@ -75,16 +75,23 @@ def _trgm(table: str, column: str) -> Index:
     )
 
 
-class Work(Timestamps, Base):
-    """One book, across every printing of it."""
+class Source(Timestamps, Base):
+    """Where recipes come from: so far a book, across every printing of it.
 
-    __tablename__ = "works"
+    Each kind has its own parts in its own table: a book's are its editions,
+    and later kinds add theirs (a magazine's issues, a show's episodes, a
+    site's posts). Migration 0019; Ray, 2026-11-08.
+    """
+
+    __tablename__ = "sources"
     __table_args__ = (
         CheckConstraint("title <> ''", name="title_not_empty"),
-        _trgm("works", "title"),
+        CheckConstraint("kind IN ('book')", name="kind_known"),
+        _trgm("sources", "title"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
+    kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="book")
     title: Mapped[str] = mapped_column(Text, nullable=False)
     subtitle: Mapped[str | None] = mapped_column(Text)
     open_library_work_id: Mapped[str | None] = mapped_column(Text, unique=True)
@@ -124,26 +131,26 @@ class AuthorLink(Timestamps, Base):
     label: Mapped[str | None] = mapped_column(Text)
 
 
-class WorkCredit(Timestamps, Base):
+class SourceCredit(Timestamps, Base):
     """One name on a book's cover or title page, in the order printed."""
 
-    __tablename__ = "work_credits"
+    __tablename__ = "source_credits"
     __table_args__ = (
-        UniqueConstraint("work_id", "position"),
+        UniqueConstraint("source_id", "position"),
         # The same person credited twice in one role is a duplicate; as author
         # and photographer is two credits.
-        UniqueConstraint("work_id", "author_id", "role"),
+        UniqueConstraint("source_id", "author_id", "role"),
         CheckConstraint("credited_as <> ''", name="credited_as_not_empty"),
         CheckConstraint(
             "role IN ('author', 'editor', 'contributor', 'photographer', 'illustrator',"
             " 'translator')",
             name="role_known",
         ),
-        Index("ix_work_credits_author_id", "author_id"),
+        Index("ix_source_credits_author_id", "author_id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    work_id: Mapped[uuid.UUID] = _fk("works.id", ondelete="CASCADE")
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
     # RESTRICT: an author still credited is merged into another, not deleted.
     author_id: Mapped[uuid.UUID] = _fk("authors.id", ondelete="RESTRICT")
     position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
@@ -158,8 +165,8 @@ class Edition(Timestamps, Base):
 
     __tablename__ = "editions"
     __table_args__ = (
-        # The target of recipe_pages' composite key.
-        UniqueConstraint("work_id", "id"),
+        # The target of recipe_locations' composite key.
+        UniqueConstraint("source_id", "id"),
         # ISBN-13 only; ISBN-10s are converted on the way in. Nullable because
         # older books have none. The checksum is checked by the application.
         CheckConstraint("isbn13 ~ '^97[89][0-9]{10}$'", name="isbn13_format"),
@@ -168,7 +175,7 @@ class Edition(Timestamps, Base):
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    work_id: Mapped[uuid.UUID] = _fk("works.id", ondelete="CASCADE")
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
     # Only when it differs from the work's, e.g. a UK edition retitled.
     title: Mapped[str | None] = mapped_column(Text)
     isbn13: Mapped[str | None] = mapped_column(Text, unique=True)
@@ -197,17 +204,17 @@ class PurchaseLink(Timestamps, Base):
 class Recipe(Timestamps, Base):
     __tablename__ = "recipes"
     __table_args__ = (
-        UniqueConstraint("work_id", "id"),
+        UniqueConstraint("source_id", "id"),
         CheckConstraint("title <> ''", name="title_not_empty"),
         # Not unique: one book can have two recipes called "Vinaigrette".
         # Duplicate detection warns on title + work; it does not refuse.
-        Index("ix_recipes_work_id_title", "work_id", "title"),
+        Index("ix_recipes_source_id_title", "source_id", "title"),
         Index("ix_recipes_created_by", "created_by"),
         _trgm("recipes", "title"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    work_id: Mapped[uuid.UUID] = _fk("works.id", ondelete="CASCADE")
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
     title: Mapped[str] = mapped_column(Text, nullable=False)
     # Only where the publisher posted the recipe itself.
     online_url: Mapped[str | None] = mapped_column(Text)
@@ -216,23 +223,23 @@ class Recipe(Timestamps, Base):
     created_by: Mapped[uuid.UUID | None] = _fk("users.id", ondelete="SET NULL", nullable=True)
 
 
-class RecipePage(Timestamps, Base):
-    __tablename__ = "recipe_pages"
+class RecipeLocation(Timestamps, Base):
+    __tablename__ = "recipe_locations"
     __table_args__ = (
         PrimaryKeyConstraint("recipe_id", "edition_id"),
         ForeignKeyConstraint(
-            ["work_id", "recipe_id"], ["recipes.work_id", "recipes.id"], ondelete="CASCADE"
+            ["source_id", "recipe_id"], ["recipes.source_id", "recipes.id"], ondelete="CASCADE"
         ),
         ForeignKeyConstraint(
-            ["work_id", "edition_id"], ["editions.work_id", "editions.id"], ondelete="CASCADE"
+            ["source_id", "edition_id"], ["editions.source_id", "editions.id"], ondelete="CASCADE"
         ),
         CheckConstraint("page <> ''", name="page_not_empty"),
-        Index("ix_recipe_pages_edition_id", "edition_id"),
+        Index("ix_recipe_locations_edition_id", "edition_id"),
     )
 
     recipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     edition_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    work_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     # Text, because books number pages "xii" and recipes span "112-13".
     # Null means in this edition, page not yet recorded.
     page: Mapped[str | None] = mapped_column(Text)
@@ -378,16 +385,16 @@ class Tag(Timestamps, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class WorkTag(Base):
+class SourceTag(Base):
     """A tag on a whole book, inherited by every recipe in it."""
 
-    __tablename__ = "work_tags"
+    __tablename__ = "source_tags"
     __table_args__ = (
-        PrimaryKeyConstraint("work_id", "tag_id"),
-        Index("ix_work_tags_tag_id", "tag_id"),
+        PrimaryKeyConstraint("source_id", "tag_id"),
+        Index("ix_source_tags_tag_id", "tag_id"),
     )
 
-    work_id: Mapped[uuid.UUID] = _fk("works.id", ondelete="CASCADE")
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
     tag_id: Mapped[uuid.UUID] = _fk("tags.id", ondelete="CASCADE")
 
 

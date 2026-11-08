@@ -13,7 +13,7 @@ export interface RecipePage {
 export interface Recipe {
   id: string;
   title: string;
-  book: { id: string; title: string };
+  source: { id: string; title: string };
   pages: RecipePage[];
   // As typed, for the edit form.
   ingredients: string[];
@@ -48,7 +48,7 @@ export async function saveRecipe(
 ): Promise<string> {
   const isNew = "bookId" in target;
   const res = await fetch(
-    isNew ? `/api/books/${target.bookId}/recipes` : `/api/recipes/${target.recipeId}`,
+    isNew ? `/api/sources/${target.bookId}/recipes` : `/api/recipes/${target.recipeId}`,
     {
       method: isNew ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },

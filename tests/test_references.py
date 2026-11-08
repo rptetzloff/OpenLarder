@@ -204,9 +204,9 @@ def test_an_option_without_a_page_is_not_a_reference() -> None:
 
 @pytest.fixture
 async def work(adb):
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Healthy') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Healthy') RETURNING id"))
     await adb.execute(
-        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": E, "w": work}
+        text("INSERT INTO editions (id, source_id) VALUES (:id, :w)"), {"id": E, "w": work}
     )
     return work
 
@@ -220,7 +220,7 @@ async def admin(client, broker, adb):
 
 async def _add(client, work, title, page, ingredients):
     response = await client.post(
-        f"/api/books/{work}/recipes",
+        f"/api/sources/{work}/recipes",
         json={
             "title": title,
             "editions": [{"edition_id": str(E), "page": page}],
@@ -344,7 +344,7 @@ async def test_an_import_links_a_reference_to_a_later_batch(admin, work, adb) ->
     def item(row, title, page, ingredients):
         return {
             "row": row,
-            "work_id": str(work),
+            "source_id": str(work),
             "isbn13": None,
             "title": title,
             "page": page,
@@ -370,17 +370,17 @@ async def test_an_admin_can_link_a_books_references_again(admin, work, adb) -> N
     await _add(admin, work, "Curry", "101", ["Basic Cauli-Rice (p. 269)"])
     # As stored before linking existed: lines, no options.
     await adb.execute(text("DELETE FROM ingredient_options"))
-    response = await admin.post(f"/api/books/{work}/references")
+    response = await admin.post(f"/api/sources/{work}/references")
     assert response.status_code == 200
     assert response.json() == {"linked": 1}
-    assert (await admin.post(f"/api/books/{work}/references")).json() == {"linked": 1}
+    assert (await admin.post(f"/api/sources/{work}/references")).json() == {"linked": 1}
 
 
 async def test_only_an_admin_links_references(client, broker, work) -> None:
-    assert (await client.post(f"/api/books/{work}/references")).status_code == 401
+    assert (await client.post(f"/api/sources/{work}/references")).status_code == 401
     await _sign_in(client, broker)
-    assert (await client.post(f"/api/books/{work}/references")).status_code == 403
+    assert (await client.post(f"/api/sources/{work}/references")).status_code == 403
 
 
 async def test_linking_an_unknown_book_is_a_404(admin) -> None:
-    assert (await admin.post(f"/api/books/{uuid.uuid4()}/references")).status_code == 404
+    assert (await admin.post(f"/api/sources/{uuid.uuid4()}/references")).status_code == 404

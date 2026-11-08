@@ -32,7 +32,7 @@ async function act(resolution: "fixed" | "dismissed") {
     </p>
     <p v-if="showRecipe" class="byline">
       <a :href="`/recipes/${flag.recipe.id}`">{{ flag.recipe.title }}</a>
-      in <a :href="`/books/${flag.recipe.book_id}`">{{ flag.recipe.book_title }}</a>
+      in <a :href="`/sources/${flag.recipe.source_id}`">{{ flag.recipe.source_title }}</a>
     </p>
     <p v-if="flag.resolution" class="status">
       {{ flag.resolution === "fixed" ? "Fixed" : "Dismissed" }}

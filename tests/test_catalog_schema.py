@@ -21,27 +21,33 @@ def _insert(db: Connection, sql: str, **params) -> uuid.UUID:
     return db.execute(text(sql + " RETURNING id"), params).scalar_one()
 
 
-def _work(db: Connection, title: str = "Salt Fat Acid Heat") -> uuid.UUID:
-    return _insert(db, "INSERT INTO works (title) VALUES (:t)", t=title)
+def _work(db: Connection, title: str = "Salt Fat Acid Heat", *, old: bool = False) -> uuid.UUID:
+    # old: at a revision before 0019, which named sources works.
+    return _insert(db, f"INSERT INTO {'works' if old else 'sources'} (title) VALUES (:t)", t=title)
 
 
-def _edition(db: Connection, work_id: uuid.UUID, isbn13: str | None = None) -> uuid.UUID:
+def _edition(db: Connection, source_id: uuid.UUID, isbn13: str | None = None) -> uuid.UUID:
     return _insert(
-        db, "INSERT INTO editions (work_id, isbn13) VALUES (:w, :i)", w=work_id, i=isbn13
+        db, "INSERT INTO editions (source_id, isbn13) VALUES (:w, :i)", w=source_id, i=isbn13
     )
 
 
-def _recipe(db: Connection, work_id: uuid.UUID, title: str = "Caesar Salad") -> uuid.UUID:
-    return _insert(db, "INSERT INTO recipes (work_id, title) VALUES (:w, :t)", w=work_id, t=title)
+def _recipe(
+    db: Connection, source_id: uuid.UUID, title: str = "Caesar Salad", *, old: bool = False
+) -> uuid.UUID:
+    column = "work_id" if old else "source_id"
+    return _insert(
+        db, f"INSERT INTO recipes ({column}, title) VALUES (:w, :t)", w=source_id, t=title
+    )
 
 
-def _page(db: Connection, recipe_id, edition_id, work_id, page: str | None) -> None:
+def _page(db: Connection, recipe_id, edition_id, source_id, page: str | None) -> None:
     db.execute(
         text(
-            "INSERT INTO recipe_pages (recipe_id, edition_id, work_id, page)"
+            "INSERT INTO recipe_locations (recipe_id, edition_id, source_id, page)"
             " VALUES (:r, :e, :w, :p)"
         ),
-        {"r": recipe_id, "e": edition_id, "w": work_id, "p": page},
+        {"r": recipe_id, "e": edition_id, "w": source_id, "p": page},
     )
 
 
@@ -216,7 +222,7 @@ def test_recipes_inherit_their_books_tags_once(db: Connection) -> None:
     recipe = _recipe(db, work)
     gf = _diet(db, "Gluten-Free")
     salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Salad')")
-    db.execute(text("INSERT INTO work_tags VALUES (:w, :t)"), {"w": work, "t": gf})
+    db.execute(text("INSERT INTO source_tags VALUES (:w, :t)"), {"w": work, "t": gf})
     db.execute(text("INSERT INTO recipe_tags VALUES (:r, :t)"), {"r": recipe, "t": salad})
 
     def effective() -> set[tuple[uuid.UUID, bool]]:
@@ -237,11 +243,11 @@ def test_updated_at_moves_on_update(db: Connection) -> None:
     work = _work(db)
     # now() is fixed within a transaction, so backdate rather than wait.
     db.execute(
-        text("UPDATE works SET updated_at = now() - interval '1 day' WHERE id = :w"), {"w": work}
+        text("UPDATE sources SET updated_at = now() - interval '1 day' WHERE id = :w"), {"w": work}
     )
-    db.execute(text("UPDATE works SET subtitle = 'x' WHERE id = :w"), {"w": work})
+    db.execute(text("UPDATE sources SET subtitle = 'x' WHERE id = :w"), {"w": work})
     moved = db.execute(
-        text("SELECT updated_at = now() FROM works WHERE id = :w"), {"w": work}
+        text("SELECT updated_at = now() FROM sources WHERE id = :w"), {"w": work}
     ).scalar_one()
     assert moved
 
@@ -254,8 +260,9 @@ def test_existing_lines_keep_their_targets_and_downgrade_keeps_fallbacks(
     command.downgrade(alembic_config, "0001")
     try:
         with engine.begin() as conn:
-            work = _work(conn, "Migration Test")
-            recipe, blend = _recipe(conn, work), _recipe(conn, work, "Biscuit Blend")
+            work = _work(conn, "Migration Test", old=True)
+            recipe = _recipe(conn, work, old=True)
+            blend = _recipe(conn, work, "Biscuit Blend", old=True)
             egg = _insert(conn, "INSERT INTO ingredients (name) VALUES ('migration egg')")
             old_line = (
                 "INSERT INTO recipe_ingredients"
@@ -304,10 +311,10 @@ def test_existing_lines_keep_their_targets_and_downgrade_keeps_fallbacks(
             conn.execute(
                 text(
                     "DELETE FROM ingredient_options WHERE recipe_id IN (SELECT r.id FROM recipes r"
-                    " JOIN works w ON w.id = r.work_id WHERE w.title = 'Migration Test')"
+                    " JOIN sources w ON w.id = r.source_id WHERE w.title = 'Migration Test')"
                 )
             )
-            conn.execute(text("DELETE FROM works WHERE title = 'Migration Test'"))
+            conn.execute(text("DELETE FROM sources WHERE title = 'Migration Test'"))
             conn.execute(text("DELETE FROM ingredients WHERE name = 'migration egg'"))
 
 
@@ -321,12 +328,12 @@ def _author(db: Connection, name: str, kind: str = "person", wikidata_id=None) -
     )
 
 
-def _credit(db: Connection, work_id, author_id, position: int, credited_as: str, role="author"):
+def _credit(db: Connection, source_id, author_id, position: int, credited_as: str, role="author"):
     return _insert(
         db,
-        "INSERT INTO work_credits (work_id, author_id, position, role, credited_as)"
+        "INSERT INTO source_credits (source_id, author_id, position, role, credited_as)"
         " VALUES (:w, :a, :p, :r, :c)",
-        w=work_id,
+        w=source_id,
         a=author_id,
         p=position,
         r=role,
@@ -343,7 +350,8 @@ def test_credits_keep_printed_order_and_name(db: Connection) -> None:
     _credit(db, approach, sarah, 1, "Sarah Ballantyne, PhD")
     credits = db.execute(
         text(
-            "SELECT author_id, credited_as FROM work_credits WHERE work_id = :w ORDER BY position"
+            "SELECT author_id, credited_as FROM source_credits"
+            " WHERE source_id = :w ORDER BY position"
         ),
         {"w": paleo},
     ).all()
@@ -352,7 +360,7 @@ def test_credits_keep_printed_order_and_name(db: Connection) -> None:
         (atk, "America's Test Kitchen"),
     ]
     books = db.execute(
-        text("SELECT count(*) FROM work_credits WHERE author_id = :a"), {"a": sarah}
+        text("SELECT count(*) FROM source_credits WHERE author_id = :a"), {"a": sarah}
     ).scalar_one()
     assert books == 2
 
@@ -376,7 +384,7 @@ def test_author_still_credited_cannot_be_deleted(db: Connection) -> None:
     delete = text("DELETE FROM authors WHERE id = :a")
     _refused(db, lambda: db.execute(delete, {"a": yotam}))
     # Deleting the book takes its credits with it, and frees the author.
-    db.execute(text("DELETE FROM works WHERE id = :w"), {"w": work})
+    db.execute(text("DELETE FROM sources WHERE id = :w"), {"w": work})
     db.execute(delete, {"a": yotam})
 
 
@@ -407,8 +415,8 @@ def test_author_lists_become_credits_and_downgrade_keeps_roles(engine, alembic_c
             def credits(work):
                 rows = conn.execute(
                     text(
-                        "SELECT c.position, c.role, c.credited_as, a.name FROM work_credits c"
-                        " JOIN authors a ON a.id = c.author_id WHERE c.work_id = :w"
+                        "SELECT c.position, c.role, c.credited_as, a.name FROM source_credits c"
+                        " JOIN authors a ON a.id = c.author_id WHERE c.source_id = :w"
                         " ORDER BY c.position"
                     ),
                     {"w": work},
@@ -436,7 +444,7 @@ def test_author_lists_become_credits_and_downgrade_keeps_roles(engine, alembic_c
         engine.dispose()
         command.upgrade(alembic_config, "head")
         with engine.begin() as conn:
-            conn.execute(text("DELETE FROM works WHERE title = ANY(:t)"), {"t": list(titles)})
+            conn.execute(text("DELETE FROM sources WHERE title = ANY(:t)"), {"t": list(titles)})
             conn.execute(text("DELETE FROM authors WHERE name IN ('Michelle Tam', 'Henry Fong')"))
 
 

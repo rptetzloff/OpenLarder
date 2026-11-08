@@ -16,7 +16,7 @@ const loadFailed = ref(false);
 
 onMounted(async () => {
   try {
-    const res = await fetch(`/api/books/${props.id}`);
+    const res = await fetch(`/api/sources/${props.id}`);
     if (!res.ok) throw new Error();
     const b: Book = await res.json();
     book.value = b;
@@ -58,7 +58,7 @@ async function save() {
   saving.value = true;
   try {
     await saveBook(props.id, { ...form.value, editions });
-    location.href = `/books/${props.id}`;
+    location.href = `/sources/${props.id}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     saving.value = false;
@@ -68,7 +68,7 @@ async function save() {
 
 <template>
   <article>
-    <p><a :href="`/books/${id}`">← {{ book?.title ?? "Back to the book" }}</a></p>
+    <p><a :href="`/sources/${id}`">← {{ book?.title ?? "Back to the book" }}</a></p>
     <h1>Edit book</h1>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="form && book" class="recipe-form" @submit.prevent="save">

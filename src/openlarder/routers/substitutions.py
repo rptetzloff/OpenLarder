@@ -29,8 +29,8 @@ class ThingOut(BaseModel):
 
 
 class SourceOut(BaseModel):
-    book_id: uuid.UUID
-    book_title: str
+    source_id: uuid.UUID
+    source_title: str
     edition_id: uuid.UUID
     page: str | None
 
@@ -52,7 +52,10 @@ def swap_out(s: substitutions.Listed) -> SwapOut:
         use=ThingOut(kind=s.use.kind, id=s.use.id, name=s.use.name),
         diet=Diet(id=s.diet[0], name=s.diet[1]) if s.diet else None,
         source=SourceOut(
-            book_id=s.source[0], book_title=s.source[1], edition_id=s.source[2], page=s.source[3]
+            source_id=s.source[0],
+            source_title=s.source[1],
+            edition_id=s.source[2],
+            page=s.source[3],
         )
         if s.source
         else None,

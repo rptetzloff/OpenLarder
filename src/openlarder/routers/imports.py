@@ -1,7 +1,7 @@
 """Bulk import, for admins: read the two lists, then store recipes in batches.
 
 See importer.py for how an import runs and what it flags. Books are added
-through /api/books (by ISBN) and /api/books/manual (without one).
+through /api/sources (by ISBN) and /api/sources/manual (without one).
 """
 
 import uuid
@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from openlarder import importer, isbn
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import ImportRun, ImportRunLine, Recipe, User, Work
+from openlarder.models import ImportRun, ImportRunLine, Recipe, Source, User
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -53,7 +53,7 @@ class Parsed(BaseModel):
 
 class ItemIn(BaseModel):
     row: int
-    work_id: uuid.UUID
+    source_id: uuid.UUID
     isbn13: str | None = None
     title: str
     page: str | None = None
@@ -171,7 +171,7 @@ async def import_recipes(batch: Batch, admin: AdminUser, session: Session) -> Ba
         items.append(
             importer.Item(
                 row=i.row,
-                work_id=i.work_id,
+                source_id=i.source_id,
                 isbn13=isbn13,
                 title=i.title,
                 page=i.page,
@@ -283,8 +283,8 @@ async def run_report(run_id: uuid.UUID, admin: AdminUser, session: Session) -> R
         dict(
             (
                 await session.execute(
-                    select(Recipe.id, Work.title)
-                    .join(Work, Work.id == Recipe.work_id)
+                    select(Recipe.id, Source.title)
+                    .join(Source, Source.id == Recipe.source_id)
                     .where(Recipe.id.in_(recipe_ids))
                 )
             ).all()

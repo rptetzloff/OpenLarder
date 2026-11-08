@@ -17,10 +17,10 @@ async def admin(client, broker, adb):
 
 async def _book(client, title="Heritage", authors=("Moore, Russell (Chef)",), year=2020):
     response = await client.post(
-        "/api/books/manual", json={"title": title, "authors": list(authors), "year": year}
+        "/api/sources/manual", json={"title": title, "authors": list(authors), "year": year}
     )
     assert response.status_code == 200, response.text
-    return (await client.get(f"/api/books/{response.json()['id']}")).json()
+    return (await client.get(f"/api/sources/{response.json()['id']}")).json()
 
 
 def _same(book, **changes):
@@ -46,7 +46,7 @@ def _same(book, **changes):
 
 
 async def _edit(client, book, **changes):
-    return await client.put(f"/api/books/{book['id']}", json=_same(book, **changes))
+    return await client.put(f"/api/sources/{book['id']}", json=_same(book, **changes))
 
 
 async def _names(adb):
@@ -57,10 +57,10 @@ async def test_title_and_subtitle_change(admin, client) -> None:
     book = await _book(admin)
     response = await _edit(admin, book, title="  The Heritage  Cookbook ", subtitle="Recipes")
     assert response.status_code == 200, response.text
-    shown = (await client.get(f"/api/books/{book['id']}")).json()
+    shown = (await client.get(f"/api/sources/{book['id']}")).json()
     assert (shown["title"], shown["subtitle"]) == ("The Heritage Cookbook", "Recipes")
     await _edit(admin, shown, subtitle="  ")
-    assert (await client.get(f"/api/books/{book['id']}")).json()["subtitle"] is None
+    assert (await client.get(f"/api/sources/{book['id']}")).json()["subtitle"] is None
 
 
 async def test_a_book_needs_a_title(admin) -> None:
@@ -74,7 +74,7 @@ async def test_renaming_a_credit_fixes_the_author_too(admin, adb, client) -> Non
     author = book["credits"][0]["author_id"]
     credits = [{"author_id": author, "name": "Russell Moore", "role": "author"}]
     assert (await _edit(admin, book, credits=credits)).status_code == 200
-    shown = (await client.get(f"/api/books/{book['id']}")).json()
+    shown = (await client.get(f"/api/sources/{book['id']}")).json()
     assert [(c["author_id"], c["credited_as"]) for c in shown["credits"]] == [
         (author, "Russell Moore")
     ]
@@ -111,7 +111,7 @@ async def test_credits_are_added_reordered_and_removed(admin, adb, client) -> No
         {"author_id": yotam, "name": "Yotam Ottolenghi", "role": "author"},
     ]
     assert (await _edit(admin, book, credits=credits)).status_code == 200
-    shown = (await client.get(f"/api/books/{book['id']}")).json()
+    shown = (await client.get(f"/api/sources/{book['id']}")).json()
     assert [(c["credited_as"], c["role"]) for c in shown["credits"]] == [
         ("Jonathan Lovekin", "photographer"),
         ("Yotam Ottolenghi", "author"),
@@ -143,7 +143,7 @@ async def test_a_bad_credit_is_refused(admin, adb, client, credit, reason) -> No
     response = await _edit(admin, book, credits=[credit])
     assert response.status_code == 422
     assert reason in response.json()["detail"]
-    shown = (await client.get(f"/api/books/{book['id']}")).json()
+    shown = (await client.get(f"/api/sources/{book['id']}")).json()
     assert [c["credited_as"] for c in shown["credits"]] == ["Moore, Russell (Chef)"]
 
 
@@ -182,7 +182,7 @@ async def test_an_edition_changes(admin, client) -> None:
         }
     ]
     assert (await _edit(admin, book, editions=editions)).status_code == 200
-    shown = (await client.get(f"/api/books/{book['id']}")).json()["editions"][0]
+    shown = (await client.get(f"/api/sources/{book['id']}")).json()["editions"][0]
     assert (shown["title"], shown["publisher"], shown["published_year"]) == (
         "Heritage (UK)",
         "Ten Speed",
@@ -192,7 +192,7 @@ async def test_an_edition_changes(admin, client) -> None:
     for same in ("Heritage", ""):
         editions[0]["title"] = same
         await _edit(admin, book, editions=editions)
-        shown = (await client.get(f"/api/books/{book['id']}")).json()["editions"][0]
+        shown = (await client.get(f"/api/sources/{book['id']}")).json()["editions"][0]
         assert shown["title"] is None
 
 
@@ -219,7 +219,7 @@ async def test_only_admins_edit_books(admin, adb) -> None:
 
 async def test_an_unknown_book_is_a_404(admin) -> None:
     book = await _book(admin)
-    response = await admin.put(f"/api/books/{uuid.uuid4()}", json=_same(book))
+    response = await admin.put(f"/api/sources/{uuid.uuid4()}", json=_same(book))
     assert response.status_code == 404
 
 
@@ -244,16 +244,16 @@ async def test_books_are_found_by_title_subtitle_or_credit(admin, client) -> Non
     await _edit(admin, camino, subtitle="Recipes from the Oakland restaurant")
     await _book(admin, title="100% Rye", authors=[])
     titles = lambda r: [b["title"] for b in r.json()]  # noqa: E731
-    assert titles(await client.get("/api/books", params={"q": "PLENTY"})) == ["Plenty"]
-    assert titles(await client.get("/api/books", params={"q": "lovekin"})) == ["Plenty"]
-    assert titles(await client.get("/api/books", params={"q": "oakland"})) == ["This Is Camino"]
+    assert titles(await client.get("/api/sources", params={"q": "PLENTY"})) == ["Plenty"]
+    assert titles(await client.get("/api/sources", params={"q": "lovekin"})) == ["Plenty"]
+    assert titles(await client.get("/api/sources", params={"q": "oakland"})) == ["This Is Camino"]
     # Every word, wherever it is.
-    assert titles(await client.get("/api/books", params={"q": "camino moore"})) == [
+    assert titles(await client.get("/api/sources", params={"q": "camino moore"})) == [
         "This Is Camino"
     ]
-    assert titles(await client.get("/api/books", params={"q": "camino lovekin"})) == []
-    assert titles(await client.get("/api/books", params={"q": "%"})) == ["100% Rye"]
-    assert titles(await client.get("/api/books", params={"q": "  "})) == [
+    assert titles(await client.get("/api/sources", params={"q": "camino lovekin"})) == []
+    assert titles(await client.get("/api/sources", params={"q": "%"})) == ["100% Rye"]
+    assert titles(await client.get("/api/sources", params={"q": "  "})) == [
         "100% Rye",
         "Plenty",
         "This Is Camino",
@@ -263,6 +263,6 @@ async def test_books_are_found_by_title_subtitle_or_credit(admin, client) -> Non
 async def test_a_picker_asks_for_a_few(admin, client) -> None:
     for title in ("Bread A", "Bread B", "Bread C"):
         await _book(admin, title=title, authors=[])
-    found = await client.get("/api/books", params={"q": "bread", "limit": 2})
+    found = await client.get("/api/sources", params={"q": "bread", "limit": 2})
     assert [b["title"] for b in found.json()] == ["Bread A", "Bread B"]
-    assert (await client.get("/api/books", params={"limit": 51})).status_code == 422
+    assert (await client.get("/api/sources", params={"limit": 51})).status_code == 422

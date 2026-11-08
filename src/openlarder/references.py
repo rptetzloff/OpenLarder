@@ -26,23 +26,23 @@ from openlarder.models import (
     Recipe,
     RecipeFlag,
     RecipeIngredient,
-    RecipePage,
+    RecipeLocation,
 )
 
 REFERENCE_KINDS = (FlagKind.REFERENCE_PAGE.value, FlagKind.UNKNOWN_REFERENCE.value)
 
 
-async def relink(session: AsyncSession, work_id: uuid.UUID) -> None:
+async def relink(session: AsyncSession, source_id: uuid.UUID) -> None:
     titles = {
         recipe_id: title
         for recipe_id, title in await session.execute(
-            select(Recipe.id, Recipe.title).where(Recipe.work_id == work_id)
+            select(Recipe.id, Recipe.title).where(Recipe.source_id == source_id)
         )
     }
     pages: dict[uuid.UUID, set[str]] = defaultdict(set)
     for recipe_id, page in await session.execute(
-        select(RecipePage.recipe_id, RecipePage.page).where(
-            RecipePage.work_id == work_id, RecipePage.page.is_not(None)
+        select(RecipeLocation.recipe_id, RecipeLocation.page).where(
+            RecipeLocation.source_id == source_id, RecipeLocation.page.is_not(None)
         )
     ):
         pages[recipe_id].add(page)
@@ -55,7 +55,7 @@ async def relink(session: AsyncSession, work_id: uuid.UUID) -> None:
     for option in await session.scalars(
         select(IngredientOption)
         .join(Recipe, Recipe.id == IngredientOption.recipe_id)
-        .where(Recipe.work_id == work_id)
+        .where(Recipe.source_id == source_id)
         .order_by(IngredientOption.rank)
     ):
         existing[option.recipe_ingredient_id].append(option)
@@ -64,7 +64,7 @@ async def relink(session: AsyncSession, work_id: uuid.UUID) -> None:
     for line in await session.scalars(
         select(RecipeIngredient)
         .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
-        .where(Recipe.work_id == work_id)
+        .where(Recipe.source_id == source_id)
     ):
         wanted = []
         for option in lines.options(line.original_text):
@@ -94,7 +94,7 @@ async def relink(session: AsyncSession, work_id: uuid.UUID) -> None:
         await session.execute(
             select(RecipeFlag)
             .join(Recipe, Recipe.id == RecipeFlag.recipe_id)
-            .where(Recipe.work_id == work_id, RecipeFlag.kind.in_(REFERENCE_KINDS))
+            .where(Recipe.source_id == source_id, RecipeFlag.kind.in_(REFERENCE_KINDS))
         )
     ).scalars()
     seen = set()
@@ -107,7 +107,7 @@ async def relink(session: AsyncSession, work_id: uuid.UUID) -> None:
         session.add(RecipeFlag(recipe_id=recipe_id, kind=kind, detail=detail))
     await session.flush()
     # Options just written, and any never matched, get their ingredients.
-    await ingredients.match_book(session, work_id)
+    await ingredients.match_book(session, source_id)
 
 
 async def release(session: AsyncSession, recipe_id: uuid.UUID) -> None:

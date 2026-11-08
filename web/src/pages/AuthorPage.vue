@@ -101,8 +101,8 @@ onMounted(load);
 
       <h2>Books</h2>
       <ul class="book-list">
-        <li v-for="b in author.books" :key="b.id">
-          <a :href="`/books/${b.id}`" class="book-card">
+        <li v-for="b in author.sources" :key="b.id">
+          <a :href="`/sources/${b.id}`" class="book-card">
             <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" />
             <span v-else class="no-cover" aria-hidden="true"></span>
             <span>
@@ -122,7 +122,7 @@ onMounted(load);
           <li v-for="c in author.coauthors" :key="c.id">
             <a :href="`/authors/${c.id}`">{{ c.name }}</a>
             <span class="page-ref">
-              {{ c.books }} {{ c.books === 1 ? "book" : "books" }} together
+              {{ c.sources }} {{ c.sources === 1 ? "book" : "books" }} together
             </span>
           </li>
         </ul>

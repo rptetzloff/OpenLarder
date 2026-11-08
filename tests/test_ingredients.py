@@ -61,9 +61,9 @@ def test_the_key_spelled_out(name, key) -> None:
 
 @pytest.fixture
 async def work(adb):
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Pink Cake') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     await adb.execute(
-        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": E, "w": work}
+        text("INSERT INTO editions (id, source_id) VALUES (:id, :w)"), {"id": E, "w": work}
     )
     return work
 
@@ -77,7 +77,7 @@ async def admin(client, broker, adb):
 
 async def _add(client, work, title, page, ingredients):
     response = await client.post(
-        f"/api/books/{work}/recipes",
+        f"/api/sources/{work}/recipes",
         json={
             "title": title,
             "editions": [{"edition_id": str(E), "page": page}],
@@ -136,14 +136,14 @@ async def test_a_name_with_no_letters_is_left_unmatched(admin, work, adb) -> Non
 
 
 async def test_an_ingredient_is_shared_across_books(admin, work, adb) -> None:
-    other = await adb.scalar(text("INSERT INTO works (title) VALUES ('Other') RETURNING id"))
+    other = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Other') RETURNING id"))
     edition = uuid.uuid4()
     await adb.execute(
-        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": edition, "w": other}
+        text("INSERT INTO editions (id, source_id) VALUES (:id, :w)"), {"id": edition, "w": other}
     )
     await _add(admin, work, "Cake", "1", ["Butter"])
     response = await admin.post(
-        f"/api/books/{other}/recipes",
+        f"/api/sources/{other}/recipes",
         json={
             "title": "Toast",
             "editions": [{"edition_id": str(edition)}],
@@ -210,7 +210,7 @@ async def test_an_ingredient_lists_its_recipes_with_book_and_page(admin, work, c
     shown = (await client.get(f"/api/ingredients/{sugar['id']}")).json()
     assert shown["name"] == "Sugar"
     assert shown["total"] == 2
-    assert [(r["title"], r["book_title"], r["pages"]) for r in shown["recipes"]] == [
+    assert [(r["title"], r["source_title"], r["pages"]) for r in shown["recipes"]] == [
         ("Apple Pie", "Pink Cake", ["90"]),
         ("Rhubarb Cake", "Pink Cake", ["112"]),
     ]

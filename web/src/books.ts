@@ -1,4 +1,4 @@
-// What /api/books returns, and adding a book by ISBN.
+// What /api/sources returns, and adding a book by ISBN.
 
 export interface BookSummary {
   id: string;
@@ -35,19 +35,19 @@ export interface Book {
 // Resolves to the book's ID, whether it was added now or was already here
 // (`existing`), or rejects with a reason to show beside the field.
 export async function addByIsbn(isbn: string): Promise<{ id: string; existing: boolean }> {
-  const res = await fetch("/api/books", {
+  const res = await fetch("/api/sources", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ isbn }),
   });
   const body = await res.json().catch(() => ({}));
   if (res.status === 201) return { id: body.id, existing: false };
-  if (res.status === 409 && body.detail?.work_id) return { id: body.detail.work_id, existing: true };
+  if (res.status === 409 && body.detail?.source_id) return { id: body.detail.source_id, existing: true };
   const detail = typeof body.detail === "string" ? body.detail : "That didn't work. Try again.";
   throw new Error(detail);
 }
 
-// What linking a book to Open Library would do; see routers/books.py.
+// What linking a book to Open Library would do; see routers/sources.py.
 export interface LinkPreview {
   open_library_url: string | null;
   title: string;
@@ -83,11 +83,11 @@ async function post(path: string, reference: string) {
 }
 
 export async function previewLink(bookId: string, reference: string): Promise<LinkPreview> {
-  return post(`/api/books/${bookId}/open-library/preview`, reference);
+  return post(`/api/sources/${bookId}/open-library/preview`, reference);
 }
 
 export async function linkToOpenLibrary(bookId: string, reference: string): Promise<void> {
-  await post(`/api/books/${bookId}/open-library`, reference);
+  await post(`/api/sources/${bookId}/open-library`, reference);
 }
 
 // What the edit form sends: credits in order, each naming an author already
@@ -100,7 +100,7 @@ export interface BookIn {
 }
 
 export async function saveBook(bookId: string, body: BookIn): Promise<void> {
-  const res = await fetch(`/api/books/${bookId}`, {
+  const res = await fetch(`/api/sources/${bookId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -114,7 +114,7 @@ export async function saveBook(bookId: string, body: BookIn): Promise<void> {
 // A few books with every word of q in the title, subtitle or a credited
 // name, for type-to-find pickers.
 export async function findBooks(q: string, limit = 8): Promise<BookSummary[]> {
-  const res = await fetch(`/api/books?${new URLSearchParams({ q, limit: String(limit) })}`);
+  const res = await fetch(`/api/sources?${new URLSearchParams({ q, limit: String(limit) })}`);
   if (!res.ok) throw new Error("The books couldn't be searched.");
   return res.json();
 }
@@ -132,7 +132,7 @@ export interface Difference {
 export async function checkOpenLibrary(
   bookId: string,
 ): Promise<{ open_library_url: string; differences: Difference[] }> {
-  const res = await fetch(`/api/books/${bookId}/open-library/check`, { method: "POST" });
+  const res = await fetch(`/api/sources/${bookId}/open-library/check`, { method: "POST" });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
   return body;
@@ -143,7 +143,7 @@ export async function takeFromOpenLibrary(
   bookId: string,
   keys: string[],
 ): Promise<{ taken: number; differences: Difference[] }> {
-  const res = await fetch(`/api/books/${bookId}/open-library/take`, {
+  const res = await fetch(`/api/sources/${bookId}/open-library/take`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ keys }),

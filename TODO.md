@@ -34,7 +34,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 - [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
       book or a blog or an instagram post or a tv episode or a magazine
-      article".* Decided (Ray, 2026-11-08):
+      article".* **Step 1 done (#55):** books are sources, the only kind so
+      far. Next: web sources with the archive link; then the other kinds;
+      then private recipes and sharing. Decided (Ray, 2026-11-08):
       - **Every kind people document is offered**: books, magazines, blogs
         and websites, social media posts, TV and video. Social media is one
         generic kind, an account's post by address, not a kind per
@@ -149,6 +151,9 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Books become sources: tables, API (`/api/sources`) and pages
+      (`/sources/…`; old `/books/…` links redirect); books the only kind so
+      far (#55)
 - [x] Check Open Library: a book's differences from Open Library now, taking
       only those ticked; Open Library's names cleaned on the way in; test
       queries time out (#53)

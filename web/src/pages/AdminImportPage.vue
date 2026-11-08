@@ -93,7 +93,7 @@ async function run() {
       progress.value.recipes++;
       continue;
     }
-    placed.push({ ...r, work_id: work.id, isbn13: work.isbn13 });
+    placed.push({ ...r, source_id: work.id, isbn13: work.isbn13 });
   }
   const byRow = new Map(p.recipes.map((r) => [r.row, r]));
   for (let i = 0; i < placed.length; i += BATCH) {
@@ -103,7 +103,7 @@ async function run() {
         runId.value,
         batch.map((r) => ({
           row: r.row,
-          work_id: r.work_id,
+          source_id: r.source_id,
           isbn13: r.isbn13,
           title: r.title,
           page: r.page,

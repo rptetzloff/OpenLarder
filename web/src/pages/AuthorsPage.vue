@@ -44,7 +44,7 @@ onMounted(() => load());
 
 <template>
   <article>
-    <p><a href="/books">← Books</a></p>
+    <p><a href="/sources">← Books</a></p>
     <h1>Authors</h1>
     <div class="isbn-form">
       <label for="author-filter">Find an author</label>
@@ -70,7 +70,7 @@ onMounted(() => load());
       <ul class="recipe-list">
         <li v-for="a in authors" :key="a.id">
           <a :href="`/authors/${a.id}`">{{ a.name }}</a>
-          <span class="page-ref">{{ a.books }} {{ a.books === 1 ? "book" : "books" }}</span>
+          <span class="page-ref">{{ a.sources }} {{ a.sources === 1 ? "book" : "books" }}</span>
         </li>
       </ul>
       <button

@@ -22,8 +22,8 @@ from openlarder.models import (
     IngredientOption,
     Recipe,
     RecipeIngredient,
-    RecipePage,
-    Work,
+    RecipeLocation,
+    Source,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
 
@@ -76,7 +76,7 @@ class PageOut(BaseModel):
     page: str | None
 
 
-class BookRef(BaseModel):
+class SourceRef(BaseModel):
     id: uuid.UUID
     title: str
 
@@ -108,7 +108,7 @@ class LineOut(BaseModel):
 class RecipeOut(BaseModel):
     id: uuid.UUID
     title: str
-    book: BookRef
+    source: SourceRef
     pages: list[PageOut]
     # The lines as typed, which is what the edit form edits.
     ingredients: list[str]
@@ -141,12 +141,12 @@ async def _recipe_or_404(session, recipe_id: uuid.UUID) -> Recipe:
 
 
 async def _out(session, recipe: Recipe) -> RecipeOut:
-    work = await session.get(Work, recipe.work_id)
+    work = await session.get(Source, recipe.source_id)
     pages = (
         await session.execute(
-            select(RecipePage.page, Edition)
-            .join(Edition, Edition.id == RecipePage.edition_id)
-            .where(RecipePage.recipe_id == recipe.id)
+            select(RecipeLocation.page, Edition)
+            .join(Edition, Edition.id == RecipeLocation.edition_id)
+            .where(RecipeLocation.recipe_id == recipe.id)
             .order_by(Edition.published_year.desc().nulls_last(), Edition.isbn13)
         )
     ).all()
@@ -193,7 +193,7 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
     return RecipeOut(
         id=recipe.id,
         title=recipe.title,
-        book=BookRef(id=work.id, title=work.title),
+        source=SourceRef(id=work.id, title=work.title),
         pages=[
             PageOut(
                 edition_id=e.id,
@@ -234,22 +234,22 @@ async def get_recipe(recipe_id: uuid.UUID, session: Session) -> RecipeOut:
 
 
 @router.post(
-    "/api/books/{work_id}/recipes",
+    "/api/sources/{source_id}/recipes",
     response_model=Created,
     status_code=status.HTTP_201_CREATED,
     dependencies=[SameOrigin],
 )
 async def add_recipe(
-    work_id: uuid.UUID, body: RecipeIn, admin: AdminUser, session: Session
+    source_id: uuid.UUID, body: RecipeIn, admin: AdminUser, session: Session
 ) -> Created:
-    if await session.get(Work, work_id) is None:
+    if await session.get(Source, source_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     entry = _clean(body)
     try:
-        recipe = await recipes.create(session, work_id, entry)
+        recipe = await recipes.create(session, source_id, entry)
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
-    await references.relink(session, work_id)
+    await references.relink(session, source_id)
     await session.commit()
     return Created(id=recipe.id)
 
@@ -264,7 +264,7 @@ async def change_recipe(
         await recipes.replace(session, recipe, entry)
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
-    await references.relink(session, recipe.work_id)
+    await references.relink(session, recipe.source_id)
     await session.commit()
     return await _out(session, recipe)
 
@@ -276,10 +276,10 @@ async def change_recipe(
 )
 async def remove_recipe(recipe_id: uuid.UUID, admin: AdminUser, session: Session) -> Response:
     recipe = await _recipe_or_404(session, recipe_id)
-    work_id = recipe.work_id
+    source_id = recipe.source_id
     await references.release(session, recipe.id)
     await session.delete(recipe)
     await session.flush()
-    await references.relink(session, work_id)
+    await references.relink(session, source_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

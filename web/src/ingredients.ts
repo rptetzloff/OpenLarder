@@ -21,7 +21,7 @@ export interface Ingredient {
   // Broader and narrower: cheese above cheddar, aged cheddar below it.
   parent: { id: string; name: string } | null;
   children: { id: string; name: string }[];
-  recipes: { id: string; title: string; book_id: string; book_title: string; pages: string[] }[];
+  recipes: { id: string; title: string; source_id: string; source_title: string; pages: string[] }[];
   total: number;
   // Recipes using it or anything under it, as search counts them.
   family_total: number;
@@ -92,12 +92,12 @@ export async function deleteAlias(id: string, aliasId: string): Promise<void> {
 }
 
 export interface SearchResult {
-  // The books searched within, if any were.
-  books: Named[];
+  // The sources searched within, if any were.
+  sources: Named[];
   ingredients: Named[];
   // IDs in the search that name no ingredient now, as after a merge.
   missing: string[];
-  missing_books: string[];
+  missing_sources: string[];
   // The title words searched for.
   q: string;
   // With ingredients: how many of the recipe's lines you have, of how many,
@@ -114,11 +114,11 @@ export interface SearchResult {
 // title words and books.
 export async function searchRecipes(
   ids: string[],
-  { offset = 0, books = [], q = "" }: { offset?: number; books?: string[]; q?: string } = {},
+  { offset = 0, sources = [], q = "" }: { offset?: number; sources?: string[]; q?: string } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
   if (q.trim()) query.set("q", q.trim());
-  for (const book of books) query.append("book", book);
+  for (const source of sources) query.append("source", source);
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

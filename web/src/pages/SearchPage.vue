@@ -34,7 +34,8 @@ async function run(more = false) {
   const url = new URL(location.href);
   url.searchParams.delete("i");
   url.searchParams.delete("book");
-  for (const id of books) url.searchParams.append("book", id);
+  url.searchParams.delete("source");
+  for (const id of books) url.searchParams.append("source", id);
   for (const id of ids) url.searchParams.append("i", id);
   if (title.value.trim()) url.searchParams.set("q", title.value.trim());
   else url.searchParams.delete("q");
@@ -47,7 +48,7 @@ async function run(more = false) {
   loading.value = true;
   try {
     const offset = more ? (result.value?.recipes.length ?? 0) : 0;
-    const page = await searchRecipes(ids, { offset, books, q: title.value });
+    const page = await searchRecipes(ids, { offset, sources: books, q: title.value });
     if (mine !== asked) return;
     if (more && result.value) result.value.recipes.push(...page.recipes);
     else result.value = page;
@@ -143,22 +144,22 @@ function where(r: SearchResult["recipes"][number]) {
 
 onMounted(async () => {
   const ids = params.getAll("i").slice(0, MAX_INGREDIENTS);
-  const books = params.getAll("book").slice(0, MAX_BOOKS);
+  const books = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_BOOKS);
   try {
     if (!ids.length && !title.value.trim()) {
       // Books, before anything to search by: their names are all to show.
       for (const id of books) {
-        const res = await fetch(`/api/books/${id}`);
+        const res = await fetch(`/api/sources/${id}`);
         if (res.ok) shelf.value.push({ id, name: (await res.json()).title });
       }
       if (shelf.value.length < books.length) run();
       return;
     }
     // The search names the ingredients and books, so a link needs only IDs.
-    const page = await searchRecipes(ids, { books, q: title.value });
+    const page = await searchRecipes(ids, { sources: books, q: title.value });
     chosen.value = page.ingredients;
-    shelf.value = page.books;
-    missing.value = page.missing.length + page.missing_books.length;
+    shelf.value = page.sources;
+    missing.value = page.missing.length + page.missing_sources.length;
     result.value = page;
     if (missing.value) run();
   } catch {
@@ -247,7 +248,7 @@ onMounted(async () => {
     </div>
     <ul v-if="shelf.length" class="chosen" aria-label="Books">
       <li v-for="b in shelf" :key="b.id">
-        <a :href="`/books/${b.id}`">{{ b.name }}</a>
+        <a :href="`/sources/${b.id}`">{{ b.name }}</a>
         <button type="button" class="link" :aria-label="`Remove ${b.name}`" @click="dropBook(b.id)">
           ×
         </button>
@@ -281,7 +282,7 @@ onMounted(async () => {
         <li v-for="r in result.recipes" :key="r.id">
           <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
           <span class="page-ref">
-            <a :href="`/books/${r.book_id}`">{{ r.book_title }}</a>{{ where(r) }}
+            <a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a>{{ where(r) }}
           </span>
           <span v-if="r.lines !== null" class="match">
             <template v-if="!r.needs.length">You have everything it lists.</template>

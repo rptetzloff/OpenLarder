@@ -49,13 +49,13 @@ async def admin(client, broker, adb, openlib):
 
 
 async def _pink_cake(client):
-    response = await client.post("/api/books", json={"isbn": PINK_CAKE})
+    response = await client.post("/api/sources", json={"isbn": PINK_CAKE})
     assert response.status_code == 201, response.text
     return response.json()["id"]
 
 
 async def _check(client, book):
-    return await client.post(f"/api/books/{book}/open-library/check")
+    return await client.post(f"/api/sources/{book}/open-library/check")
 
 
 def _diffs(response):
@@ -108,26 +108,26 @@ async def test_a_check_lists_what_changed_there(admin, openlib, adb) -> None:
     assert diffs["edition.cover"]["cover"] is True
     assert diffs["edition.cover"]["theirs"].endswith("999-M.jpg")
     # A check changes nothing.
-    assert await adb.scalar(text("SELECT title FROM works")) == "Love Is a Pink Cake"
+    assert await adb.scalar(text("SELECT title FROM sources")) == "Love Is a Pink Cake"
 
 
 async def test_only_what_is_ticked_is_taken(admin, openlib, adb) -> None:
     book = await _pink_cake(admin)
     # Fixed here, which Open Library doesn't say.
-    await adb.execute(text("UPDATE works SET title = 'Love Is A Pink Cake'"))
+    await adb.execute(text("UPDATE sources SET title = 'Love Is A Pink Cake'"))
     openlib.records[PTAK]["name"] = "Ptak, Claire Louise"
     openlib.records[EDITION]["publishers"] = ["W. W. Norton"]
     keys = {d["key"] for d in (await _check(admin, book)).json()["differences"]}
     name_key = next(k for k in keys if k.endswith(":name"))
     response = await admin.post(
-        f"/api/books/{book}/open-library/take", json={"keys": [name_key, "not-a-key"]}
+        f"/api/sources/{book}/open-library/take", json={"keys": [name_key, "not-a-key"]}
     )
     assert response.status_code == 200, response.text
     assert response.json()["taken"] == 1
     # What's left is what wasn't ticked.
     assert {d["key"] for d in response.json()["differences"]} == keys - {name_key}
     assert await adb.scalar(text("SELECT name FROM authors")) == "Claire Louise Ptak"
-    assert await adb.scalar(text("SELECT title FROM works")) == "Love Is A Pink Cake"
+    assert await adb.scalar(text("SELECT title FROM sources")) == "Love Is A Pink Cake"
     publisher = await adb.scalar(text("SELECT publisher FROM editions"))
     assert publisher != "W. W. Norton"
 
@@ -141,8 +141,8 @@ async def test_taking_the_credits_follows_open_library(admin, openlib, adb, clie
         "Claire Ptak",
         "Claire Ptak, Norton",
     )
-    await admin.post(f"/api/books/{book}/open-library/take", json={"keys": ["credits"]})
-    shown = (await client.get(f"/api/books/{book}")).json()
+    await admin.post(f"/api/sources/{book}/open-library/take", json={"keys": ["credits"]})
+    shown = (await client.get(f"/api/sources/{book}")).json()
     assert [c["credited_as"] for c in shown["credits"]] == ["Claire Ptak", "Norton"]
     kind = await adb.scalar(text("SELECT kind FROM authors WHERE open_library_author_id = 'OL1A'"))
     assert kind == "organisation"
@@ -152,17 +152,17 @@ async def test_an_author_dropped_there_goes_when_credits_are_taken(
     admin, openlib, client, adb
 ) -> None:
     book = await _pink_cake(admin)
-    shown = (await client.get(f"/api/books/{book}")).json()
+    shown = (await client.get(f"/api/sources/{book}")).json()
     credits = [
         {"author_id": shown["credits"][0]["author_id"], "name": "Claire Ptak", "role": "author"}
     ]
     credits.append({"name": "Someone Added Here", "role": "photographer"})
     await admin.put(
-        f"/api/books/{book}", json={"title": shown["title"], "credits": credits, "editions": []}
+        f"/api/sources/{book}", json={"title": shown["title"], "credits": credits, "editions": []}
     )
     diffs = _diffs(await _check(admin, book))
     assert diffs["credits"]["ours"] == "Claire Ptak, Someone Added Here"
-    await admin.post(f"/api/books/{book}/open-library/take", json={"keys": ["credits"]})
+    await admin.post(f"/api/sources/{book}/open-library/take", json={"keys": ["credits"]})
     # Credited nowhere now, with no outside record: gone, not just unlisted.
     names = (await adb.scalars(text("SELECT name FROM authors ORDER BY name"))).all()
     assert names == ["Claire Ptak"]
@@ -200,7 +200,7 @@ async def test_what_open_library_lacks_is_not_offered_as_a_blank(admin, openlib,
 
 
 async def test_a_book_not_from_open_library_cant_be_checked(admin) -> None:
-    added = await admin.post("/api/books/manual", json={"title": "Family Recipes", "authors": []})
+    added = await admin.post("/api/sources/manual", json={"title": "Family Recipes", "authors": []})
     response = await _check(admin, added.json()["id"])
     assert response.status_code == 409
 
@@ -215,22 +215,22 @@ async def test_open_library_failing_changes_nothing(admin, openlib, adb, fail, s
         del openlib.records[WORK]
     for path in ("check", "take"):
         response = await admin.post(
-            f"/api/books/{book}/open-library/{path}", json={"keys": ["title"]}
+            f"/api/sources/{book}/open-library/{path}", json={"keys": ["title"]}
         )
         assert response.status_code == status
-    assert await adb.scalar(text("SELECT title FROM works")) == "Love Is a Pink Cake"
+    assert await adb.scalar(text("SELECT title FROM sources")) == "Love Is a Pink Cake"
 
 
 async def test_only_admins_check(admin, adb) -> None:
     book = await _pink_cake(admin)
     await adb.execute(text("UPDATE users SET is_admin = false"))
     assert (await _check(admin, book)).status_code == 403
-    take = await admin.post(f"/api/books/{book}/open-library/take", json={"keys": []})
+    take = await admin.post(f"/api/sources/{book}/open-library/take", json={"keys": []})
     assert take.status_code == 403
 
 
 async def test_a_new_open_library_author_is_cleaned_when_added(admin, openlib, client) -> None:
     openlib.records[PTAK]["name"] = "Ptak, Claire (Baker)"
     book = await _pink_cake(admin)
-    shown = (await client.get(f"/api/books/{book}")).json()
+    shown = (await client.get(f"/api/sources/{book}")).json()
     assert [c["credited_as"] for c in shown["credits"]] == ["Claire Ptak"]

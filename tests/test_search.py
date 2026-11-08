@@ -12,9 +12,9 @@ E = uuid.uuid4()
 
 @pytest.fixture
 async def work(adb):
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Pink Cake') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     await adb.execute(
-        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": E, "w": work}
+        text("INSERT INTO editions (id, source_id) VALUES (:id, :w)"), {"id": E, "w": work}
     )
     return work
 
@@ -28,7 +28,7 @@ async def admin(client, broker, adb):
 
 async def _add(client, work, title, page, ingredients):
     response = await client.post(
-        f"/api/books/{work}/recipes",
+        f"/api/sources/{work}/recipes",
         json={
             "title": title,
             "editions": [{"edition_id": str(E), "page": page}],
@@ -184,7 +184,7 @@ async def test_results_come_in_pages(admin, work, adb, client, monkeypatch) -> N
 async def test_a_search_has_limits(client) -> None:
     assert (await client.get("/api/search")).status_code == 422
     ids = lambda n: [str(uuid.uuid4()) for _ in range(n)]  # noqa: E731
-    for name, most in (("ingredient", 30), ("book", 10)):
+    for name, most in (("ingredient", 30), ("source", 10)):
         extra = {} if name == "ingredient" else {"q": "cake"}
         ok = await client.get("/api/search", params={name: ids(most), **extra})
         assert ok.status_code == 200
@@ -202,24 +202,24 @@ async def test_a_page_not_recorded_is_left_off(admin, work, adb, client) -> None
 
 
 async def _other_book(adb):
-    other = await adb.scalar(text("INSERT INTO works (title) VALUES ('Plenty') RETURNING id"))
+    other = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Plenty') RETURNING id"))
     edition = uuid.uuid4()
     await adb.execute(
-        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": edition, "w": other}
+        text("INSERT INTO editions (id, source_id) VALUES (:id, :w)"), {"id": edition, "w": other}
     )
     return other, edition
 
 
 async def test_a_search_can_stay_in_some_books(admin, work, adb, client) -> None:
     other, edition = await _other_book(adb)
-    third = await adb.scalar(text("INSERT INTO works (title) VALUES ('Jerusalem') RETURNING id"))
+    third = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Jerusalem') RETURNING id"))
     await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb", "Egg"])
     for book, title in ((other, "Rhubarb Salad"), (third, "Rhubarb Tart")):
         edition = await adb.scalar(
-            text("INSERT INTO editions (work_id) VALUES (:w) RETURNING id"), {"w": book}
+            text("INSERT INTO editions (source_id) VALUES (:w) RETURNING id"), {"w": book}
         )
         response = await admin.post(
-            f"/api/books/{book}/recipes",
+            f"/api/sources/{book}/recipes",
             json={
                 "title": title,
                 "editions": [{"edition_id": str(edition), "page": "9"}],
@@ -229,9 +229,9 @@ async def test_a_search_can_stay_in_some_books(admin, work, adb, client) -> None
         assert response.status_code == 201
     rhubarb = await _id(adb, "Rhubarb")
     everywhere = await _search(client, rhubarb)
-    assert (everywhere["books"], everywhere["total"]) == ([], 3)
-    found = await _search(client, rhubarb, book=[str(third), str(other)])
-    assert found["books"] == [
+    assert (everywhere["sources"], everywhere["total"]) == ([], 3)
+    found = await _search(client, rhubarb, source=[str(third), str(other)])
+    assert found["sources"] == [
         {"id": str(third), "name": "Jerusalem"},
         {"id": str(other), "name": "Plenty"},
     ]
@@ -242,8 +242,8 @@ async def test_a_search_can_stay_in_some_books(admin, work, adb, client) -> None
 async def test_an_unknown_book_is_reported_and_left_out(admin, work, adb, client) -> None:
     await _add(admin, work, "Cake", "1", ["Egg"])
     gone = uuid.uuid4()
-    found = await _search(client, await _id(adb, "Egg"), book=[str(gone), str(work)])
-    assert (found["missing_books"], [b["name"] for b in found["books"]]) == (
+    found = await _search(client, await _id(adb, "Egg"), source=[str(gone), str(work)])
+    assert (found["missing_sources"], [b["name"] for b in found["sources"]]) == (
         [str(gone)],
         ["Pink Cake"],
     )
@@ -258,14 +258,14 @@ async def test_a_book_lists_the_ingredients_it_uses_most(admin, work, adb, clien
     await _add(admin, work, "D", "4", ["Margarine"])
     for title in ("X", "Y", "Z"):
         await admin.post(
-            f"/api/books/{other}/recipes",
+            f"/api/sources/{other}/recipes",
             json={
                 "title": title,
                 "editions": [{"edition_id": str(edition)}],
                 "ingredients": ["Flour"],
             },
         )
-    book = (await client.get(f"/api/books/{work}")).json()
+    book = (await client.get(f"/api/sources/{work}")).json()
     # Counted in this book only, each recipe once; a tie goes by name.
     assert [(i["name"], i["recipes"]) for i in book["ingredients"]] == [
         ("Butter", 2),
@@ -278,7 +278,7 @@ async def test_a_book_lists_the_ingredients_it_uses_most(admin, work, adb, clien
 
 async def test_a_book_shows_its_thirty_most_used(admin, work, client) -> None:
     await _add(admin, work, "A", "1", [f"Spice {n:02}" for n in range(35)])
-    book = (await client.get(f"/api/books/{work}")).json()
+    book = (await client.get(f"/api/sources/{work}")).json()
     assert [i["name"] for i in book["ingredients"]] == [f"Spice {n:02}" for n in range(30)]
 
 
@@ -306,14 +306,14 @@ async def test_title_words_within_a_book(admin, work, adb, client) -> None:
     other, edition = await _other_book(adb)
     await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb"])
     await admin.post(
-        f"/api/books/{other}/recipes",
+        f"/api/sources/{other}/recipes",
         json={
             "title": "Rhubarb Salad",
             "editions": [{"edition_id": str(edition)}],
             "ingredients": ["Rhubarb"],
         },
     )
-    assert _titles(await _search(client, q="rhubarb", book=str(other))) == ["Rhubarb Salad"]
+    assert _titles(await _search(client, q="rhubarb", source=str(other))) == ["Rhubarb Salad"]
 
 
 async def test_wildcards_in_a_title_are_typed_characters(admin, work, client) -> None:

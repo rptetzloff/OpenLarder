@@ -19,7 +19,7 @@ missing.
 **Title words** must all appear in the title, ignoring case; accents count,
 as they do for ingredients. The trigram index on recipe titles serves them.
 
-**Books**: a recipe in any of them. IDs that name no ingredient or book now,
+**Sources**: a recipe in any of them. IDs that name no ingredient or source now,
 as after a merge, are left out of the search and reported, so an old link
 still finds what it can. An ingredient's own page lists exactly the recipes
 matched to it; this is the broader search.
@@ -34,7 +34,7 @@ from sqlalchemy import case, exists, func, select
 
 from openlarder.db import Session
 from openlarder.ingredients import family
-from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Work
+from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Source
 from openlarder.routers import ingredients as listing
 from openlarder.routers.ingredients import (
     UsedBy,
@@ -47,7 +47,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 
 MAX_INGREDIENTS = 30
 MAX_WORDS = 10
-MAX_BOOKS = 10
+MAX_SOURCES = 10
 
 
 class Named(BaseModel):
@@ -64,13 +64,13 @@ class Hit(UsedBy):
 
 
 class Found(BaseModel):
-    # The books searched within, if any were, in the order asked.
-    books: list[Named]
+    # The sources searched within, if any were, in the order asked.
+    sources: list[Named]
     # The ingredients searched for, in the order asked.
     ingredients: list[Named]
-    # Ingredient and book IDs asked for that name nothing now.
+    # Ingredient and source IDs asked for that name nothing now.
     missing: list[uuid.UUID]
-    missing_books: list[uuid.UUID]
+    missing_sources: list[uuid.UUID]
     # The title words searched for, tidied.
     q: str
     recipes: list[Hit]
@@ -89,33 +89,35 @@ async def search(
     session: Session,
     ingredient: Annotated[list[uuid.UUID] | None, Query()] = None,
     q: str = Query("", max_length=200),
-    book: Annotated[list[uuid.UUID] | None, Query()] = None,
+    source: Annotated[list[uuid.UUID] | None, Query()] = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     asked = list(dict.fromkeys(ingredient or []))
     words = list(dict.fromkeys(q.casefold().split()))
-    shelf = list(dict.fromkeys(book or []))
+    shelf = list(dict.fromkeys(source or []))
     if not asked and not words:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose an ingredient or type part of a title."
         )
     _too_many(len(asked), MAX_INGREDIENTS, "ingredients")
     _too_many(len(words), MAX_WORDS, "words of a title")
-    _too_many(len(shelf), MAX_BOOKS, "books")
+    _too_many(len(shelf), MAX_SOURCES, "sources")
 
     found_names = await session.execute(
         select(Ingredient.id, Ingredient.name).where(Ingredient.id.in_(asked))
     )
     names = {i: n for i, n in found_names}
-    found_titles = await session.execute(select(Work.id, Work.title).where(Work.id.in_(shelf)))
+    found_titles = await session.execute(
+        select(Source.id, Source.title).where(Source.id.in_(shelf))
+    )
     titles = {i: t for i, t in found_titles}
     known = [i for i in asked if i in names]
     books = [i for i in shelf if i in titles]
     found = Found(
-        books=[Named(id=i, name=titles[i]) for i in books],
+        sources=[Named(id=i, name=titles[i]) for i in books],
         ingredients=[Named(id=i, name=names[i]) for i in known],
         missing=[i for i in asked if i not in names],
-        missing_books=[i for i in shelf if i not in titles],
+        missing_sources=[i for i in shelf if i not in titles],
         q=" ".join(q.split()),
         recipes=[],
         total=0,
@@ -125,7 +127,7 @@ async def search(
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
     if books:
-        conditions.append(Recipe.work_id.in_(books))
+        conditions.append(Recipe.source_id.in_(books))
     if not known:
         page, found.total = await recipes_where(session, *conditions, offset=offset)
         found.recipes = [Hit(**r.model_dump()) for r in page]
@@ -158,9 +160,9 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
         .subquery()
     )
     matching = (
-        select(Recipe.id, Recipe.title, Work.id, Work.title, tally.c.have, tally.c.lines)
+        select(Recipe.id, Recipe.title, Source.id, Source.title, tally.c.have, tally.c.lines)
         .join(tally, tally.c.recipe_id == Recipe.id)
-        .join(Work, Work.id == Recipe.work_id)
+        .join(Source, Source.id == Recipe.source_id)
         .where(*conditions)
     )
     total = await session.scalar(select(func.count()).select_from(matching.subquery()))
@@ -171,7 +173,7 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
                 (tally.c.have / tally.c.lines).desc(),
                 (tally.c.lines - tally.c.have).asc(),
                 tally.c.have.desc(),
-                func.lower(Work.title),
+                func.lower(Source.title),
                 func.lower(Recipe.title),
                 Recipe.id,
             )

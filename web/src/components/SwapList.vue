@@ -32,7 +32,7 @@ async function remove(s: Swap) {
         <template v-if="s.diet">{{ s.diet.name }}</template>
         <template v-if="s.diet && s.source"> · </template>
         <template v-if="s.source">
-          <a :href="`/books/${s.source.book_id}`">{{ s.source.book_title }}</a
+          <a :href="`/sources/${s.source.source_id}`">{{ s.source.source_title }}</a
           ><template v-if="s.source.page">, p. {{ s.source.page }}</template>
         </template>
       </span>

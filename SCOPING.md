@@ -106,13 +106,13 @@ What goes into a recipe's ingredient list, and what is left out. These are the r
 
 ## Data model
 
-A Recipe belongs to one Work (the book); its page number lives on Recipe Page, one row per Edition it appears in, so one recipe entry covers every printing.
+A Recipe belongs to one Source, so far always a book; where it is lives on Recipe Location, for a book one row per Edition it appears in with its page, so one recipe entry covers every printing. *Migration 0019 renamed Work to Source and Recipe Page to Recipe Location, ahead of other kinds of source (Ray, 2026-11-08); each kind keeps its own parts in its own table, editions for books.*
 
 ![OpenLarder data model: 11 catalog entities, 3 community](DATA_MODEL.svg)
 
 Ingredient lines name the ingredient as the book does, without an amount ("caster sugar", not "200g caster sugar"), and each of a line's options points to one canonical Ingredient, which carries the shopping term and a parent for broader search. On the book page, editions show as tabs or subpages with their own page numbers and purchase links.
 
-Tags set on a Work (such as a diet focus like Gluten-Free) are inherited by every recipe in it, in addition to any tags set on the recipe itself.
+Tags set on a Source (such as a diet focus like Gluten-Free) are inherited by every recipe in it, in addition to any tags set on the recipe itself.
 
 A Recipe Ingredient holds one or more ranked Ingredient Options. Each option points to either a canonical Ingredient or another Recipe (a sub-recipe, such as a flour blend used throughout a gluten-free book). Sub-recipe links let users jump to the component recipe and its page, and shopping lists expand them into their own ingredients.
 
@@ -143,7 +143,7 @@ Every author gets a page: a bio, links, their books, the people they've written 
 
 **Authors and credits**
 
-An Author is a person or an organisation (America's Test Kitchen, The Culinary Institute of America). A Work credits its authors in order, each with a role: author, editor, and so on. The credit keeps the name as the book prints it ("Sarah Ballantyne, PhD", "Adam Rapoport (Editor)") and points to one Author, the same way an ingredient line keeps its original text and points to one Ingredient. This replaces the plain list of names on Work (migration 0003). Authors link to Open Library and Wikidata where those records exist.
+An Author is a person or an organisation (America's Test Kitchen, The Culinary Institute of America). A Source credits its authors in order, each with a role: author, editor, and so on. The credit keeps the name as the book prints it ("Sarah Ballantyne, PhD", "Adam Rapoport (Editor)") and points to one Author, the same way an ingredient line keeps its original text and points to one Ingredient. This replaces the plain list of names on Work, now Source (migration 0003). Authors link to Open Library and Wikidata where those records exist.
 
 Roles are author, editor, contributor, photographer, illustrator and translator. *Chosen by Claude, 2026-11-06, as the roles cookbook covers and title pages commonly print. A new role is a one-line change to a CHECK constraint.*
 
@@ -308,7 +308,7 @@ Contributors agree at signup that their contributions are licensed under the cho
 
 **API**
 
-- Read endpoints: works, editions, recipes, ingredients, search by ingredient
+- Read endpoints: sources, editions, recipes, ingredients, search by ingredient
 - API keys, rate limited, free tier
 - Periodic full data dumps so heavy users don't hammer the API
 - Write API later, gated by trust level
@@ -399,7 +399,7 @@ The biggest risk is cold start: a crowdsourced index is empty until someone fill
 - [x] Which phase substitutions ship in: MVP (see the MVP list)
 - [x] Allergen data on ingredients: yes, presented as crowdsourced (see Allergen data)
 - [ ] Grocery partner and its API terms
-- [x] Edition handling when a recipe's page is unknown for an edition: a recipe_pages row with no page means "in this edition, page not recorded"; no row means not in it. The entry form starts a new recipe in every edition, with a page box each. *Chosen by Claude, 2026-11-07, following the model's existing rule.*
+- [x] Edition handling when a recipe's page is unknown for an edition: a recipe location row with no page means "in this edition, page not recorded"; no row means not in it. The entry form starts a new recipe in every edition, with a page box each. *Chosen by Claude, 2026-11-07, following the model's existing rule.*
 - [x] Seeding plan: start from the household index (122 books, 18,859 recipes), imported through the bulk importer
 - [ ] USPTO check on "Open Larder" (Classes 9 and 42)
 

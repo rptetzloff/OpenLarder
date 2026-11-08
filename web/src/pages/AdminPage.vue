@@ -17,13 +17,13 @@ async function linkAll() {
   linking.value = true;
   linkError.value = "";
   try {
-    const res = await fetch("/api/books");
+    const res = await fetch("/api/sources");
     if (!res.ok) throw new Error("The books couldn't be loaded.");
     const books: BookSummary[] = await res.json();
     let linked = 0;
     for (const [i, book] of books.entries()) {
       progress.value = `${i + 1} of ${books.length}: ${book.title}`;
-      const done = await fetch(`/api/books/${book.id}/references`, { method: "POST" });
+      const done = await fetch(`/api/sources/${book.id}/references`, { method: "POST" });
       if (!done.ok) throw new Error(`${book.title} couldn't be linked. Try again.`);
       linked += (await done.json()).linked;
     }

@@ -21,9 +21,9 @@ from openlarder.models import (
     IngredientAlias,
     IngredientOption,
     Recipe,
-    RecipePage,
+    RecipeLocation,
+    Source,
     Substitution,
-    Work,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
 
@@ -46,8 +46,8 @@ class IngredientList(BaseModel):
 class UsedBy(BaseModel):
     id: uuid.UUID
     title: str
-    book_id: uuid.UUID
-    book_title: str
+    source_id: uuid.UUID
+    source_title: str
     pages: list[str]
 
 
@@ -90,10 +90,10 @@ async def recipes_where(
     total = await session.scalar(select(func.count()).select_from(Recipe).where(*conditions))
     rows = (
         await session.execute(
-            select(Recipe.id, Recipe.title, Work.id, Work.title)
-            .join(Work, Work.id == Recipe.work_id)
+            select(Recipe.id, Recipe.title, Source.id, Source.title)
+            .join(Source, Source.id == Recipe.source_id)
             .where(*conditions)
-            .order_by(func.lower(Work.title), func.lower(Recipe.title), Recipe.id)
+            .order_by(func.lower(Source.title), func.lower(Recipe.title), Recipe.id)
             .offset(offset)
             .limit(PAGE)
         )
@@ -108,13 +108,15 @@ async def with_pages(
     pages: dict[uuid.UUID, list[str]] = {}
     if rows:
         for recipe_id, page in await session.execute(
-            select(RecipePage.recipe_id, RecipePage.page)
-            .where(RecipePage.recipe_id.in_([r[0] for r in rows]), RecipePage.page.is_not(None))
-            .order_by(RecipePage.page)
+            select(RecipeLocation.recipe_id, RecipeLocation.page)
+            .where(
+                RecipeLocation.recipe_id.in_([r[0] for r in rows]), RecipeLocation.page.is_not(None)
+            )
+            .order_by(RecipeLocation.page)
         ):
             pages.setdefault(recipe_id, []).append(page)
     return [
-        UsedBy(id=r, title=t, book_id=b, book_title=bt, pages=pages.get(r, []))
+        UsedBy(id=r, title=t, source_id=b, source_title=bt, pages=pages.get(r, []))
         for r, t, b, bt in rows
     ]
 
