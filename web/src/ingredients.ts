@@ -81,3 +81,20 @@ export async function deleteIngredient(id: string): Promise<void> {
 export async function deleteAlias(id: string, aliasId: string): Promise<void> {
   await send(`/api/ingredients/${id}/aliases/${aliasId}`, "DELETE");
 }
+
+export interface SearchResult {
+  ingredients: Named[];
+  // IDs in the search that name no ingredient now, as after a merge.
+  missing: string[];
+  recipes: Ingredient["recipes"];
+  total: number;
+}
+
+// The recipes that use every one of the ingredients.
+export async function searchRecipes(ids: string[], offset = 0): Promise<SearchResult> {
+  const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
+  if (offset) query.set("offset", String(offset));
+  const res = await fetch(`/api/search?${query}`);
+  if (!res.ok) throw new Error("The search didn't work. Try again.");
+  return res.json();
+}
