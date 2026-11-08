@@ -10,8 +10,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from openlarder import __version__
@@ -91,8 +92,27 @@ def spa_response(web_dir: Path, path: str) -> FileResponse:
     return FileResponse(web_dir / "index.html", headers={"Cache-Control": "no-cache"})
 
 
+class Assets(StaticFiles):
+    """The build's hashed files, whose 404 must not be cached.
+
+    During a deploy the old and new servers answer side by side, so a page
+    from the new one can ask the old one for a file it doesn't have yet.
+    Sent without Cache-Control, that 404 was given Cloudflare's four-hour
+    browser default, and the site stayed unstyled for whoever got it, on
+    2026-11-08. no-store makes the next load ask again.
+    """
+
+    async def get_response(self, path: str, scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            raise StarletteHTTPException(404, headers={"Cache-Control": "no-store"}) from None
+
+
 if WEB_DIR.is_dir():
-    app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
+    app.mount("/assets", Assets(directory=WEB_DIR / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
     async def spa(path: str) -> FileResponse:
