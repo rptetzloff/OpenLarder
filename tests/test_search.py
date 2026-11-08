@@ -155,3 +155,73 @@ async def test_a_page_not_recorded_is_left_off(admin, work, adb, client) -> None
     await _add(admin, work, "Cake", None, ["Egg"])
     found = await _search(client, await _id(adb, "Egg"))
     assert [r["pages"] for r in found["recipes"]] == [[]]
+
+
+# Within one book
+
+
+async def _other_book(adb):
+    other = await adb.scalar(text("INSERT INTO works (title) VALUES ('Plenty') RETURNING id"))
+    edition = uuid.uuid4()
+    await adb.execute(
+        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": edition, "w": other}
+    )
+    return other, edition
+
+
+async def test_a_search_can_stay_in_one_book(admin, work, adb, client) -> None:
+    other, edition = await _other_book(adb)
+    await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb", "Egg"])
+    response = await admin.post(
+        f"/api/books/{other}/recipes",
+        json={
+            "title": "Rhubarb Salad",
+            "editions": [{"edition_id": str(edition), "page": "9"}],
+            "ingredients": ["Rhubarb"],
+        },
+    )
+    assert response.status_code == 201
+    rhubarb = await _id(adb, "Rhubarb")
+    assert _titles(await _search(client, rhubarb)) == ["Rhubarb Cake", "Rhubarb Salad"]
+    found = await _search(client, rhubarb, book=str(other))
+    assert found["book"] == {"id": str(other), "name": "Plenty"}
+    assert (_titles(found), found["total"]) == (["Rhubarb Salad"], 1)
+    assert (await _search(client, rhubarb))["book"] is None
+
+
+async def test_an_unknown_book_is_a_404(admin, work, adb, client) -> None:
+    await _add(admin, work, "Cake", "1", ["Egg"])
+    params = {"ingredient": [str(await _id(adb, "Egg"))], "book": str(uuid.uuid4())}
+    assert (await client.get("/api/search", params=params)).status_code == 404
+
+
+async def test_a_book_lists_the_ingredients_it_uses_most(admin, work, adb, client) -> None:
+    other, edition = await _other_book(adb)
+    await _add(admin, work, "A", "1", ["Egg", "Butter or Margarine", "Margarine"])
+    await _add(admin, work, "B", "2", ["Egg", "Flour"])
+    await _add(admin, work, "C", "3", ["Butter"])
+    await _add(admin, work, "D", "4", ["Margarine"])
+    for title in ("X", "Y", "Z"):
+        await admin.post(
+            f"/api/books/{other}/recipes",
+            json={
+                "title": title,
+                "editions": [{"edition_id": str(edition)}],
+                "ingredients": ["Flour"],
+            },
+        )
+    book = (await client.get(f"/api/books/{work}")).json()
+    # Counted in this book only, each recipe once; a tie goes by name.
+    assert [(i["name"], i["recipes"]) for i in book["ingredients"]] == [
+        ("Butter", 2),
+        ("Egg", 2),
+        ("Margarine", 2),
+        ("Flour", 1),
+    ]
+    assert book["ingredients"][0]["id"] == str(await _id(adb, "Butter"))
+
+
+async def test_a_book_shows_its_thirty_most_used(admin, work, client) -> None:
+    await _add(admin, work, "A", "1", [f"Spice {n:02}" for n in range(35)])
+    book = (await client.get(f"/api/books/{work}")).json()
+    assert [i["name"] for i in book["ingredients"]] == [f"Spice {n:02}" for n in range(30)]

@@ -10,10 +10,11 @@ import {
 
 document.title = "Search · OpenLarder";
 
-// The ingredients are kept in the address (?i=…&i=…), so a search can be
-// bookmarked or shared.
+// The ingredients, and the book if the search is within one, are kept in
+// the address (?book=…&i=…&i=…), so a search can be bookmarked or shared.
 const MAX = 10;
 const chosen = ref<Named[]>([]);
+const book = ref<Named | null>(null);
 const result = ref<SearchResult | null>(null);
 const missing = ref(0);
 const failed = ref(false);
@@ -26,6 +27,8 @@ async function run(more = false) {
   const url = new URL(location.href);
   url.searchParams.delete("i");
   for (const id of ids) url.searchParams.append("i", id);
+  if (book.value) url.searchParams.set("book", book.value.id);
+  else url.searchParams.delete("book");
   history.replaceState(null, "", url);
   failed.value = false;
   if (!ids.length) {
@@ -34,7 +37,8 @@ async function run(more = false) {
   }
   loading.value = true;
   try {
-    const page = await searchRecipes(ids, more ? (result.value?.recipes.length ?? 0) : 0);
+    const offset = more ? (result.value?.recipes.length ?? 0) : 0;
+    const page = await searchRecipes(ids, offset, book.value?.id);
     if (mine !== asked) return;
     if (more && result.value) result.value.recipes.push(...page.recipes);
     else result.value = page;
@@ -76,17 +80,33 @@ function drop(id: string) {
   run();
 }
 
+function everyBook() {
+  book.value = null;
+  run();
+}
+
 function where(r: SearchResult["recipes"][number]) {
   return r.pages.length ? `, p. ${r.pages.join(" / ")}` : "";
 }
 
 onMounted(async () => {
-  const ids = new URLSearchParams(location.search).getAll("i").slice(0, MAX);
-  if (!ids.length) return;
-  // The search names the ingredients, so a link needs only their IDs.
+  const params = new URLSearchParams(location.search);
+  const ids = params.getAll("i").slice(0, MAX);
+  const bookId = params.get("book");
   try {
-    const page = await searchRecipes(ids);
+    if (!ids.length) {
+      // Within a book, before any ingredient: the book's name is all to show.
+      const res = bookId ? await fetch(`/api/books/${bookId}`) : null;
+      if (res?.ok) {
+        const found = await res.json();
+        book.value = { id: found.id, name: found.title };
+      }
+      return;
+    }
+    // The search names the ingredients and book, so a link needs only IDs.
+    const page = await searchRecipes(ids, 0, bookId);
     chosen.value = page.ingredients;
+    book.value = page.book;
     missing.value = page.missing.length;
     result.value = page;
     if (page.missing.length) run();
@@ -127,6 +147,10 @@ onMounted(async () => {
       <p v-if="chosen.length >= MAX" class="status">That's as many as one search takes.</p>
     </div>
 
+    <p v-if="book" class="search-book">
+      In <a :href="`/books/${book.id}`">{{ book.name }}</a>
+      <button type="button" class="link" @click="everyBook">Search every book</button>
+    </p>
     <ul v-if="chosen.length" class="chosen" aria-label="Searching for">
       <li v-for="i in chosen" :key="i.id">
         <a :href="`/ingredients/${i.id}`">{{ i.name }}</a>

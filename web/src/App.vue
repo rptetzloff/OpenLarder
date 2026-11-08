@@ -488,6 +488,9 @@ button.link {
 .fix-ingredient .error {
   color: var(--error);
 }
+.search-book button {
+  margin-left: 0.5rem;
+}
 .chosen {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,5 @@
-"""Search: the recipes that use every one of several ingredients.
+"""Search: the recipes that use every one of several ingredients, in every
+book or in one.
 
 Public, like the rest of the catalog. A recipe matches an ingredient when
 any option on any of its lines is that ingredient or one under it in the
@@ -19,7 +20,7 @@ from sqlalchemy import select
 
 from openlarder.db import Session
 from openlarder.ingredients import family
-from openlarder.models import Ingredient, IngredientOption, Recipe
+from openlarder.models import Ingredient, IngredientOption, Recipe, Work
 from openlarder.routers.ingredients import UsedBy, recipes_where
 
 router = APIRouter(prefix="/api/search", tags=["search"])
@@ -33,6 +34,8 @@ class Named(BaseModel):
 
 
 class Found(BaseModel):
+    # The book searched within, if one was.
+    book: Named | None
     # The ingredients searched for, in the order asked, and any IDs that
     # name no ingredient now.
     ingredients: list[Named]
@@ -45,6 +48,7 @@ class Found(BaseModel):
 async def search(
     session: Session,
     ingredient: Annotated[list[uuid.UUID] | None, Query()] = None,
+    book: uuid.UUID | None = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     asked = list(dict.fromkeys(ingredient or []))
@@ -60,7 +64,11 @@ async def search(
     )
     names = {i: name for i, name in rows}
     known = [i for i in asked if i in names]
+    work = await session.get(Work, book) if book else None
+    if book and work is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     found = Found(
+        book=Named(id=work.id, name=work.title) if work else None,
         ingredients=[Named(id=i, name=names[i]) for i in known],
         missing=[i for i in asked if i not in names],
         recipes=[],
@@ -76,5 +84,7 @@ async def search(
         )
         for n, i in enumerate(known)
     ]
+    if work:
+        conditions.append(Recipe.work_id == work.id)
     found.recipes, found.total = await recipes_where(session, *conditions, offset=offset)
     return found

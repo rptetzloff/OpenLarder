@@ -28,6 +28,8 @@ export interface Book {
   editions: Edition[];
   // pages: one per edition it is in, newest first; null = not recorded.
   recipes: { id: string; title: string; pages: (string | null)[] }[];
+  // The ingredients its recipes use most, with how many recipes use each.
+  ingredients: { id: string; name: string; recipes: number }[];
 }
 
 // Resolves to the book's ID, whether it was added now or was already here
