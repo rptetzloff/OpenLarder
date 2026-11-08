@@ -127,7 +127,7 @@ async def test_a_recipe_on_packaging_has_no_place(admin, client, adb) -> None:
 @pytest.mark.parametrize(
     ("where", "says"),
     [
-        ({"web_address": "https://example.com/cookies"}, "just on it"),
+        ({"web_address": "https://example.com/cookies"}, "is just in it"),
         ({"issue": "May 2024"}, "Only a magazine or newspaper"),
         ({"episode": {"number": 1}}, "Only a TV show"),
     ],
@@ -148,4 +148,4 @@ async def test_a_recipe_on_packaging_takes_no_edition(admin, adb) -> None:
     )
     response = await _recipe(admin, product, "Cookies", editions=[{"edition_id": str(edition)}])
     assert response.status_code == 422
-    assert "just on it" in response.json()["detail"]
+    assert "is just in it" in response.json()["detail"]

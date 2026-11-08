@@ -20,8 +20,8 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import author_merge, openlibrary
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder import author_merge, openlibrary, visibility
+from openlarder.auth import AdminUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Source, SourceCredit
 from openlarder.routers.ingredients import contains_pattern
@@ -77,7 +77,10 @@ class AuthorOut(BaseModel):
 
 @router.get("", response_model=AuthorList)
 async def list_authors(
-    session: Session, q: str = Query("", max_length=200), offset: int = Query(0, ge=0)
+    session: Session,
+    viewer: Viewer,
+    q: str = Query("", max_length=200),
+    offset: int = Query(0, ge=0),
 ) -> AuthorList:
     """Authors by name, with how many books credit them; with q, those with
     every word of it in their name or a name a book prints for them."""
@@ -85,6 +88,7 @@ async def list_authors(
     query = (
         select(Author.id, Author.name, books)
         .join(SourceCredit, SourceCredit.author_id == Author.id)
+        .where(SourceCredit.source_id.in_(visibility.seen_source_ids(viewer)))
         .group_by(Author.id, Author.name)
     )
     for word in q.casefold().split()[:10]:
@@ -112,12 +116,17 @@ async def _author_or_404(session: Session, author_id: uuid.UUID) -> Author:
 
 
 @router.get("/{author_id}", response_model=AuthorOut)
-async def get_author(author_id: uuid.UUID, session: Session) -> AuthorOut:
-    author = await _author_or_404(session, author_id)
+async def get_author(author_id: uuid.UUID, session: Session, viewer: Viewer) -> AuthorOut:
+    author = await session.scalar(
+        select(Author).where(Author.id == author_id, visibility.authors_seen_by(viewer))
+    )
+    if author is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such author.")
+    seen = visibility.seen_source_ids(viewer)
     credits = (
         await session.execute(
             select(SourceCredit.source_id, SourceCredit.role, SourceCredit.credited_as)
-            .where(SourceCredit.author_id == author_id)
+            .where(SourceCredit.author_id == author_id, SourceCredit.source_id.in_(seen))
             .order_by(SourceCredit.position)
         )
     ).all()
@@ -164,8 +173,15 @@ async def get_author(author_id: uuid.UUID, session: Session) -> AuthorOut:
             AuthorSummary(id=i, name=n, sources=c)
             for i, n, c in await session.execute(
                 select(Author.id, Author.name, func.count(func.distinct(SourceCredit.source_id)))
-                .outerjoin(SourceCredit, SourceCredit.author_id == Author.id)
-                .where(Author.name_key == author.name_key, Author.id != author.id)
+                .outerjoin(
+                    SourceCredit,
+                    (SourceCredit.author_id == Author.id) & SourceCredit.source_id.in_(seen),
+                )
+                .where(
+                    Author.name_key == author.name_key,
+                    Author.id != author.id,
+                    visibility.authors_seen_by(viewer),
+                )
                 .group_by(Author.id, Author.name)
                 .order_by(func.lower(Author.name), Author.id)
             )

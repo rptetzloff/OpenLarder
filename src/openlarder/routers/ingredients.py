@@ -13,8 +13,8 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Row, exists, func, select
 
-from openlarder import ingredients, substitutions
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder import ingredients, substitutions, visibility
+from openlarder.auth import AdminUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import (
     Ingredient,
@@ -123,19 +123,21 @@ async def with_pages(
 
 @router.get("", response_model=IngredientList)
 async def list_ingredients(
-    session: Session, q: str = "", offset: int = Query(0, ge=0)
+    session: Session, viewer: Viewer, q: str = "", offset: int = Query(0, ge=0)
 ) -> IngredientList:
     uses = (
         select(
             IngredientOption.ingredient_id,
             func.count(func.distinct(IngredientOption.recipe_id)).label("n"),
         )
-        .where(IngredientOption.ingredient_id.is_not(None))
+        .where(IngredientOption.ingredient_id.is_not(None), visibility.options_seen_by(viewer))
         .group_by(IngredientOption.ingredient_id)
         .subquery()
     )
-    query = select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0)).outerjoin(
-        uses, uses.c.ingredient_id == Ingredient.id
+    query = (
+        select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0))
+        .outerjoin(uses, uses.c.ingredient_id == Ingredient.id)
+        .where(visibility.ingredients_seen_by(viewer))
     )
     if q.strip():
         like = contains_pattern(" ".join(q.split()))
@@ -160,9 +162,13 @@ async def list_ingredients(
 
 @router.get("/{ingredient_id}", response_model=IngredientOut)
 async def get_ingredient(
-    ingredient_id: uuid.UUID, session: Session, offset: int = Query(0, ge=0)
+    ingredient_id: uuid.UUID, session: Session, viewer: Viewer, offset: int = Query(0, ge=0)
 ) -> IngredientOut:
-    ingredient = await session.get(Ingredient, ingredient_id)
+    ingredient = await session.scalar(
+        select(Ingredient).where(
+            Ingredient.id == ingredient_id, visibility.ingredients_seen_by(viewer)
+        )
+    )
     if ingredient is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingredient.")
     recipes, total = await recipes_where(
@@ -172,6 +178,7 @@ async def get_ingredient(
                 IngredientOption.ingredient_id == ingredient_id
             )
         ),
+        visibility.recipes_seen_by(viewer),
         offset=offset,
     )
     aliases = await session.execute(
@@ -179,10 +186,14 @@ async def get_ingredient(
         .where(IngredientAlias.ingredient_id == ingredient_id)
         .order_by(func.lower(IngredientAlias.name))
     )
-    parent = await session.get(Ingredient, ingredient.parent_id) if ingredient.parent_id else None
+    parent = await session.scalar(
+        select(Ingredient).where(
+            Ingredient.id == ingredient.parent_id, visibility.ingredients_seen_by(viewer)
+        )
+    )
     children = await session.execute(
         select(Ingredient.id, Ingredient.name)
-        .where(Ingredient.parent_id == ingredient_id)
+        .where(Ingredient.parent_id == ingredient_id, visibility.ingredients_seen_by(viewer))
         .order_by(func.lower(Ingredient.name))
     )
     children = [Related(id=i, name=n) for i, n in children]
@@ -190,7 +201,8 @@ async def get_ingredient(
     if children:
         family_total = await session.scalar(
             select(func.count(func.distinct(IngredientOption.recipe_id))).where(
-                IngredientOption.ingredient_id.in_(ingredients.family(ingredient_id))
+                IngredientOption.ingredient_id.in_(ingredients.family(ingredient_id)),
+                visibility.options_seen_by(viewer),
             )
         )
     return IngredientOut(

@@ -32,6 +32,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import case, exists, func, select
 
+from openlarder import visibility
+from openlarder.auth import Viewer
 from openlarder.db import Session
 from openlarder.ingredients import family
 from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Source
@@ -87,6 +89,7 @@ def _too_many(n: int, limit: int, what: str) -> None:
 @router.get("", response_model=Found)
 async def search(
     session: Session,
+    viewer: Viewer,
     ingredient: Annotated[list[uuid.UUID] | None, Query()] = None,
     q: str = Query("", max_length=200),
     source: Annotated[list[uuid.UUID] | None, Query()] = None,
@@ -104,11 +107,15 @@ async def search(
     _too_many(len(shelf), MAX_SOURCES, "sources")
 
     found_names = await session.execute(
-        select(Ingredient.id, Ingredient.name).where(Ingredient.id.in_(asked))
+        select(Ingredient.id, Ingredient.name).where(
+            Ingredient.id.in_(asked), visibility.ingredients_seen_by(viewer)
+        )
     )
     names = {i: n for i, n in found_names}
     found_titles = await session.execute(
-        select(Source.id, Source.title).where(Source.id.in_(shelf))
+        select(Source.id, Source.title).where(
+            Source.id.in_(shelf), visibility.sources_seen_by(viewer)
+        )
     )
     titles = {i: t for i, t in found_titles}
     known = [i for i in asked if i in names]
@@ -126,6 +133,7 @@ async def search(
     if not known and not words:
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
+    conditions.append(visibility.recipes_seen_by(viewer))
     if books:
         conditions.append(Recipe.source_id.in_(books))
     if not known:

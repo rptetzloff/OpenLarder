@@ -8,7 +8,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 7 November 2026</p>
+    <p class="updated">Last updated 8 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -47,7 +47,14 @@ document.title = "Privacy policy · OpenLarder";
       <li>
         the identifier Authgear gives your account, which is how OpenLarder recognises you;
       </li>
-      <li>whether your account may add books, which only an admin can for now;</li>
+      <li>whether your account is an admin's;</li>
+      <li>
+        the family collections you add: each one's name, whether it is private, when you ticked
+        that you understand what is kept, and each of its recipes' titles and ingredient names,
+        never amounts or the method. A private collection is shown to no one else, admins
+        included; the people who run the site can reach anything stored on it, as on any
+        website;
+      </li>
       <li>
         which account added each recipe, so that its flags can be shown to you, who dealt with
         a flag, and, for admins, which account ran each bulk import;
@@ -88,7 +95,8 @@ document.title = "Privacy policy · OpenLarder";
     <p>
       Contributing to the catalog is not open yet. When it is, contributions will be public and
       attributed to your display name in the edit history, and this page will say so in more
-      detail before that happens.
+      detail before that happens. Family collections are the exception: anyone signed in can add
+      their own now, and they stay private.
     </p>
 
     <h2>Your choices</h2>
@@ -96,8 +104,9 @@ document.title = "Privacy policy · OpenLarder";
       You can sign out at any time, which ends the session here and at Authgear. To see what
       OpenLarder holds about you, correct it, or delete your account, email
       <a href="mailto:privacy@openlarder.com">privacy@openlarder.com</a>. Deleting your account
-      removes your user record and sessions here; your Authgear account can be removed at the
-      same time on request.
+      removes your user record, your sessions and your family collections here; your Authgear
+      account can be removed at the same time on request. You can delete a family collection
+      yourself, from its page, at any time.
     </p>
 
     <h2>Children</h2>

@@ -83,12 +83,15 @@ def _trgm(table: str, column: str) -> Index:
 class Source(Timestamps, Base):
     """Where recipes come from: a book, across every printing of it, a
     website, a magazine or newspaper, a TV show, podcast or video channel, a
-    social media account, or a product's packaging.
+    social media account, a product's packaging, or a family's collection.
 
     Each kind has its own parts in its own table: a book's are its editions,
     a website's and a social media account's its pages, a magazine's its
-    issues, a show's its episodes. Packaging has none: its recipes are just
-    on it. Migration 0019; Ray, 2026-11-08.
+    issues, a show's its episodes. Packaging and family collections have
+    none: their recipes are just in them. Migration 0019; Ray, 2026-11-08.
+
+    A family collection has an owner and can be private: seen only by its
+    owner (migration 0026). visibility.py is where that is applied.
     """
 
     __tablename__ = "sources"
@@ -96,12 +99,18 @@ class Source(Timestamps, Base):
         CheckConstraint("title <> ''", name="title_not_empty"),
         CheckConstraint(
             "kind IN ('book', 'website', 'magazine', 'newspaper', 'tv_show', 'podcast',"
-            " 'video_channel', 'social', 'packaging')",
+            " 'video_channel', 'social', 'packaging', 'family')",
             name="kind_known",
         ),
         CheckConstraint("(kind = 'website') = (host IS NOT NULL)", name="host_for_websites"),
         CheckConstraint("host <> ''", name="host_not_empty"),
         CheckConstraint("NOT paywalled OR kind = 'website'", name="paywalled_websites_only"),
+        CheckConstraint("(kind = 'family') = (owner_id IS NOT NULL)", name="owner_for_family"),
+        CheckConstraint("NOT private OR kind = 'family'", name="private_only_family"),
+        CheckConstraint(
+            "(kind = 'family') = (acknowledged_at IS NOT NULL)", name="family_acknowledged"
+        ),
+        Index("ix_sources_owner_id", "owner_id"),
         _trgm("sources", "title"),
     )
 
@@ -112,6 +121,13 @@ class Source(Timestamps, Base):
     host: Mapped[str | None] = mapped_column(Text, unique=True)
     # A website behind a subscription: linked, never copied.
     paywalled: Mapped[bool] = mapped_column(nullable=False, server_default=false())
+    # A family collection's: who added it, whether only they see it, and
+    # when they ticked that they understand what the site keeps.
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    private: Mapped[bool] = mapped_column(nullable=False, server_default=false())
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     title: Mapped[str] = mapped_column(Text, nullable=False)
     subtitle: Mapped[str | None] = mapped_column(Text)
     open_library_work_id: Mapped[str | None] = mapped_column(Text, unique=True)

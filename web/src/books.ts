@@ -2,7 +2,7 @@
 
 export interface BookSummary {
   id: string;
-  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging";
+  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" | "family";
   // A website's, as "smittenkitchen.com".
   host: string | null;
   title: string;
@@ -10,6 +10,8 @@ export interface BookSummary {
   authors: string[];
   cover_url: string | null;
   editions: number;
+  // A family collection only its owner sees.
+  private: boolean;
 }
 
 export interface Edition {
@@ -24,7 +26,7 @@ export interface Edition {
 
 export interface Book {
   id: string;
-  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging";
+  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" | "family";
   host: string | null;
   // A website behind a subscription: linked, never copied.
   paywalled: boolean;
@@ -46,6 +48,10 @@ export interface Book {
   }[];
   // A magazine's or newspaper's issues, newest first.
   issues: { id: string; label: string; published_on: string | null }[];
+  // A family collection only its owner sees; and whether you may add to and
+  // change it.
+  private: boolean;
+  editable: boolean;
   // A TV show's, podcast's or video channel's episodes, in order.
   episodes: {
     id: string;
@@ -261,6 +267,45 @@ export async function addNamed(
   return body;
 }
 
+// A family collection of yours. private: only you see it (only an admin can
+// add a public one for now); acknowledged: the form's tick box.
+export async function addFamily(
+  title: string,
+  isPrivate: boolean,
+  acknowledged: boolean,
+): Promise<{ id: string; existing: boolean }> {
+  const res = await fetch("/api/sources/family", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, private: isPrivate, acknowledged }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
+// Rename a family collection.
+export async function renameFamily(id: string, title: string): Promise<void> {
+  const res = await fetch(`/api/sources/${id}/family`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  }
+}
+
+// Delete a family collection and its recipes.
+export async function removeFamily(id: string): Promise<void> {
+  const res = await fetch(`/api/sources/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  }
+}
+
 export const SHOWS = ["tv_show", "podcast", "video_channel"];
 
 // What a kind of source is called in a sentence: "this magazine".
@@ -274,6 +319,7 @@ export const KIND_NAMES: Record<string, string> = {
   video_channel: "video channel",
   social: "social media account",
   packaging: "product",
+  family: "family collection",
 };
 
 // An issue as people say it: one named by its date ("2024-09-18", as a

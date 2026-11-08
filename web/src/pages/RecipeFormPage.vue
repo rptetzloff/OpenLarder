@@ -13,7 +13,9 @@ const ingredients = ref("");
 const webAddress = ref("");
 // A social media account's recipes are on its posts, by address, too.
 const onWeb = computed(() => ["website", "social"].includes(book.value?.kind ?? ""));
+// Packaging's and a family collection's recipes are just in them.
 const onPackaging = computed(() => book.value?.kind === "packaging");
+const inFamily = computed(() => book.value?.kind === "family");
 // A magazine's or newspaper's recipe: its issue (name or date) and page.
 const inIssue = computed(() => ["magazine", "newspaper"].includes(book.value?.kind ?? ""));
 const issue = ref("");
@@ -40,7 +42,9 @@ const place = computed(() =>
         ? "episode"
         : onPackaging.value
           ? "packaging"
-          : "book",
+          : inFamily.value
+            ? "family's copy"
+            : "book",
 );
 // Per edition: is the recipe in it, and on which page.
 const editions = ref<{ id: string; label: string; included: boolean; page: string }[]>([]);
@@ -136,7 +140,8 @@ async function save() {
     const id = await saveRecipe(
       {
         title: title.value,
-        editions: onWeb.value || inIssue.value || inEpisode.value || onPackaging.value
+        editions:
+          onWeb.value || inIssue.value || inEpisode.value || onPackaging.value || inFamily.value
           ? []
           : editions.value
               .filter((e) => e.included)
@@ -174,7 +179,11 @@ async function save() {
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="book" class="recipe-form" @submit.prevent="save">
       <label for="recipe-title">{{
-        onWeb || inEpisode ? `Title, as the ${place} gives it` : `Title, as the ${place} prints it`
+        inFamily
+          ? "Title, as your family calls it"
+          : onWeb || inEpisode
+            ? `Title, as the ${place} gives it`
+            : `Title, as the ${place} prints it`
       }}</label>
       <input id="recipe-title" v-model="title" required maxlength="200" />
 
@@ -286,7 +295,7 @@ async function save() {
           title="Minutes and seconds, like 12:34, or 1:02:03"
         />
       </template>
-      <template v-else-if="onPackaging" />
+      <template v-else-if="onPackaging || inFamily" />
       <fieldset v-else>
         <legend>Page</legend>
         <p class="help">Leave a page blank if you don't know it yet.</p>

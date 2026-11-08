@@ -8,7 +8,7 @@ document.title = "Terms of service · OpenLarder";
 <template>
   <article>
     <h1>Terms of service</h1>
-    <p class="updated">Last updated 7 November 2026</p>
+    <p class="updated">Last updated 8 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks: which book, which page, and
@@ -51,6 +51,14 @@ document.title = "Terms of service · OpenLarder";
         display name in the edit history, and may be reviewed, corrected, reverted or removed.
       </li>
     </ul>
+
+    <h2>Family collections</h2>
+    <p>
+      Anyone signed in can add family collections of their own now. The same rule holds: titles
+      and ingredient names, never amounts or the method. A private collection is not part of the
+      catalog: it is not published, licensed or shown to anyone else, and you can delete it at
+      any time. A collection made public becomes catalog data under the rules above.
+    </p>
 
     <h2>Allergens and diets</h2>
     <p>

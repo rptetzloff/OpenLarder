@@ -270,9 +270,10 @@ async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: Recip
         return
     if entry.issue:
         raise InvalidRecipe("Only a magazine or newspaper has issues.")
-    if source.kind == "packaging":
+    if source.kind in ("packaging", "family"):
         if entry.pages or entry.web_address:
-            raise InvalidRecipe("A recipe on packaging is just on it: no page or address.")
+            where = "on packaging" if source.kind == "packaging" else "in a family collection"
+            raise InvalidRecipe(f"A recipe {where} is just in it: no page or address.")
         return
     if source.kind in ("website", "social"):
         if not entry.web_address:

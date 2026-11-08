@@ -136,6 +136,10 @@ async function remove() {
         >{{ recipe.episode.aired_on ? ` (${issueName(recipe.episode.aired_on)})` : ""
         }}{{ recipe.episode.at ? `, at ${recipe.episode.at}` : "" }}
       </p>
+      <p v-else-if="recipe.source.kind === 'family'" class="byline">
+        From <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>, a family
+        collection
+      </p>
       <p v-else-if="recipe.source.kind === 'packaging'" class="byline">
         On the packaging of <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>
       </p>
@@ -172,6 +176,8 @@ async function remove() {
                 ? "in the episode"
                 : recipe.source.kind === "packaging"
                   ? "on the packaging"
+                  : recipe.source.kind === "family"
+                    ? "with the family's copy"
                   : "in the book"
         }}.
       </p>
@@ -222,9 +228,9 @@ async function remove() {
         </ul>
       </section>
 
-      <div v-if="user?.is_admin" class="admin-actions">
+      <div v-if="recipe.editable" class="admin-actions">
         <a :href="`/recipes/${recipe.id}/edit`">Edit</a>
-        <template v-if="recipe.web_page">
+        <template v-if="recipe.web_page && user?.is_admin">
           <button v-if="!recipe.web_page.archive_url" type="button" class="link" @click="archiveNow">
             Archive now
           </button>

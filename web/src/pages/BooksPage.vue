@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import {
   addByIsbn,
+  addFamily,
   addPeriodical,
   addNamed,
   addShow,
@@ -58,6 +59,23 @@ watch(filter, () => {
   }, 200);
 });
 onMounted(() => load());
+
+// A family collection: anyone signed in adds one, private unless an admin
+// makes it public; the tick box is required.
+const familyName = ref("");
+const familyPublic = ref(false);
+const familyPrivate = computed(() => !familyPublic.value);
+const familyAcknowledged = ref(false);
+const familyError = ref("");
+async function addCollection() {
+  familyError.value = "";
+  try {
+    const { id } = await addFamily(familyName.value, familyPrivate.value, familyAcknowledged.value);
+    location.href = `/sources/${id}`;
+  } catch (e) {
+    familyError.value = e instanceof Error ? e.message : String(e);
+  }
+}
 
 // Adding a source other than a book by ISBN: a website (any address on it
 // finds the site), or a magazine, newspaper, TV show, podcast, video
@@ -131,8 +149,49 @@ async function add() {
 <template>
   <article>
     <h1>Sources</h1>
-    <p class="status">Cookbooks and recipe websites, with the recipes indexed from them.</p>
+    <p class="status">Cookbooks, websites, magazines, shows and more, with the recipes indexed from them.</p>
     <p class="status"><a href="/authors">Browse by author</a></p>
+
+    <details v-if="user" class="family-add">
+      <summary>Add a family collection</summary>
+    <form class="recipe-form family-form" @submit.prevent="addCollection">
+      <label for="family-name">Its name</label>
+      <input
+        id="family-name"
+        v-model="familyName"
+        required
+        maxlength="300"
+        placeholder="Grandma's recipe box"
+      />
+      <p class="help">
+        A recipe box, a church or school cookbook, a class's handouts: recipes your family keeps.
+      </p>
+      <div class="notice">
+        <p>
+          <strong>What OpenLarder keeps:</strong> the collection's name, each recipe's title and
+          the names of its ingredients. Never amounts or the method.
+        </p>
+        <p v-if="familyPrivate">
+          <strong>Who sees it:</strong> only you. It isn't listed, searched or counted for anyone
+          else, admins included. The people who run the site can reach anything stored on it, as on
+          any website.
+        </p>
+        <p v-else>
+          <strong>Who sees it:</strong> everyone. It becomes part of OpenLarder's open data, which
+          anyone may copy under the ODbL.
+        </p>
+      </div>
+      <label v-if="user.is_admin" class="check"
+        ><input v-model="familyPublic" type="checkbox" /> Public, for everyone</label
+      >
+      <label class="check"
+        ><input v-model="familyAcknowledged" type="checkbox" required /> I understand what
+        OpenLarder keeps and who sees it</label
+      >
+      <p v-if="familyError" class="error" role="alert">{{ familyError }}</p>
+      <button type="submit" class="primary">Add the collection</button>
+    </form>
+    </details>
 
     <form v-if="user?.is_admin" class="isbn-form" @submit.prevent="add">
       <label for="isbn">Add a book by ISBN</label>
@@ -234,6 +293,7 @@ async function add() {
             <strong>{{ book.title }}</strong>
             <span v-if="book.authors.length" class="byline">{{ book.authors.join(", ") }}</span>
             <span v-else-if="book.host" class="byline">{{ book.host }}</span>
+            <span v-if="book.private" class="byline">Private: only you see it</span>
           </span>
         </a>
       </li>

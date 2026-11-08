@@ -40,8 +40,27 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       and number, title or a video's address, at a time. **Social media
       accounts and packaging (#63):** an account's recipes are on its
       posts, by address, on any site, archived like a website's pages; a
-      product's recipes are simply on its packaging, with no page. Next:
-      family recipes, with private recipes and sharing. Found while
+      product's recipes are simply on its packaging, with no page.
+      **Family collections (#64):** anyone signed in adds their own,
+      private (only an admin can add a public one until review exists),
+      after ticking that they understand what is kept and who sees it.
+      Every read leaves out what the viewer can't see, including an
+      ingredient or author only a private collection uses; a test asks
+      every GET route as other people. Decided (Ray, 2026-11-08): privacy
+      is per collection; public ones are open data like the rest.
+      **Next: household groups** (Ray, 2026-11-08): a person makes a group
+      and invites others by a link; members see each other's private
+      collections, with view-only, edit and admin roles. The larder will
+      share the same way. Found while building family collections:
+      - **A family recipe has no page**, like packaging; a church or school
+        cookbook's page number could be wanted.
+      - **Deleting an account** isn't built: an owner with collections is
+        kept by the database (RESTRICT), and the privacy policy says
+        deletion removes their collections, so the deletion has to.
+      - **Credits on a family collection** can't be added through any
+        route yet (the book editor is an admin's, and won't open a private
+        collection); "Grandma" as an author would need the same privacy.
+      Found while
       building social media and packaging:
       - **Which social media pages archive at all** is still unchecked
         against the real Internet Archive: Instagram and others may save
@@ -170,6 +189,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Family collections: anyone signed in adds their own, private, after
+      a tick box; nothing private shows to anyone else on any route (#64)
 - [x] Social media accounts and products' packaging as sources: posts by
       address on any site, archived; packaging recipes with no page (#63)
 - [x] TV shows, podcasts and video channels as sources: recipes in
