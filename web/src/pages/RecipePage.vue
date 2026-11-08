@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import FlagItem from "../components/FlagItem.vue";
+import SwapForm from "../components/SwapForm.vue";
+import SwapList from "../components/SwapList.vue";
 import { type Flag, recipeFlags } from "../flags";
 import type { Me } from "../me";
 import { type Recipe, removeRecipe } from "../recipes";
+import type { Thing } from "../substitutions";
 
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
 const recipe = ref<Recipe | null>(null);
@@ -27,6 +30,25 @@ onMounted(async () => {
     failed.value = true;
   }
 });
+
+// What a swap entered here can replace: the ingredients, the recipes the
+// lines cite, and the recipe itself.
+const swapChoices = computed<Thing[]>(() => {
+  const r = recipe.value;
+  if (!r) return [];
+  const seen = new Map<string, Thing>();
+  for (const line of r.lines) {
+    for (const o of line.options) {
+      if (o.ingredient) seen.set(o.ingredient.id, { kind: "ingredient", ...o.ingredient });
+      else if (o.recipe) seen.set(o.recipe.id, { kind: "recipe", id: o.recipe.id, name: o.recipe.title });
+    }
+  }
+  seen.set(r.id, { kind: "recipe", id: r.id, name: r.title });
+  return [...seen.values()];
+});
+// The book and page a printed swap starts at: this recipe's.
+const firstPage = computed(() => recipe.value?.pages.find((p) => p.page) ?? recipe.value?.pages[0]);
+const addingSwap = ref(false);
 
 function where(p: Recipe["pages"][number]) {
   const edition = [p.edition_title, p.published_year].filter(Boolean).join(", ");
@@ -82,6 +104,30 @@ async function remove() {
             <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
           </li>
         </ul>
+      </template>
+
+      <template v-if="recipe.swaps.length || user?.is_admin">
+        <h2>Swaps</h2>
+        <SwapList
+          v-if="recipe.swaps.length"
+          :swaps="recipe.swaps"
+          :can-edit="!!user?.is_admin"
+          @removed="(id) => (recipe!.swaps = recipe!.swaps.filter((s) => s.id !== id))"
+        />
+        <p v-else class="status">None recorded yet.</p>
+        <template v-if="user?.is_admin">
+          <button v-if="!addingSwap" type="button" class="link" @click="addingSwap = true">
+            Add a swap
+          </button>
+          <SwapForm
+            v-else
+            :choices="swapChoices"
+            :book-id="recipe.book.id"
+            :edition-id="firstPage?.edition_id"
+            :page="firstPage?.page"
+            @added="(s) => recipe!.swaps.push(s)"
+          />
+        </template>
       </template>
 
       <section v-if="flags.some((f) => !f.resolution)" class="recipe-flags">

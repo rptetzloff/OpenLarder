@@ -522,6 +522,40 @@ button.link {
 .search-book button {
   margin-left: 0.5rem;
 }
+.swap-list {
+  padding-left: 1.25rem;
+}
+.swap-list li {
+  margin-bottom: 0.5rem;
+}
+.swap-note {
+  display: block;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.swap-form {
+  margin-top: 1rem;
+}
+.swap-form fieldset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+.swap-form fieldset > label:not(.check) {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+.swap-form fieldset > .isbn-form {
+  align-self: stretch;
+  margin-bottom: 0;
+}
+.swap-form .check {
+  font-weight: normal;
+}
+.swap-form select {
+  max-width: 100%;
+}
 .chosen {
   display: flex;
   flex-wrap: wrap;

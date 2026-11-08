@@ -1,5 +1,7 @@
 // Canonical ingredients: what /api/ingredients returns.
 
+import type { Swap } from "./substitutions";
+
 export interface IngredientSummary {
   id: string;
   name: string;
@@ -23,6 +25,8 @@ export interface Ingredient {
   total: number;
   // Recipes using it or anything under it, as search counts them.
   family_total: number;
+  // What can stand in for it.
+  swaps: Swap[];
 }
 
 export async function listIngredients(q: string, offset = 0): Promise<IngredientList> {

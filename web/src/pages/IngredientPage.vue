@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
+import SwapForm from "../components/SwapForm.vue";
+import SwapList from "../components/SwapList.vue";
 import {
   deleteAlias,
   deleteIngredient,
@@ -15,6 +17,7 @@ import {
 import type { Me } from "../me";
 
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
+const addingSwap = ref(false);
 const ingredient = ref<Ingredient | null>(null);
 const missing = ref(false);
 const failed = ref(false);
@@ -198,6 +201,27 @@ onMounted(() => load());
       >
         Show more ({{ (ingredient.total - ingredient.recipes.length).toLocaleString() }} left)
       </button>
+
+      <template v-if="ingredient.swaps.length || user?.is_admin">
+        <h2>Swaps</h2>
+        <SwapList
+          v-if="ingredient.swaps.length"
+          :swaps="ingredient.swaps"
+          :can-edit="!!user?.is_admin"
+          @removed="(id) => (ingredient!.swaps = ingredient!.swaps.filter((s) => s.id !== id))"
+        />
+        <p v-else class="status">None recorded yet.</p>
+        <template v-if="user?.is_admin">
+          <button v-if="!addingSwap" type="button" class="link" @click="addingSwap = true">
+            Add a swap
+          </button>
+          <SwapForm
+            v-else
+            :choices="[{ kind: 'ingredient', id: ingredient.id, name: ingredient.name }]"
+            @added="(s) => ingredient!.swaps.push(s)"
+          />
+        </template>
+      </template>
 
       <section v-if="user?.is_admin" class="fix-ingredient">
         <h2>Fix this ingredient</h2>

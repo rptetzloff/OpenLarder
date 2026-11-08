@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from openlarder import detector, recipes, references
+from openlarder import detector, recipes, references, substitutions
 from openlarder import lines as line_reading
 from openlarder.auth import AdminUser, CurrentUser, SameOrigin
 from openlarder.db import Session
@@ -25,6 +25,7 @@ from openlarder.models import (
     RecipePage,
     Work,
 )
+from openlarder.routers.substitutions import SwapOut, swap_out
 
 router = APIRouter(tags=["recipes"])
 
@@ -115,6 +116,8 @@ class RecipeOut(BaseModel):
     lines: list[LineOut]
     # Recipes in the book that use this one as a component.
     used_in: list[RecipeLink]
+    # What can stand in for its ingredients, the recipes it cites, or itself.
+    swaps: list[SwapOut]
 
 
 class Created(BaseModel):
@@ -218,6 +221,10 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
             for line_id, text in lines
         ],
         used_in=[RecipeLink(id=i, title=t) for i, t in used_in],
+        swaps=[
+            swap_out(x)
+            for x in await substitutions.listed(session, substitutions.for_recipe(recipe.id))
+        ],
     )
 
 
