@@ -6,6 +6,8 @@ import AccountPage from "./pages/AccountPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
+import AuthorPage from "./pages/AuthorPage.vue";
+import AuthorsPage from "./pages/AuthorsPage.vue";
 import FlagsPage from "./pages/FlagsPage.vue";
 import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
@@ -29,6 +31,7 @@ const onAccount = path === "/account";
 const onBooks = path === "/books";
 const onIngredients = path === "/ingredients";
 const onSearch = path === "/search";
+const onAuthors = path === "/authors";
 const onAdmin = path === "/admin";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
@@ -40,6 +43,7 @@ const newRecipeFor = match(`/books/${UUID}/recipes/new`);
 const editBookId = match(`/books/${UUID}/edit`);
 const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
+const authorId = match(`/authors/${UUID}`);
 const editRecipeId = match(`/recipes/${UUID}/edit`);
 
 // A placeholder until there is a catalog to show: proves the SPA reaches the
@@ -103,6 +107,8 @@ onMounted(async () => {
     <BooksPage v-else-if="onBooks" :user="user" />
     <IngredientsPage v-else-if="onIngredients" />
     <SearchPage v-else-if="onSearch" />
+    <AuthorsPage v-else-if="onAuthors" />
+    <AuthorPage v-else-if="authorId" :id="authorId" :user="user" />
     <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
@@ -523,6 +529,19 @@ button.link {
   display: block;
   color: var(--muted);
   font-size: 0.875rem;
+}
+.author-links {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+.author-link-form {
+  margin-top: 1.5rem;
+}
+.byline a {
+  color: inherit;
 }
 .swap-list {
   padding-left: 1.25rem;

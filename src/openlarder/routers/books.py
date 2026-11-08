@@ -7,6 +7,7 @@ and stores what comes back.
 
 import logging
 import uuid
+from collections.abc import Sequence
 from typing import Annotated
 
 import httpx2
@@ -130,7 +131,12 @@ async def list_books(
         )
     if limit:
         query = query.limit(limit)
-    works = (await session.scalars(query)).all()
+    return await summaries(session, (await session.scalars(query)).all())
+
+
+async def summaries(session: Session, works: Sequence[Work]) -> list[BookSummary]:
+    """Books as cards, in the order given: credits, a cover, how many
+    editions."""
     if not works:
         return []
     ids = [w.id for w in works]

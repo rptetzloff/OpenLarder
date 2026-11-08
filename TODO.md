@@ -6,9 +6,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## MVP
 
-- [ ] **Author pages**: each author's books, co-authors and links; Wikidata
-      facts (born, nationality, website) after. Credits and roles exist; the
-      page doesn't.
+- [ ] **Wikidata facts on author pages** (born, nationality, website). The
+      pages themselves are built (#52).
+- [ ] **Merge two authors**: the same person can end up as two records (a
+      book printing "Ottolenghi" gets a new author, not Yotam Ottolenghi's),
+      and nothing can merge them yet.
 - [ ] **Recipe tags** (course, cuisine, diet): the tables exist, with nothing
       to set or show them. Book-level tags are inherited by its recipes.
 - [ ] **Bookshop.org affiliate links**: the purchase_links table exists, with
@@ -27,9 +29,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 - [ ] **Books page at scale**: it loads every book and filters in the
       browser; past a few hundred it needs server-side paging (the API's `q`
       exists, from #50).
-- [ ] **Merge two books**: the local catalog has two "The How can it be
-      gluten free cookbook" works differing only in case, and nothing can
-      merge them.
+- [ ] **Merge two books**: nothing can merge two records of one book yet.
+      (The two "How can it be gluten free" books are volumes 1 and 2, not a
+      duplicate; the second's title needs "Volume 2", in the book editor.)
 - [ ] **Long-lived caching for the build's hashed files**: optional; a 404
       for a missing one is already never cached (#42).
 
@@ -41,8 +43,6 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 - [ ] **Typo fixing in the importer** ("Lemon Jucie"): fix when the match is
       close enough, otherwise suggest and flag, with a measured threshold.
 - [ ] **#17**: sign-in and account screens that look like OpenLarder.
-- [ ] **Close #26 and #32**: built in #41 and #36; they stayed open because
-      PRs merge into `dev`.
 - [ ] **Ray**: publish the Google sign-in consent screen.
 - [ ] **Ray**: Cloudflare Browser Cache TTL to "Respect Existing Headers".
 
@@ -69,6 +69,9 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Author pages: books, co-authors, links, fixing an author; the
+      authors list; names on book pages link to them (#52)
+- [x] TODO.md (#51); #26 and #32 closed
 - [x] Search by what you have across several books, closest to made first;
       type-to-find books (#50)
 - [x] Book picker on Search (#49)
