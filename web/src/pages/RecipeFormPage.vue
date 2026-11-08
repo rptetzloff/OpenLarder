@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type { Book } from "../books";
-import { type Recipe, saveRecipe } from "../recipes";
+import { checkLines, type LineReview, type Recipe, saveRecipe } from "../recipes";
 
 // New when bookId is given, editing when recipeId is.
 const props = defineProps<{ bookId?: string; recipeId?: string }>();
@@ -54,6 +54,37 @@ onMounted(async () => {
     loadFailed.value = true;
   }
 });
+
+// The entry rules, checked as the lines are typed (issue #26). Advice only:
+// a line can be an exception, so saving never waits on it.
+const reviews = ref<{ index: number; line: string; review: LineReview }[]>([]);
+let asked = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(ingredients, () => {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const mine = ++asked;
+    const lines = ingredients.value.split("\n");
+    try {
+      const found = await checkLines(lines);
+      if (mine !== asked) return;
+      reviews.value = found
+        .map((review, index) => ({ index, line: lines[index].trim(), review }))
+        .filter((r) => r.review.problems.length);
+    } catch {
+      if (mine === asked) reviews.value = [];
+    }
+  }, 400);
+});
+
+// Replaces (or with null removes) a line, if it still reads as it did.
+function fix(index: number, line: string, replacement: string | null) {
+  const lines = ingredients.value.split("\n");
+  if (lines[index]?.trim() !== line) return;
+  if (replacement === null) lines.splice(index, 1);
+  else lines[index] = replacement;
+  ingredients.value = lines.join("\n");
+}
 
 async function save() {
   saving.value = true;
@@ -119,6 +150,27 @@ async function save() {
         Just what goes in, as the book names it: “rhubarb”, not “200g rhubarb”. Amounts and
         the method stay in the book.
       </p>
+      <ul v-if="reviews.length" class="line-hints" aria-live="polite">
+        <li v-for="r in reviews" :key="`${r.index}:${r.line}`">
+          <strong>{{ r.line }}</strong>: {{ r.review.problems.join(" ") }}
+          <button
+            v-if="r.review.suggestion"
+            type="button"
+            class="link"
+            @click="fix(r.index, r.line, r.review.suggestion)"
+          >
+            Use “{{ r.review.suggestion }}”
+          </button>
+          <button
+            v-else-if="r.review.remove"
+            type="button"
+            class="link"
+            @click="fix(r.index, r.line, null)"
+          >
+            Remove it
+          </button>
+        </li>
+      </ul>
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button type="submit" class="primary" :disabled="saving">

@@ -9,12 +9,12 @@ Reading is public. Writing is for admins until review exists, like books.
 import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from openlarder import detector, recipes, references
 from openlarder import lines as line_reading
-from openlarder import recipes, references
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder.auth import AdminUser, CurrentUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
@@ -27,6 +27,33 @@ from openlarder.models import (
 )
 
 router = APIRouter(tags=["recipes"])
+
+
+class LinesIn(BaseModel):
+    # Blank lines count here, though saving drops them.
+    lines: list[str] = Field(max_length=2 * recipes.MAX_LINES)
+
+
+class LineReview(BaseModel):
+    problems: list[str]
+    suggestion: str | None
+    remove: bool
+
+
+class LinesReviewed(BaseModel):
+    lines: list[LineReview]
+
+
+@router.post("/api/ingredient-lines/check", response_model=LinesReviewed, dependencies=[SameOrigin])
+async def check_lines(body: LinesIn, user: CurrentUser) -> LinesReviewed:
+    """What the entry rules say about each line, for the form to show as
+    it's typed. Changes nothing; saving doesn't depend on it."""
+    return LinesReviewed(
+        lines=[
+            LineReview(problems=r.problems, suggestion=r.suggestion, remove=r.remove)
+            for r in detector.review_all([line[: recipes.MAX_LINE] for line in body.lines])
+        ]
+    )
 
 
 class PageIn(BaseModel):

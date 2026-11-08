@@ -62,3 +62,22 @@ export async function removeRecipe(recipeId: string): Promise<void> {
   const res = await fetch(`/api/recipes/${recipeId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("That didn't remove it. Try again.");
 }
+
+// What the entry rules say about a line: shown under the form, never enforced.
+export interface LineReview {
+  problems: string[];
+  // The line as the rules would have it, when that's a change.
+  suggestion: string | null;
+  // The rules would leave the whole line out.
+  remove: boolean;
+}
+
+export async function checkLines(lines: string[]): Promise<LineReview[]> {
+  const res = await fetch("/api/ingredient-lines/check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lines }),
+  });
+  if (!res.ok) throw new Error("The lines couldn't be checked.");
+  return (await res.json()).lines;
+}

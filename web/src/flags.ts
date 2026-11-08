@@ -25,6 +25,8 @@ export const KIND_LABELS: Record<string, string> = {
   line_fragment: "Fragment of a page reference",
   reference_page: "Reference to the wrong page",
   unknown_reference: "Reference to a missing recipe",
+  usually_left_out: "Usually left out",
+  line_detail: "Amount or prep in a line",
 };
 
 export async function fetchFlags(params: {
