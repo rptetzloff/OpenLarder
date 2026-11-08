@@ -55,6 +55,20 @@ onMounted(async () => {
         </div>
       </div>
 
+      <template v-if="book.ingredients.length">
+        <h2>Ingredients</h2>
+        <p class="status">
+          The ones its recipes use most. Open one for the recipes here that use it, or
+          <a :href="`/search?book=${book.id}`">search this book by ingredient</a>.
+        </p>
+        <ul class="chosen">
+          <li v-for="i in book.ingredients" :key="i.id">
+            <a :href="`/search?book=${book.id}&i=${i.id}`">{{ i.name }}</a>
+            <span class="page-ref">{{ i.recipes }}</span>
+          </li>
+        </ul>
+      </template>
+
       <h2>Recipes</h2>
       <p v-if="user?.is_admin"><a :href="`/books/${book.id}/recipes/new`">Add a recipe</a></p>
       <ul v-if="book.recipes.length" class="recipe-list">

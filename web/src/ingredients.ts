@@ -88,6 +88,8 @@ export async function deleteAlias(id: string, aliasId: string): Promise<void> {
 }
 
 export interface SearchResult {
+  // The book searched within, if one was.
+  book: Named | null;
   ingredients: Named[];
   // IDs in the search that name no ingredient now, as after a merge.
   missing: string[];
@@ -96,8 +98,13 @@ export interface SearchResult {
 }
 
 // The recipes that use every one of the ingredients.
-export async function searchRecipes(ids: string[], offset = 0): Promise<SearchResult> {
+export async function searchRecipes(
+  ids: string[],
+  offset = 0,
+  book: string | null = null,
+): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
+  if (book) query.set("book", book);
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

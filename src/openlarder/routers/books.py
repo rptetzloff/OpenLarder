@@ -22,6 +22,7 @@ from openlarder.db import Session
 from openlarder.models import (
     Author,
     Edition,
+    Ingredient,
     IngredientOption,
     Recipe,
     RecipePage,
@@ -73,6 +74,13 @@ class RecipeSummary(BaseModel):
     pages: list[str | None]
 
 
+class TopIngredient(BaseModel):
+    id: uuid.UUID
+    name: str
+    # Recipes in this book that use it.
+    recipes: int
+
+
 class Book(BaseModel):
     id: uuid.UUID
     title: str
@@ -81,6 +89,11 @@ class Book(BaseModel):
     credits: list[Credit]
     editions: list[EditionOut]
     recipes: list[RecipeSummary]
+    # The ingredients its recipes use most, for finding your way in by one.
+    ingredients: list[TopIngredient]
+
+
+TOP_INGREDIENTS = 30
 
 
 class AddByIsbn(BaseModel):
@@ -173,6 +186,16 @@ async def get_book(work_id: uuid.UUID, session: Session) -> Book:
         )
     ).all():
         pages.setdefault(recipe_id, []).append((edition_order.get(edition_id, 0), page))
+    uses = func.count(func.distinct(IngredientOption.recipe_id))
+    top = await session.execute(
+        select(Ingredient.id, Ingredient.name, uses)
+        .join(IngredientOption, IngredientOption.ingredient_id == Ingredient.id)
+        .join(Recipe, Recipe.id == IngredientOption.recipe_id)
+        .where(Recipe.work_id == work_id)
+        .group_by(Ingredient.id, Ingredient.name)
+        .order_by(uses.desc(), func.lower(Ingredient.name))
+        .limit(TOP_INGREDIENTS)
+    )
     return Book(
         id=work.id,
         title=work.title,
@@ -204,6 +227,7 @@ async def get_book(work_id: uuid.UUID, session: Session) -> Book:
             RecipeSummary(id=r.id, title=r.title, pages=[p for _, p in sorted(pages.get(r.id, []))])
             for r in recipes
         ],
+        ingredients=[TopIngredient(id=i, name=n, recipes=c) for i, n, c in top],
     )
 
 
