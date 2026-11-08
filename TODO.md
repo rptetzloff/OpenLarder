@@ -32,7 +32,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - **Every kind people document is offered**: books, magazines, blogs
         and websites, social media posts, TV and video. Social media is one
         generic kind, an account's post by address, not a kind per
-        platform; nothing is built for TikTok in particular (Ray).
+        platform; nothing is built for TikTok in particular (Ray). Also,
+        all agreed (Ray, 2026-11-08): video channels (a channel's videos,
+        maybe a time), podcasts (a show's episodes), newspaper food sections
+        (a paper's dates and pages), subscription recipe sites (websites
+        behind a paywall, linked, never copied), packaging (a product's
+        label), and **family recipes** (cards, community cookbooks, class
+        handouts), which **can be marked private**: seen only by the person
+        who added them and whoever they share with, as with the larder.
       - **Each kind has its own shape**, in levels: a book's editions and
         pages; a magazine's issues and pages; a website's posts, by address;
         a social media account's posts; **a TV show's episodes, where the recipe
