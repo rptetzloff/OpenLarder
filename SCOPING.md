@@ -353,6 +353,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Saves, likes, "want to cook" lists, reviews, user descriptions
 - Contributor-written author bios, with the other user-written text, and top-ranked recipes on author pages, once ratings exist
 - Personal shelf: mark books you own, filter search to your shelf
+- Personal larder: a person's own inventory lists (pantry, spice drawer, fridge, freezer, named as they like), each item their own name matched to a canonical ingredient, feeding "what can I make with what I have". Private by default, shareable with friends and family, public by choice. *Ray, 2026-11-08; open questions in TODO.md. Placed in Phase 2 by Claude, beside the shelf; move it up if it should come sooner.*
 - Amazon Associates links, once traffic supports it
 - Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.*
 

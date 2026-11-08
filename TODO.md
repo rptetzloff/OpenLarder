@@ -24,6 +24,25 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       only admins add to the catalog. The ingredient matching flow's
       suggestions and "new ingredient" step wait on this too.
 
+## Planned features
+
+- [ ] **Personal larder: your own inventory lists.** *Ray, 2026-11-08.* Each
+      person keeps lists named and arranged their own way ("Pantry", "Spice
+      drawer", "Refrigerator", "Freezer", or whatever they like). An item is
+      a name of their own ("Cholula Chipotle") and the canonical ingredient
+      it matches ("Hot Sauce"), so 34 hot sauces are still hot sauce. It
+      feeds Search's "what can I make with what I have": your larder becomes
+      the ingredients you have. Private by default; shareable with friends
+      and family; public if someone wants it. To settle when it's built:
+      - whether an item can match a specific kind ("Chipotle Hot Sauce")
+        with the broader one counting through the hierarchy, or only the
+        top-level ingredient;
+      - "out of" or "running low" on an item, with no amounts (amounts stay
+        out, as for recipes);
+      - how friends and family link: invite by account, a shared household
+        larder, or both; and whether shared means view or edit;
+      - whether a book shelf ("books I own", Phase 2) lives alongside it.
+
 ## Found along the way
 
 - [ ] **Books page at scale**: it loads every book and filters in the
