@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
   type IngredientSummary,
   listIngredients,
@@ -10,11 +10,13 @@ import {
 
 document.title = "Search · OpenLarder";
 
-// The ingredients, and the book if the search is within one, are kept in
-// the address (?book=…&i=…&i=…), so a search can be bookmarked or shared.
+// The ingredients, title words, and the book if the search is within one,
+// are kept in the address (?book=…&q=…&i=…&i=…), so a search can be
+// bookmarked or shared.
 const MAX = 10;
 const chosen = ref<Named[]>([]);
 const book = ref<Named | null>(null);
+const title = ref(new URLSearchParams(location.search).get("q") ?? "");
 const result = ref<SearchResult | null>(null);
 const missing = ref(0);
 const failed = ref(false);
@@ -29,16 +31,18 @@ async function run(more = false) {
   for (const id of ids) url.searchParams.append("i", id);
   if (book.value) url.searchParams.set("book", book.value.id);
   else url.searchParams.delete("book");
+  if (title.value.trim()) url.searchParams.set("q", title.value.trim());
+  else url.searchParams.delete("q");
   history.replaceState(null, "", url);
   failed.value = false;
-  if (!ids.length) {
+  if (!ids.length && !title.value.trim()) {
     result.value = null;
     return;
   }
   loading.value = true;
   try {
     const offset = more ? (result.value?.recipes.length ?? 0) : 0;
-    const page = await searchRecipes(ids, offset, book.value?.id);
+    const page = await searchRecipes(ids, { offset, book: book.value?.id, q: title.value });
     if (mine !== asked) return;
     if (more && result.value) result.value.recipes.push(...page.recipes);
     else result.value = page;
@@ -48,6 +52,12 @@ async function run(more = false) {
     if (mine === asked) loading.value = false;
   }
 }
+
+let titleTimer: ReturnType<typeof setTimeout> | undefined;
+watch(title, () => {
+  clearTimeout(titleTimer);
+  titleTimer = setTimeout(() => run(), 300);
+});
 
 // Picking an ingredient.
 const query = ref("");
@@ -85,6 +95,20 @@ function everyBook() {
   run();
 }
 
+// "3 recipes use all of these and have “cake” in the title."
+const summary = computed(() => {
+  const r = result.value;
+  if (!r) return "";
+  const one = r.total === 1;
+  const parts = [];
+  if (chosen.value.length) {
+    const what = chosen.value.length > 1 ? "all of these" : "it";
+    parts.push(`${one ? "uses" : "use"} ${what}`);
+  }
+  if (r.q) parts.push(`${one ? "has" : "have"} “${r.q}” in the title`);
+  return `${r.total.toLocaleString()} ${one ? "recipe" : "recipes"} ${parts.join(" and ")}.`;
+});
+
 function where(r: SearchResult["recipes"][number]) {
   return r.pages.length ? `, p. ${r.pages.join(" / ")}` : "";
 }
@@ -94,8 +118,8 @@ onMounted(async () => {
   const ids = params.getAll("i").slice(0, MAX);
   const bookId = params.get("book");
   try {
-    if (!ids.length) {
-      // Within a book, before any ingredient: the book's name is all to show.
+    if (!ids.length && !title.value.trim()) {
+      // Within a book, before anything to search by: the book's name is all to show.
       const res = bookId ? await fetch(`/api/books/${bookId}`) : null;
       if (res?.ok) {
         const found = await res.json();
@@ -104,7 +128,7 @@ onMounted(async () => {
       return;
     }
     // The search names the ingredients and book, so a link needs only IDs.
-    const page = await searchRecipes(ids, 0, bookId);
+    const page = await searchRecipes(ids, { book: bookId, q: title.value });
     chosen.value = page.ingredients;
     book.value = page.book;
     missing.value = page.missing.length;
@@ -120,8 +144,23 @@ onMounted(async () => {
   <article>
     <h1>Search</h1>
     <p class="status">
-      Recipes that use every ingredient you choose, with the book and page to find them on.
+      Recipes that use every ingredient you choose, or have every word you type in their title,
+      or both, with the book and page to find them on.
     </p>
+
+    <div class="isbn-form">
+      <label for="search-title">Words in the title</label>
+      <div class="row">
+        <input
+          id="search-title"
+          v-model="title"
+          type="search"
+          autocomplete="off"
+          maxlength="200"
+          placeholder="cake"
+        />
+      </div>
+    </div>
 
     <div class="isbn-form">
       <label for="search-ingredient">Add an ingredient</label>
@@ -166,12 +205,8 @@ onMounted(async () => {
     </p>
 
     <p v-if="failed" role="alert">The search didn't work. Try again.</p>
-    <template v-else-if="result && chosen.length">
-      <p class="status">
-        {{ result.total.toLocaleString() }}
-        {{ result.total === 1 ? "recipe uses" : "recipes use" }}
-        {{ chosen.length > 1 ? "all of these" : "it" }}.
-      </p>
+    <template v-else-if="result && (chosen.length || result.q)">
+      <p class="status">{{ summary }}</p>
       <ul class="recipe-list">
         <li v-for="r in result.recipes" :key="r.id">
           <a :href="`/recipes/${r.id}`">{{ r.title }}</a>

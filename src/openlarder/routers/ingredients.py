@@ -72,7 +72,7 @@ class IngredientOut(BaseModel):
     family_total: int
 
 
-def _like(q: str) -> str:
+def contains_pattern(q: str) -> str:
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
@@ -125,7 +125,7 @@ async def list_ingredients(
         uses, uses.c.ingredient_id == Ingredient.id
     )
     if q.strip():
-        like = _like(" ".join(q.split()))
+        like = contains_pattern(" ".join(q.split()))
         query = query.where(
             Ingredient.name.ilike(like, escape="\\")
             | exists().where(
