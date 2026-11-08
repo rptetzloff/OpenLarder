@@ -197,7 +197,8 @@ something queues a job.
 Every PR checks the documents that make claims about the thing it changes, and
 updates the ones the change made wrong: `README.md`, `SCOPING.md`,
 `DATA_MODEL.svg`, this file, the module docstrings, and later the content rules,
-licence terms and any help text. A claim written when it was true does not
+licence terms and any help text. `TODO.md` too, in every PR: tick off what it
+finishes, with the PR number, and add what it finds (Ray, 2026-11-08). A claim written when it was true does not
 announce that it stopped being true: no test fails, no build breaks. One
 sibling's security policy listed a fixed issue as known, which does more than
 mislead; it tells researchers not to report it.
