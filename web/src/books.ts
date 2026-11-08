@@ -110,3 +110,11 @@ export async function saveBook(bookId: string, body: BookIn): Promise<void> {
     throw new Error(typeof out.detail === "string" ? out.detail : "That didn't save. Try again.");
   }
 }
+
+// A few books with every word of q in the title, subtitle or a credited
+// name, for type-to-find pickers.
+export async function findBooks(q: string, limit = 8): Promise<BookSummary[]> {
+  const res = await fetch(`/api/books?${new URLSearchParams({ q, limit: String(limit) })}`);
+  if (!res.ok) throw new Error("The books couldn't be searched.");
+  return res.json();
+}

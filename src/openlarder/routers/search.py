@@ -1,18 +1,28 @@
-"""Search: the recipes that use every one of several ingredients, or whose
-titles have every word typed, or both, in every book or in one.
+"""Search: what can I make from these books with what I have?
 
-Public, like the rest of the catalog. A recipe matches an ingredient when
-any option on any of its lines is that ingredient or one under it in the
-hierarchy, so a search for cheese finds a recipe that uses cheddar, and
-"butter or oil" counts for butter. An ingredient's own page lists exactly
-the recipes matched to it; this is the broader search.
+Public, like the rest of the catalog. Three things narrow it, alone or
+together: ingredients you have, words of a title, and books.
 
-An ingredient ID that no longer exists, as after a merge, is left out of
-the search and reported, so an old link still finds what it can.
+**Ingredients you have** rank recipes rather than filter them strictly. A
+recipe is found if any of its lines is covered. Recipes needing nothing
+else come first, then the more of the recipe you have ("you have 5 of its
+7" before "1 of 2"), then the fewer lines still needed; each lists what
+it's missing. *Ray, 2026-11-08: "I have three
+cookbooks pulled out... I have these ingredients".* A line is covered when
+any of its options is one of your ingredients or one under it in the
+hierarchy, so cheese covers "Aged Cheddar", and "Butter or Margarine" is
+covered by either. Salt, pepper, sugar and water are left out of lines by
+the entry rules, so they never count as missing. A line citing another
+recipe is a component to make, not something you have, and counts as
+missing.
 
-Title words match anywhere in a title, ignoring case, so "rhubarb cake"
-finds "Rhubarb and Ginger Cake"; accents count, as they do for
-ingredients. The trigram index on recipe titles serves these.
+**Title words** must all appear in the title, ignoring case; accents count,
+as they do for ingredients. The trigram index on recipe titles serves them.
+
+**Books**: a recipe in any of them. IDs that name no ingredient or book now,
+as after a merge, are left out of the search and reported, so an old link
+still finds what it can. An ingredient's own page lists exactly the recipes
+matched to it; this is the broader search.
 """
 
 import uuid
@@ -20,17 +30,24 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import case, exists, func, select
 
 from openlarder.db import Session
 from openlarder.ingredients import family
-from openlarder.models import Ingredient, IngredientOption, Recipe, Work
-from openlarder.routers.ingredients import UsedBy, contains_pattern, recipes_where
+from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Work
+from openlarder.routers import ingredients as listing
+from openlarder.routers.ingredients import (
+    UsedBy,
+    contains_pattern,
+    recipes_where,
+    with_pages,
+)
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
-MAX_INGREDIENTS = 10
+MAX_INGREDIENTS = 30
 MAX_WORDS = 10
+MAX_BOOKS = 10
 
 
 class Named(BaseModel):
@@ -38,17 +55,33 @@ class Named(BaseModel):
     name: str
 
 
+class Hit(UsedBy):
+    # With ingredients: how many of the recipe's lines you have, of how
+    # many, and the lines you don't, as the book names them.
+    have: int | None = None
+    lines: int | None = None
+    needs: list[str] = []
+
+
 class Found(BaseModel):
-    # The book searched within, if one was.
-    book: Named | None
-    # The ingredients searched for, in the order asked, and any IDs that
-    # name no ingredient now.
+    # The books searched within, if any were, in the order asked.
+    books: list[Named]
+    # The ingredients searched for, in the order asked.
     ingredients: list[Named]
+    # Ingredient and book IDs asked for that name nothing now.
     missing: list[uuid.UUID]
+    missing_books: list[uuid.UUID]
     # The title words searched for, tidied.
     q: str
-    recipes: list[UsedBy]
+    recipes: list[Hit]
     total: int
+
+
+def _too_many(n: int, limit: int, what: str) -> None:
+    if n > limit:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"Search with at most {limit} {what}."
+        )
 
 
 @router.get("", response_model=Found)
@@ -56,36 +89,33 @@ async def search(
     session: Session,
     ingredient: Annotated[list[uuid.UUID] | None, Query()] = None,
     q: str = Query("", max_length=200),
-    book: uuid.UUID | None = None,
+    book: Annotated[list[uuid.UUID] | None, Query()] = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     asked = list(dict.fromkeys(ingredient or []))
     words = list(dict.fromkeys(q.casefold().split()))
+    shelf = list(dict.fromkeys(book or []))
     if not asked and not words:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose an ingredient or type part of a title."
         )
-    if len(words) > MAX_WORDS:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, f"Use at most {MAX_WORDS} words of a title."
-        )
-    if len(asked) > MAX_INGREDIENTS:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            f"Search for at most {MAX_INGREDIENTS} ingredients at once.",
-        )
-    rows = await session.execute(
+    _too_many(len(asked), MAX_INGREDIENTS, "ingredients")
+    _too_many(len(words), MAX_WORDS, "words of a title")
+    _too_many(len(shelf), MAX_BOOKS, "books")
+
+    found_names = await session.execute(
         select(Ingredient.id, Ingredient.name).where(Ingredient.id.in_(asked))
     )
-    names = {i: name for i, name in rows}
+    names = {i: n for i, n in found_names}
+    found_titles = await session.execute(select(Work.id, Work.title).where(Work.id.in_(shelf)))
+    titles = {i: t for i, t in found_titles}
     known = [i for i in asked if i in names]
-    work = await session.get(Work, book) if book else None
-    if book and work is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    books = [i for i in shelf if i in titles]
     found = Found(
-        book=Named(id=work.id, name=work.title) if work else None,
+        books=[Named(id=i, name=titles[i]) for i in books],
         ingredients=[Named(id=i, name=names[i]) for i in known],
         missing=[i for i in asked if i not in names],
+        missing_books=[i for i in shelf if i not in titles],
         q=" ".join(q.split()),
         recipes=[],
         total=0,
@@ -93,16 +123,74 @@ async def search(
     # Every ingredient asked for is gone: nothing left to search by.
     if not known and not words:
         return found
-    conditions = [
-        Recipe.id.in_(
-            select(IngredientOption.recipe_id).where(
-                IngredientOption.ingredient_id.in_(family(i, f"family_{n}"))
-            )
-        )
-        for n, i in enumerate(known)
-    ]
-    conditions += [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
-    if work:
-        conditions.append(Recipe.work_id == work.id)
-    found.recipes, found.total = await recipes_where(session, *conditions, offset=offset)
+    conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
+    if books:
+        conditions.append(Recipe.work_id.in_(books))
+    if not known:
+        page, found.total = await recipes_where(session, *conditions, offset=offset)
+        found.recipes = [Hit(**r.model_dump()) for r in page]
+        return found
+    found.recipes, found.total = await _best_match(session, known, conditions, offset)
     return found
+
+
+async def _best_match(session: Session, have: list[uuid.UUID], conditions, offset: int):
+    """Recipes covering any line with what you have, by the share of lines
+    covered (so complete ones come first), then fewest still needed, most of
+    yours used, then book and title."""
+    yours = family(*have, name="yours")
+    covered = exists().where(
+        IngredientOption.recipe_ingredient_id == RecipeIngredient.id,
+        IngredientOption.ingredient_id.in_(yours),
+    )
+    per_line = select(
+        RecipeIngredient.recipe_id.label("recipe_id"),
+        case((covered, 1), else_=0).label("covered"),
+    ).subquery()
+    tally = (
+        select(
+            per_line.c.recipe_id,
+            func.sum(per_line.c.covered).label("have"),
+            func.count().label("lines"),
+        )
+        .group_by(per_line.c.recipe_id)
+        .having(func.sum(per_line.c.covered) > 0)
+        .subquery()
+    )
+    matching = (
+        select(Recipe.id, Recipe.title, Work.id, Work.title, tally.c.have, tally.c.lines)
+        .join(tally, tally.c.recipe_id == Recipe.id)
+        .join(Work, Work.id == Recipe.work_id)
+        .where(*conditions)
+    )
+    total = await session.scalar(select(func.count()).select_from(matching.subquery()))
+    rows = (
+        await session.execute(
+            matching.order_by(
+                # True division: SQLAlchemy makes / between integers a real one.
+                (tally.c.have / tally.c.lines).desc(),
+                (tally.c.lines - tally.c.have).asc(),
+                tally.c.have.desc(),
+                func.lower(Work.title),
+                func.lower(Recipe.title),
+                Recipe.id,
+            )
+            .offset(offset)
+            # Read at call time, so a test can shrink it.
+            .limit(listing.PAGE)
+        )
+    ).all()
+    listed = await with_pages(session, [r[:4] for r in rows])
+    needs: dict[uuid.UUID, list[str]] = {}
+    if rows:
+        for recipe_id, text in await session.execute(
+            select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
+            .where(RecipeIngredient.recipe_id.in_([r[0] for r in rows]), ~covered)
+            .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
+        ):
+            needs.setdefault(recipe_id, []).append(text)
+    hits = [
+        Hit(**u.model_dump(), have=r[4], lines=r[5], needs=needs.get(u.id, []))
+        for u, r in zip(listed, rows, strict=True)
+    ]
+    return hits, total or 0

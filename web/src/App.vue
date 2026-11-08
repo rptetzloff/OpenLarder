@@ -519,15 +519,10 @@ button.link {
 .fix-ingredient .error {
   color: var(--error);
 }
-#search-book {
-  align-self: flex-start;
-  max-width: 100%;
-  font: inherit;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
+.recipe-list .match {
+  display: block;
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 .swap-list {
   padding-left: 1.25rem;

@@ -219,12 +219,14 @@ _SWAP_KEY = (
 )
 
 
-def family(ingredient_id: uuid.UUID, name: str = "family"):
-    """The ingredient and everything under it, as a select of IDs. UNION,
+def family(*ingredient_ids: uuid.UUID, name: str = "family"):
+    """The ingredients and everything under them, as a select of IDs. UNION,
     not UNION ALL, so a loop in the hierarchy still ends; set_parent makes
     none, but rows written another way could."""
     tree = (
-        select(Ingredient.id).where(Ingredient.id == ingredient_id).cte(name=name, recursive=True)
+        select(Ingredient.id)
+        .where(Ingredient.id.in_(ingredient_ids))
+        .cte(name=name, recursive=True)
     )
     tree = tree.union(select(Ingredient.id).where(Ingredient.parent_id == tree.c.id))
     return select(tree.c.id)

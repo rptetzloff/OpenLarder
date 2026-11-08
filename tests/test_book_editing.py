@@ -233,3 +233,36 @@ async def test_a_new_name_is_not_matched_to_an_open_library_author(admin, adb) -
     ids = (await adb.scalars(text("SELECT id FROM authors ORDER BY open_library_author_id"))).all()
     assert len(ids) == 2
     assert str(ids[0]) == first["credits"][0]["author_id"]
+
+
+# Finding a book by name (the list's q and limit)
+
+
+async def test_books_are_found_by_title_subtitle_or_credit(admin, client) -> None:
+    await _book(admin, title="Plenty", authors=["Yotam Ottolenghi", "Jonathan Lovekin"])
+    camino = await _book(admin, title="This Is Camino", authors=["Russell Moore"])
+    await _edit(admin, camino, subtitle="Recipes from the Oakland restaurant")
+    await _book(admin, title="100% Rye", authors=[])
+    titles = lambda r: [b["title"] for b in r.json()]  # noqa: E731
+    assert titles(await client.get("/api/books", params={"q": "PLENTY"})) == ["Plenty"]
+    assert titles(await client.get("/api/books", params={"q": "lovekin"})) == ["Plenty"]
+    assert titles(await client.get("/api/books", params={"q": "oakland"})) == ["This Is Camino"]
+    # Every word, wherever it is.
+    assert titles(await client.get("/api/books", params={"q": "camino moore"})) == [
+        "This Is Camino"
+    ]
+    assert titles(await client.get("/api/books", params={"q": "camino lovekin"})) == []
+    assert titles(await client.get("/api/books", params={"q": "%"})) == ["100% Rye"]
+    assert titles(await client.get("/api/books", params={"q": "  "})) == [
+        "100% Rye",
+        "Plenty",
+        "This Is Camino",
+    ]
+
+
+async def test_a_picker_asks_for_a_few(admin, client) -> None:
+    for title in ("Bread A", "Bread B", "Bread C"):
+        await _book(admin, title=title, authors=[])
+    found = await client.get("/api/books", params={"q": "bread", "limit": 2})
+    assert [b["title"] for b in found.json()] == ["Bread A", "Bread B"]
+    assert (await client.get("/api/books", params={"limit": 51})).status_code == 422

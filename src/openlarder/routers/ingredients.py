@@ -7,10 +7,11 @@ Renaming, merging and deleting are for admins.
 """
 
 import uuid
+from collections.abc import Sequence
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import ColumnElement, exists, func, select
+from sqlalchemy import ColumnElement, Row, exists, func, select
 
 from openlarder import ingredients, substitutions
 from openlarder.auth import AdminUser, SameOrigin
@@ -97,6 +98,13 @@ async def recipes_where(
             .limit(PAGE)
         )
     ).all()
+    return await with_pages(session, rows), total or 0
+
+
+async def with_pages(
+    session: Session, rows: Sequence[Row[tuple[uuid.UUID, str, uuid.UUID, str]]]
+) -> list[UsedBy]:
+    """(recipe ID, title, book ID, book title) rows, in order, with pages."""
     pages: dict[uuid.UUID, list[str]] = {}
     if rows:
         for recipe_id, page in await session.execute(
@@ -105,11 +113,10 @@ async def recipes_where(
             .order_by(RecipePage.page)
         ):
             pages.setdefault(recipe_id, []).append(page)
-    recipes = [
+    return [
         UsedBy(id=r, title=t, book_id=b, book_title=bt, pages=pages.get(r, []))
         for r, t, b, bt in rows
     ]
-    return recipes, total or 0
 
 
 @router.get("", response_model=IngredientList)
