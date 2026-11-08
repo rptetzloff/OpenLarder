@@ -20,7 +20,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import openlibrary
+from openlarder import author_merge, openlibrary
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Source, SourceCredit
@@ -70,6 +70,9 @@ class AuthorOut(BaseModel):
     links: list[LinkOut]
     sources: list[AuthorBook]
     coauthors: list[CoAuthor]
+    # Other authors whose names compare the same: likely the same person,
+    # to merge (author_merge.py).
+    same_name: list[AuthorSummary]
 
 
 @router.get("", response_model=AuthorList)
@@ -157,6 +160,16 @@ async def get_author(author_id: uuid.UUID, session: Session) -> AuthorOut:
         links=[LinkOut(id=x.id, url=x.url, label=x.label) for x in links],
         sources=books,
         coauthors=[CoAuthor(id=i, name=n, sources=c) for i, n, c in coauthors],
+        same_name=[
+            AuthorSummary(id=i, name=n, sources=c)
+            for i, n, c in await session.execute(
+                select(Author.id, Author.name, func.count(func.distinct(SourceCredit.source_id)))
+                .outerjoin(SourceCredit, SourceCredit.author_id == Author.id)
+                .where(Author.name_key == author.name_key, Author.id != author.id)
+                .group_by(Author.id, Author.name)
+                .order_by(func.lower(Author.name), Author.id)
+            )
+        ],
     )
 
 
@@ -238,3 +251,27 @@ async def remove_link(
     await session.delete(link)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class MergeInto(BaseModel):
+    into: uuid.UUID
+
+
+@router.post("/{author_id}/merge", response_model=AuthorSummary, dependencies=[SameOrigin])
+async def merge_author(
+    author_id: uuid.UUID, body: MergeInto, admin: AdminUser, session: Session
+) -> AuthorSummary:
+    """Merge this author into another; answers with the one that's left."""
+    gone = await _author_or_404(session, author_id)
+    kept = await _author_or_404(session, body.into)
+    try:
+        await author_merge.merge(session, gone, kept)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await session.commit()
+    sources = await session.scalar(
+        select(func.count(func.distinct(SourceCredit.source_id))).where(
+            SourceCredit.author_id == kept.id
+        )
+    )
+    return AuthorSummary(id=kept.id, name=kept.name, sources=sources or 0)

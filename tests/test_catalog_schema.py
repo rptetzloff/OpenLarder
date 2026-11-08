@@ -9,6 +9,7 @@ from alembic.migration import MigrationContext
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import IntegrityError
 
+from openlarder.author_names import name_key
 from openlarder.models import Base
 
 
@@ -321,8 +322,9 @@ def test_existing_lines_keep_their_targets_and_downgrade_keeps_fallbacks(
 def _author(db: Connection, name: str, kind: str = "person", wikidata_id=None) -> uuid.UUID:
     return _insert(
         db,
-        "INSERT INTO authors (name, kind, wikidata_id) VALUES (:n, :k, :q)",
+        "INSERT INTO authors (name, name_key, kind, wikidata_id) VALUES (:n, :nk, :k, :q)",
         n=name,
+        nk=name_key(name),
         k=kind,
         q=wikidata_id,
     )

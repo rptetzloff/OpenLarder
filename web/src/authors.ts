@@ -18,6 +18,8 @@ export interface Author {
   sources: (BookSummary & { roles: string[]; credited_as: string })[];
   // People credited on the same books, most shared first.
   coauthors: AuthorSummary[];
+  // Others whose names compare the same: likely one person, to merge.
+  same_name: AuthorSummary[];
 }
 
 async function send(path: string, method: string, body?: unknown) {
@@ -63,4 +65,9 @@ export async function addLink(
 
 export async function removeLink(id: string, linkId: string): Promise<void> {
   await send(`/api/authors/${id}/links/${linkId}`, "DELETE");
+}
+
+// Merges this author into another; resolves to the one that's left.
+export async function mergeAuthor(id: string, into: string): Promise<AuthorSummary> {
+  return send(`/api/authors/${id}/merge`, "POST", { into });
 }

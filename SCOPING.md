@@ -162,6 +162,8 @@ How an author proves who they are is not designed yet.
 
 **Built** (2026-11-08): each author has a page with their books (and their role, when it isn't author, and the name the book prints when it differs), the people credited with them on those books, most shared first, their links and Open Library. Names on a book page link there, and there's an authors list. An admin fixes an author's own name and kind on the page, Open Library authors included, since its names come as it files them ("Moore, Russell (Chef)"); editing a book changes only how that book prints the name. Links must be http or https. Wikidata facts, bios and photos wait (TODO.md).
 
+Two records of one person are merged on the author's page, which lists other authors whose names compare the same (case, accents, punctuation and "Last, First" aside): credits, links and outside records move to the one kept, and each source still prints its own name. A typed name matches the one author with the same name key, Open Library's included; when several share it, a new record is made for merging by hand. *Ray, 2026-11-08, after Katarina Cermelj and Jennifer McLagan each came out as two; until then Open Library's authors were left out of matching.*
+
 ## Ingredient normalization
 
 Every ingredient line resolves to one canonical ingredient. Search, shopping, and the API all depend on this.

@@ -11,14 +11,13 @@ admin can check the Open Library record is the same book first; several
 "Heritage Cookbook"s by other authors exist there. apply() does it.
 """
 
-import re
-import unicodedata
 import uuid
 from dataclasses import dataclass, field
 
 from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from openlarder.author_names import name_key
 from openlarder.models import Author, Edition, Source, SourceCredit
 from openlarder.openlibrary import FoundAuthor, FoundBook
 
@@ -42,21 +41,6 @@ class Plan:
     edition_step: str | None = None
     edition: Edition | None = None
     authors: list[AuthorStep] = field(default_factory=list)
-
-
-def name_key(name: str) -> str:
-    """A name reduced for matching: "Moore, Russell (Chef)" -> "russell moore".
-
-    Bracketed notes go, "Last, First" turns round, and accents, case and
-    punctuation are ignored. Only for comparing; nothing stores it.
-    """
-    name = re.sub(r"\([^)]*\)", " ", name)
-    if name.count(",") == 1:
-        last, first = name.split(",")
-        name = f"{first} {last}"
-    name = unicodedata.normalize("NFKD", name)
-    name = "".join(c for c in name if not unicodedata.combining(c))
-    return " ".join(re.sub(r"[^\w\s]", " ", name.casefold()).split())
 
 
 async def plan(session: AsyncSession, work: Source, found: FoundBook) -> Plan:
