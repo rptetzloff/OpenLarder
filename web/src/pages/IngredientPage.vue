@@ -166,6 +166,7 @@ onMounted(() => load());
       <p class="status">
         Used in {{ ingredient.total.toLocaleString() }}
         {{ ingredient.total === 1 ? "recipe" : "recipes" }}.
+        <a :href="`/search?i=${ingredient.id}`">Search with other ingredients too</a>
       </p>
       <ul class="recipe-list">
         <li v-for="r in ingredient.recipes" :key="r.id">

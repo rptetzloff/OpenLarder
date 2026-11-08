@@ -29,6 +29,7 @@ from openlarder.routers import (
     imports,
     ingredients,
     recipes,
+    search,
 )
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -74,6 +75,7 @@ app.include_router(imports.router)
 app.include_router(covers.router)
 app.include_router(flags.router)
 app.include_router(ingredients.router)
+app.include_router(search.router)
 
 
 def spa_response(web_dir: Path, path: str) -> FileResponse:

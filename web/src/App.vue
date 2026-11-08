@@ -13,6 +13,7 @@ import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
 import RecipePage from "./pages/RecipePage.vue";
+import SearchPage from "./pages/SearchPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
 
@@ -26,6 +27,7 @@ const page = pages[path];
 const onAccount = path === "/account";
 const onBooks = path === "/books";
 const onIngredients = path === "/ingredients";
+const onSearch = path === "/search";
 const onAdmin = path === "/admin";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
@@ -70,7 +72,8 @@ onMounted(async () => {
 <template>
   <header>
     <a href="/books">Books</a>
-    <a href="/ingredients" class="nav">Ingredients</a>
+    <a href="/ingredients">Ingredients</a>
+    <a href="/search" class="nav">Search</a>
     <template v-if="user">
       <a v-if="user.is_admin" href="/admin">Admin</a>
       <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
@@ -97,6 +100,7 @@ onMounted(async () => {
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
     <IngredientsPage v-else-if="onIngredients" />
+    <SearchPage v-else-if="onSearch" />
     <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
@@ -483,6 +487,24 @@ button.link {
 }
 .fix-ingredient .error {
   color: var(--error);
+}
+.chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+.chosen li {
+  margin: 0;
+  padding: 0.25rem 0.375rem 0.25rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.chosen button {
+  margin-left: 0.25rem;
+  padding: 0 0.25rem;
 }
 .merge-candidates {
   list-style: none;

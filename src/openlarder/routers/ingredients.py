@@ -10,7 +10,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import exists, func, select
+from sqlalchemy import ColumnElement, exists, func, select
 
 from openlarder import ingredients
 from openlarder.auth import AdminUser, SameOrigin
@@ -67,6 +67,37 @@ def _like(q: str) -> str:
     return f"%{escaped}%"
 
 
+async def recipes_where(
+    session: Session, *conditions: ColumnElement[bool], offset: int
+) -> tuple[list[UsedBy], int]:
+    """A page of the recipes meeting the conditions, by book then title,
+    with their pages, and how many there are in all."""
+    total = await session.scalar(select(func.count()).select_from(Recipe).where(*conditions))
+    rows = (
+        await session.execute(
+            select(Recipe.id, Recipe.title, Work.id, Work.title)
+            .join(Work, Work.id == Recipe.work_id)
+            .where(*conditions)
+            .order_by(func.lower(Work.title), func.lower(Recipe.title), Recipe.id)
+            .offset(offset)
+            .limit(PAGE)
+        )
+    ).all()
+    pages: dict[uuid.UUID, list[str]] = {}
+    if rows:
+        for recipe_id, page in await session.execute(
+            select(RecipePage.recipe_id, RecipePage.page)
+            .where(RecipePage.recipe_id.in_([r[0] for r in rows]), RecipePage.page.is_not(None))
+            .order_by(RecipePage.page)
+        ):
+            pages.setdefault(recipe_id, []).append(page)
+    recipes = [
+        UsedBy(id=r, title=t, book_id=b, book_title=bt, pages=pages.get(r, []))
+        for r, t, b, bt in rows
+    ]
+    return recipes, total or 0
+
+
 @router.get("", response_model=IngredientList)
 async def list_ingredients(
     session: Session, q: str = "", offset: int = Query(0, ge=0)
@@ -111,32 +142,15 @@ async def get_ingredient(
     ingredient = await session.get(Ingredient, ingredient_id)
     if ingredient is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingredient.")
-    using = select(IngredientOption.recipe_id).where(
-        IngredientOption.ingredient_id == ingredient_id
+    recipes, total = await recipes_where(
+        session,
+        Recipe.id.in_(
+            select(IngredientOption.recipe_id).where(
+                IngredientOption.ingredient_id == ingredient_id
+            )
+        ),
+        offset=offset,
     )
-    total = await session.scalar(
-        select(func.count(func.distinct(IngredientOption.recipe_id))).where(
-            IngredientOption.ingredient_id == ingredient_id
-        )
-    )
-    recipes = (
-        await session.execute(
-            select(Recipe.id, Recipe.title, Work.id, Work.title)
-            .join(Work, Work.id == Recipe.work_id)
-            .where(Recipe.id.in_(using))
-            .order_by(func.lower(Work.title), func.lower(Recipe.title), Recipe.id)
-            .offset(offset)
-            .limit(PAGE)
-        )
-    ).all()
-    pages: dict[uuid.UUID, list[str]] = {}
-    if recipes:
-        for recipe_id, page in await session.execute(
-            select(RecipePage.recipe_id, RecipePage.page)
-            .where(RecipePage.recipe_id.in_([r[0] for r in recipes]), RecipePage.page.is_not(None))
-            .order_by(RecipePage.page)
-        ):
-            pages.setdefault(recipe_id, []).append(page)
     aliases = await session.execute(
         select(IngredientAlias.id, IngredientAlias.name)
         .where(IngredientAlias.ingredient_id == ingredient_id)
@@ -146,11 +160,8 @@ async def get_ingredient(
         id=ingredient.id,
         name=ingredient.name,
         aliases=[AliasOut(id=a, name=n) for a, n in aliases],
-        recipes=[
-            UsedBy(id=r, title=t, book_id=b, book_title=bt, pages=pages.get(r, []))
-            for r, t, b, bt in recipes
-        ],
-        total=total or 0,
+        recipes=recipes,
+        total=total,
     )
 
 
