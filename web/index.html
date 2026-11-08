@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>OpenLarder</title>
+    <script>
+      // The theme before anything is drawn, so a dark choice never flashes
+      // light first. theme.ts keeps it in step afterwards.
+      (function () {
+        var choice = null;
+        try {
+          choice = localStorage.getItem("openlarder_theme");
+        } catch (e) {}
+        var dark =
+          choice === "dark" ||
+          (choice !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
