@@ -26,6 +26,26 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
+- [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
+      book or a blog or an instagram post or a tv episode or a magazine
+      article".* Where a recipe is depends on the kind of source:
+      - a book: an edition and a page (as now);
+      - a magazine: an issue and a page;
+      - a blog or website: an address;
+      - an Instagram or other social post: an address;
+      - a TV episode or video: the show, season and episode, maybe a time.
+
+      Only books come from Open Library, and only books have affiliate
+      links. Everything else stays as it is: the entry rules, ingredient
+      lines, search, substitutions and the larder all hang off the recipe,
+      not the source. The content rules matter more for web sources: an
+      entry links to the recipe and never copies it. *Claude's
+      recommendation:* settle the model before launch, renaming Work to
+      Source with a kind and Edition to a printing (or issue), even if only
+      books are offered at first. Renaming after launch would change the
+      public API and every `/books/…` link. Open: which kinds to start with,
+      what to store for a web page that disappears, and whether a TV recipe
+      is the episode or the show.
 - [ ] **Personal larder: your own inventory lists.** *Ray, 2026-11-08.* Each
       person keeps lists named and arranged their own way ("Pantry", "Spice
       drawer", "Refrigerator", "Freezer", or whatever they like). An item is

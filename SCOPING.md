@@ -361,7 +361,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 - Meal planning and shopping lists
 - Photo/OCR import of a book's index pages
-- Magazines and web recipe sources
+- Magazines and web recipe sources. *Ray, 2026-11-08, widened: a source can be a book, magazine article, blog post, Instagram or other social post, or TV episode. The data model should allow it before launch, even if non-book sources come later; see TODO.md.*
 - Verified authors curating their own pages (waits on the verification process)
 - Write API
 - Data dumps on a schedule
