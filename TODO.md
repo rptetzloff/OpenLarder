@@ -28,12 +28,31 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 - [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
       book or a blog or an instagram post or a tv episode or a magazine
-      article".* Where a recipe is depends on the kind of source:
-      - a book: an edition and a page (as now);
-      - a magazine: an issue and a page;
-      - a blog or website: an address;
-      - an Instagram or other social post: an address;
-      - a TV episode or video: the show, season and episode, maybe a time.
+      article".* Decided (Ray, 2026-11-08):
+      - **Every kind people document is offered**: books, magazines, blogs
+        and websites, Instagram and other social posts, TV and video.
+      - **Each kind has its own shape**, in levels: a book's editions and
+        pages; a magazine's issues and pages; a website's posts, by address;
+        an account's posts; **a TV show's episodes, where the recipe
+        belongs** (Ray), maybe with a time in it.
+      - **A web page that disappears** is marked archived and links to the
+        Internet Archive's copy from when it was added. Adding a web source
+        asks the Archive to save the page then (its Save Page Now service),
+        and keeps the snapshot's address; if that fails, the Archive's
+        nearest earlier copy is looked up instead. To check when built:
+        the Archive's current terms and limits, and that Instagram pages
+        archive at all.
+
+      *Claude's recommendation on storage:* real columns and tables per
+      kind, not a JSON blob. A source (kind, title, credits) has parts (an
+      edition, issue, episode or post, each with its own fields), and a
+      recipe sits in a part at a page, a time or an address. JSON only for
+      the odd field a kind needs and nothing searches by. Columns keep
+      search, constraints and the API documentation honest; a JSON field
+      hides typos and can't be indexed cheaply. Settle it before launch:
+      renaming Work to Source after would change the public API and every
+      `/books/…` link. Books stay first-class: Open Library, ISBNs and
+      affiliate links are theirs alone.
 
       Only books come from Open Library, and only books have affiliate
       links. Everything else stays as it is: the entry rules, ingredient
