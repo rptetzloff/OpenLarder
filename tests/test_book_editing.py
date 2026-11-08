@@ -289,6 +289,26 @@ async def test_the_list_comes_in_pages(admin, client) -> None:
     assert [b["title"] for b in rest["sources"]] == ["Book 4"]
 
 
+async def test_the_newest_come_first_when_asked(admin, client, adb) -> None:
+    """The front page's "recently added", each with how many recipes."""
+    for n, days_ago in enumerate((3, 1, 2)):
+        book = await _book(admin, title=f"Book {n}", authors=[])
+        # One transaction's now() is one moment, so the test sets the times.
+        await adb.execute(
+            text("UPDATE sources SET created_at = now() - make_interval(days => :d) WHERE id = :i"),
+            {"d": days_ago, "i": uuid.UUID(book["id"])},
+        )
+    await adb.execute(
+        text(
+            "INSERT INTO recipes (source_id, title)"
+            " SELECT id, 'Cake' FROM sources WHERE title = 'Book 1'"
+        )
+    )
+    page = (await client.get("/api/sources", params={"sort": "recent", "limit": 2})).json()
+    assert [(b["title"], b["recipes"]) for b in page["sources"]] == [("Book 1", 1), ("Book 2", 0)]
+    assert (await client.get("/api/sources", params={"sort": "oldest"})).status_code == 422
+
+
 async def test_a_website_is_found_by_its_address(admin, client) -> None:
     await admin.post("/api/sources/websites", json={"address": "https://www.seriouseats.com/"})
     found = (await client.get("/api/sources", params={"q": "seriouseats"})).json()

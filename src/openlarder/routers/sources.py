@@ -65,6 +65,7 @@ class BookSummary(BaseModel):
     authors: list[str]
     cover_url: str | None
     editions: int
+    recipes: int = 0
     # A family collection only its owner sees.
     private: bool = False
 
@@ -188,6 +189,8 @@ async def list_books(
     q: str = Query("", max_length=200),
     offset: int = Query(0, ge=0),
     limit: int = Query(PAGE, ge=1, le=PAGE),
+    # "recent": newest added first, for the front page; otherwise by title.
+    sort: Literal["title", "recent"] = "title",
 ) -> SourceList:
     """Sources by title, a page at a time; with q, those with every word of
     it in the title, subtitle, a credited name or a website's address,
@@ -207,9 +210,12 @@ async def list_books(
             )
         )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    page = await session.scalars(
-        query.order_by(func.lower(Source.title), Source.id).offset(offset).limit(limit)
+    order = (
+        (Source.created_at.desc(), Source.id)
+        if sort == "recent"
+        else (func.lower(Source.title), Source.id)
     )
+    page = await session.scalars(query.order_by(*order).offset(offset).limit(limit))
     return SourceList(sources=await summaries(session, page.all()), total=total or 0)
 
 
@@ -233,6 +239,15 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
             .order_by(Edition.source_id, Edition.published_year.desc().nulls_last())
         )
     ).all()
+    recipe_counts = dict(
+        (
+            await session.execute(
+                select(Recipe.source_id, func.count())
+                .where(Recipe.source_id.in_(ids))
+                .group_by(Recipe.source_id)
+            )
+        ).all()
+    )
     names: dict[uuid.UUID, list[str]] = {}
     for source_id, name in credits:
         names.setdefault(source_id, []).append(name)
@@ -253,6 +268,7 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
             authors=names.get(w.id, []),
             cover_url=_cover(covers.get(w.id)),
             editions=counts.get(w.id, 0),
+            recipes=recipe_counts.get(w.id, 0),
             private=w.private,
         )
         for w in works

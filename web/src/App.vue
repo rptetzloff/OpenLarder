@@ -10,6 +10,7 @@ import AdminPage from "./pages/AdminPage.vue";
 import AuthorPage from "./pages/AuthorPage.vue";
 import AuthorsPage from "./pages/AuthorsPage.vue";
 import FlagsPage from "./pages/FlagsPage.vue";
+import HomePage from "./pages/HomePage.vue";
 import GroupPage from "./pages/GroupPage.vue";
 import GroupsPage from "./pages/GroupsPage.vue";
 import InvitePage from "./pages/InvitePage.vue";
@@ -59,9 +60,14 @@ const groupId = match(`/groups/${UUID}`);
 // An invite link's token (secrets.token_urlsafe).
 const inviteCode = match("/invite/([A-Za-z0-9_-]+)");
 
-// A placeholder until there is a catalog to show: proves the SPA reaches the
-// API through whichever path it is served from, and that sign-in works.
-const status = ref("checking…");
+// The main sections, so the header can mark the one you're in.
+const SECTIONS = [
+  { href: "/search", label: "Search" },
+  { href: "/sources", label: "Sources" },
+  { href: "/ingredients", label: "Ingredients" },
+  { href: "/authors", label: "Authors" },
+];
+const inSection = (href: string) => path === href || path.startsWith(`${href}/`);
 // undefined while asking, null when signed out.
 const user = ref<Me | null | undefined>(undefined);
 // Someone signed in who hasn't chosen a name yet is asked for one before
@@ -72,13 +78,6 @@ const needsName = computed(() => !!user.value && !user.value.display_name && !pa
 const signInFailed = new URLSearchParams(location.search).get("sign-in") === "failed";
 
 onMounted(async () => {
-  try {
-    const res = await fetch("/readyz");
-    const body = await res.json();
-    status.value = res.ok ? `database ${body.database}, schema ${body.revision}` : body.database;
-  } catch {
-    status.value = "API unreachable";
-  }
   try {
     const res = await fetch("/api/auth/me");
     user.value = res.ok ? await res.json() : null;
@@ -92,22 +91,39 @@ onMounted(async () => {
 </script>
 
 <template>
-  <header>
-    <a href="/sources">Sources</a>
-    <a href="/ingredients">Ingredients</a>
-    <a href="/search" class="nav">Search</a>
-    <template v-if="user">
-      <a v-if="user.is_admin" href="/admin">Admin</a>
-      <a href="/groups">Groups</a>
-      <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
-      <!-- A form, not fetch: signing out ends at the broker, which ends the
-           session there and sends the browser back here. -->
-      <form method="post" action="/api/auth/logout">
-        <button type="submit">Sign out</button>
-      </form>
-    </template>
-    <!-- A full page load, not fetch: the broker's sign-in page is a redirect. -->
-    <a v-else-if="user === null" href="/api/auth/login">Sign in</a>
+  <header class="site-header">
+    <div class="bar">
+      <a href="/" class="brand">
+        <!-- The full logo, in the version for the page's light or dark. -->
+        <picture>
+          <source srcset="/logo-dark.svg" media="(prefers-color-scheme: dark)" />
+          <img src="/logo-light.svg" alt="OpenLarder" width="140" height="36" />
+        </picture>
+      </a>
+      <nav class="primary-nav" aria-label="Main">
+        <a
+          v-for="s in SECTIONS"
+          :key="s.href"
+          :href="s.href"
+          :aria-current="inSection(s.href) ? 'page' : undefined"
+          >{{ s.label }}</a
+        >
+      </nav>
+      <div class="account">
+        <template v-if="user">
+          <a v-if="user.is_admin" href="/admin">Admin</a>
+          <a href="/groups">Groups</a>
+          <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
+          <!-- A form, not fetch: signing out ends at the broker, which ends the
+               session there and sends the browser back here. -->
+          <form method="post" action="/api/auth/logout">
+            <button type="submit">Sign out</button>
+          </form>
+        </template>
+        <!-- A full page load, not fetch: the broker's sign-in page is a redirect. -->
+        <a v-else-if="user === null" href="/api/auth/login" class="button-outline">Sign in</a>
+      </div>
+    </div>
   </header>
   <main>
     <component :is="page" v-if="page" />
@@ -140,42 +156,64 @@ onMounted(async () => {
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
     <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
     <template v-else>
-      <h1>OpenLarder</h1>
-      <p>A free, open index of the recipes in your cookbooks.</p>
-      <p><a href="/sources">Browse the sources</a></p>
-      <p v-if="signInFailed" role="alert">Sign-in didn't work. Please try again.</p>
-      <p class="status">{{ status }}</p>
+      <p v-if="signInFailed" class="sign-in-failed" role="alert">
+        Sign-in didn't work. Please try again.
+      </p>
+      <HomePage />
     </template>
   </main>
-  <footer>
-    <a href="/">OpenLarder</a>
-    <a href="/privacy">Privacy</a>
-    <a href="/terms">Terms</a>
+  <footer class="site-footer">
+    <div class="bar">
+      <span
+        >Catalog data under the
+        <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a></span
+      >
+      <a href="/api/docs">API</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
   </footer>
 </template>
 
 <style>
+/* The design's colours, once (Ray's wireframes, 2026-11-08): light as
+   drawn, and dark when the device asks for it. --accent is the primary
+   action (the blue Search button); --line is a divider, lighter than
+   --border, which input edges use and which keeps 3:1 against --bg. */
 :root {
-  --bg: #fbfaf7;
-  --fg: #1f1e1c;
+  --bg: #ffffff;
+  --surface: #f3f2ef;
+  --fg: #1a1a19;
   --muted: #5f5e5a;
-  --accent: #8a5a1c;
-  --accent-hover: #734a15;
+  --link: #1f5fbf;
+  --accent: #1f5fbf;
+  --accent-hover: #194f9f;
   --on-accent: #ffffff;
   --border: #8a877f;
+  --line: #e3e2de;
+  --chip: #e8eef7;
+  --admin-bg: #fdf3d3;
+  --admin-line: #ecd58a;
   --error: #b3261e;
+  --page: 72rem;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1a1918;
+    --bg: #161615;
+    --surface: #22211f;
     --fg: #ecebe6;
     --muted: #a8a59c;
-    /* The logo's amber, with dark text: white on it is 2.2:1. */
-    --accent: #e0a24a;
-    --accent-hover: #ebb368;
-    --on-accent: #1f1e1c;
+    --link: #8ab4f8;
+    /* Light blue with dark text: white on it would be under 3:1. */
+    --accent: #8ab4f8;
+    --accent-hover: #a8c7fa;
+    --on-accent: #0b1f3a;
     --border: #77746c;
+    --line: #34332f;
+    --chip: #1f2c40;
+    --admin-bg: #3a3016;
+    --admin-line: #5c4c1f;
     --error: #f2a8a2;
   }
 }
@@ -183,27 +221,56 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
 }
-header {
+.site-header {
+  border-bottom: 1px solid var(--line);
+}
+.site-header .bar,
+.site-footer .bar {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  max-width: 40rem;
+  gap: 0.75rem 1.75rem;
+  max-width: var(--page);
   margin: 0 auto;
-  padding: 1rem 1rem 0;
-  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
 }
-header form {
+.brand img {
+  display: block;
+  height: 2.25rem;
+  width: auto;
+}
+.primary-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+.primary-nav a {
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 500;
+}
+.primary-nav a:hover {
+  text-decoration: underline;
+}
+.primary-nav a[aria-current="page"] {
+  font-weight: 700;
+}
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-left: auto;
+  font-size: 0.9375rem;
+}
+.account form {
   margin: 0;
 }
-header .nav {
-  margin-right: auto;
-}
-header a,
-header button,
-footer a {
+.account a,
+.account button {
   color: var(--fg);
   text-decoration: underline;
   background: none;
@@ -212,10 +279,197 @@ footer a {
   font: inherit;
   cursor: pointer;
 }
-main {
+.account a.button-outline,
+a.button-outline {
+  display: inline-block;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 600;
+}
+/* On a phone the sections go on their own line, under the logo. */
+@media (max-width: 40rem) {
+  .site-header .bar {
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .primary-nav {
+    order: 3;
+    width: 100%;
+  }
+  .brand img {
+    height: 2rem;
+  }
+}
+.site-footer {
+  margin-top: 3rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.site-footer .bar {
+  gap: 0.5rem 1.25rem;
+  padding: 1.25rem 1.5rem 2rem;
+}
+.site-footer a {
+  color: var(--link);
+}
+main > article,
+main > section {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 2rem 1rem 3rem;
+  padding: 2rem 1rem 0;
+}
+.sign-in-failed {
+  max-width: var(--page);
+  margin: 1rem auto 0;
+  padding: 0 1.5rem;
+  color: var(--error);
+}
+
+/* The front page. */
+.hero {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.hero-inner {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 2.5rem;
+}
+.hero h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1.15;
+}
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  font-size: 1.0625rem;
+}
+.hero-search {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.hero-search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.hero-search button.primary {
+  align-self: stretch;
+}
+.hero-have .isbn-form {
+  margin-bottom: 0.75rem;
+}
+.hero-have .chosen {
+  margin-bottom: 0.75rem;
+}
+.hero-have .chosen li {
+  background: var(--chip);
+  border-color: transparent;
+}
+.hero-have .help {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.home-section {
+  max-width: var(--page);
+  margin: 2.5rem auto 0;
+  padding: 0 1.5rem;
+  box-sizing: border-box;
+}
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+}
+.section-head h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+.section-head a,
+.value-cards a {
+  color: var(--link);
+}
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 1.5rem 1.25rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cover-grid li {
+  margin: 0;
+}
+.cover-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+.cover-card img,
+.cover-card .cover-blank {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
+}
+.cover-card .cover-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.cover-card:hover strong {
+  text-decoration: underline;
+}
+.cover-card .kind {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cover-card .byline {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.value-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.value-cards > div {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.value-cards h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+}
+.value-cards p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
 }
 .status,
 .updated {
@@ -739,13 +993,5 @@ button.link {
   list-style: none;
   padding: 0;
   margin: 0;
-}
-footer {
-  display: flex;
-  gap: 1rem;
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 0 1rem 2rem;
-  font-size: 0.875rem;
 }
 </style>

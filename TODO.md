@@ -7,11 +7,21 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 ## MVP
 
 - [ ] **Site design.** *Ray, 2026-11-08: "not most important for
-      development, but definitely part of MVP".* The pages work but aren't
-      designed: a real home page (it still shows the placeholder's database
-      status), the look (type, colour, logo use, light and dark), navigation
-      as sources, search and the larder arrive, and the phone layout. #17's
-      sign-in screens should match it.
+      development, but definitely part of MVP".* Ray's wireframes (in
+      private/, not committed) draw the home, search, source, recipe,
+      ingredient and author pages, adding a recipe, and entering a whole
+      book. Decided (Ray, 2026-11-08): light as drawn, dark when the device
+      asks; nothing that doesn't work yet is shown, each arriving with its
+      feature; one PR per page. **The shell and home page (#66):** colours
+      as tokens for light and dark, the full logo top left, the header's
+      sections and footer, and the front page's search, "cook with what you
+      have" and recently added sources. Next, in order: search; a source's
+      page (with the admin bar and breadcrumbs); a recipe's page; the
+      ingredient and author pages; then adding a recipe and entering a whole
+      book, which are contribution features too. #17's sign-in screens
+      should match. Fonts are the system's; the wireframes look like Inter,
+      which could be served from OpenLarder itself (not Google Fonts, which
+      would tell Google who visits).
 - [ ] **Wikidata facts on author pages** (born, nationality, website). The
       pages themselves are built (#52).
 - [ ] **Recipe tags** (course, cuisine, diet): the tables exist, with nothing
@@ -195,6 +205,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Site design, part 1: the shell (colours, logo, header, footer) and
+      the home page, light and dark (#66)
 - [x] Household groups: invites by link, view, edit and admin roles, and
       sharing a private collection with the groups its owner picks (#65)
 - [x] Family collections: anyone signed in adds their own, private, after
