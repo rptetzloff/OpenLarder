@@ -84,7 +84,7 @@ async def test_a_website_is_added_once_per_site(admin, client) -> None:
         False,
     )
     assert site["editions"] == []
-    listed = (await client.get("/api/sources")).json()
+    listed = (await client.get("/api/sources")).json()["sources"]
     assert [(s["kind"], s["host"]) for s in listed] == [("website", "smittenkitchen.com")]
 
 

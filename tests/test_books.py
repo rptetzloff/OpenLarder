@@ -178,7 +178,7 @@ async def test_the_list_is_public_and_alphabetical(admin, client, openlib) -> No
     await _add(admin, "9780306406157")
     await admin.post("/api/auth/logout")
 
-    books = (await client.get("/api/sources")).json()
+    books = (await client.get("/api/sources")).json()["sources"]
     assert [b["title"] for b in books] == ["apple pies", "Love Is a Pink Cake"]
     assert books[0]["cover_url"] == "/covers/14125211-M.jpg"
     assert books[1]["authors"] == ["Claire Ptak"]

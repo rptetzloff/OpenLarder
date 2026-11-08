@@ -120,29 +120,44 @@ def _cover(cover_id: int | None) -> str | None:
     return openlibrary.cover_url(cover_id) if cover_id else None
 
 
-@router.get("", response_model=list[BookSummary])
+class SourceList(BaseModel):
+    sources: list[BookSummary]
+    # How many match, however many this page holds.
+    total: int
+
+
+PAGE = 100
+
+
+@router.get("", response_model=SourceList)
 async def list_books(
     session: Session,
     q: str = Query("", max_length=200),
-    limit: int | None = Query(None, ge=1, le=50),
-) -> list[BookSummary]:
-    """Every book, by title; or, with q, those with every word of it in the
-    title, subtitle or a credited name, ignoring case. limit is for pickers,
-    which show a handful as someone types."""
-    query = select(Source).order_by(func.lower(Source.title), Source.id)
+    offset: int = Query(0, ge=0),
+    limit: int = Query(PAGE, ge=1, le=PAGE),
+) -> SourceList:
+    """Sources by title, a page at a time; with q, those with every word of
+    it in the title, subtitle, a credited name or a website's address,
+    ignoring case. Pickers ask for a handful (limit) as someone types; the
+    Sources page a hundred at a time, since the whole catalog won't fit
+    one answer."""
+    query = select(Source)
     for word in q.casefold().split()[:10]:
         like = contains_pattern(word)
         query = query.where(
             Source.title.ilike(like, escape="\\")
             | Source.subtitle.ilike(like, escape="\\")
+            | Source.host.ilike(like, escape="\\")
             | exists().where(
                 SourceCredit.source_id == Source.id,
                 SourceCredit.credited_as.ilike(like, escape="\\"),
             )
         )
-    if limit:
-        query = query.limit(limit)
-    return await summaries(session, (await session.scalars(query)).all())
+    total = await session.scalar(select(func.count()).select_from(query.subquery()))
+    page = await session.scalars(
+        query.order_by(func.lower(Source.title), Source.id).offset(offset).limit(limit)
+    )
+    return SourceList(sources=await summaries(session, page.all()), total=total or 0)
 
 
 async def summaries(session: Session, works: Sequence[Source]) -> list[BookSummary]:

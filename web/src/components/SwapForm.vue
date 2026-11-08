@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import type { Book, BookSummary } from "../books";
+import { type Book, type BookSummary, findBooks } from "../books";
 import { searchRecipes, type SearchResult } from "../ingredients";
 import {
   addDiet,
@@ -33,7 +33,11 @@ const diets = ref<Diet[]>([]);
 const dietId = ref("");
 const newDiet = ref("");
 
-const books = ref<BookSummary[]>([]);
+// The book it's printed in, found by typing: the catalog is too big for a
+// list to choose from.
+const bookTitle = ref("");
+const bookQuery = ref("");
+const bookHits = ref<BookSummary[]>([]);
 const printed = ref(!!props.bookId);
 const bookId = ref(props.bookId ?? "");
 const editions = ref<Book["editions"]>([]);
@@ -47,8 +51,6 @@ const saving = ref(false);
 onMounted(async () => {
   try {
     diets.value = await listDiets();
-    const res = await fetch("/api/sources");
-    if (res.ok) books.value = await res.json();
   } catch {
     error.value = "The form couldn't load its lists. Try reloading the page.";
   }
@@ -58,16 +60,41 @@ watch(
   bookId,
   async (id, before) => {
     editions.value = [];
-    if (!id) return;
+    if (!id) {
+      editionId.value = "";
+      bookTitle.value = "";
+      return;
+    }
     const res = await fetch(`/api/sources/${id}`);
     if (!res.ok) return;
-    editions.value = (await res.json()).editions;
+    const found = await res.json();
+    editions.value = found.editions;
+    bookTitle.value = found.title;
     // A different book: its first edition, and the page starts over.
     if (before !== undefined || !editionId.value) editionId.value = editions.value[0]?.id ?? "";
     if (before !== undefined) page.value = "";
   },
   { immediate: true },
 );
+
+let bookAsked = 0;
+let bookTimer: ReturnType<typeof setTimeout> | undefined;
+watch(bookQuery, () => {
+  clearTimeout(bookTimer);
+  bookTimer = setTimeout(async () => {
+    const mine = ++bookAsked;
+    const q = bookQuery.value.trim();
+    // Only a book has editions and pages to print a swap on.
+    const found = q ? (await findBooks(q).catch(() => [])).filter((b) => b.kind === "book") : [];
+    if (mine === bookAsked) bookHits.value = found;
+  }, 200);
+});
+
+function pickBook(b: BookSummary) {
+  bookId.value = b.id;
+  bookQuery.value = "";
+  bookHits.value = [];
+}
 
 // Finding a recipe to stand in, by title.
 const recipeQuery = ref("");
@@ -198,11 +225,31 @@ async function save() {
         ><input v-model="printed" type="radio" :value="false" /> contributed (not printed)</label
       >
       <template v-if="printed">
-        <label for="swap-book">Book</label>
-        <select id="swap-book" v-model="bookId" required>
-          <option value="" disabled>Choose a book</option>
-          <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }}</option>
-        </select>
+        <template v-if="bookId">
+          <span>Book</span>
+          <p>
+            <strong>{{ bookTitle || "…" }}</strong>
+            <button type="button" class="link" @click="bookId = ''">Change</button>
+          </p>
+        </template>
+        <div v-else class="isbn-form">
+          <label for="swap-book">Book</label>
+          <div class="row">
+            <input
+              id="swap-book"
+              v-model="bookQuery"
+              type="search"
+              autocomplete="off"
+              placeholder="title or author"
+            />
+          </div>
+          <ul v-if="bookHits.length" class="merge-candidates">
+            <li v-for="b in bookHits" :key="b.id">
+              <button type="button" class="link" @click="pickBook(b)">{{ b.title }}</button>
+              <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
+            </li>
+          </ul>
+        </div>
         <template v-if="editions.length > 1">
           <label for="swap-edition">Edition</label>
           <select id="swap-edition" v-model="editionId">
