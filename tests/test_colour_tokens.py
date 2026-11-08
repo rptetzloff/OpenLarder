@@ -17,7 +17,13 @@ TEXT, BOUNDARY = 4.5, 3.0
 PAIRS = [
     ("fg", "bg", TEXT),
     ("muted", "bg", TEXT),
-    ("accent", "bg", TEXT),  # links
+    ("accent", "bg", TEXT),
+    ("link", "bg", TEXT),
+    ("link", "surface", TEXT),
+    ("fg", "surface", TEXT),  # the home page's band
+    ("muted", "surface", TEXT),
+    ("fg", "chip", TEXT),  # chosen ingredients
+    ("fg", "admin-bg", TEXT),
     ("on-accent", "accent", TEXT),  # button text
     ("on-accent", "accent-hover", TEXT),
     ("error", "bg", TEXT),
@@ -29,7 +35,9 @@ PAIRS = [
 def _tokens() -> dict[str, dict[str, str]]:
     css = APP.read_text(encoding="utf-8")
     light = re.search(r":root\s*\{(.*?)\}", css, re.S)
-    dark = re.search(r"prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{(.*?)\}", css, re.S)
+    # Dark is chosen by data-theme on <html> (theme.ts), set from the device
+    # unless someone picks.
+    dark = re.search(r':root\[data-theme="dark"\]\s*\{(.*?)\}', css, re.S)
     assert light and dark, "App.vue no longer defines both themes"
 
     def parse(block: str) -> dict[str, str]:
