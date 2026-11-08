@@ -92,25 +92,33 @@ export async function deleteAlias(id: string, aliasId: string): Promise<void> {
 }
 
 export interface SearchResult {
-  // The book searched within, if one was.
-  book: Named | null;
+  // The books searched within, if any were.
+  books: Named[];
   ingredients: Named[];
   // IDs in the search that name no ingredient now, as after a merge.
   missing: string[];
+  missing_books: string[];
   // The title words searched for.
   q: string;
-  recipes: Ingredient["recipes"];
+  // With ingredients: how many of the recipe's lines you have, of how many,
+  // and the lines you don't. Null without ingredients.
+  recipes: (Ingredient["recipes"][number] & {
+    have: number | null;
+    lines: number | null;
+    needs: string[];
+  })[];
   total: number;
 }
 
-// The recipes that use every one of the ingredients.
+// Recipes ranked by how much of them the ingredients cover, narrowed by
+// title words and books.
 export async function searchRecipes(
   ids: string[],
-  { offset = 0, book = null, q = "" }: { offset?: number; book?: string | null; q?: string } = {},
+  { offset = 0, books = [], q = "" }: { offset?: number; books?: string[]; q?: string } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
   if (q.trim()) query.set("q", q.trim());
-  if (book) query.set("book", book);
+  for (const book of books) query.append("book", book);
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

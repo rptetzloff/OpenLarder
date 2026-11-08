@@ -52,11 +52,13 @@ def _titles(found):
     return [r["title"] for r in found["recipes"]]
 
 
-async def test_a_recipe_must_use_every_ingredient(admin, work, adb, client) -> None:
-    await _add(admin, work, "Rhubarb Crumble", "12", ["Rhubarb", "Ginger", "Oats"])
+async def test_recipes_needing_least_come_first(admin, work, adb, client) -> None:
+    await _add(admin, work, "Rhubarb Crumble", "12", ["Rhubarb", "Butter", "Ginger", "Oats"])
     await _add(admin, work, "Rhubarb Fool", "14", ["Rhubarb", "Cream"])
-    await _add(admin, work, "Ginger Biscuits", "30", ["Ginger", "Rhubarb", "Flour"])
-    await _add(admin, work, "Gingerbread", "31", ["Ginger"])
+    await _add(admin, work, "Ginger Biscuits", "30", ["Ginger", "Rhubarb"])
+    # Before "Ginger Biscuits" by name, after it by what you have.
+    await _add(admin, work, "Candied Ginger", "31", ["Ginger"])
+    await _add(admin, work, "Toast", "32", ["Bread"])
     rhubarb, ginger = await _id(adb, "Rhubarb"), await _id(adb, "Ginger")
     found = await _search(client, rhubarb, ginger)
     assert found["ingredients"] == [
@@ -64,43 +66,77 @@ async def test_a_recipe_must_use_every_ingredient(admin, work, adb, client) -> N
         {"id": str(ginger), "name": "Ginger"},
     ]
     assert found["missing"] == []
-    assert found["total"] == 2
-    assert [(r["title"], r["book_title"], r["pages"]) for r in found["recipes"]] == [
-        ("Ginger Biscuits", "Pink Cake", ["30"]),
-        ("Rhubarb Crumble", "Pink Cake", ["12"]),
+    assert found["total"] == 4
+    # Nothing else needed first, using more of yours before less; then the
+    # fewest lines still needed.
+    assert [
+        (r["title"], r["pages"], r["have"], r["lines"], r["needs"]) for r in found["recipes"]
+    ] == [
+        ("Ginger Biscuits", ["30"], 2, 2, []),
+        ("Candied Ginger", ["31"], 1, 1, []),
+        ("Rhubarb Fool", ["14"], 1, 2, ["Cream"]),
+        # Missing lines in the book's order.
+        ("Rhubarb Crumble", ["12"], 2, 4, ["Butter", "Oats"]),
     ]
 
 
-async def test_any_option_on_a_line_counts(admin, work, adb, client) -> None:
-    await _add(admin, work, "Cake", "1", ["Butter or Coconut Oil", "Egg"])
+async def test_more_of_the_recipe_beats_fewer_lines_missing(admin, work, adb, client) -> None:
+    """Having 3 of 5 is closer than 1 of 2, though it needs one more line."""
+    await _add(admin, work, "Big Stew", "1", ["Onion", "Carrot", "Celery", "Beef", "Stock"])
+    await _add(admin, work, "Buttered Carrots", "2", ["Carrot", "Butter"])
+    await _add(admin, work, "Mirepoix", "3", ["Onion", "Carrot", "Celery"])
+    have = [await _id(adb, n) for n in ("Onion", "Carrot", "Celery")]
+    found = await _search(client, *have)
+    assert [(r["title"], r["have"], r["lines"]) for r in found["recipes"]] == [
+        ("Mirepoix", 3, 3),
+        ("Big Stew", 3, 5),
+        ("Buttered Carrots", 1, 2),
+    ]
+
+
+async def test_any_option_on_a_line_covers_it(admin, work, adb, client) -> None:
+    await _add(admin, work, "Cake", "1", ["Butter or Coconut Oil", "Egg", "Flour"])
     found = await _search(client, await _id(adb, "Coconut Oil"), await _id(adb, "Egg"))
-    assert _titles(found) == ["Cake"]
+    [cake] = found["recipes"]
+    assert (cake["have"], cake["lines"], cake["needs"]) == (2, 3, ["Flour"])
+
+
+async def test_a_component_is_something_to_make(admin, work, adb, client) -> None:
+    await _add(admin, work, "Flour Blend", "10", ["Rice Flour"])
+    await _add(admin, work, "Bread", "50", ["Flour Blend (p. 10)", "Egg"])
+    found = await _search(client, await _id(adb, "Egg"))
+    assert [(r["title"], r["needs"]) for r in found["recipes"]] == [
+        ("Bread", ["Flour Blend (p. 10)"])
+    ]
 
 
 async def test_a_recipe_using_one_twice_is_listed_once(admin, work, adb, client) -> None:
     await _add(admin, work, "Cake", "1", ["Butter or Margarine", "Margarine"])
     found = await _search(client, await _id(adb, "Margarine"))
     assert (_titles(found), found["total"]) == (["Cake"], 1)
+    assert (found["recipes"][0]["have"], found["recipes"][0]["lines"]) == (2, 2)
 
 
-async def test_an_ingredient_finds_the_ones_under_it(admin, work, adb, client) -> None:
+async def test_an_ingredient_covers_the_ones_under_it(admin, work, adb, client) -> None:
     await _add(admin, work, "Rarebit", "1", ["Aged Cheddar", "Bread"])
     await _add(admin, work, "Toastie", "2", ["Cheese", "Bread"])
-    await _add(admin, work, "Toast", "3", ["Bread"])
-    cheese, cheddar, aged = [await _id(adb, n) for n in ("Cheese", "Cheddar", "Aged Cheddar")]
-    assert cheddar is None
+    await _add(admin, work, "Salad", "3", ["Lettuce"])
+    cheese, aged = await _id(adb, "Cheese"), await _id(adb, "Aged Cheddar")
     cheddar = await adb.scalar(
         text("INSERT INTO ingredients (name, match_key) VALUES ('Cheddar', 'cheddar') RETURNING id")
     )
     parent = "UPDATE ingredients SET parent_id = :p WHERE id = :i"
     await adb.execute(text(parent), {"p": cheese, "i": cheddar})
     await adb.execute(text(parent), {"p": cheddar, "i": aged})
-    assert _titles(await _search(client, cheese, await _id(adb, "Bread"))) == [
-        "Rarebit",
-        "Toastie",
+    found = await _search(client, cheese, await _id(adb, "Bread"))
+    assert [(r["title"], r["needs"]) for r in found["recipes"]] == [
+        ("Rarebit", []),
+        ("Toastie", []),
     ]
-    # Not upward: a search for aged cheddar isn't one for any cheese.
-    assert _titles(await _search(client, aged)) == ["Rarebit"]
+    # Not upward: having aged cheddar isn't having any cheese.
+    assert [(r["title"], r["needs"]) for r in (await _search(client, aged))["recipes"]] == [
+        ("Rarebit", ["Bread"])
+    ]
 
 
 async def test_a_loop_in_the_hierarchy_still_ends(admin, work, adb, client) -> None:
@@ -141,14 +177,19 @@ async def test_results_come_in_pages(admin, work, adb, client, monkeypatch) -> N
     rest = await _search(client, egg, offset=4)
     assert (_titles(first), first["total"]) == (["Cake 0", "Cake 1"], 5)
     assert _titles(rest) == ["Cake 4"]
+    by_title = await _search(client, q="cake", offset=2)
+    assert (_titles(by_title), by_title["total"]) == (["Cake 2", "Cake 3"], 5)
 
 
-async def test_a_search_needs_one_to_ten_ingredients(client) -> None:
+async def test_a_search_has_limits(client) -> None:
     assert (await client.get("/api/search")).status_code == 422
-    many = {"ingredient": [str(uuid.uuid4()) for _ in range(11)]}
-    assert (await client.get("/api/search", params=many)).status_code == 422
-    ten = {"ingredient": [str(uuid.uuid4()) for _ in range(10)]}
-    assert (await client.get("/api/search", params=ten)).status_code == 200
+    ids = lambda n: [str(uuid.uuid4()) for _ in range(n)]  # noqa: E731
+    for name, most in (("ingredient", 30), ("book", 10)):
+        extra = {} if name == "ingredient" else {"q": "cake"}
+        ok = await client.get("/api/search", params={name: ids(most), **extra})
+        assert ok.status_code == 200
+        over = await client.get("/api/search", params={name: ids(most + 1), **extra})
+        assert over.status_code == 422
 
 
 async def test_a_page_not_recorded_is_left_off(admin, work, adb, client) -> None:
@@ -169,30 +210,44 @@ async def _other_book(adb):
     return other, edition
 
 
-async def test_a_search_can_stay_in_one_book(admin, work, adb, client) -> None:
+async def test_a_search_can_stay_in_some_books(admin, work, adb, client) -> None:
     other, edition = await _other_book(adb)
+    third = await adb.scalar(text("INSERT INTO works (title) VALUES ('Jerusalem') RETURNING id"))
     await _add(admin, work, "Rhubarb Cake", "1", ["Rhubarb", "Egg"])
-    response = await admin.post(
-        f"/api/books/{other}/recipes",
-        json={
-            "title": "Rhubarb Salad",
-            "editions": [{"edition_id": str(edition), "page": "9"}],
-            "ingredients": ["Rhubarb"],
-        },
-    )
-    assert response.status_code == 201
+    for book, title in ((other, "Rhubarb Salad"), (third, "Rhubarb Tart")):
+        edition = await adb.scalar(
+            text("INSERT INTO editions (work_id) VALUES (:w) RETURNING id"), {"w": book}
+        )
+        response = await admin.post(
+            f"/api/books/{book}/recipes",
+            json={
+                "title": title,
+                "editions": [{"edition_id": str(edition), "page": "9"}],
+                "ingredients": ["Rhubarb"],
+            },
+        )
+        assert response.status_code == 201
     rhubarb = await _id(adb, "Rhubarb")
-    assert _titles(await _search(client, rhubarb)) == ["Rhubarb Cake", "Rhubarb Salad"]
-    found = await _search(client, rhubarb, book=str(other))
-    assert found["book"] == {"id": str(other), "name": "Plenty"}
-    assert (_titles(found), found["total"]) == (["Rhubarb Salad"], 1)
-    assert (await _search(client, rhubarb))["book"] is None
+    everywhere = await _search(client, rhubarb)
+    assert (everywhere["books"], everywhere["total"]) == ([], 3)
+    found = await _search(client, rhubarb, book=[str(third), str(other)])
+    assert found["books"] == [
+        {"id": str(third), "name": "Jerusalem"},
+        {"id": str(other), "name": "Plenty"},
+    ]
+    # By book: Jerusalem, then Plenty.
+    assert _titles(found) == ["Rhubarb Tart", "Rhubarb Salad"]
 
 
-async def test_an_unknown_book_is_a_404(admin, work, adb, client) -> None:
+async def test_an_unknown_book_is_reported_and_left_out(admin, work, adb, client) -> None:
     await _add(admin, work, "Cake", "1", ["Egg"])
-    params = {"ingredient": [str(await _id(adb, "Egg"))], "book": str(uuid.uuid4())}
-    assert (await client.get("/api/search", params=params)).status_code == 404
+    gone = uuid.uuid4()
+    found = await _search(client, await _id(adb, "Egg"), book=[str(gone), str(work)])
+    assert (found["missing_books"], [b["name"] for b in found["books"]]) == (
+        [str(gone)],
+        ["Pink Cake"],
+    )
+    assert _titles(found) == ["Cake"]
 
 
 async def test_a_book_lists_the_ingredients_it_uses_most(admin, work, adb, client) -> None:

@@ -10,9 +10,9 @@ import uuid
 from typing import Annotated
 
 import httpx2
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 
 from openlarder import books as books_module
 from openlarder import isbn, linking, openlibrary, references
@@ -29,6 +29,7 @@ from openlarder.models import (
     Work,
     WorkCredit,
 )
+from openlarder.routers.ingredients import contains_pattern
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/books", tags=["books"])
@@ -109,8 +110,27 @@ def _cover(cover_id: int | None) -> str | None:
 
 
 @router.get("", response_model=list[BookSummary])
-async def list_books(session: Session) -> list[BookSummary]:
-    works = (await session.scalars(select(Work).order_by(func.lower(Work.title)))).all()
+async def list_books(
+    session: Session,
+    q: str = Query("", max_length=200),
+    limit: int | None = Query(None, ge=1, le=50),
+) -> list[BookSummary]:
+    """Every book, by title; or, with q, those with every word of it in the
+    title, subtitle or a credited name, ignoring case. limit is for pickers,
+    which show a handful as someone types."""
+    query = select(Work).order_by(func.lower(Work.title), Work.id)
+    for word in q.casefold().split()[:10]:
+        like = contains_pattern(word)
+        query = query.where(
+            Work.title.ilike(like, escape="\\")
+            | Work.subtitle.ilike(like, escape="\\")
+            | exists().where(
+                WorkCredit.work_id == Work.id, WorkCredit.credited_as.ilike(like, escape="\\")
+            )
+        )
+    if limit:
+        query = query.limit(limit)
+    works = (await session.scalars(query)).all()
     if not works:
         return []
     ids = [w.id for w in works]
