@@ -2,7 +2,7 @@
 
 export interface BookSummary {
   id: string;
-  kind: "book" | "website" | "magazine" | "newspaper";
+  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel";
   // A website's, as "smittenkitchen.com".
   host: string | null;
   title: string;
@@ -24,7 +24,7 @@ export interface Edition {
 
 export interface Book {
   id: string;
-  kind: "book" | "website" | "magazine" | "newspaper";
+  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel";
   host: string | null;
   // A website behind a subscription: linked, never copied.
   paywalled: boolean;
@@ -35,9 +35,27 @@ export interface Book {
   editions: Edition[];
   // pages: one per edition it is in, newest first; null = not recorded.
   // issue: a magazine's or newspaper's recipe's issue; pages then its page.
-  recipes: { id: string; title: string; pages: (string | null)[]; issue: string | null }[];
+  // episode and at: a show's recipe's episode, and the time in it.
+  recipes: {
+    id: string;
+    title: string;
+    pages: (string | null)[];
+    issue: string | null;
+    episode: string | null;
+    at: string | null;
+  }[];
   // A magazine's or newspaper's issues, newest first.
   issues: { id: string; label: string; published_on: string | null }[];
+  // A TV show's, podcast's or video channel's episodes, in order.
+  episodes: {
+    id: string;
+    name: string;
+    season: number | null;
+    number: number | null;
+    title: string | null;
+    url: string | null;
+    aired_on: string | null;
+  }[];
   // The ingredients its recipes use most, with how many recipes use each.
   ingredients: { id: string; name: string; recipes: number }[];
 }
@@ -210,12 +228,34 @@ export async function addPeriodical(
   return body;
 }
 
+// A TV show, podcast or video channel as a source: the one already here,
+// or a new one.
+export async function addShow(
+  kind: "tv_show" | "podcast" | "video_channel",
+  title: string,
+  authors: string[] = [],
+): Promise<{ id: string; existing: boolean }> {
+  const res = await fetch("/api/sources/shows", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, title, authors }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
+export const SHOWS = ["tv_show", "podcast", "video_channel"];
+
 // What a kind of source is called in a sentence: "this magazine".
 export const KIND_NAMES: Record<string, string> = {
   book: "book",
   website: "website",
   magazine: "magazine",
   newspaper: "newspaper",
+  tv_show: "TV show",
+  podcast: "podcast",
+  video_channel: "video channel",
 };
 
 // An issue as people say it: one named by its date ("2024-09-18", as a

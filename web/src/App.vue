@@ -391,9 +391,10 @@ button.primary:disabled {
   gap: 0.5rem;
   max-width: 32rem;
 }
-.recipe-form > label {
+.recipe-form > label,
+.recipe-form > .form-heading {
   font-weight: 600;
-  margin-top: 0.75rem;
+  margin: 0.75rem 0 0;
 }
 .recipe-form input:not([type="checkbox"]),
 .recipe-form textarea {
@@ -471,6 +472,21 @@ button.primary:disabled {
 .edition-row .only-edition {
   flex: 1;
   min-width: 0;
+}
+.episode-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+.episode-numbers > span {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.episode-numbers label {
+  font-weight: 600;
 }
 .recipe-form .page-input {
   width: 6rem;

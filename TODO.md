@@ -35,9 +35,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       (#56):** a website is a source, one per site, optionally a
       subscription site, with recipes on its pages by address. The
       Internet Archive copy of each web page (#57). **Magazines and
-      newspapers (#60):** recipes in issues, at a page. Next: TV shows,
-      podcasts and video channels (episodes); then social media posts and
-      packaging; then family recipes, with private recipes and sharing. Decided (Ray, 2026-11-08):
+      newspapers (#60):** recipes in issues, at a page. **TV shows,
+      podcasts and video channels (#62):** recipes in episodes, by season
+      and number, title or a video's address, at a time. Next: social
+      media posts and packaging; then family recipes, with private recipes
+      and sharing. Found while building episodes:
+      - **Search and ingredient pages say only a page**: a magazine's
+        recipe shows "p. 42" without its issue, and a show's nothing about
+        its episode. The source and recipe pages say both.
+      - **A video's or podcast episode's address isn't archived** the way
+        a web page is; whether the Internet Archive keeps video pages
+        usefully needs checking first.
+      - **Hosts are credited as authors**: there is no "host" role yet,
+        which is a one-line change to the roles CHECK if wanted.
+      Decided (Ray, 2026-11-08):
       - **Every kind people document is offered**: books, magazines, blogs
         and websites, social media posts, TV and video. Social media is one
         generic kind, an account's post by address, not a kind per
@@ -149,6 +160,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] TV shows, podcasts and video channels as sources: recipes in
+      episodes, by number, title or address, at a time (#62)
 - [x] SCOPING.md caught up: site design, private family recipes and
       sources beyond books in the MVP; the data model's kinds of place (#61)
 - [x] Magazines and newspapers as sources: recipes in issues, named as the

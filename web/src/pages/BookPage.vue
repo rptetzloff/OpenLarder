@@ -96,6 +96,9 @@ onMounted(load);
           <span v-if="r.issue" class="page-ref"
             >{{ issueName(r.issue) }}{{ r.pages[0] ? `, p. ${r.pages[0]}` : "" }}</span
           >
+          <span v-else-if="r.episode" class="page-ref"
+            >{{ r.episode }}{{ r.at ? `, at ${r.at}` : "" }}</span
+          >
           <span v-else-if="pages(r.pages)" class="page-ref">{{ pages(r.pages) }}</span>
         </li>
       </ul>

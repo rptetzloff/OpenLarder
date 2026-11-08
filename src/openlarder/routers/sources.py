@@ -21,12 +21,14 @@ from sqlalchemy import exists, func, select
 
 from openlarder import books as books_module
 from openlarder import isbn, linking, openlibrary, references, refresh, web
+from openlarder import recipes as recipes_module
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
 from openlarder.models import (
     Author,
     Edition,
+    Episode,
     Ingredient,
     IngredientOption,
     Issue,
@@ -85,12 +87,26 @@ class RecipeSummary(BaseModel):
     pages: list[str | None]
     # A magazine's or newspaper's recipe: the issue it's in.
     issue: str | None = None
+    # A TV show's, podcast's or video channel's: the episode, and the time
+    # in it.
+    episode: str | None = None
+    at: str | None = None
 
 
 class IssueSummary(BaseModel):
     id: uuid.UUID
     label: str
     published_on: date | None
+
+
+class EpisodeSummary(BaseModel):
+    id: uuid.UUID
+    name: str
+    season: int | None
+    number: int | None
+    title: str | None
+    url: str | None
+    aired_on: date | None
 
 
 class TopIngredient(BaseModel):
@@ -116,6 +132,8 @@ class Book(BaseModel):
     ingredients: list[TopIngredient]
     # A magazine's or newspaper's issues, newest first.
     issues: list[IssueSummary]
+    # A TV show's, podcast's or video channel's episodes, in order.
+    episodes: list[EpisodeSummary]
 
 
 TOP_INGREDIENTS = 30
@@ -259,6 +277,31 @@ async def get_book(source_id: uuid.UUID, session: Session) -> Book:
         )
     ):
         issue_of[recipe_id] = issue_labels[issue_id]
+    episodes = (
+        await session.scalars(
+            select(Episode)
+            .where(Episode.source_id == source_id)
+            .order_by(
+                Episode.season.nulls_last(),
+                Episode.number.nulls_last(),
+                Episode.aired_on.nulls_last(),
+                func.lower(Episode.title),
+            )
+        )
+    ).all()
+    episode_names = {
+        e.id: recipes_module.episode_name(e.season, e.number, e.title) for e in episodes
+    }
+    episode_of: dict[uuid.UUID, tuple[str, str | None]] = {}
+    for recipe_id, episode_id, at in await session.execute(
+        select(
+            RecipeLocation.recipe_id, RecipeLocation.episode_id, RecipeLocation.at_seconds
+        ).where(RecipeLocation.source_id == source_id, RecipeLocation.episode_id.is_not(None))
+    ):
+        episode_of[recipe_id] = (
+            episode_names[episode_id],
+            recipes_module.clock(at) if at is not None else None,
+        )
     pages: dict[uuid.UUID, list[tuple[int, str | None]]] = {}
     for recipe_id, edition_id, page in (
         await session.execute(
@@ -314,11 +357,25 @@ async def get_book(source_id: uuid.UUID, session: Session) -> Book:
                 title=r.title,
                 pages=[p for _, p in sorted(pages.get(r.id, []))],
                 issue=issue_of.get(r.id),
+                episode=episode_of[r.id][0] if r.id in episode_of else None,
+                at=episode_of[r.id][1] if r.id in episode_of else None,
             )
             for r in recipes
         ],
         ingredients=[TopIngredient(id=i, name=n, recipes=c) for i, n, c in top],
         issues=[IssueSummary(id=i.id, label=i.label, published_on=i.published_on) for i in issues],
+        episodes=[
+            EpisodeSummary(
+                id=e.id,
+                name=episode_names[e.id],
+                season=e.season,
+                number=e.number,
+                title=e.title,
+                url=e.url,
+                aired_on=e.aired_on,
+            )
+            for e in episodes
+        ],
     )
 
 
@@ -727,29 +784,51 @@ class PeriodicalIn(BaseModel):
     authors: list[str] = Field(default=[], max_length=30)
 
 
+class ShowIn(BaseModel):
+    kind: Literal["tv_show", "podcast", "video_channel"]
+    title: str = Field(max_length=300)
+    # Its hosts, in order, credited as authors.
+    authors: list[str] = Field(default=[], max_length=30)
+
+
 @router.post("/periodicals", response_model=AddedManually, dependencies=[SameOrigin])
 async def add_periodical(body: PeriodicalIn, admin: AdminUser, session: Session) -> AddedManually:
     """A magazine or newspaper as a source: the one already here of that
     kind and name, or a new one. Its issues are added as recipes name them."""
-    title = " ".join(body.title.split())
+    return await _add_named(session, admin, body.kind, body.title, body.authors)
+
+
+@router.post("/shows", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_show(body: ShowIn, admin: AdminUser, session: Session) -> AddedManually:
+    """A TV show, podcast or video channel as a source: the one already here
+    of that kind and name, or a new one. Its episodes are added as recipes
+    name them."""
+    return await _add_named(session, admin, body.kind, body.title, body.authors)
+
+
+async def _add_named(
+    session: Session, admin: AdminUser, kind: str, title: str, authors: list[str]
+) -> AddedManually:
+    """A source known only by its kind and name."""
+    title = " ".join(title.split())
     if not title:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give it its name.")
     existing = await session.scalar(
-        select(Source).where(Source.kind == body.kind, func.lower(Source.title) == title.lower())
+        select(Source).where(Source.kind == kind, func.lower(Source.title) == title.lower())
     )
     if existing is not None:
         return AddedManually(id=existing.id, existing=True)
-    periodical = Source(kind=body.kind, title=title)
-    session.add(periodical)
+    source = Source(kind=kind, title=title)
+    session.add(source)
     await session.flush()
-    names = [n for n in (" ".join(a.split()) for a in body.authors) if n]
+    names = [n for n in (" ".join(a.split()) for a in authors) if n]
     for position, name in enumerate(dict.fromkeys(names), start=1):
         author = await books_module.author_named(session, name)
         session.add(
             SourceCredit(
-                source_id=periodical.id, author_id=author.id, position=position, credited_as=name
+                source_id=source.id, author_id=author.id, position=position, credited_as=name
             )
         )
     await session.commit()
-    log.info("%s added the %s %s", admin.id, body.kind, title)
-    return AddedManually(id=periodical.id, existing=False)
+    log.info("%s added the %s %s", admin.id, kind, title)
+    return AddedManually(id=source.id, existing=False)

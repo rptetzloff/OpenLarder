@@ -81,17 +81,22 @@ def _trgm(table: str, column: str) -> Index:
 
 
 class Source(Timestamps, Base):
-    """Where recipes come from: so far a book, across every printing of it.
+    """Where recipes come from: a book, across every printing of it, a
+    website, a magazine or newspaper, or a TV show, podcast or video channel.
 
     Each kind has its own parts in its own table: a book's are its editions,
-    and later kinds add theirs (a magazine's issues, a show's episodes, a
-    site's posts). Migration 0019; Ray, 2026-11-08.
+    a website's its pages, a magazine's its issues, a show's its episodes.
+    Migration 0019; Ray, 2026-11-08.
     """
 
     __tablename__ = "sources"
     __table_args__ = (
         CheckConstraint("title <> ''", name="title_not_empty"),
-        CheckConstraint("kind IN ('book', 'website', 'magazine', 'newspaper')", name="kind_known"),
+        CheckConstraint(
+            "kind IN ('book', 'website', 'magazine', 'newspaper', 'tv_show', 'podcast',"
+            " 'video_channel')",
+            name="kind_known",
+        ),
         CheckConstraint("(kind = 'website') = (host IS NOT NULL)", name="host_for_websites"),
         CheckConstraint("host <> ''", name="host_not_empty"),
         CheckConstraint("NOT paywalled OR kind = 'website'", name="paywalled_websites_only"),
@@ -290,10 +295,46 @@ class Issue(Timestamps, Base):
     published_on: Mapped[date | None] = mapped_column(Date)
 
 
+class Episode(Timestamps, Base):
+    """An episode of a TV show, podcast or video channel, where a recipe is:
+    known by its season and number, its title, or for a video its address,
+    whichever are given (migration 0024)."""
+
+    __tablename__ = "episodes"
+    __table_args__ = (
+        # The target of recipe_locations' composite key.
+        UniqueConstraint("source_id", "id"),
+        UniqueConstraint("source_id", "url"),
+        # Season 2, episode 5 once per show; an episode without a season once too.
+        Index(
+            "uq_episodes_source_id_season_number",
+            "source_id",
+            text("coalesce(season, -1)"),
+            "number",
+            unique=True,
+            postgresql_where=text("number IS NOT NULL"),
+        ),
+        CheckConstraint("num_nonnulls(number, title, url) >= 1", name="named"),
+        CheckConstraint("season IS NULL OR number IS NOT NULL", name="season_needs_number"),
+        CheckConstraint("season >= 0 AND number >= 0", name="numbers_not_negative"),
+        CheckConstraint("title <> ''", name="title_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
+    season: Mapped[int | None] = mapped_column(Integer)
+    number: Mapped[int | None] = mapped_column(Integer)
+    title: Mapped[str | None] = mapped_column(Text)
+    # A video's or podcast episode's address, as web.page keeps it.
+    url: Mapped[str | None] = mapped_column(Text)
+    aired_on: Mapped[date | None] = mapped_column(Date)
+
+
 class RecipeLocation(Timestamps, Base):
-    """Where a recipe is in its source: an edition of a book, a web page, or
-    an issue of a magazine or newspaper, exactly one (migrations 0020,
-    0023); a page goes with an edition or an issue."""
+    """Where a recipe is in its source: an edition of a book, a web page, an
+    issue of a magazine or newspaper, or an episode, exactly one (migrations
+    0020, 0023, 0024); a page goes with an edition or an issue, and a time
+    with an episode."""
 
     __tablename__ = "recipe_locations"
     __table_args__ = (
@@ -311,11 +352,21 @@ class RecipeLocation(Timestamps, Base):
         ForeignKeyConstraint(
             ["source_id", "issue_id"], ["issues.source_id", "issues.id"], ondelete="CASCADE"
         ),
+        ForeignKeyConstraint(
+            ["source_id", "episode_id"], ["episodes.source_id", "episodes.id"], ondelete="CASCADE"
+        ),
         UniqueConstraint("recipe_id", "edition_id"),
         UniqueConstraint("recipe_id", "issue_id"),
+        UniqueConstraint("recipe_id", "episode_id"),
         UniqueConstraint("recipe_id", "web_page_id"),
         CheckConstraint("page <> ''", name="page_not_empty"),
-        CheckConstraint("num_nonnulls(edition_id, web_page_id, issue_id) = 1", name="one_place"),
+        CheckConstraint(
+            "num_nonnulls(edition_id, web_page_id, issue_id, episode_id) = 1", name="one_place"
+        ),
+        CheckConstraint(
+            "at_seconds IS NULL OR (episode_id IS NOT NULL AND at_seconds >= 0)",
+            name="time_needs_an_episode",
+        ),
         CheckConstraint(
             "page IS NULL OR edition_id IS NOT NULL OR issue_id IS NOT NULL",
             name="page_needs_a_printing",
@@ -323,6 +374,7 @@ class RecipeLocation(Timestamps, Base):
         Index("ix_recipe_locations_edition_id", "edition_id"),
         Index("ix_recipe_locations_web_page_id", "web_page_id"),
         Index("ix_recipe_locations_issue_id", "issue_id"),
+        Index("ix_recipe_locations_episode_id", "episode_id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -330,10 +382,13 @@ class RecipeLocation(Timestamps, Base):
     edition_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     web_page_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     issue_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    episode_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     # Text, because books number pages "xii" and recipes span "112-13".
     # Null means in this edition, page not yet recorded.
     page: Mapped[str | None] = mapped_column(Text)
+    # Seconds into an episode where the recipe starts.
+    at_seconds: Mapped[int | None] = mapped_column(Integer)
 
 
 class Ingredient(Timestamps, Base):

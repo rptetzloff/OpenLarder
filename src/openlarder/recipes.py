@@ -26,12 +26,13 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import web
 from openlarder.models import (
     Edition,
+    Episode,
     Issue,
     Recipe,
     RecipeIngredient,
@@ -67,8 +68,57 @@ AMOUNT = re.compile(
 )
 
 
+SHOWS = ("tv_show", "podcast", "video_channel")
+# A time in an episode: 12:34 or 1:02:03.
+_CLOCK = re.compile(r"^(?:(\d{1,2}):)?(\d{1,3}):([0-5]\d)$")
+
+
 class InvalidRecipe(ValueError):
     """The reason is written to be shown to the person entering the recipe."""
+
+
+@dataclass
+class EpisodeEntry:
+    """Which episode of a show a recipe is in: any of its season and number,
+    its title, or its address; and where in it, in seconds."""
+
+    season: int | None = None
+    number: int | None = None
+    title: str | None = None
+    url: str | None = None
+    aired_on: date | None = None
+    at_seconds: int | None = None
+
+
+def seconds(clock: str | None) -> int | None:
+    """A time in an episode, "12:34" or "1:02:03", as seconds; blank is None."""
+    clock = (clock or "").strip()
+    if not clock:
+        return None
+    found = _CLOCK.match(clock)
+    hours, minutes, secs = found.groups() if found else (None, "60", "0")
+    if not found or (hours is not None and int(minutes) > 59):
+        raise InvalidRecipe("Give the time as minutes and seconds, like 12:34, or 1:02:03.")
+    return int(hours or 0) * 3600 + int(minutes) * 60 + int(secs)
+
+
+def clock(at: int) -> str:
+    """Seconds as a time in an episode: 12:34, or 1:02:03."""
+    hours, rest = divmod(at, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02}:{secs:02}" if hours else f"{minutes}:{secs:02}"
+
+
+def episode_name(season: int | None, number: int | None, title: str | None) -> str:
+    """How an episode reads: Season 2, episode 5, “Fat”; or a video's title."""
+    parts = []
+    if number is not None:
+        parts.append(
+            f"Season {season}, episode {number}" if season is not None else f"Episode {number}"
+        )
+    if title:
+        parts.append(f"“{title}”")
+    return ", ".join(parts) or "A video"
 
 
 @dataclass
@@ -84,6 +134,8 @@ class RecipeEntry:
     issue: str | None = None
     issue_date: date | None = None
     issue_page: str | None = None
+    # For a TV show's, podcast's or video channel's: the episode.
+    episode: EpisodeEntry | None = None
 
 
 def _squash(text: str) -> str:
@@ -98,6 +150,7 @@ def clean(
     issue: str | None = None,
     issue_date: date | None = None,
     issue_page: str | None = None,
+    episode: EpisodeEntry | None = None,
 ) -> RecipeEntry:
     """Normalise what was typed, or raise InvalidRecipe. Which of pages or
     web_address the recipe needs depends on its source (create, replace)."""
@@ -113,12 +166,13 @@ def clean(
     in_issue = _squash(issue_page or "") or None
     if in_issue and len(in_issue) > MAX_PAGE:
         raise InvalidRecipe(f"A page is at most {MAX_PAGE} characters, like 112 or xii.")
-    if label and (pages or (web_address and web_address.strip())):
-        raise InvalidRecipe("A recipe is in one place: an edition, a web page or an issue.")
+    episode = _clean_episode(episode)
+    if sum(bool(p) for p in (label, pages, web_address and web_address.strip(), episode)) > 1:
+        raise InvalidRecipe(
+            "A recipe is in one place: an edition, a web page, an issue or an episode."
+        )
     url = None
     if web_address and web_address.strip():
-        if pages:
-            raise InvalidRecipe("A recipe is in a book's edition or on a web page, not both.")
         try:
             url, _ = web.page(web_address)
         except web.BadAddress as exc:
@@ -158,6 +212,41 @@ def clean(
         issue=label,
         issue_date=issue_date,
         issue_page=in_issue if label else None,
+        episode=episode,
+    )
+
+
+def _clean_episode(episode: EpisodeEntry | None) -> EpisodeEntry | None:
+    """The episode as given, tidied; None when nothing names one."""
+    if episode is None:
+        return None
+    title = _squash(episode.title or "") or None
+    if title and len(title) > MAX_TITLE:
+        raise InvalidRecipe(f"An episode's title is at most {MAX_TITLE} characters.")
+    url = None
+    if episode.url and episode.url.strip():
+        try:
+            url, _ = web.page(episode.url)
+        except web.BadAddress as exc:
+            raise InvalidRecipe(str(exc)) from None
+    for n in (episode.season, episode.number):
+        if n is not None and not 0 <= n <= 10_000:
+            raise InvalidRecipe("Seasons and episodes are numbered from 0 to 10,000.")
+    if episode.season is not None and episode.number is None:
+        raise InvalidRecipe("Give the episode's number in its season too.")
+    if episode.number is None and not title and not url:
+        if episode.aired_on or episode.at_seconds is not None:
+            raise InvalidRecipe("Say which episode: its number, its title or its address.")
+        return None
+    if episode.at_seconds is not None and episode.at_seconds >= 100 * 3600:
+        raise InvalidRecipe("That time is longer than any episode.")
+    return EpisodeEntry(
+        season=episode.season,
+        number=episode.number,
+        title=title,
+        url=url,
+        aired_on=episode.aired_on,
+        at_seconds=episode.at_seconds,
     )
 
 
@@ -167,6 +256,14 @@ async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: Recip
     composite keys on recipe_locations; checking here turns that into a
     message rather than a 500."""
     source = await session.get_one(Source, source_id)
+    if source.kind in SHOWS:
+        if not entry.episode:
+            raise InvalidRecipe("Say which episode the recipe is in: its number or its title.")
+        if source.kind == "video_channel" and not entry.episode.url:
+            raise InvalidRecipe("Give the video's address.")
+        return
+    if entry.episode:
+        raise InvalidRecipe("Only a TV show, podcast or video channel has episodes.")
     if source.kind in ("magazine", "newspaper"):
         if not entry.issue:
             raise InvalidRecipe("Say which issue the recipe is in: its name or its date.")
@@ -190,7 +287,60 @@ async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: Recip
         raise InvalidRecipe("That edition isn't one of this book's.")
 
 
+async def _episode(session: AsyncSession, source_id: uuid.UUID, given: EpisodeEntry) -> Episode:
+    """The episode a recipe names: found by its address, then its number,
+    then its title, with blanks filled in from what's given; or a new one."""
+    here = Episode.source_id == source_id
+    by_number = and_(
+        here, Episode.number == given.number, Episode.season.is_not_distinct_from(given.season)
+    )
+    found = None
+    if given.url:
+        found = await session.scalar(select(Episode).where(here, Episode.url == given.url))
+    if found is None and given.number is not None:
+        found = await session.scalar(select(Episode).where(by_number))
+    if found is None and given.title:
+        found = await session.scalar(
+            select(Episode)
+            .where(here, func.lower(Episode.title) == given.title.lower())
+            .order_by(Episode.created_at)
+            .limit(1)
+        )
+    if found is None:
+        found = Episode(
+            source_id=source_id,
+            season=given.season,
+            number=given.number,
+            title=given.title,
+            url=given.url,
+            aired_on=given.aired_on,
+        )
+        session.add(found)
+        await session.flush()
+        return found
+    found.title = found.title or given.title
+    found.aired_on = found.aired_on or given.aired_on
+    if found.url is None and given.url:
+        # No other episode has it: the search by address came first.
+        found.url = given.url
+    if found.number is None and given.number is not None:
+        # Unless another episode has that number already.
+        if await session.scalar(select(Episode.id).where(by_number)) is None:
+            found.season, found.number = given.season, given.number
+    return found
+
+
 async def _write_parts(session: AsyncSession, recipe: Recipe, entry: RecipeEntry) -> None:
+    if entry.episode:
+        episode = await _episode(session, recipe.source_id, entry.episode)
+        session.add(
+            RecipeLocation(
+                recipe_id=recipe.id,
+                episode_id=episode.id,
+                source_id=recipe.source_id,
+                at_seconds=entry.episode.at_seconds,
+            )
+        )
     if entry.issue:
         # One row per issue: a recipe names it, and the first names it.
         found_issue = await session.scalar(
