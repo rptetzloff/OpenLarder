@@ -6,6 +6,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## MVP
 
+- [ ] **Site design.** *Ray, 2026-11-08: "not most important for
+      development, but definitely part of MVP".* The pages work but aren't
+      designed: a real home page (it still shows the placeholder's database
+      status), the look (type, colour, logo use, light and dark), navigation
+      as sources, search and the larder arrive, and the phone layout. #17's
+      sign-in screens should match it.
 - [ ] **Wikidata facts on author pages** (born, nationality, website). The
       pages themselves are built (#52).
 - [ ] **Merge two authors**: the same person can end up as two records (a
