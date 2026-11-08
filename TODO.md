@@ -30,18 +30,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       book or a blog or an instagram post or a tv episode or a magazine
       article".* Decided (Ray, 2026-11-08):
       - **Every kind people document is offered**: books, magazines, blogs
-        and websites, Instagram and other social posts, TV and video.
+        and websites, social media posts, TV and video. Social media is one
+        generic kind, an account's post by address, not a kind per
+        platform; nothing is built for TikTok in particular (Ray).
       - **Each kind has its own shape**, in levels: a book's editions and
         pages; a magazine's issues and pages; a website's posts, by address;
-        an account's posts; **a TV show's episodes, where the recipe
+        a social media account's posts; **a TV show's episodes, where the recipe
         belongs** (Ray), maybe with a time in it.
       - **A web page that disappears** is marked archived and links to the
         Internet Archive's copy from when it was added. Adding a web source
         asks the Archive to save the page then (its Save Page Now service),
         and keeps the snapshot's address; if that fails, the Archive's
         nearest earlier copy is looked up instead. To check when built:
-        the Archive's current terms and limits, and that Instagram pages
-        archive at all.
+        the Archive's current terms and limits, and which social media
+        pages archive at all.
 
       *Claude's recommendation on storage:* real columns and tables per
       kind, not a JSON blob. A source (kind, title, credits) has parts (an
