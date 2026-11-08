@@ -31,12 +31,16 @@ class Archiver:
         sessions: Callable[[], AbstractAsyncContextManager[AsyncSession]],
         keys: tuple[str, str] | None,
         transport: httpx2.AsyncBaseTransport | None = None,
+        enabled: bool = True,
     ) -> None:
         self.sessions = sessions
         self.keys = keys
         self.transport = transport
+        self.enabled = enabled
 
     async def run(self, page_ids: list[uuid.UUID]) -> None:
+        if not self.enabled:
+            return
         async with self.sessions() as session:
             for page_id in page_ids:
                 page = await session.get(WebPage, page_id)
@@ -52,7 +56,7 @@ class Archiver:
 
 
 def get_archiver(settings: Annotated[Settings, Depends(get_settings)]) -> Archiver:
-    return Archiver(db.session_factory(), settings.archive_keys)
+    return Archiver(db.session_factory(), settings.archive_keys, enabled=settings.archive_web_pages)
 
 
 ArchiverDep = Annotated[Archiver, Depends(get_archiver)]

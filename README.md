@@ -69,6 +69,7 @@ neither: with one alone, they're ignored.
 | --- | --- |
 | `OPENLARDER_ARCHIVE_ACCESS_KEY` | From https://archive.org/account/s3.php, signed in to the account |
 | `OPENLARDER_ARCHIVE_SECRET_KEY` | From the same page. Never committed |
+| `OPENLARDER_ARCHIVE_WEB_PAGES` | `true` unless set; `false` stops web recipes asking the Internet Archive for a copy, for throwaway checks |
 
 Signing out goes on to Authgear's end-session endpoint, which returns people
 to `https://openlarder.com/`. That address is registered in Authgear as a
@@ -88,7 +89,24 @@ cd web && npm run typecheck
 
 The tests need the Postgres from `docker compose up db`. Each run creates its
 own database beside the configured one, migrates it, and drops it afterwards.
-CI (`.github/workflows/ci.yml`) runs the same checks plus a build of the image.
+CI (`.github/workflows/ci.yml`) runs the same checks plus a build of the image,
+and the accessibility check below.
+
+The accessibility check (`web/a11y/check.mjs`) runs every kind of page through
+axe-core's WCAG 2.1 AA rules in light and dark, and checks phone width. It adds
+a sample catalog through the API, so give it a throwaway database and an app
+with archiving off:
+
+```sh
+docker compose exec -T db psql -U openlarder -d postgres -c "CREATE DATABASE openlarder_a11y"
+docker run -d --name openlarder-a11y --network openlarder_default -p 8001:8000 \
+  -e OPENLARDER_DATABASE_URL=postgresql+psycopg://openlarder:openlarder@db:5432/openlarder_a11y \
+  -e OPENLARDER_ARCHIVE_WEB_PAGES=false openlarder-api
+docker compose exec -T db psql -U openlarder -d openlarder_a11y < web/a11y/users.sql
+cd web && A11Y_BASE=http://localhost:8001 npm run a11y
+```
+
+It needs Chrome (`CHROME` points at it if it isn't where the script looks).
 
 Once per clone, turn on the repo's git hooks:
 

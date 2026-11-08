@@ -205,6 +205,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] An accessibility check in CI: every kind of page through axe-core's
+      WCAG 2.1 AA rules in light and dark, and at phone width (#68)
 - [x] A light, dark or same-as-device theme choice in the footer (#67)
 - [x] Site design, part 1: the shell (colours, logo, header, footer) and
       the home page, light and dark (#66)

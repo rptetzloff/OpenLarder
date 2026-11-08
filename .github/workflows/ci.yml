@@ -83,6 +83,53 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  # Every kind of page, as the built image serves it, through axe-core's WCAG
+  # 2.1 A and AA rules (contrast among them) in light and dark, and for
+  # sideways scrolling at phone width (web/a11y/check.mjs). Ray, 2026-11-08:
+  # accessibility and contrast checked along the way. It adds a sample
+  # catalog through the API, so it runs against this job's own database, with
+  # web recipes asking the Internet Archive for nothing.
+  a11y:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: openlarder
+          POSTGRES_PASSWORD: openlarder
+          POSTGRES_DB: openlarder
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openlarder -d openlarder"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: docker build -t openlarder:a11y .
+      - name: Run the image
+        run: |
+          docker run -d --name app --network host \
+            -e OPENLARDER_DATABASE_URL=postgresql+psycopg://openlarder:openlarder@localhost:5432/openlarder \
+            -e OPENLARDER_ARCHIVE_WEB_PAGES=false \
+            openlarder:a11y
+          for i in $(seq 1 60); do curl -sf localhost:8000/readyz && exit 0; sleep 2; done
+          docker logs app; exit 1
+      - name: Plant the people the check signs in as
+        run: psql postgresql://openlarder:openlarder@localhost:5432/openlarder -v ON_ERROR_STOP=1 -f web/a11y/users.sql
+      - run: npm ci
+        working-directory: web
+      - run: node a11y/check.mjs
+        working-directory: web
+      - if: failure()
+        run: docker logs app
+
   image:
     runs-on: ubuntu-latest
     steps:
