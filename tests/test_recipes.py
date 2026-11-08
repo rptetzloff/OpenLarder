@@ -65,7 +65,6 @@ def test_entries_are_tidied() -> None:
     [
         ("  ", [(E1, None)], [], "title"),
         ("x" * 201, [(E1, None)], [], "200"),
-        ("Cake", [], [], "edition"),
         ("Cake", [(E1, "1"), (E1, "2")], [], "once"),
         ("Cake", [(E1, "1" * 21)], [], "page"),
         ("Cake", [(E1, None)], ["x" * 151], "method"),

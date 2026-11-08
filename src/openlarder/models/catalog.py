@@ -39,6 +39,7 @@ from sqlalchemy import (
     SmallInteger,
     Text,
     UniqueConstraint,
+    false,
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM, UUID
@@ -86,12 +87,20 @@ class Source(Timestamps, Base):
     __tablename__ = "sources"
     __table_args__ = (
         CheckConstraint("title <> ''", name="title_not_empty"),
-        CheckConstraint("kind IN ('book')", name="kind_known"),
+        CheckConstraint("kind IN ('book', 'website')", name="kind_known"),
+        CheckConstraint("(kind = 'website') = (host IS NOT NULL)", name="host_for_websites"),
+        CheckConstraint("host <> ''", name="host_not_empty"),
+        CheckConstraint("NOT paywalled OR kind = 'website'", name="paywalled_websites_only"),
         _trgm("sources", "title"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="book")
+    # A website's, without "www." ("smittenkitchen.com"); one source per site
+    # (migration 0020).
+    host: Mapped[str | None] = mapped_column(Text, unique=True)
+    # A website behind a subscription: linked, never copied.
+    paywalled: Mapped[bool] = mapped_column(nullable=False, server_default=false())
     title: Mapped[str] = mapped_column(Text, nullable=False)
     subtitle: Mapped[str | None] = mapped_column(Text)
     open_library_work_id: Mapped[str | None] = mapped_column(Text, unique=True)
@@ -223,22 +232,51 @@ class Recipe(Timestamps, Base):
     created_by: Mapped[uuid.UUID | None] = _fk("users.id", ondelete="SET NULL", nullable=True)
 
 
+class WebPage(Timestamps, Base):
+    """A page of a website source, where a recipe is (migration 0020)."""
+
+    __tablename__ = "web_pages"
+    __table_args__ = (
+        # The target of recipe_locations' composite key.
+        UniqueConstraint("source_id", "id"),
+        CheckConstraint("url <> ''", name="url_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
+    url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+
+
 class RecipeLocation(Timestamps, Base):
+    """Where a recipe is in its source: a page in a book's edition, or a web
+    page, never both (migration 0020)."""
+
     __tablename__ = "recipe_locations"
     __table_args__ = (
-        PrimaryKeyConstraint("recipe_id", "edition_id"),
         ForeignKeyConstraint(
             ["source_id", "recipe_id"], ["recipes.source_id", "recipes.id"], ondelete="CASCADE"
         ),
         ForeignKeyConstraint(
             ["source_id", "edition_id"], ["editions.source_id", "editions.id"], ondelete="CASCADE"
         ),
+        ForeignKeyConstraint(
+            ["source_id", "web_page_id"],
+            ["web_pages.source_id", "web_pages.id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("recipe_id", "edition_id"),
+        UniqueConstraint("recipe_id", "web_page_id"),
         CheckConstraint("page <> ''", name="page_not_empty"),
+        CheckConstraint("num_nonnulls(edition_id, web_page_id) = 1", name="one_place"),
+        CheckConstraint("page IS NULL OR edition_id IS NOT NULL", name="page_needs_edition"),
         Index("ix_recipe_locations_edition_id", "edition_id"),
+        Index("ix_recipe_locations_web_page_id", "web_page_id"),
     )
 
+    id: Mapped[uuid.UUID] = uuid_pk()
     recipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    edition_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    edition_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    web_page_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     # Text, because books number pages "xii" and recipes span "112-13".
     # Null means in this edition, page not yet recorded.

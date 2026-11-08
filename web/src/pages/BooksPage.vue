@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { addByIsbn, type BookSummary } from "../books";
+import { addByIsbn, addWebsite, type BookSummary } from "../books";
 import type { Me } from "../me";
 
 defineProps<{ user: Me | null | undefined }>();
-document.title = "Books · OpenLarder";
+document.title = "Sources · OpenLarder";
 
 const books = ref<BookSummary[] | null>(null);
 const failed = ref(false);
@@ -42,6 +42,21 @@ onMounted(async () => {
   }
 });
 
+// Adding a website: any address on it finds the site.
+const siteAddress = ref("");
+const siteName = ref("");
+const sitePaywalled = ref(false);
+const siteError = ref("");
+async function addSite() {
+  siteError.value = "";
+  try {
+    const { id } = await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value);
+    location.href = `/sources/${id}`;
+  } catch (e) {
+    siteError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
 async function add() {
   adding.value = true;
   error.value = "";
@@ -58,7 +73,8 @@ async function add() {
 
 <template>
   <article>
-    <h1>Books</h1>
+    <h1>Sources</h1>
+    <p class="status">Cookbooks and recipe websites, with the recipes indexed from them.</p>
     <p class="status"><a href="/authors">Browse by author</a></p>
 
     <form v-if="user?.is_admin" class="isbn-form" @submit.prevent="add">
@@ -79,6 +95,24 @@ async function add() {
         </button>
       </div>
       <p v-if="error" id="isbn-error" class="error" role="alert">{{ error }}</p>
+    </form>
+
+    <form v-if="user?.is_admin" class="recipe-form site-form" @submit.prevent="addSite">
+      <label for="site-address">Add a website: any page on it</label>
+      <input
+        id="site-address"
+        v-model="siteAddress"
+        required
+        autocomplete="off"
+        placeholder="https://smittenkitchen.com"
+      />
+      <label for="site-name">What it calls itself (optional)</label>
+      <input id="site-name" v-model="siteName" maxlength="300" placeholder="Smitten Kitchen" />
+      <label class="check"
+        ><input v-model="sitePaywalled" type="checkbox" /> Behind a subscription</label
+      >
+      <p v-if="siteError" class="error" role="alert">{{ siteError }}</p>
+      <button type="submit" class="primary">Add the website</button>
     </form>
 
     <p v-if="failed" role="alert">The books couldn't be loaded. Try reloading the page.</p>
@@ -112,6 +146,7 @@ async function add() {
           <span>
             <strong>{{ book.title }}</strong>
             <span v-if="book.authors.length" class="byline">{{ book.authors.join(", ") }}</span>
+            <span v-else-if="book.host" class="byline">{{ book.host }}</span>
           </span>
         </a>
       </li>

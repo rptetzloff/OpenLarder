@@ -18,6 +18,7 @@ from openlarder.models.catalog import (
     Substitution,
     Tag,
     TagKind,
+    WebPage,
 )
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.imports import ImportRun, ImportRunLine
@@ -48,4 +49,5 @@ __all__ = [
     "Source",
     "SourceCredit",
     "SourceTag",
+    "WebPage",
 ]

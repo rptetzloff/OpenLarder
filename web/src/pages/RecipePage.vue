@@ -75,7 +75,13 @@ async function remove() {
     <template v-else>
       <p><a :href="`/sources/${recipe.source.id}`">← {{ recipe.source.title }}</a></p>
       <h1>{{ recipe.title }}</h1>
-      <p class="byline">
+      <p v-if="recipe.web_address" class="byline">
+        On <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>:
+        <a :href="recipe.web_address" rel="nofollow noopener" class="web-address">{{
+          recipe.web_address
+        }}</a>
+      </p>
+      <p v-else class="byline">
         In <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>,
         {{ recipe.pages.map(where).join("; ") }}
       </p>
@@ -95,7 +101,9 @@ async function remove() {
         </li>
       </ul>
       <p v-else class="status">No ingredients recorded yet.</p>
-      <p class="status">The amounts and the method are in the book.</p>
+      <p class="status">
+        The amounts and the method are {{ recipe.web_address ? "on the page" : "in the book" }}.
+      </p>
 
       <template v-if="recipe.used_in.length">
         <h2>Used in</h2>

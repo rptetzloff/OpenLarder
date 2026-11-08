@@ -9,6 +9,9 @@ const props = defineProps<{ bookId?: string; recipeId?: string }>();
 const book = ref<Book | null>(null);
 const title = ref("");
 const ingredients = ref("");
+// A website's recipe: the page it's on.
+const webAddress = ref("");
+const onWeb = computed(() => book.value?.kind === "website");
 // Per edition: is the recipe in it, and on which page.
 const editions = ref<{ id: string; label: string; included: boolean; page: string }[]>([]);
 const error = ref("");
@@ -47,6 +50,7 @@ onMounted(async () => {
     }));
     if (existing) {
       title.value = existing.title;
+      webAddress.value = existing.web_address ?? "";
       ingredients.value = existing.ingredients.join("\n");
     }
     document.title = `${heading.value} · ${book.value!.title} · OpenLarder`;
@@ -93,9 +97,12 @@ async function save() {
     const id = await saveRecipe(
       {
         title: title.value,
-        editions: editions.value
-          .filter((e) => e.included)
-          .map((e) => ({ edition_id: e.id, page: e.page.trim() || null })),
+        editions: onWeb.value
+          ? []
+          : editions.value
+              .filter((e) => e.included)
+              .map((e) => ({ edition_id: e.id, page: e.page.trim() || null })),
+        web_address: onWeb.value ? webAddress.value : null,
         ingredients: ingredients.value.split("\n"),
       },
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
@@ -114,10 +121,22 @@ async function save() {
     <h1>{{ heading }}</h1>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="book" class="recipe-form" @submit.prevent="save">
-      <label for="recipe-title">Title, as the book prints it</label>
+      <label for="recipe-title">{{ onWeb ? "Title, as the page gives it" : "Title, as the book prints it" }}</label>
       <input id="recipe-title" v-model="title" required maxlength="200" />
 
-      <fieldset>
+      <template v-if="onWeb">
+        <label for="recipe-address">Web address of the recipe</label>
+        <input
+          id="recipe-address"
+          v-model="webAddress"
+          type="url"
+          required
+          maxlength="2000"
+          :placeholder="`https://${book.host}/…`"
+        />
+        <p class="help">A page on {{ book.host }}. OpenLarder links to it; it never copies it.</p>
+      </template>
+      <fieldset v-else>
         <legend>Page</legend>
         <p class="help">Leave a page blank if you don't know it yet.</p>
         <div v-for="e in editions" :key="e.id" class="edition-row">
@@ -147,8 +166,8 @@ async function save() {
         aria-describedby="recipe-ingredients-help"
       />
       <p id="recipe-ingredients-help" class="help">
-        Just what goes in, as the book names it: “rhubarb”, not “200g rhubarb”. Amounts and
-        the method stay in the book.
+        Just what goes in, as the {{ onWeb ? "page" : "book" }} names it: “rhubarb”, not “200g
+        rhubarb”. Amounts and the method stay {{ onWeb ? "on the page" : "in the book" }}.
       </p>
       <ul v-if="reviews.length" class="line-hints" aria-live="polite">
         <li v-for="r in reviews" :key="`${r.index}:${r.line}`">
