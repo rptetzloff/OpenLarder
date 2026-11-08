@@ -83,9 +83,11 @@ async function save() {
       <input id="book-subtitle" v-model="form.subtitle" maxlength="500" />
 
       <fieldset>
-        <legend>Credits, in the order the book prints them</legend>
+        <legend>
+          {{ book.kind === "website" ? "Who writes it, in order" : "Credits, in the order the book prints them" }}
+        </legend>
         <p class="help">
-          Names as the cover prints them. Fixing a name here fixes the author's own name too,
+          Names as the {{ book.kind === "website" ? "site gives" : "cover prints" }} them. Fixing a name here fixes the author's own name too,
           unless they're on other books or come from Open Library.
         </p>
         <div v-for="(c, i) in form.credits" :key="i" class="credit-row">

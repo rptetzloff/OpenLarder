@@ -70,7 +70,7 @@ onMounted(() => load());
       <ul class="recipe-list">
         <li v-for="a in authors" :key="a.id">
           <a :href="`/authors/${a.id}`">{{ a.name }}</a>
-          <span class="page-ref">{{ a.sources }} {{ a.sources === 1 ? "book" : "books" }}</span>
+          <span class="page-ref">{{ a.sources }} {{ a.sources === 1 ? "source" : "sources" }}</span>
         </li>
       </ul>
       <button

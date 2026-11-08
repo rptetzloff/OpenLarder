@@ -135,15 +135,7 @@ async def add_without_isbn(
     session.add(work)
     await session.flush()
     for position, name in enumerate(authors, start=1):
-        author = await session.scalar(
-            select(Author).where(
-                func.lower(Author.name) == name.lower(), Author.open_library_author_id.is_(None)
-            )
-        )
-        if author is None:
-            author = Author(name=name)
-            session.add(author)
-            await session.flush()
+        author = await author_named(session, name)
         session.add(
             SourceCredit(
                 source_id=work.id, author_id=author.id, position=position, credited_as=name
@@ -229,16 +221,7 @@ async def edit_book(
             ):
                 author.name = name
         else:
-            author = await session.scalar(
-                select(Author).where(
-                    func.lower(Author.name) == name.lower(),
-                    Author.open_library_author_id.is_(None),
-                )
-            )
-            if author is None:
-                author = Author(name=name)
-                session.add(author)
-                await session.flush()
+            author = await author_named(session, name)
         rows.append((author, name, credit.role))
     seen: set[tuple[uuid.UUID, str]] = set()
     for author, name, role in rows:
@@ -303,3 +286,20 @@ async def drop_uncredited(session: AsyncSession, author_ids: list[uuid.UUID]) ->
                 ~exists().where(SourceCredit.author_id == Author.id),
             )
         )
+
+
+async def author_named(session: AsyncSession, name: str) -> Author:
+    """The author a typed name means: one by exactly that name among those
+    without an Open Library record, the nearest thing to identity there is
+    without one, or a new author. Two people sharing a name is a merge for
+    review."""
+    author = await session.scalar(
+        select(Author).where(
+            func.lower(Author.name) == name.lower(), Author.open_library_author_id.is_(None)
+        )
+    )
+    if author is None:
+        author = Author(name=name)
+        session.add(author)
+        await session.flush()
+    return author

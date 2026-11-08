@@ -167,11 +167,12 @@ export async function addWebsite(
   address: string,
   name: string,
   paywalled: boolean,
+  authors: string[] = [],
 ): Promise<{ id: string; existing: boolean }> {
   const res = await fetch("/api/sources/websites", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, name: name || null, paywalled }),
+    body: JSON.stringify({ address, name: name || null, paywalled, authors }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");

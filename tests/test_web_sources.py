@@ -210,3 +210,42 @@ async def test_a_website_doesnt_link_to_open_library(admin) -> None:
         f"/api/sources/{site}/open-library/preview", json={"reference": "9780393541113"}
     )
     assert response.status_code == 409
+
+
+# Who writes it
+
+
+async def test_a_website_credits_who_writes_it(admin, client) -> None:
+    site = (
+        await _site(admin, name="Smitten Kitchen", authors=["Deb Perelman", " Deb  Perelman "])
+    )["id"]
+    shown = (await client.get(f"/api/sources/{site}")).json()
+    assert [(c["credited_as"], c["role"]) for c in shown["credits"]] == [("Deb Perelman", "author")]
+    author = (await client.get(f"/api/authors/{shown['credits'][0]['author_id']}")).json()
+    assert [(s["title"], s["kind"], s["host"]) for s in author["sources"]] == [
+        ("Smitten Kitchen", "website", "smittenkitchen.com")
+    ]
+
+
+async def test_a_websites_author_is_the_same_as_her_books(admin, client) -> None:
+    book = await admin.post(
+        "/api/sources/manual",
+        json={"title": "Smitten Kitchen Every Day", "authors": ["Deb Perelman"]},
+    )
+    site = (await _site(admin, authors=["Deb Perelman"]))["id"]
+    shown = (await client.get(f"/api/sources/{site}")).json()
+    deb = shown["credits"][0]["author_id"]
+    page = (await client.get(f"/api/authors/{deb}")).json()
+    assert sorted(s["kind"] for s in page["sources"]) == ["book", "website"]
+    assert book.status_code == 200
+
+
+async def test_a_websites_credits_are_edited_like_a_books(admin, client) -> None:
+    site = (await _site(admin, name="Smitten Kitchen"))["id"]
+    response = await admin.put(
+        f"/api/sources/{site}",
+        json={"title": "Smitten Kitchen", "credits": [{"name": "Deb Perelman", "role": "author"}]},
+    )
+    assert response.status_code == 200, response.text
+    shown = (await client.get(f"/api/sources/{site}")).json()
+    assert [c["credited_as"] for c in shown["credits"]] == ["Deb Perelman"]

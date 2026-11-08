@@ -46,11 +46,14 @@ onMounted(async () => {
 const siteAddress = ref("");
 const siteName = ref("");
 const sitePaywalled = ref(false);
+// Who writes it: names separated by commas.
+const siteAuthors = ref("");
 const siteError = ref("");
 async function addSite() {
   siteError.value = "";
   try {
-    const { id } = await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value);
+    const authors = siteAuthors.value.split(",").map((a) => a.trim()).filter(Boolean);
+    const { id } = await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value, authors);
     location.href = `/sources/${id}`;
   } catch (e) {
     siteError.value = e instanceof Error ? e.message : String(e);
@@ -108,6 +111,8 @@ async function add() {
       />
       <label for="site-name">What it calls itself (optional)</label>
       <input id="site-name" v-model="siteName" maxlength="300" placeholder="Smitten Kitchen" />
+      <label for="site-authors">Who writes it (optional; separate names with commas)</label>
+      <input id="site-authors" v-model="siteAuthors" maxlength="500" placeholder="Deb Perelman" />
       <label class="check"
         ><input v-model="sitePaywalled" type="checkbox" /> Behind a subscription</label
       >

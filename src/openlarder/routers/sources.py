@@ -635,6 +635,8 @@ class WebsiteIn(BaseModel):
     # What the site calls itself ("Smitten Kitchen"); its host when not given.
     name: str | None = Field(default=None, max_length=300)
     paywalled: bool = False
+    # Who writes it, in order, credited as authors.
+    authors: list[str] = Field(default=[], max_length=30)
 
 
 @router.post("/websites", response_model=AddedManually, dependencies=[SameOrigin])
@@ -655,6 +657,15 @@ async def add_website(body: WebsiteIn, admin: AdminUser, session: Session) -> Ad
         paywalled=body.paywalled,
     )
     session.add(site)
+    await session.flush()
+    names = [n for n in (" ".join(a.split()) for a in body.authors) if n]
+    for position, name in enumerate(dict.fromkeys(names), start=1):
+        author = await books_module.author_named(session, name)
+        session.add(
+            SourceCredit(
+                source_id=site.id, author_id=author.id, position=position, credited_as=name
+            )
+        )
     await session.commit()
     log.info("%s added the website %s", admin.id, host)
     return AddedManually(id=site.id, existing=False)
