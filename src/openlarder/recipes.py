@@ -28,7 +28,8 @@ from dataclasses import dataclass
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder.models import Edition, Recipe, RecipeIngredient, RecipeLocation
+from openlarder import web
+from openlarder.models import Edition, Recipe, RecipeIngredient, RecipeLocation, Source, WebPage
 
 MAX_TITLE = 200
 MAX_PAGE = 20
@@ -67,22 +68,36 @@ class RecipeEntry:
     # edition ID -> page, or None for "in this edition, page not recorded"
     pages: dict[uuid.UUID, str | None]
     lines: list[str]
+    # For a website's recipe instead: the page's address, as web.page keeps it.
+    web_address: str | None = None
 
 
 def _squash(text: str) -> str:
     return " ".join(text.split())
 
 
-def clean(title: str, pages: list[tuple[uuid.UUID, str | None]], lines: list[str]) -> RecipeEntry:
-    """Normalise what was typed, or raise InvalidRecipe."""
+def clean(
+    title: str,
+    pages: list[tuple[uuid.UUID, str | None]],
+    lines: list[str],
+    web_address: str | None = None,
+) -> RecipeEntry:
+    """Normalise what was typed, or raise InvalidRecipe. Which of pages or
+    web_address the recipe needs depends on its source (create, replace)."""
     title = _squash(title)
     if not title:
         raise InvalidRecipe("Give the recipe its title as the book prints it.")
     if len(title) > MAX_TITLE:
         raise InvalidRecipe(f"Titles are at most {MAX_TITLE} characters.")
 
-    if not pages:
-        raise InvalidRecipe("Say which edition the recipe is in.")
+    url = None
+    if web_address and web_address.strip():
+        if pages:
+            raise InvalidRecipe("A recipe is in a book's edition or on a web page, not both.")
+        try:
+            url, _ = web.page(web_address)
+        except web.BadAddress as exc:
+            raise InvalidRecipe(str(exc)) from None
     cleaned_pages: dict[uuid.UUID, str | None] = {}
     for edition_id, page in pages:
         if edition_id in cleaned_pages:
@@ -110,13 +125,25 @@ def clean(title: str, pages: list[tuple[uuid.UUID, str | None]], lines: list[str
             raise InvalidRecipe(
                 f"An ingredient is at most {MAX_LINE} characters: its name, not the method."
             )
-    return RecipeEntry(title=title, pages=cleaned_pages, lines=kept)
+    return RecipeEntry(title=title, pages=cleaned_pages, lines=kept, web_address=url)
 
 
-async def _check_editions(session: AsyncSession, source_id: uuid.UUID, entry: RecipeEntry) -> None:
-    # The database refuses a page in another book's edition too, through the
-    # composite keys on recipe_locations; checking here turns that into a
-    # message rather than a 500.
+async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: RecipeEntry) -> None:
+    """A book's recipe is in its editions; a website's is on one of its
+    pages. The database refuses a place in another source too, through the
+    composite keys on recipe_locations; checking here turns that into a
+    message rather than a 500."""
+    source = await session.get_one(Source, source_id)
+    if source.kind == "website":
+        if not entry.web_address:
+            raise InvalidRecipe("Give the web address of the recipe.")
+        if web.site(entry.web_address) != source.host:
+            raise InvalidRecipe(f"That address isn't on {source.host}.")
+        return
+    if entry.web_address:
+        raise InvalidRecipe("A book's recipe is in its editions, not on a web page.")
+    if not entry.pages:
+        raise InvalidRecipe("Say which edition the recipe is in.")
     known = set(
         (await session.scalars(select(Edition.id).where(Edition.source_id == source_id))).all()
     )
@@ -125,6 +152,16 @@ async def _check_editions(session: AsyncSession, source_id: uuid.UUID, entry: Re
 
 
 async def _write_parts(session: AsyncSession, recipe: Recipe, entry: RecipeEntry) -> None:
+    if entry.web_address:
+        # One row per address: several recipes can share a page.
+        found = await session.scalar(select(WebPage).where(WebPage.url == entry.web_address))
+        if found is None:
+            found = WebPage(source_id=recipe.source_id, url=entry.web_address)
+            session.add(found)
+            await session.flush()
+        session.add(
+            RecipeLocation(recipe_id=recipe.id, web_page_id=found.id, source_id=recipe.source_id)
+        )
     for edition_id, page in entry.pages.items():
         session.add(
             RecipeLocation(
@@ -137,7 +174,7 @@ async def _write_parts(session: AsyncSession, recipe: Recipe, entry: RecipeEntry
 
 
 async def create(session: AsyncSession, source_id: uuid.UUID, entry: RecipeEntry) -> Recipe:
-    await _check_editions(session, source_id, entry)
+    await _check_place(session, source_id, entry)
     recipe = Recipe(source_id=source_id, title=entry.title)
     session.add(recipe)
     await session.flush()
@@ -152,7 +189,7 @@ async def replace(session: AsyncSession, recipe: Recipe, entry: RecipeEntry) -> 
     matching exists there is nothing to drop; when it does, editing will
     have to keep a line's matches when its text is unchanged.
     """
-    await _check_editions(session, recipe.source_id, entry)
+    await _check_place(session, recipe.source_id, entry)
     recipe.title = entry.title
     await session.execute(delete(RecipeLocation).where(RecipeLocation.recipe_id == recipe.id))
     await session.execute(delete(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe.id))

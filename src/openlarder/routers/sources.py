@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import exists, func, select
 
 from openlarder import books as books_module
-from openlarder import isbn, linking, openlibrary, references, refresh
+from openlarder import isbn, linking, openlibrary, references, refresh, web
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.db import Session
@@ -49,6 +49,9 @@ Transport = Annotated[httpx2.AsyncBaseTransport | None, Depends(openlibrary_tran
 
 class BookSummary(BaseModel):
     id: uuid.UUID
+    # "book" or "website"; a website's host, as "smittenkitchen.com".
+    kind: str
+    host: str | None
     title: str
     subtitle: str | None
     authors: list[str]
@@ -88,6 +91,10 @@ class TopIngredient(BaseModel):
 
 class Book(BaseModel):
     id: uuid.UUID
+    kind: str
+    # A website's host, and whether it's behind a subscription.
+    host: str | None
+    paywalled: bool
     title: str
     subtitle: str | None
     open_library_url: str | None
@@ -171,6 +178,8 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
     return [
         BookSummary(
             id=w.id,
+            kind=w.kind,
+            host=w.host,
             title=w.title,
             subtitle=w.subtitle,
             authors=names.get(w.id, []),
@@ -228,6 +237,9 @@ async def get_book(source_id: uuid.UUID, session: Session) -> Book:
     )
     return Book(
         id=work.id,
+        kind=work.kind,
+        host=work.host,
+        paywalled=work.paywalled,
         title=work.title,
         subtitle=work.subtitle,
         open_library_url=(
@@ -382,6 +394,8 @@ async def _plan(
     work = await session.get(Source, source_id)
     if work is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    if work.kind != "book":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only a book links to Open Library.")
     try:
         reference = openlibrary.parse_reference(body.reference)
     except openlibrary.BadReference as exc:
@@ -498,6 +512,8 @@ class BookIn(BaseModel):
     credits: list[CreditIn] = Field(default=[], max_length=30)
     # Editions left out are left as they are.
     editions: list[EditionIn] = []
+    # A website's only; left as it is when not given.
+    paywalled: bool | None = None
 
 
 @router.put("/{source_id}", response_model=Added, dependencies=[SameOrigin])
@@ -522,6 +538,12 @@ async def edit_book(
         )
     except books_module.InvalidBook as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    if body.paywalled is not None:
+        if work.kind != "website" and body.paywalled:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "Only a website is behind a subscription."
+            )
+        work.paywalled = body.paywalled
     await session.commit()
     log.info("%s edited book %s", admin.id, source_id)
     return Added(id=work.id)
@@ -605,3 +627,45 @@ async def take_from_open_library(
     log.info("%s took %d changes from Open Library for %s", admin.id, taken, source_id)
     left = await _open_library(work, refresh.check(session, work, transport))
     return Taken(taken=taken, differences=_out(left))
+
+
+class WebsiteIn(BaseModel):
+    # Any address on the site, or just its host.
+    address: str = Field(max_length=2000)
+    # What the site calls itself ("Smitten Kitchen"); its host when not given.
+    name: str | None = Field(default=None, max_length=300)
+    paywalled: bool = False
+    # Who writes it, in order, credited as authors.
+    authors: list[str] = Field(default=[], max_length=30)
+
+
+@router.post("/websites", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_website(body: WebsiteIn, admin: AdminUser, session: Session) -> AddedManually:
+    """A website as a source, one per site: the one already here for that
+    host if there is one. Nothing is fetched from the site (web.py)."""
+    try:
+        host = web.site(body.address)
+    except web.BadAddress as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    existing = await session.scalar(select(Source).where(Source.host == host))
+    if existing is not None:
+        return AddedManually(id=existing.id, existing=True)
+    site = Source(
+        kind="website",
+        host=host,
+        title=" ".join((body.name or "").split()) or host,
+        paywalled=body.paywalled,
+    )
+    session.add(site)
+    await session.flush()
+    names = [n for n in (" ".join(a.split()) for a in body.authors) if n]
+    for position, name in enumerate(dict.fromkeys(names), start=1):
+        author = await books_module.author_named(session, name)
+        session.add(
+            SourceCredit(
+                source_id=site.id, author_id=author.id, position=position, credited_as=name
+            )
+        )
+    await session.commit()
+    log.info("%s added the website %s", admin.id, host)
+    return AddedManually(id=site.id, existing=False)

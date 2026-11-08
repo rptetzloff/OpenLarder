@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { addLink, type Author, fetchAuthor, removeLink, saveAuthor } from "../authors";
 import type { Me } from "../me";
 
@@ -64,6 +64,13 @@ const remove = (link: Author["links"][number]) =>
     author.value!.links = author.value!.links.filter((x) => x.id !== link.id);
   });
 
+// "Books", "Websites", or "Books and websites", by what they've made.
+const sourcesHeading = computed(() => {
+  const kinds = new Set(author.value?.sources.map((s) => s.kind));
+  if (kinds.size > 1) return "Books and websites";
+  return kinds.has("website") ? "Websites" : "Books";
+});
+
 // "photographer", or "author and photographer"; plain authorship goes unsaid.
 function roles(list: string[]) {
   return list.length === 1 && list[0] === "author" ? "" : list.join(" and ");
@@ -99,7 +106,7 @@ onMounted(load);
         </li>
       </ul>
 
-      <h2>Books</h2>
+      <h2>{{ sourcesHeading }}</h2>
       <ul class="book-list">
         <li v-for="b in author.sources" :key="b.id">
           <a :href="`/sources/${b.id}`" class="book-card">
@@ -107,6 +114,7 @@ onMounted(load);
             <span v-else class="no-cover" aria-hidden="true"></span>
             <span>
               <strong>{{ b.title }}</strong>
+              <span v-if="b.host" class="byline">{{ b.host }}</span>
               <span v-if="roles(b.roles)" class="byline">{{ roles(b.roles) }}</span>
               <span v-if="b.credited_as !== author.name" class="byline"
                 >as {{ b.credited_as }}</span
@@ -122,7 +130,7 @@ onMounted(load);
           <li v-for="c in author.coauthors" :key="c.id">
             <a :href="`/authors/${c.id}`">{{ c.name }}</a>
             <span class="page-ref">
-              {{ c.sources }} {{ c.sources === 1 ? "book" : "books" }} together
+              {{ c.sources }} together
             </span>
           </li>
         </ul>

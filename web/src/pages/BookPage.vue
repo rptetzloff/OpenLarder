@@ -43,7 +43,7 @@ onMounted(load);
 
 <template>
   <article>
-    <p><a href="/sources">← All books</a></p>
+    <p><a href="/sources">← All sources</a></p>
     <p v-if="missing">There's no book here. It may have been removed, or the link is wrong.</p>
     <p v-else-if="failed" role="alert">This book couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!book" class="status">Loading…</p>
@@ -53,6 +53,10 @@ onMounted(load);
         <div>
           <h1>{{ book.title }}</h1>
           <p v-if="book.subtitle" class="subtitle">{{ book.subtitle }}</p>
+          <p v-if="book.host" class="byline">
+            <a :href="`https://${book.host}`" rel="nofollow noopener">{{ book.host }}</a>
+            <template v-if="book.paywalled"> · subscription site</template>
+          </p>
           <p v-if="credits.length" class="byline">
             <template v-for="(c, i) in credits" :key="i"
               ><template v-if="i > 0">, </template
@@ -63,7 +67,7 @@ onMounted(load);
             <a :href="book.open_library_url">On Open Library</a>
           </p>
           <p v-if="user?.is_admin" class="byline">
-            <a :href="`/sources/${book.id}/edit`">Edit book</a>
+            <a :href="`/sources/${book.id}/edit`">{{ book.kind === "website" ? "Edit website" : "Edit book" }}</a>
           </p>
         </div>
       </div>
@@ -72,7 +76,9 @@ onMounted(load);
         <h2>Ingredients</h2>
         <p class="status">
           The ones its recipes use most. Open one for the recipes here that use it, or
-          <a :href="`/search?source=${book.id}`">search this book by ingredient</a>.
+          <a :href="`/search?source=${book.id}`"
+            >search this {{ book.kind === "website" ? "website" : "book" }} by ingredient</a
+          >.
         </p>
         <ul class="chosen">
           <li v-for="i in book.ingredients" :key="i.id">
@@ -92,6 +98,7 @@ onMounted(load);
       </ul>
       <p v-else class="status">No recipes indexed yet.</p>
 
+      <template v-if="book.kind === 'book'">
       <h2>Editions</h2>
       <ul class="editions">
         <li v-for="e in book.editions" :key="e.id">
@@ -112,6 +119,7 @@ onMounted(load);
       <p class="status">
         Book details and covers from <a href="https://openlibrary.org">Open Library</a>.
       </p>
+      </template>
     </template>
   </article>
 </template>

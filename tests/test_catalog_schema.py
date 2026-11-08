@@ -576,3 +576,42 @@ def test_downgrade_keeps_substitutions(engine, alembic_config) -> None:
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM substitutions WHERE from_ingredient_id = :a"), {"a": a})
             conn.execute(text("DELETE FROM ingredients WHERE id IN (:a, :b)"), {"a": a, "b": b})
+
+
+def test_a_website_has_a_host_and_only_a_website_does(db: Connection) -> None:
+    site = "INSERT INTO sources (kind, title, host, paywalled) VALUES (:k, :t, :h, :p)"
+    _insert(db, site, k="website", t="Smitten Kitchen", h="smittenkitchen.com", p=False)
+    _refused(db, lambda: _insert(db, site, k="website", t="No Host", h=None, p=False))
+    _refused(db, lambda: _insert(db, site, k="book", t="Hosted Book", h="book.example", p=False))
+    _refused(db, lambda: _insert(db, site, k="book", t="Paywalled Book", h=None, p=True))
+    _refused(db, lambda: _insert(db, site, k="website", t="Again", h="smittenkitchen.com", p=False))
+
+
+def test_a_location_is_an_edition_or_a_web_page_never_both(db: Connection) -> None:
+    book = _work(db)
+    edition = _edition(db, book)
+    site = _insert(
+        db,
+        "INSERT INTO sources (kind, title, host) VALUES ('website', 'Site', 'site.example')",
+    )
+    page = _insert(
+        db,
+        "INSERT INTO web_pages (source_id, url) VALUES (:s, 'https://site.example/a')",
+        s=site,
+    )
+    on_web = _recipe(db, site)
+    in_book = _recipe(db, book)
+    place = (
+        "INSERT INTO recipe_locations (recipe_id, source_id, edition_id, web_page_id, page)"
+        " VALUES (:r, :s, :e, :w, :p)"
+    )
+    _insert(db, place, r=on_web, s=site, e=None, w=page, p=None)
+    _insert(db, place, r=in_book, s=book, e=edition, w=None, p="12")
+    for r, s, e, w, p in [
+        (in_book, book, None, None, None),  # nowhere
+        (on_web, site, None, page, "12"),  # a page number on a web page
+        (in_book, book, edition, page, None),  # both
+        (in_book, book, None, page, None),  # another source's web page
+    ]:
+        values = {"r": r, "s": s, "e": e, "w": w, "p": p}
+        _refused(db, lambda v=values: _insert(db, place, **v))

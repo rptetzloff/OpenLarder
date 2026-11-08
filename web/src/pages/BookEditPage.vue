@@ -30,6 +30,8 @@ onMounted(async () => {
         publisher: e.publisher ?? "",
         published_year: e.published_year,
       })),
+      // Only a website's is sent.
+      paywalled: b.kind === "website" ? b.paywalled : undefined,
     };
     years.value = b.editions.map((e) => (e.published_year ? String(e.published_year) : ""));
     document.title = `Edit · ${b.title} · OpenLarder`;
@@ -69,18 +71,23 @@ async function save() {
 <template>
   <article>
     <p><a :href="`/sources/${id}`">← {{ book?.title ?? "Back to the book" }}</a></p>
-    <h1>Edit book</h1>
+    <h1>{{ book?.kind === "website" ? "Edit website" : "Edit book" }}</h1>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="form && book" class="recipe-form" @submit.prevent="save">
       <label for="book-title">Title</label>
       <input id="book-title" v-model="form.title" required maxlength="300" />
+      <label v-if="book.kind === 'website'" class="check"
+        ><input v-model="form.paywalled" type="checkbox" /> Behind a subscription</label
+      >
       <label for="book-subtitle">Subtitle</label>
       <input id="book-subtitle" v-model="form.subtitle" maxlength="500" />
 
       <fieldset>
-        <legend>Credits, in the order the book prints them</legend>
+        <legend>
+          {{ book.kind === "website" ? "Who writes it, in order" : "Credits, in the order the book prints them" }}
+        </legend>
         <p class="help">
-          Names as the cover prints them. Fixing a name here fixes the author's own name too,
+          Names as the {{ book.kind === "website" ? "site gives" : "cover prints" }} them. Fixing a name here fixes the author's own name too,
           unless they're on other books or come from Open Library.
         </p>
         <div v-for="(c, i) in form.credits" :key="i" class="credit-row">

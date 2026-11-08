@@ -2,6 +2,9 @@
 
 export interface BookSummary {
   id: string;
+  kind: "book" | "website";
+  // A website's, as "smittenkitchen.com".
+  host: string | null;
   title: string;
   subtitle: string | null;
   authors: string[];
@@ -21,6 +24,10 @@ export interface Edition {
 
 export interface Book {
   id: string;
+  kind: "book" | "website";
+  host: string | null;
+  // A website behind a subscription: linked, never copied.
+  paywalled: boolean;
   title: string;
   subtitle: string | null;
   open_library_url: string | null;
@@ -97,6 +104,8 @@ export interface BookIn {
   subtitle: string;
   credits: { author_id: string | null; name: string; role: string }[];
   editions: { id: string; title: string; publisher: string; published_year: number | null }[];
+  // A website's only.
+  paywalled?: boolean;
 }
 
 export async function saveBook(bookId: string, body: BookIn): Promise<void> {
@@ -147,6 +156,23 @@ export async function takeFromOpenLibrary(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ keys }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
+// A website as a source: the one already here for that site, or a new one.
+export async function addWebsite(
+  address: string,
+  name: string,
+  paywalled: boolean,
+  authors: string[] = [],
+): Promise<{ id: string; existing: boolean }> {
+  const res = await fetch("/api/sources/websites", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address, name: name || null, paywalled, authors }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");

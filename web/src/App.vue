@@ -82,7 +82,7 @@ onMounted(async () => {
 
 <template>
   <header>
-    <a href="/sources">Books</a>
+    <a href="/sources">Sources</a>
     <a href="/ingredients">Ingredients</a>
     <a href="/search" class="nav">Search</a>
     <template v-if="user">
@@ -127,7 +127,7 @@ onMounted(async () => {
     <template v-else>
       <h1>OpenLarder</h1>
       <p>A free, open index of the recipes in your cookbooks.</p>
-      <p><a href="/sources">Browse the books</a></p>
+      <p><a href="/sources">Browse the sources</a></p>
       <p v-if="signInFailed" role="alert">Sign-in didn't work. Please try again.</p>
       <p class="status">{{ status }}</p>
     </template>
@@ -566,6 +566,9 @@ button.link {
 }
 .author-link-form {
   margin-top: 1.5rem;
+}
+.web-address {
+  overflow-wrap: anywhere;
 }
 .byline a {
   color: inherit;

@@ -361,7 +361,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 - Meal planning and shopping lists
 - Photo/OCR import of a book's index pages
-- Magazines and web recipe sources. *Ray, 2026-11-08, widened: a source can be a book, magazine article, blog post, social media post (one generic kind, not per platform), TV or video episode, podcast episode, newspaper food section, subscription recipe site, packaging, or a family recipe, which can be marked private. Every kind people document is offered; each has its own shape (a TV recipe sits in an episode of a show); a vanished web page links to the Internet Archive's copy from when it was added. The model is settled before launch; see TODO.md.*
+- Magazines and web recipe sources. *Ray, 2026-11-08, widened: a source can be a book, magazine article, blog post, social media post (one generic kind, not per platform), TV or video episode, podcast episode, newspaper food section, subscription recipe site, packaging, or a family recipe, which can be marked private. Every kind people document is offered; each has its own shape (a TV recipe sits in an episode of a show); a vanished web page links to the Internet Archive's copy from when it was added. The model is settled before launch; see TODO.md.* *Built so far: books, and websites (migration 0020): one source per site, found by its host, optionally a subscription site, with each recipe on a web page by its address. Nothing is fetched from a site; recipes are linked, never copied.*
 - Verified authors curating their own pages (waits on the verification process)
 - Write API
 - Data dumps on a schedule

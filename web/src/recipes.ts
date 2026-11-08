@@ -13,8 +13,10 @@ export interface RecipePage {
 export interface Recipe {
   id: string;
   title: string;
-  source: { id: string; title: string };
+  source: { id: string; title: string; kind: "book" | "website" };
   pages: RecipePage[];
+  // A website's recipe: the page it's on.
+  web_address: string | null;
   // As typed, for the edit form.
   ingredients: string[];
   // The same lines read into their options, page references linked.
@@ -37,6 +39,8 @@ export interface RecipeIn {
   title: string;
   // Only the editions the recipe is in; page null = in it, page not recorded.
   editions: { edition_id: string; page: string | null }[];
+  // A website's recipe instead: the page's address.
+  web_address?: string | null;
   ingredients: string[];
 }
 

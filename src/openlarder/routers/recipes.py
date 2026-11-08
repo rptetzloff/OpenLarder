@@ -24,6 +24,7 @@ from openlarder.models import (
     RecipeIngredient,
     RecipeLocation,
     Source,
+    WebPage,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
 
@@ -64,7 +65,10 @@ class PageIn(BaseModel):
 
 class RecipeIn(BaseModel):
     title: str
-    editions: list[PageIn]
+    # A book's recipe: the editions it's in, each with its page.
+    editions: list[PageIn] = []
+    # A website's recipe instead: the page's address.
+    web_address: str | None = Field(default=None, max_length=2000)
     ingredients: list[str] = []
 
 
@@ -79,6 +83,7 @@ class PageOut(BaseModel):
 class SourceRef(BaseModel):
     id: uuid.UUID
     title: str
+    kind: str
 
 
 class RecipeLink(BaseModel):
@@ -109,7 +114,10 @@ class RecipeOut(BaseModel):
     id: uuid.UUID
     title: str
     source: SourceRef
+    # A book's recipe: where it is in each edition.
     pages: list[PageOut]
+    # A website's recipe: the page it's on.
+    web_address: str | None
     # The lines as typed, which is what the edit form edits.
     ingredients: list[str]
     # The same lines read into their options, with page references linked.
@@ -127,7 +135,10 @@ class Created(BaseModel):
 def _clean(body: RecipeIn) -> recipes.RecipeEntry:
     try:
         return recipes.clean(
-            body.title, [(p.edition_id, p.page) for p in body.editions], body.ingredients
+            body.title,
+            [(p.edition_id, p.page) for p in body.editions],
+            body.ingredients,
+            web_address=body.web_address,
         )
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
@@ -150,6 +161,11 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
             .order_by(Edition.published_year.desc().nulls_last(), Edition.isbn13)
         )
     ).all()
+    web_address = await session.scalar(
+        select(WebPage.url)
+        .join(RecipeLocation, RecipeLocation.web_page_id == WebPage.id)
+        .where(RecipeLocation.recipe_id == recipe.id)
+    )
     lines = (
         await session.execute(
             select(RecipeIngredient.id, RecipeIngredient.original_text)
@@ -193,7 +209,8 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
     return RecipeOut(
         id=recipe.id,
         title=recipe.title,
-        source=SourceRef(id=work.id, title=work.title),
+        source=SourceRef(id=work.id, title=work.title, kind=work.kind),
+        web_address=web_address,
         pages=[
             PageOut(
                 edition_id=e.id,
