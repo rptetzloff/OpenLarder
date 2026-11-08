@@ -28,10 +28,11 @@ rank and treat the lowest as first.
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -90,7 +91,7 @@ class Source(Timestamps, Base):
     __tablename__ = "sources"
     __table_args__ = (
         CheckConstraint("title <> ''", name="title_not_empty"),
-        CheckConstraint("kind IN ('book', 'website')", name="kind_known"),
+        CheckConstraint("kind IN ('book', 'website', 'magazine', 'newspaper')", name="kind_known"),
         CheckConstraint("(kind = 'website') = (host IS NOT NULL)", name="host_for_websites"),
         CheckConstraint("host <> ''", name="host_not_empty"),
         CheckConstraint("NOT paywalled OR kind = 'website'", name="paywalled_websites_only"),
@@ -270,9 +271,29 @@ class WebPage(Timestamps, Base):
     gone: Mapped[bool] = mapped_column(nullable=False, server_default=false())
 
 
+class Issue(Timestamps, Base):
+    """An issue of a magazine or newspaper source, where a recipe is, at a
+    page: named as the cover names it ("May 2024"), or for a newspaper by
+    its date (migration 0023)."""
+
+    __tablename__ = "issues"
+    __table_args__ = (
+        # The target of recipe_locations' composite key.
+        UniqueConstraint("source_id", "id"),
+        Index("uq_issues_source_id_label", "source_id", text("lower(label)"), unique=True),
+        CheckConstraint("label <> ''", name="label_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    published_on: Mapped[date | None] = mapped_column(Date)
+
+
 class RecipeLocation(Timestamps, Base):
-    """Where a recipe is in its source: a page in a book's edition, or a web
-    page, never both (migration 0020)."""
+    """Where a recipe is in its source: an edition of a book, a web page, or
+    an issue of a magazine or newspaper, exactly one (migrations 0020,
+    0023); a page goes with an edition or an issue."""
 
     __tablename__ = "recipe_locations"
     __table_args__ = (
@@ -287,19 +308,28 @@ class RecipeLocation(Timestamps, Base):
             ["web_pages.source_id", "web_pages.id"],
             ondelete="CASCADE",
         ),
+        ForeignKeyConstraint(
+            ["source_id", "issue_id"], ["issues.source_id", "issues.id"], ondelete="CASCADE"
+        ),
         UniqueConstraint("recipe_id", "edition_id"),
+        UniqueConstraint("recipe_id", "issue_id"),
         UniqueConstraint("recipe_id", "web_page_id"),
         CheckConstraint("page <> ''", name="page_not_empty"),
-        CheckConstraint("num_nonnulls(edition_id, web_page_id) = 1", name="one_place"),
-        CheckConstraint("page IS NULL OR edition_id IS NOT NULL", name="page_needs_edition"),
+        CheckConstraint("num_nonnulls(edition_id, web_page_id, issue_id) = 1", name="one_place"),
+        CheckConstraint(
+            "page IS NULL OR edition_id IS NOT NULL OR issue_id IS NOT NULL",
+            name="page_needs_a_printing",
+        ),
         Index("ix_recipe_locations_edition_id", "edition_id"),
         Index("ix_recipe_locations_web_page_id", "web_page_id"),
+        Index("ix_recipe_locations_issue_id", "issue_id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     recipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     edition_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     web_page_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    issue_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     # Text, because books number pages "xii" and recipes span "112-13".
     # Null means in this edition, page not yet recorded.

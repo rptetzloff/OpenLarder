@@ -7,7 +7,7 @@ Reading is public. Writing is for admins until review exists, like books.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -22,6 +22,7 @@ from openlarder.models import (
     Edition,
     Ingredient,
     IngredientOption,
+    Issue,
     Recipe,
     RecipeIngredient,
     RecipeLocation,
@@ -71,6 +72,11 @@ class RecipeIn(BaseModel):
     editions: list[PageIn] = []
     # A website's recipe instead: the page's address.
     web_address: str | None = Field(default=None, max_length=2000)
+    # A magazine's or newspaper's: the issue (its name, or its date), and the
+    # page in it.
+    issue: str | None = Field(default=None, max_length=200)
+    issue_date: date | None = None
+    issue_page: str | None = Field(default=None, max_length=40)
     ingredients: list[str] = []
 
 
@@ -90,6 +96,14 @@ class WebPageOut(BaseModel):
     archived_at: datetime | None
     # Marked when the page no longer has the recipe.
     gone: bool
+
+
+class IssueOut(BaseModel):
+    id: uuid.UUID
+    label: str
+    published_on: date | None
+    # The recipe's page in it.
+    page: str | None
 
 
 class SourceRef(BaseModel):
@@ -131,6 +145,8 @@ class RecipeOut(BaseModel):
     # A website's recipe: the page it's on, and that page's archived copy.
     web_address: str | None
     web_page: WebPageOut | None
+    # A magazine's or newspaper's recipe: the issue it's in, at its page.
+    issue: IssueOut | None
     # The lines as typed, which is what the edit form edits.
     ingredients: list[str]
     # The same lines read into their options, with page references linked.
@@ -152,6 +168,9 @@ def _clean(body: RecipeIn) -> recipes.RecipeEntry:
             [(p.edition_id, p.page) for p in body.editions],
             body.ingredients,
             web_address=body.web_address,
+            issue=body.issue,
+            issue_date=body.issue_date,
+            issue_page=body.issue_page,
         )
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
@@ -174,6 +193,13 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
             .order_by(Edition.published_year.desc().nulls_last(), Edition.isbn13)
         )
     ).all()
+    in_issue = (
+        await session.execute(
+            select(Issue, RecipeLocation.page)
+            .join(RecipeLocation, RecipeLocation.issue_id == Issue.id)
+            .where(RecipeLocation.recipe_id == recipe.id)
+        )
+    ).first()
     page = await session.scalar(
         select(WebPage)
         .join(RecipeLocation, RecipeLocation.web_page_id == WebPage.id)
@@ -224,6 +250,14 @@ async def _out(session, recipe: Recipe) -> RecipeOut:
         title=recipe.title,
         source=SourceRef(id=work.id, title=work.title, kind=work.kind),
         web_address=page.url if page else None,
+        issue=IssueOut(
+            id=in_issue[0].id,
+            label=in_issue[0].label,
+            published_on=in_issue[0].published_on,
+            page=in_issue[1],
+        )
+        if in_issue
+        else None,
         web_page=WebPageOut(
             id=page.id,
             url=page.url,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { type Book, type BookIn, saveBook } from "../books";
+import { type Book, type BookIn, KIND_NAMES, saveBook } from "../books";
 
 const props = defineProps<{ id: string }>();
 
@@ -71,7 +71,7 @@ async function save() {
 <template>
   <article>
     <p><a :href="`/sources/${id}`">← {{ book?.title ?? "Back to the book" }}</a></p>
-    <h1>{{ book?.kind === "website" ? "Edit website" : "Edit book" }}</h1>
+    <h1>Edit {{ KIND_NAMES[book?.kind ?? "book"] }}</h1>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="form && book" class="recipe-form" @submit.prevent="save">
       <label for="book-title">Title</label>

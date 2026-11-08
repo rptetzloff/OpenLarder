@@ -11,7 +11,8 @@ and stores what comes back.
 import logging
 import uuid
 from collections.abc import Awaitable, Sequence
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Literal
 
 import httpx2
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,6 +29,7 @@ from openlarder.models import (
     Edition,
     Ingredient,
     IngredientOption,
+    Issue,
     Recipe,
     RecipeLocation,
     Source,
@@ -79,7 +81,16 @@ class RecipeSummary(BaseModel):
     id: uuid.UUID
     title: str
     # One per edition it is in, newest edition first; None = page not recorded.
+    # A magazine's or newspaper's: its page in its issue.
     pages: list[str | None]
+    # A magazine's or newspaper's recipe: the issue it's in.
+    issue: str | None = None
+
+
+class IssueSummary(BaseModel):
+    id: uuid.UUID
+    label: str
+    published_on: date | None
 
 
 class TopIngredient(BaseModel):
@@ -103,6 +114,8 @@ class Book(BaseModel):
     recipes: list[RecipeSummary]
     # The ingredients its recipes use most, for finding your way in by one.
     ingredients: list[TopIngredient]
+    # A magazine's or newspaper's issues, newest first.
+    issues: list[IssueSummary]
 
 
 TOP_INGREDIENTS = 30
@@ -231,6 +244,21 @@ async def get_book(source_id: uuid.UUID, session: Session) -> Book:
         )
     ).all()
     edition_order = {e.id: i for i, e in enumerate(editions)}
+    issues = (
+        await session.scalars(
+            select(Issue)
+            .where(Issue.source_id == source_id)
+            .order_by(Issue.published_on.desc().nulls_last(), func.lower(Issue.label))
+        )
+    ).all()
+    issue_labels = {i.id: i.label for i in issues}
+    issue_of: dict[uuid.UUID, str] = {}
+    for recipe_id, issue_id in await session.execute(
+        select(RecipeLocation.recipe_id, RecipeLocation.issue_id).where(
+            RecipeLocation.source_id == source_id, RecipeLocation.issue_id.is_not(None)
+        )
+    ):
+        issue_of[recipe_id] = issue_labels[issue_id]
     pages: dict[uuid.UUID, list[tuple[int, str | None]]] = {}
     for recipe_id, edition_id, page in (
         await session.execute(
@@ -281,10 +309,16 @@ async def get_book(source_id: uuid.UUID, session: Session) -> Book:
             for e in editions
         ],
         recipes=[
-            RecipeSummary(id=r.id, title=r.title, pages=[p for _, p in sorted(pages.get(r.id, []))])
+            RecipeSummary(
+                id=r.id,
+                title=r.title,
+                pages=[p for _, p in sorted(pages.get(r.id, []))],
+                issue=issue_of.get(r.id),
+            )
             for r in recipes
         ],
         ingredients=[TopIngredient(id=i, name=n, recipes=c) for i, n, c in top],
+        issues=[IssueSummary(id=i.id, label=i.label, published_on=i.published_on) for i in issues],
     )
 
 
@@ -684,3 +718,38 @@ async def add_website(body: WebsiteIn, admin: AdminUser, session: Session) -> Ad
     await session.commit()
     log.info("%s added the website %s", admin.id, host)
     return AddedManually(id=site.id, existing=False)
+
+
+class PeriodicalIn(BaseModel):
+    kind: Literal["magazine", "newspaper"]
+    title: str = Field(max_length=300)
+    # Its editors or regular writers, in order, credited as authors.
+    authors: list[str] = Field(default=[], max_length=30)
+
+
+@router.post("/periodicals", response_model=AddedManually, dependencies=[SameOrigin])
+async def add_periodical(body: PeriodicalIn, admin: AdminUser, session: Session) -> AddedManually:
+    """A magazine or newspaper as a source: the one already here of that
+    kind and name, or a new one. Its issues are added as recipes name them."""
+    title = " ".join(body.title.split())
+    if not title:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give it its name.")
+    existing = await session.scalar(
+        select(Source).where(Source.kind == body.kind, func.lower(Source.title) == title.lower())
+    )
+    if existing is not None:
+        return AddedManually(id=existing.id, existing=True)
+    periodical = Source(kind=body.kind, title=title)
+    session.add(periodical)
+    await session.flush()
+    names = [n for n in (" ".join(a.split()) for a in body.authors) if n]
+    for position, name in enumerate(dict.fromkeys(names), start=1):
+        author = await books_module.author_named(session, name)
+        session.add(
+            SourceCredit(
+                source_id=periodical.id, author_id=author.id, position=position, credited_as=name
+            )
+        )
+    await session.commit()
+    log.info("%s added the %s %s", admin.id, body.kind, title)
+    return AddedManually(id=periodical.id, existing=False)

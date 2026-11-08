@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import type { Book } from "../books";
+import { type Book, issueName, KIND_NAMES } from "../books";
 import OpenLibraryCheck from "../components/OpenLibraryCheck.vue";
 import OpenLibraryLink from "../components/OpenLibraryLink.vue";
 import type { Me } from "../me";
@@ -67,7 +67,7 @@ onMounted(load);
             <a :href="book.open_library_url">On Open Library</a>
           </p>
           <p v-if="user?.is_admin" class="byline">
-            <a :href="`/sources/${book.id}/edit`">{{ book.kind === "website" ? "Edit website" : "Edit book" }}</a>
+            <a :href="`/sources/${book.id}/edit`">Edit {{ KIND_NAMES[book.kind] }}</a>
           </p>
         </div>
       </div>
@@ -77,7 +77,7 @@ onMounted(load);
         <p class="status">
           The ones its recipes use most. Open one for the recipes here that use it, or
           <a :href="`/search?source=${book.id}`"
-            >search this {{ book.kind === "website" ? "website" : "book" }} by ingredient</a
+            >search this {{ KIND_NAMES[book.kind] }} by ingredient</a
           >.
         </p>
         <ul class="chosen">
@@ -93,7 +93,10 @@ onMounted(load);
       <ul v-if="book.recipes.length" class="recipe-list">
         <li v-for="r in book.recipes" :key="r.id">
           <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
-          <span v-if="pages(r.pages)" class="page-ref">{{ pages(r.pages) }}</span>
+          <span v-if="r.issue" class="page-ref"
+            >{{ issueName(r.issue) }}{{ r.pages[0] ? `, p. ${r.pages[0]}` : "" }}</span
+          >
+          <span v-else-if="pages(r.pages)" class="page-ref">{{ pages(r.pages) }}</span>
         </li>
       </ul>
       <p v-else class="status">No recipes indexed yet.</p>

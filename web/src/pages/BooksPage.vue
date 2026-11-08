@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import { addByIsbn, addWebsite, type BookSummary, listSources } from "../books";
+import { addByIsbn, addPeriodical, addWebsite, type BookSummary, listSources } from "../books";
 import type { Me } from "../me";
 
 defineProps<{ user: Me | null | undefined }>();
@@ -50,7 +50,9 @@ watch(filter, () => {
 });
 onMounted(() => load());
 
-// Adding a website: any address on it finds the site.
+// Adding a source other than a book by ISBN: a website (any address on it
+// finds the site), or a magazine or newspaper by name.
+const siteKind = ref<"website" | "magazine" | "newspaper">("website");
 const siteAddress = ref("");
 const siteName = ref("");
 const sitePaywalled = ref(false);
@@ -61,7 +63,10 @@ async function addSite() {
   siteError.value = "";
   try {
     const authors = siteAuthors.value.split(",").map((a) => a.trim()).filter(Boolean);
-    const { id } = await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value, authors);
+    const { id } =
+      siteKind.value === "website"
+        ? await addWebsite(siteAddress.value, siteName.value, sitePaywalled.value, authors)
+        : await addPeriodical(siteKind.value, siteName.value, authors);
     location.href = `/sources/${id}`;
   } catch (e) {
     siteError.value = e instanceof Error ? e.message : String(e);
@@ -109,23 +114,41 @@ async function add() {
     </form>
 
     <form v-if="user?.is_admin" class="recipe-form site-form" @submit.prevent="addSite">
-      <label for="site-address">Add a website: any page on it</label>
-      <input
-        id="site-address"
-        v-model="siteAddress"
-        required
-        autocomplete="off"
-        placeholder="https://smittenkitchen.com"
-      />
-      <label for="site-name">What it calls itself (optional)</label>
-      <input id="site-name" v-model="siteName" maxlength="300" placeholder="Smitten Kitchen" />
+      <label for="site-kind">Add another kind of source</label>
+      <select id="site-kind" v-model="siteKind">
+        <option value="website">A website</option>
+        <option value="magazine">A magazine</option>
+        <option value="newspaper">A newspaper</option>
+      </select>
+      <template v-if="siteKind === 'website'">
+        <label for="site-address">Any page on it</label>
+        <input
+          id="site-address"
+          v-model="siteAddress"
+          required
+          autocomplete="off"
+          placeholder="https://smittenkitchen.com"
+        />
+        <label for="site-name">What it calls itself (optional)</label>
+        <input id="site-name" v-model="siteName" maxlength="300" placeholder="Smitten Kitchen" />
+      </template>
+      <template v-else>
+        <label for="site-name">Its name</label>
+        <input
+          id="site-name"
+          v-model="siteName"
+          required
+          maxlength="300"
+          :placeholder="siteKind === 'magazine' ? 'Bon Appétit' : 'The New York Times'"
+        />
+      </template>
       <label for="site-authors">Who writes it (optional; separate names with commas)</label>
       <input id="site-authors" v-model="siteAuthors" maxlength="500" placeholder="Deb Perelman" />
-      <label class="check"
+      <label v-if="siteKind === 'website'" class="check"
         ><input v-model="sitePaywalled" type="checkbox" /> Behind a subscription</label
       >
       <p v-if="siteError" class="error" role="alert">{{ siteError }}</p>
-      <button type="submit" class="primary">Add the website</button>
+      <button type="submit" class="primary">Add the {{ siteKind }}</button>
     </form>
 
     <div class="isbn-form">
