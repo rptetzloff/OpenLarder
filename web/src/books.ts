@@ -52,6 +52,12 @@ export interface Book {
   // change it.
   private: boolean;
   editable: boolean;
+  // A family collection's: whose it is, whether you may rename, delete or
+  // share it, and the groups it's shared with (every one for its owner; the
+  // ones you're in otherwise).
+  owner_name: string | null;
+  manageable: boolean;
+  shared_with: { id: string; name: string }[];
   // A TV show's, podcast's or video channel's episodes, in order.
   episodes: {
     id: string;

@@ -128,8 +128,8 @@ async def list_flags(
 async def recipe_flags(recipe_id: uuid.UUID, user: CurrentUser, session: Session) -> list[FlagOut]:
     """A recipe's flags, open first, for whoever may deal with them; others see none."""
     recipe = await session.get(Recipe, recipe_id)
-    if recipe is None or not visibility.can_see(
-        user, await session.get_one(Source, recipe.source_id)
+    if recipe is None or not await visibility.can_see(
+        session, user, await session.get_one(Source, recipe.source_id)
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     if not (user.is_admin or recipe.created_by == user.id):
@@ -151,8 +151,8 @@ async def resolve(
 ) -> FlagOut:
     flag = await session.get(RecipeFlag, flag_id)
     recipe = await session.get(Recipe, flag.recipe_id) if flag else None
-    if recipe is None or not visibility.can_see(
-        user, await session.get_one(Source, recipe.source_id)
+    if recipe is None or not await visibility.can_see(
+        session, user, await session.get_one(Source, recipe.source_id)
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such flag.")
     if not (user.is_admin or recipe.created_by == user.id):

@@ -111,6 +111,9 @@ class Source(Timestamps, Base):
             "(kind = 'family') = (acknowledged_at IS NOT NULL)", name="family_acknowledged"
         ),
         Index("ix_sources_owner_id", "owner_id"),
+        # The target of source_groups' key, which only allows a family
+        # collection (migration 0027).
+        UniqueConstraint("id", "kind"),
         _trgm("sources", "title"),
     )
 

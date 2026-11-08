@@ -17,7 +17,7 @@ from typing import Annotated, Literal
 import httpx2
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import exists, func, select
+from sqlalchemy import delete, exists, func, select
 
 from openlarder import books as books_module
 from openlarder import isbn, linking, openlibrary, references, refresh, visibility, web
@@ -29,6 +29,8 @@ from openlarder.models import (
     Author,
     Edition,
     Episode,
+    Group,
+    GroupMember,
     Ingredient,
     IngredientOption,
     Issue,
@@ -36,6 +38,8 @@ from openlarder.models import (
     RecipeLocation,
     Source,
     SourceCredit,
+    SourceGroup,
+    User,
 )
 from openlarder.routers.ingredients import contains_pattern
 
@@ -111,6 +115,11 @@ class EpisodeSummary(BaseModel):
     aired_on: date | None
 
 
+class GroupRef(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class TopIngredient(BaseModel):
     id: uuid.UUID
     name: str
@@ -138,6 +147,12 @@ class Book(BaseModel):
     # add to and change this source.
     private: bool
     editable: bool
+    # A family collection's: whose it is, whether the viewer may rename,
+    # delete or share it, and the groups it's shared with (all of them for
+    # its owner; for anyone else, the ones they're in).
+    owner_name: str | None = None
+    manageable: bool = False
+    shared_with: list[GroupRef] = []
     # A TV show's, podcast's or video channel's episodes, in order.
     episodes: list[EpisodeSummary]
 
@@ -247,7 +262,7 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
 @router.get("/{source_id}", response_model=Book)
 async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Book:
     work = await session.get(Source, source_id)
-    if work is None or not visibility.can_see(viewer, work):
+    if work is None or not await visibility.can_see(session, viewer, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     credits = (
         await session.execute(
@@ -335,7 +350,12 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         host=work.host,
         paywalled=work.paywalled,
         private=work.private,
-        editable=viewer is not None and visibility.may_edit(viewer, work),
+        editable=viewer is not None and await visibility.may_edit(session, viewer, work),
+        owner_name=(
+            (await session.get_one(User, work.owner_id)).display_name if work.owner_id else None
+        ),
+        manageable=viewer is not None and visibility.may_manage(viewer, work),
+        shared_with=await _shared_with(session, work, viewer),
         title=work.title,
         subtitle=work.subtitle,
         open_library_url=(
@@ -596,7 +616,7 @@ async def relink_references(source_id: uuid.UUID, admin: AdminUser, session: Ses
     """Link a book's page references again: for recipes stored before linking
     existed, which the Admin page runs over every book."""
     work = await session.get(Source, source_id)
-    if work is None or not visibility.can_see(admin, work):
+    if work is None or not await visibility.can_see(session, admin, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     await references.relink(session, source_id)
     await session.commit()
@@ -639,7 +659,7 @@ async def edit_book(
 ) -> Added:
     """Fix what a book says about itself (books.edit_book)."""
     work = await session.get(Source, source_id)
-    if work is None or not visibility.can_see(admin, work):
+    if work is None or not await visibility.can_see(session, admin, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     try:
         await books_module.edit_book(
@@ -925,11 +945,11 @@ async def add_family(body: FamilyIn, user: CurrentUser, session: Session) -> Add
 
 async def _family_or_404(session: Session, source_id: uuid.UUID, user: CurrentUser) -> Source:
     collection = await session.get(Source, source_id)
-    if collection is None or not visibility.can_see(user, collection):
+    if collection is None or not await visibility.can_see(session, user, collection):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
     if collection.kind != "family":
         raise HTTPException(status.HTTP_409_CONFLICT, "Only a family collection is changed here.")
-    if not visibility.may_edit(user, collection):
+    if not visibility.may_manage(user, collection):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only its owner can change it.")
     return collection
 
@@ -960,3 +980,62 @@ async def remove_family(source_id: uuid.UUID, user: CurrentUser, session: Sessio
     await session.delete(collection)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _shared_with(session: Session, work: Source, viewer) -> list[GroupRef]:
+    if work.kind != "family" or viewer is None:
+        return []
+    query = (
+        select(Group.id, Group.name)
+        .join(SourceGroup, SourceGroup.group_id == Group.id)
+        .where(SourceGroup.source_id == work.id)
+        .order_by(func.lower(Group.name), Group.id)
+    )
+    if not visibility.may_manage(viewer, work):
+        query = query.join(
+            GroupMember,
+            (GroupMember.group_id == Group.id) & (GroupMember.user_id == viewer.id),
+        )
+    return [GroupRef(id=i, name=n) for i, n in await session.execute(query)]
+
+
+class SharingIn(BaseModel):
+    # Every group it's shared with; any left out stop seeing it.
+    groups: list[uuid.UUID] = Field(max_length=50)
+
+
+@router.put("/{source_id}/groups", response_model=list[GroupRef], dependencies=[SameOrigin])
+async def share(
+    source_id: uuid.UUID, body: SharingIn, user: CurrentUser, session: Session
+) -> list[GroupRef]:
+    """Choose which of your groups see a family collection of yours. Joining a
+    group shares nothing by itself (Ray, 2026-11-08)."""
+    collection = await _family_or_404(session, source_id, user)
+    chosen = set(body.groups)
+    mine = set(
+        (
+            await session.scalars(
+                select(GroupMember.group_id).where(
+                    GroupMember.user_id == user.id, GroupMember.group_id.in_(chosen)
+                )
+            )
+        ).all()
+    )
+    if chosen - mine:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "You can only share with groups you're in.")
+    await session.execute(
+        delete(SourceGroup).where(
+            SourceGroup.source_id == collection.id, SourceGroup.group_id.not_in(chosen)
+        )
+    )
+    held = set(
+        (
+            await session.scalars(
+                select(SourceGroup.group_id).where(SourceGroup.source_id == collection.id)
+            )
+        ).all()
+    )
+    for group_id in chosen - held:
+        session.add(SourceGroup(source_id=collection.id, group_id=group_id))
+    await session.commit()
+    return await _shared_with(session, collection, user)

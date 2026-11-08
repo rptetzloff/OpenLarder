@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import NameForm from "./components/NameForm.vue";
+import { takeRememberedInvite } from "./groups";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
@@ -9,6 +10,9 @@ import AdminPage from "./pages/AdminPage.vue";
 import AuthorPage from "./pages/AuthorPage.vue";
 import AuthorsPage from "./pages/AuthorsPage.vue";
 import FlagsPage from "./pages/FlagsPage.vue";
+import GroupPage from "./pages/GroupPage.vue";
+import GroupsPage from "./pages/GroupsPage.vue";
+import InvitePage from "./pages/InvitePage.vue";
 import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
 import BookEditPage from "./pages/BookEditPage.vue";
@@ -38,6 +42,7 @@ const onIngredients = path === "/ingredients";
 const onSearch = path === "/search";
 const onAuthors = path === "/authors";
 const onAdmin = path === "/admin";
+const onGroups = path === "/groups";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
@@ -50,6 +55,9 @@ const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
 const authorId = match(`/authors/${UUID}`);
 const editRecipeId = match(`/recipes/${UUID}/edit`);
+const groupId = match(`/groups/${UUID}`);
+// An invite link's token (secrets.token_urlsafe).
+const inviteCode = match("/invite/([A-Za-z0-9_-]+)");
 
 // A placeholder until there is a catalog to show: proves the SPA reaches the
 // API through whichever path it is served from, and that sign-in works.
@@ -77,6 +85,9 @@ onMounted(async () => {
   } catch {
     user.value = null;
   }
+  // Back to an invite that sent them to sign in.
+  const pending = user.value ? takeRememberedInvite() : null;
+  if (pending && !inviteCode) location.replace(`/invite/${pending}`);
 });
 </script>
 
@@ -87,6 +98,7 @@ onMounted(async () => {
     <a href="/search" class="nav">Search</a>
     <template v-if="user">
       <a v-if="user.is_admin" href="/admin">Admin</a>
+      <a href="/groups">Groups</a>
       <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
       <!-- A form, not fetch: signing out ends at the broker, which ends the
            session there and sends the browser back here. -->
@@ -116,6 +128,9 @@ onMounted(async () => {
     <AuthorPage v-else-if="authorId" :id="authorId" :user="user" />
     <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
     <AdminPage v-else-if="onAdmin" :user="user" />
+    <GroupsPage v-else-if="onGroups" :user="user" />
+    <GroupPage v-else-if="groupId" :id="groupId" :user="user" />
+    <InvitePage v-else-if="inviteCode" :code="inviteCode" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
     <AdminImportsPage v-else-if="onImports" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
@@ -520,6 +535,31 @@ button.primary:disabled {
 .edition-row .only-edition {
   flex: 1;
   min-width: 0;
+}
+.recipe-list li > button.link {
+  margin-left: 0.75rem;
+}
+.member-list {
+  list-style: none;
+  padding: 0;
+}
+.member-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.member-list li > span:first-child {
+  flex: 1 1 10rem;
+}
+.member-list select {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
 }
 .episode-numbers {
   display: flex;

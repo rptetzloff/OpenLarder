@@ -237,8 +237,8 @@ def _episode_out(episode: Episode, at: int | None) -> EpisodeOut:
 
 async def _recipe_or_404(session, recipe_id: uuid.UUID, viewer) -> Recipe:
     recipe = await session.get(Recipe, recipe_id)
-    if recipe is None or not visibility.can_see(
-        viewer, await session.get_one(Source, recipe.source_id)
+    if recipe is None or not await visibility.can_see(
+        session, viewer, await session.get_one(Source, recipe.source_id)
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     return recipe
@@ -248,9 +248,9 @@ async def _editable_source(session, source_id: uuid.UUID, user) -> Source:
     """The source, when the user may add to and change it: 404 when they
     can't see it, 403 when they can but it isn't theirs to change."""
     source = await session.get(Source, source_id)
-    if source is None or not visibility.can_see(user, source):
+    if source is None or not await visibility.can_see(session, user, source):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
-    if not visibility.may_edit(user, source):
+    if not await visibility.may_edit(session, user, source):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an admin can change that.")
     return source
 
@@ -378,7 +378,7 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             swap_out(x)
             for x in await substitutions.listed(session, substitutions.for_recipe(recipe.id))
         ],
-        editable=viewer is not None and visibility.may_edit(viewer, work),
+        editable=viewer is not None and await visibility.may_edit(session, viewer, work),
     )
 
 

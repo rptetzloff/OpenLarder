@@ -7,12 +7,13 @@ migration, and drops it at the end.
 """
 
 import asyncio
+import hashlib
 import os
 import selectors
 import sys
 import uuid
 from collections.abc import AsyncIterator, Iterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
 import httpx2
@@ -27,7 +28,7 @@ from fake_archive import FakeArchive
 from fake_broker import CLIENT_ID, CLIENT_SECRET, ISSUER, FakeBroker, _settings
 from fake_openlibrary import FakeOpenLibrary
 from openlarder.archiving import Archiver, get_archiver
-from openlarder.auth import build_oidc_client, optional_oidc_client
+from openlarder.auth import SESSION_COOKIE, build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
 from openlarder.main import app
@@ -194,3 +195,31 @@ def openlib(configure) -> FakeOpenLibrary:
     fake = FakeOpenLibrary()
     app.dependency_overrides[openlibrary_transport] = lambda: httpx2.MockTransport(fake.handle)
     return fake
+
+
+@pytest.fixture
+async def people(client, adb):
+    """Clients signed in as different people: people("ann", admin=True)."""
+    async with AsyncExitStack() as stack:
+
+        async def person(name: str, admin: bool = False) -> httpx2.AsyncClient:
+            token = f"token-{name}-{uuid.uuid4().hex}"
+            await adb.execute(
+                text(
+                    "WITH u AS (INSERT INTO users (issuer, subject, display_name, is_admin)"
+                    " VALUES ('test', :n, :n, :a) RETURNING id)"
+                    " INSERT INTO user_sessions (user_id, token_hash, expires_at)"
+                    " SELECT id, :h, now() + interval '1 day' FROM u"
+                ),
+                {"n": name, "a": admin, "h": hashlib.sha256(token.encode()).digest()},
+            )
+            c = await stack.enter_async_context(
+                httpx2.AsyncClient(
+                    transport=httpx2.ASGITransport(app=app),
+                    base_url="http://testserver",
+                    cookies={SESSION_COOKIE: token},
+                )
+            )
+            return c
+
+        yield person
