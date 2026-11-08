@@ -8,8 +8,9 @@ is created and left alone after, so adding an edition never rewrites them.
 """
 
 import uuid
+from dataclasses import dataclass
 
-from sqlalchemy import false, func, select
+from sqlalchemy import delete, exists, false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder.models import Author, Edition, Work, WorkCredit
@@ -139,3 +140,139 @@ async def add_without_isbn(
     session.add(Edition(work_id=work.id, published_year=year, isbn13=isbn13))
     await session.flush()
     return work.id, False
+
+
+# Editing a book
+
+
+ROLES = ("author", "editor", "contributor", "photographer", "illustrator", "translator")
+
+
+class InvalidBook(ValueError):
+    """The reason is written to be shown beside the form."""
+
+
+@dataclass
+class CreditEdit:
+    # The author of one of the book's current credits, or None for a new name.
+    author_id: uuid.UUID | None
+    name: str
+    role: str
+
+
+@dataclass
+class EditionEdit:
+    id: uuid.UUID
+    title: str | None
+    publisher: str | None
+    published_year: int | None
+
+
+def _squash(text: str | None) -> str | None:
+    return " ".join((text or "").split()) or None
+
+
+async def edit_book(
+    session: AsyncSession,
+    work: Work,
+    title: str,
+    subtitle: str | None,
+    credits: list[CreditEdit],
+    editions: list[EditionEdit],
+) -> None:
+    """Change what a book says about itself: its title, subtitle, credits in
+    order, and its editions' title, publisher and year. ISBNs and Open
+    Library IDs identify the book, so they aren't edited here.
+
+    A credit keeps its author when it names one already credited, and the
+    printed name changes. That author's own name changes too when nothing
+    else depends on it: no Open Library record, whose name wins, and no
+    other book. A new name is matched as add_without_isbn matches one. An
+    author left with no book and no outside record is deleted.
+    """
+    work.title = _squash(title) or ""
+    if not work.title:
+        raise InvalidBook("Give the book its title.")
+    work.subtitle = _squash(subtitle)
+
+    current = {
+        c.author_id: c
+        for c in await session.scalars(select(WorkCredit).where(WorkCredit.work_id == work.id))
+    }
+    rows: list[tuple[Author, str, str]] = []
+    for credit in credits:
+        name = _squash(credit.name)
+        if not name:
+            raise InvalidBook("Every credit needs a name; remove the empty one.")
+        if credit.role not in ROLES:
+            raise InvalidBook(f"“{credit.role}” isn't a role a book credits.")
+        if credit.author_id is not None:
+            if credit.author_id not in current:
+                raise InvalidBook("A credit names an author this book doesn't have.")
+            author = await session.get_one(Author, credit.author_id)
+            if author.open_library_author_id is None and not await _elsewhere(
+                session, author.id, work.id
+            ):
+                author.name = name
+        else:
+            author = await session.scalar(
+                select(Author).where(
+                    func.lower(Author.name) == name.lower(),
+                    Author.open_library_author_id.is_(None),
+                )
+            )
+            if author is None:
+                author = Author(name=name)
+                session.add(author)
+                await session.flush()
+        rows.append((author, name, credit.role))
+    seen: set[tuple[uuid.UUID, str]] = set()
+    for author, name, role in rows:
+        if (author.id, role) in seen:
+            raise InvalidBook(f"{name} is credited twice as {role}.")
+        seen.add((author.id, role))
+
+    await session.execute(delete(WorkCredit).where(WorkCredit.work_id == work.id))
+    for position, (author, name, role) in enumerate(rows, start=1):
+        session.add(
+            WorkCredit(
+                work_id=work.id, author_id=author.id, position=position, role=role, credited_as=name
+            )
+        )
+    await session.flush()
+    kept = {author.id for author, _, _ in rows}
+    gone = [a for a in current if a not in kept]
+    if gone:
+        await session.execute(
+            delete(Author).where(
+                Author.id.in_(gone),
+                Author.open_library_author_id.is_(None),
+                Author.wikidata_id.is_(None),
+                ~exists().where(WorkCredit.author_id == Author.id),
+            )
+        )
+
+    own = {
+        e.id: e for e in await session.scalars(select(Edition).where(Edition.work_id == work.id))
+    }
+    for change in editions:
+        edition = own.get(change.id)
+        if edition is None:
+            raise InvalidBook("An edition in the form isn't this book's.")
+        year = change.published_year
+        if year is not None and not 1400 <= year <= 2200:
+            raise InvalidBook(f"{year} can't be the year an edition was published.")
+        edition_title = _squash(change.title)
+        # Only when it differs from the book's, as the model says.
+        edition.title = None if edition_title == work.title else edition_title
+        edition.publisher = _squash(change.publisher)
+        edition.published_year = year
+    await session.flush()
+
+
+async def _elsewhere(session: AsyncSession, author_id: uuid.UUID, work_id: uuid.UUID) -> bool:
+    return bool(
+        await session.scalar(
+            select(exists().where(WorkCredit.author_id == author_id, WorkCredit.work_id != work_id))
+        )
+    )

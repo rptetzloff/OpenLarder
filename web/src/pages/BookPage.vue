@@ -52,6 +52,9 @@ onMounted(async () => {
           <p v-if="book.open_library_url" class="byline">
             <a :href="book.open_library_url">On Open Library</a>
           </p>
+          <p v-if="user?.is_admin" class="byline">
+            <a :href="`/books/${book.id}/edit`">Edit book</a>
+          </p>
         </div>
       </div>
 

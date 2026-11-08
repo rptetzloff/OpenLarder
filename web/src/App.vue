@@ -9,6 +9,7 @@ import AdminPage from "./pages/AdminPage.vue";
 import FlagsPage from "./pages/FlagsPage.vue";
 import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
+import BookEditPage from "./pages/BookEditPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
@@ -36,6 +37,7 @@ const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
 const bookId = match(`/books/${UUID}`);
 const newRecipeFor = match(`/books/${UUID}/recipes/new`);
+const editBookId = match(`/books/${UUID}/edit`);
 const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
 const editRecipeId = match(`/recipes/${UUID}/edit`);
@@ -108,6 +110,7 @@ onMounted(async () => {
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" />
+    <BookEditPage v-else-if="editBookId" :id="editBookId" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
     <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
     <template v-else>
@@ -395,6 +398,34 @@ button.primary:disabled {
 }
 .line-hints button {
   margin-left: 0.375rem;
+}
+.credit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.credit-row input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.credit-row select,
+.recipe-form select {
+  font: inherit;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.recipe-form fieldset > button.link {
+  margin-top: 0.5rem;
+}
+.edition-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
 }
 .edition-row {
   display: flex;

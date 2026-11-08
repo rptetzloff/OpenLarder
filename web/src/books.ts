@@ -89,3 +89,24 @@ export async function previewLink(bookId: string, reference: string): Promise<Li
 export async function linkToOpenLibrary(bookId: string, reference: string): Promise<void> {
   await post(`/api/books/${bookId}/open-library`, reference);
 }
+
+// What the edit form sends: credits in order, each naming an author already
+// credited or (author_id null) a new name; editions left out are unchanged.
+export interface BookIn {
+  title: string;
+  subtitle: string;
+  credits: { author_id: string | null; name: string; role: string }[];
+  editions: { id: string; title: string; publisher: string; published_year: number | null }[];
+}
+
+export async function saveBook(bookId: string, body: BookIn): Promise<void> {
+  const res = await fetch(`/api/books/${bookId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const out = await res.json().catch(() => ({}));
+    throw new Error(typeof out.detail === "string" ? out.detail : "That didn't save. Try again.");
+  }
+}
