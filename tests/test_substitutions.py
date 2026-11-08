@@ -13,10 +13,10 @@ E = uuid.uuid4()
 @pytest.fixture
 async def work(adb):
     work = await adb.scalar(
-        text("INSERT INTO works (title) VALUES ('How Can It Be Gluten Free') RETURNING id")
+        text("INSERT INTO sources (title) VALUES ('How Can It Be Gluten Free') RETURNING id")
     )
     await adb.execute(
-        text("INSERT INTO editions (id, work_id) VALUES (:id, :w)"), {"id": E, "w": work}
+        text("INSERT INTO editions (id, source_id) VALUES (:id, :w)"), {"id": E, "w": work}
     )
     return work
 
@@ -30,7 +30,7 @@ async def admin(client, broker, adb):
 
 async def _add(client, work, title, page, ingredients):
     response = await client.post(
-        f"/api/books/{work}/recipes",
+        f"/api/sources/{work}/recipes",
         json={
             "title": title,
             "editions": [{"edition_id": str(E), "page": page}],
@@ -109,8 +109,8 @@ async def test_a_printed_swap_shows_for_the_ingredient_and_its_recipes(
     assert swap["use"] == {"kind": "ingredient", "id": coconut, "name": "Coconut Oil"}
     assert swap["diet"]["name"] == "Dairy-Free"
     assert swap["source"] == {
-        "book_id": str(work),
-        "book_title": "How Can It Be Gluten Free",
+        "source_id": str(work),
+        "source_title": "How Can It Be Gluten Free",
         "edition_id": str(E),
         "page": "12",
     }

@@ -188,7 +188,7 @@ onMounted(() => load());
         <li v-for="r in ingredient.recipes" :key="r.id">
           <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
           <span class="page-ref">
-            <a :href="`/books/${r.book_id}`">{{ r.book_title }}</a>{{ where(r) }}
+            <a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a>{{ where(r) }}
           </span>
         </li>
       </ul>

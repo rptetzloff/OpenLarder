@@ -23,7 +23,6 @@ from openlarder.routers import (
     account,
     auth,
     authors,
-    books,
     covers,
     flags,
     health,
@@ -31,6 +30,7 @@ from openlarder.routers import (
     ingredients,
     recipes,
     search,
+    sources,
     substitutions,
 )
 
@@ -71,7 +71,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(account.router)
-app.include_router(books.router)
+app.include_router(sources.router)
 app.include_router(authors.router)
 app.include_router(recipes.router)
 app.include_router(imports.router)

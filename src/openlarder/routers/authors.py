@@ -23,9 +23,9 @@ from sqlalchemy import func, select
 from openlarder import openlibrary
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Author, AuthorLink, Work, WorkCredit
-from openlarder.routers.books import BookSummary, summaries
+from openlarder.models import Author, AuthorLink, Source, SourceCredit
 from openlarder.routers.ingredients import contains_pattern
+from openlarder.routers.sources import BookSummary, summaries
 
 router = APIRouter(prefix="/api/authors", tags=["authors"])
 
@@ -35,7 +35,7 @@ PAGE = 100
 class AuthorSummary(BaseModel):
     id: uuid.UUID
     name: str
-    books: int
+    sources: int
 
 
 class AuthorList(BaseModel):
@@ -59,7 +59,7 @@ class CoAuthor(BaseModel):
     id: uuid.UUID
     name: str
     # Books they share with this author.
-    books: int
+    sources: int
 
 
 class AuthorOut(BaseModel):
@@ -68,7 +68,7 @@ class AuthorOut(BaseModel):
     kind: Literal["person", "organisation"]
     open_library_url: str | None
     links: list[LinkOut]
-    books: list[AuthorBook]
+    sources: list[AuthorBook]
     coauthors: list[CoAuthor]
 
 
@@ -78,10 +78,10 @@ async def list_authors(
 ) -> AuthorList:
     """Authors by name, with how many books credit them; with q, those with
     every word of it in their name or a name a book prints for them."""
-    books = func.count(func.distinct(WorkCredit.work_id))
+    books = func.count(func.distinct(SourceCredit.source_id))
     query = (
         select(Author.id, Author.name, books)
-        .join(WorkCredit, WorkCredit.author_id == Author.id)
+        .join(SourceCredit, SourceCredit.author_id == Author.id)
         .group_by(Author.id, Author.name)
     )
     for word in q.casefold().split()[:10]:
@@ -89,7 +89,7 @@ async def list_authors(
         query = query.having(
             func.bool_or(
                 Author.name.ilike(like, escape="\\")
-                | WorkCredit.credited_as.ilike(like, escape="\\")
+                | SourceCredit.credited_as.ilike(like, escape="\\")
             )
         )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
@@ -97,7 +97,7 @@ async def list_authors(
         query.order_by(func.lower(Author.name), Author.id).offset(offset).limit(PAGE)
     )
     return AuthorList(
-        authors=[AuthorSummary(id=i, name=n, books=c) for i, n, c in rows], total=total or 0
+        authors=[AuthorSummary(id=i, name=n, sources=c) for i, n, c in rows], total=total or 0
     )
 
 
@@ -113,30 +113,30 @@ async def get_author(author_id: uuid.UUID, session: Session) -> AuthorOut:
     author = await _author_or_404(session, author_id)
     credits = (
         await session.execute(
-            select(WorkCredit.work_id, WorkCredit.role, WorkCredit.credited_as)
-            .where(WorkCredit.author_id == author_id)
-            .order_by(WorkCredit.position)
+            select(SourceCredit.source_id, SourceCredit.role, SourceCredit.credited_as)
+            .where(SourceCredit.author_id == author_id)
+            .order_by(SourceCredit.position)
         )
     ).all()
     roles: dict[uuid.UUID, list[str]] = {}
     printed: dict[uuid.UUID, str] = {}
-    for work_id, role, credited_as in credits:
-        roles.setdefault(work_id, []).append(role)
-        printed.setdefault(work_id, credited_as)
+    for source_id, role, credited_as in credits:
+        roles.setdefault(source_id, []).append(role)
+        printed.setdefault(source_id, credited_as)
     works = (
         await session.scalars(
-            select(Work).where(Work.id.in_(roles)).order_by(func.lower(Work.title), Work.id)
+            select(Source).where(Source.id.in_(roles)).order_by(func.lower(Source.title), Source.id)
         )
     ).all()
     books = [
         AuthorBook(**card.model_dump(), roles=roles[card.id], credited_as=printed[card.id])
         for card in await summaries(session, works)
     ]
-    shared = func.count(func.distinct(WorkCredit.work_id))
+    shared = func.count(func.distinct(SourceCredit.source_id))
     coauthors = await session.execute(
         select(Author.id, Author.name, shared)
-        .join(WorkCredit, WorkCredit.author_id == Author.id)
-        .where(WorkCredit.work_id.in_(roles), Author.id != author_id)
+        .join(SourceCredit, SourceCredit.author_id == Author.id)
+        .where(SourceCredit.source_id.in_(roles), Author.id != author_id)
         .group_by(Author.id, Author.name)
         .order_by(shared.desc(), func.lower(Author.name))
     )
@@ -155,8 +155,8 @@ async def get_author(author_id: uuid.UUID, session: Session) -> AuthorOut:
             else None
         ),
         links=[LinkOut(id=x.id, url=x.url, label=x.label) for x in links],
-        books=books,
-        coauthors=[CoAuthor(id=i, name=n, books=c) for i, n, c in coauthors],
+        sources=books,
+        coauthors=[CoAuthor(id=i, name=n, sources=c) for i, n, c in coauthors],
     )
 
 
@@ -180,11 +180,11 @@ async def edit_author(
     author.kind = body.kind
     await session.commit()
     books = await session.scalar(
-        select(func.count(func.distinct(WorkCredit.work_id))).where(
-            WorkCredit.author_id == author_id
+        select(func.count(func.distinct(SourceCredit.source_id))).where(
+            SourceCredit.author_id == author_id
         )
     )
-    return AuthorSummary(id=author.id, name=author.name, books=books or 0)
+    return AuthorSummary(id=author.id, name=author.name, sources=books or 0)
 
 
 class LinkIn(BaseModel):

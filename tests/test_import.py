@@ -164,10 +164,10 @@ async def admin(client, broker, adb):
 @pytest.fixture
 async def pink_cake(adb):
     work = await adb.scalar(
-        text("INSERT INTO works (title) VALUES ('Love Is a Pink Cake') RETURNING id")
+        text("INSERT INTO sources (title) VALUES ('Love Is a Pink Cake') RETURNING id")
     )
     await adb.execute(
-        text("INSERT INTO editions (work_id, isbn13) VALUES (:w, '9780393541113')"), {"w": work}
+        text("INSERT INTO editions (source_id, isbn13) VALUES (:w, '9780393541113')"), {"w": work}
     )
     return work
 
@@ -175,7 +175,7 @@ async def pink_cake(adb):
 def _item(work, row=2, **changes):
     item = {
         "row": row,
-        "work_id": str(work),
+        "source_id": str(work),
         "isbn13": "9780393541113",
         "title": "Rhubarb Cake",
         "page": "112",
@@ -317,31 +317,31 @@ async def test_another_sites_page_cannot_import(admin, pink_cake) -> None:
 
 async def test_a_book_without_an_isbn_is_added_once(admin, adb) -> None:
     body = {"title": " Family  Recipes ", "authors": ["Ann Lee", "Bo Lee"], "year": None}
-    first = (await admin.post("/api/books/manual", json=body)).json()
-    again = (await admin.post("/api/books/manual", json=body)).json()
+    first = (await admin.post("/api/sources/manual", json=body)).json()
+    again = (await admin.post("/api/sources/manual", json=body)).json()
 
     assert first["existing"] is False and again == {"id": first["id"], "existing": True}
-    book = (await admin.get(f"/api/books/{first['id']}")).json()
+    book = (await admin.get(f"/api/sources/{first['id']}")).json()
     assert book["title"] == "Family Recipes"
     assert [c["credited_as"] for c in book["credits"]] == ["Ann Lee", "Bo Lee"]
     assert len(book["editions"]) == 1
 
 
 async def test_an_author_without_an_open_library_id_is_reused_by_name(admin, adb) -> None:
-    await admin.post("/api/books/manual", json={"title": "Book One", "authors": ["Ann Lee"]})
-    await admin.post("/api/books/manual", json={"title": "Book Two", "authors": ["ann lee"]})
+    await admin.post("/api/sources/manual", json={"title": "Book One", "authors": ["Ann Lee"]})
+    await admin.post("/api/sources/manual", json={"title": "Book Two", "authors": ["ann lee"]})
     assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
 
 
 async def test_a_book_without_an_isbn_needs_a_title_and_a_sane_year(admin) -> None:
-    assert (await admin.post("/api/books/manual", json={"title": " "})).status_code == 422
-    response = await admin.post("/api/books/manual", json={"title": "Old", "year": 99})
+    assert (await admin.post("/api/sources/manual", json={"title": " "})).status_code == 422
+    response = await admin.post("/api/sources/manual", json={"title": "Old", "year": 99})
     assert response.status_code == 422
 
 
 async def test_a_book_open_library_lacks_keeps_its_isbn(admin, adb) -> None:
     body = {"title": "Heritage", "authors": ["Ann Lee"], "isbn": "978-0-306-40615-7"}
-    work = (await admin.post("/api/books/manual", json=body)).json()["id"]
+    work = (await admin.post("/api/sources/manual", json=body)).json()["id"]
     assert await adb.scalar(text("SELECT isbn13 FROM editions")) == "9780306406157"
     result = (
         await admin.post(
@@ -354,9 +354,9 @@ async def test_a_book_open_library_lacks_keeps_its_isbn(admin, adb) -> None:
 
 async def test_running_again_gives_an_earlier_isbn_less_book_its_isbn(admin, adb) -> None:
     """What the first household import left: the book, with no ISBN on its edition."""
-    first = (await admin.post("/api/books/manual", json={"title": "Heritage"})).json()["id"]
+    first = (await admin.post("/api/sources/manual", json={"title": "Heritage"})).json()["id"]
     again = await admin.post(
-        "/api/books/manual", json={"title": "Heritage", "isbn": "9780306406157"}
+        "/api/sources/manual", json={"title": "Heritage", "isbn": "9780306406157"}
     )
     assert again.json() == {"id": first, "existing": True}
     assert await adb.scalar(text("SELECT isbn13 FROM editions")) == "9780306406157"
@@ -364,24 +364,24 @@ async def test_running_again_gives_an_earlier_isbn_less_book_its_isbn(admin, adb
 
 async def test_a_known_isbn_finds_its_book_whatever_the_title(admin, adb) -> None:
     first = (
-        await admin.post("/api/books/manual", json={"title": "Heritage", "isbn": "9780306406157"})
+        await admin.post("/api/sources/manual", json={"title": "Heritage", "isbn": "9780306406157"})
     ).json()["id"]
     again = await admin.post(
-        "/api/books/manual", json={"title": "Heritage Cookbook", "isbn": "9780306406157"}
+        "/api/sources/manual", json={"title": "Heritage Cookbook", "isbn": "9780306406157"}
     )
     assert again.json() == {"id": first, "existing": True}
-    assert await adb.scalar(text("SELECT count(*) FROM works")) == 1
+    assert await adb.scalar(text("SELECT count(*) FROM sources")) == 1
 
 
 async def test_a_bad_isbn_for_a_book_without_open_library_is_refused(admin) -> None:
     response = await admin.post(
-        "/api/books/manual", json={"title": "Heritage", "isbn": "9780306406158"}
+        "/api/sources/manual", json={"title": "Heritage", "isbn": "9780306406158"}
     )
     assert response.status_code == 422
 
 
 async def test_recipes_import_into_a_book_without_an_isbn(admin, adb) -> None:
-    work = (await admin.post("/api/books/manual", json={"title": "Family Recipes"})).json()["id"]
+    work = (await admin.post("/api/sources/manual", json={"title": "Family Recipes"})).json()["id"]
     result = (
         await admin.post(
             "/api/import/recipes",
@@ -395,7 +395,7 @@ async def test_each_recipe_goes_on_the_edition_its_isbn_names(admin, pink_cake, 
     # One recipe per ISBN, so picking either edition for both fails, whichever
     # order the database returns them in.
     second = await adb.scalar(
-        text("INSERT INTO editions (work_id, isbn13) VALUES (:w, '9780306406157') RETURNING id"),
+        text("INSERT INTO editions (source_id, isbn13) VALUES (:w, '9780306406157') RETURNING id"),
         {"w": pink_cake},
     )
     first = await adb.scalar(text("SELECT id FROM editions WHERE isbn13 = '9780393541113'"))
@@ -409,7 +409,7 @@ async def test_each_recipe_goes_on_the_edition_its_isbn_names(admin, pink_cake, 
             await adb.execute(
                 text(
                     "SELECT r.title, p.edition_id FROM recipes r"
-                    " JOIN recipe_pages p ON p.recipe_id = r.id"
+                    " JOIN recipe_locations p ON p.recipe_id = r.id"
                 )
             )
         ).all()

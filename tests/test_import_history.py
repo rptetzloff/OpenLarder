@@ -19,9 +19,9 @@ async def admin(client, broker, adb):
 
 @pytest.fixture
 async def book(adb):
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Pink Cake') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     await adb.execute(
-        text("INSERT INTO editions (work_id, isbn13) VALUES (:w, '9780393541113')"), {"w": work}
+        text("INSERT INTO editions (source_id, isbn13) VALUES (:w, '9780393541113')"), {"w": work}
     )
     return work
 
@@ -29,7 +29,7 @@ async def book(adb):
 def _item(work, row, title, page="1", ingredients=("Flour",)):
     return {
         "row": row,
-        "work_id": str(work),
+        "source_id": str(work),
         "isbn13": "9780393541113",
         "title": title,
         "page": page,

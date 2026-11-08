@@ -19,12 +19,13 @@ async def setup(client, broker, adb):
     await _sign_in(client, broker)  # the client is now Ann's
     ann, bo = await _user_id(adb, "ann"), await _user_id(adb, "bo")
     await adb.execute(text("UPDATE users SET is_admin = (subject = 'ann')"))
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Pink Cake') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     recipes = {}
     for owner, title in ((ann, "Ann's Cake"), (bo, "Bo's Bread")):
         recipes[title] = await adb.scalar(
             text(
-                "INSERT INTO recipes (work_id, title, created_by) VALUES (:w, :t, :o) RETURNING id"
+                "INSERT INTO recipes (source_id, title, created_by)"
+                " VALUES (:w, :t, :o) RETURNING id"
             ),
             {"w": work, "t": title, "o": owner},
         )

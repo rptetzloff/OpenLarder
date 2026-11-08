@@ -8,7 +8,7 @@ export interface Flag {
   resolved_at: string | null;
   resolution: "fixed" | "dismissed" | null;
   note: string | null;
-  recipe: { id: string; title: string; book_id: string; book_title: string };
+  recipe: { id: string; title: string; source_id: string; source_title: string };
 }
 
 export interface FlagPage {

@@ -25,10 +25,10 @@ from openlarder.models import (
     Ingredient,
     IngredientOption,
     Recipe,
+    Source,
     Substitution,
     Tag,
     TagKind,
-    Work,
 )
 
 MAX_NOTE = 300
@@ -180,8 +180,8 @@ async def listed(session: AsyncSession, *conditions: ColumnElement[bool]) -> lis
             instead_name,
             use_name,
             Tag.name,
-            Work.id,
-            Work.title,
+            Source.id,
+            Source.title,
         )
         .outerjoin(fi, fi.id == Substitution.from_ingredient_id)
         .outerjoin(fr, fr.id == Substitution.from_recipe_id)
@@ -189,12 +189,12 @@ async def listed(session: AsyncSession, *conditions: ColumnElement[bool]) -> lis
         .outerjoin(tr, tr.id == Substitution.to_recipe_id)
         .outerjoin(Tag, Tag.id == Substitution.diet_tag_id)
         .outerjoin(Edition, Edition.id == Substitution.source_edition_id)
-        .outerjoin(Work, Work.id == Edition.work_id)
+        .outerjoin(Source, Source.id == Edition.source_id)
         .where(*conditions)
         .order_by(func.lower(instead_name), func.lower(use_name), Substitution.id)
     )
     out = []
-    for s, instead, use, diet, book_id, book_title in rows:
+    for s, instead, use, diet, source_id, source_title in rows:
         out.append(
             Listed(
                 id=s.id,
@@ -202,7 +202,7 @@ async def listed(session: AsyncSession, *conditions: ColumnElement[bool]) -> lis
                 use=_thing(s.to_ingredient_id, s.to_recipe_id, use),
                 diet=(s.diet_tag_id, diet) if s.diet_tag_id else None,
                 source=(
-                    (book_id, book_title, s.source_edition_id, s.source_page)
+                    (source_id, source_title, s.source_edition_id, s.source_page)
                     if s.source_edition_id
                     else None
                 ),

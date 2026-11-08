@@ -28,7 +28,7 @@ from openlarder.auth import build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
 from openlarder.main import app
-from openlarder.routers.books import openlibrary_transport
+from openlarder.routers.sources import openlibrary_transport
 
 if sys.platform == "win32":
     # Psycopg's async mode refuses Windows' default proactor loop. Linux, where

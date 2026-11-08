@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 
 from openlarder.auth import CurrentUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import FlagKind, Recipe, RecipeFlag, User, Work
+from openlarder.models import FlagKind, Recipe, RecipeFlag, Source, User
 
 router = APIRouter(tags=["flags"])
 PAGE = 50
@@ -26,8 +26,8 @@ PAGE = 50
 class RecipeRef(BaseModel):
     id: uuid.UUID
     title: str
-    book_id: uuid.UUID
-    book_title: str
+    source_id: uuid.UUID
+    source_title: str
 
 
 class FlagOut(BaseModel):
@@ -62,7 +62,7 @@ def _visible(user: User, scope: str):
     return Recipe.created_by == user.id
 
 
-def _out(flag: RecipeFlag, recipe: Recipe, book: Work) -> FlagOut:
+def _out(flag: RecipeFlag, recipe: Recipe, book: Source) -> FlagOut:
     return FlagOut(
         id=flag.id,
         kind=flag.kind,
@@ -71,7 +71,9 @@ def _out(flag: RecipeFlag, recipe: Recipe, book: Work) -> FlagOut:
         resolved_at=flag.resolved_at,
         resolution=flag.resolution,
         note=flag.note,
-        recipe=RecipeRef(id=recipe.id, title=recipe.title, book_id=book.id, book_title=book.title),
+        recipe=RecipeRef(
+            id=recipe.id, title=recipe.title, source_id=book.id, source_title=book.title
+        ),
     )
 
 
@@ -86,9 +88,9 @@ async def list_flags(
 ) -> FlagPage:
     mine = _visible(user, scope)
     base = (
-        select(RecipeFlag, Recipe, Work)
+        select(RecipeFlag, Recipe, Source)
         .join(Recipe, Recipe.id == RecipeFlag.recipe_id)
-        .join(Work, Work.id == Recipe.work_id)
+        .join(Source, Source.id == Recipe.source_id)
     )
     if mine is not None:
         base = base.where(mine)
@@ -110,7 +112,7 @@ async def list_flags(
     total = await session.scalar(select(func.count()).select_from(filtered.subquery())) or 0
     rows = (
         await session.execute(
-            filtered.order_by(Work.title, Recipe.title, RecipeFlag.created_at)
+            filtered.order_by(Source.title, Recipe.title, RecipeFlag.created_at)
             .offset(offset)
             .limit(PAGE)
         )
@@ -128,7 +130,7 @@ async def recipe_flags(recipe_id: uuid.UUID, user: CurrentUser, session: Session
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     if not (user.is_admin or recipe.created_by == user.id):
         return []
-    book = await session.get(Work, recipe.work_id)
+    book = await session.get(Source, recipe.source_id)
     flags = (
         await session.scalars(
             select(RecipeFlag)
@@ -165,4 +167,4 @@ async def resolve(
     flag.resolved_at = func.now()
     await session.commit()
     await session.refresh(flag)
-    return _out(flag, recipe, await session.get(Work, recipe.work_id))
+    return _out(flag, recipe, await session.get(Source, recipe.source_id))

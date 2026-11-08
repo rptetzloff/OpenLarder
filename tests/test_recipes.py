@@ -14,18 +14,18 @@ E1, E2 = uuid.uuid4(), uuid.uuid4()
 @pytest.fixture
 async def book(adb):
     """A book with two editions, and a second book with one."""
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Pink Cake') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     for edition, isbn13, year in ((E1, "9780393541113", 2023), (E2, "9781399611329", 2024)):
         await adb.execute(
             text(
-                "INSERT INTO editions (id, work_id, isbn13, published_year)"
+                "INSERT INTO editions (id, source_id, isbn13, published_year)"
                 " VALUES (:id, :w, :i, :y)"
             ),
             {"id": edition, "w": work, "i": isbn13, "y": year},
         )
-    other = await adb.scalar(text("INSERT INTO works (title) VALUES ('Other') RETURNING id"))
+    other = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Other') RETURNING id"))
     other_edition = await adb.scalar(
-        text("INSERT INTO editions (work_id) VALUES (:w) RETURNING id"), {"w": other}
+        text("INSERT INTO editions (source_id) VALUES (:w) RETURNING id"), {"w": other}
     )
     return {"work": work, "other_edition": other_edition}
 
@@ -47,7 +47,7 @@ def _body(**changes):
 
 
 async def _add(client, work, **changes):
-    return await client.post(f"/api/books/{work}/recipes", json=_body(**changes))
+    return await client.post(f"/api/sources/{work}/recipes", json=_body(**changes))
 
 
 # What can be typed
@@ -141,7 +141,7 @@ async def test_adding_a_recipe_stores_pages_and_lines_in_order(admin, book, adb)
     recipe = (await admin.get(f"/api/recipes/{response.json()['id']}")).json()
 
     assert recipe["title"] == "Rhubarb Cake"
-    assert recipe["book"]["title"] == "Pink Cake"
+    assert recipe["source"]["title"] == "Pink Cake"
     assert recipe["ingredients"] == ["rhubarb", "vanilla pod", "caster sugar"]
     # Newest edition first; a blank page means in it, page not recorded.
     assert [(p["published_year"], p["page"]) for p in recipe["pages"]] == [
@@ -155,7 +155,7 @@ async def test_an_edition_left_out_is_one_the_recipe_is_not_in(admin, book, adb)
     recipe_id = response.json()["id"]
     assert (
         await adb.scalar(
-            text("SELECT count(*) FROM recipe_pages WHERE recipe_id = :r"), {"r": recipe_id}
+            text("SELECT count(*) FROM recipe_locations WHERE recipe_id = :r"), {"r": recipe_id}
         )
         == 1
     )
@@ -166,7 +166,7 @@ async def test_the_book_page_lists_recipes_with_their_pages(admin, client, book)
         admin, book["work"], title="banana bread", editions=[{"edition_id": str(E1), "page": "5"}]
     )
     await _add(admin, book["work"])
-    listed = (await client.get(f"/api/books/{book['work']}")).json()["recipes"]
+    listed = (await client.get(f"/api/sources/{book['work']}")).json()["recipes"]
     assert [(r["title"], r["pages"]) for r in listed] == [
         ("banana bread", ["5"]),
         ("Rhubarb Cake", [None, "112"]),
@@ -203,7 +203,7 @@ async def test_removing_a_recipe_removes_its_pages_and_lines(admin, book, adb) -
     recipe_id = (await _add(admin, book["work"])).json()["id"]
     assert (await admin.delete(f"/api/recipes/{recipe_id}")).status_code == 204
     assert (await admin.get(f"/api/recipes/{recipe_id}")).status_code == 404
-    for table in ("recipes", "recipe_pages", "recipe_ingredients"):
+    for table in ("recipes", "recipe_locations", "recipe_ingredients"):
         assert await adb.scalar(text(f"SELECT count(*) FROM {table}")) == 0
 
 
@@ -245,7 +245,9 @@ async def test_a_non_admin_cannot_change_or_remove(admin, client, broker, book, 
 
 async def test_another_sites_page_cannot_write(admin, book) -> None:
     origin = {"Origin": "https://auth.openlarder.com"}
-    response = await admin.post(f"/api/books/{book['work']}/recipes", json=_body(), headers=origin)
+    response = await admin.post(
+        f"/api/sources/{book['work']}/recipes", json=_body(), headers=origin
+    )
     assert response.status_code == 403
 
 
@@ -279,6 +281,7 @@ def test_migration_0011_refuses_to_drop_an_amount(engine, alembic_config) -> Non
         with pytest.raises(RuntimeError, match="amount"):
             command.upgrade(alembic_config, "head")
     finally:
+        # Still at 0010 when 0011 refused: the table is works there.
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM works WHERE title = 'Amounts'"))
         command.upgrade(alembic_config, "head")

@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder.models import Author, Edition, Work, WorkCredit
+from openlarder.models import Author, Edition, Source, SourceCredit
 from openlarder.openlibrary import FoundAuthor, FoundBook
 
 
@@ -30,7 +30,7 @@ class AuthorStep:
     # credited_as gets tied to it; "add": credited, as the book had no
     # credits; "unmatched": no credit here has this name, so it is left off.
     outcome: str
-    credit: WorkCredit | None = None
+    credit: SourceCredit | None = None
 
 
 @dataclass
@@ -59,21 +59,23 @@ def name_key(name: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", name.casefold()).split())
 
 
-async def plan(session: AsyncSession, work: Work, found: FoundBook) -> Plan:
+async def plan(session: AsyncSession, work: Source, found: FoundBook) -> Plan:
     result = Plan(found=found)
-    if not found.work_id:
+    if not found.open_library_work_id:
         result.problem = (
             "Open Library has that edition without a work, so there's nothing to link the book to."
         )
         return result
-    if work.open_library_work_id and work.open_library_work_id != found.work_id:
+    if work.open_library_work_id and work.open_library_work_id != found.open_library_work_id:
         result.problem = (
             f"This book is already linked to another Open Library work, "
             f"{work.open_library_work_id}."
         )
         return result
     other = await session.scalar(
-        select(Work).where(Work.open_library_work_id == found.work_id, Work.id != work.id)
+        select(Source).where(
+            Source.open_library_work_id == found.open_library_work_id, Source.id != work.id
+        )
     )
     if other is not None:
         result.problem = (
@@ -91,9 +93,9 @@ async def plan(session: AsyncSession, work: Work, found: FoundBook) -> Plan:
                 )
             )
         ).all()
-        elsewhere = [e for e in matches if e.work_id != work.id]
+        elsewhere = [e for e in matches if e.source_id != work.id]
         if elsewhere:
-            book = await session.get(Work, elsewhere[0].work_id)
+            book = await session.get(Source, elsewhere[0].source_id)
             result.problem = (
                 f"That edition is already in another book here, “{book.title if book else '?'}”."
             )
@@ -107,10 +109,10 @@ async def plan(session: AsyncSession, work: Work, found: FoundBook) -> Plan:
 
     credits = (
         await session.execute(
-            select(WorkCredit, Author)
-            .join(Author, Author.id == WorkCredit.author_id)
-            .where(WorkCredit.work_id == work.id)
-            .order_by(WorkCredit.position)
+            select(SourceCredit, Author)
+            .join(Author, Author.id == SourceCredit.author_id)
+            .where(SourceCredit.source_id == work.id)
+            .order_by(SourceCredit.position)
         )
     ).all()
     taken: set[uuid.UUID] = set()
@@ -139,11 +141,11 @@ async def plan(session: AsyncSession, work: Work, found: FoundBook) -> Plan:
     return result
 
 
-async def apply(session: AsyncSession, work: Work, steps: Plan) -> None:
+async def apply(session: AsyncSession, work: Source, steps: Plan) -> None:
     """Carry out a plan with no problem."""
     assert steps.problem is None
     found = steps.found
-    work.open_library_work_id = found.work_id
+    work.open_library_work_id = found.open_library_work_id
 
     if steps.edition_step == "fill" and steps.edition is not None:
         edition = steps.edition
@@ -155,7 +157,7 @@ async def apply(session: AsyncSession, work: Work, steps: Plan) -> None:
     elif steps.edition_step == "add":
         session.add(
             Edition(
-                work_id=work.id,
+                source_id=work.id,
                 title=(
                     found.edition_title
                     if found.edition_title
@@ -188,8 +190,8 @@ async def apply(session: AsyncSession, work: Work, steps: Plan) -> None:
                 await session.flush()
             position += 1
             session.add(
-                WorkCredit(
-                    work_id=work.id,
+                SourceCredit(
+                    source_id=work.id,
                     author_id=known.id,
                     position=position,
                     credited_as=step.found.name,
@@ -210,7 +212,7 @@ async def apply(session: AsyncSession, work: Work, steps: Plan) -> None:
         credit.author_id = known.id
         await session.flush()
         still_used = await session.scalar(
-            select(func.count()).select_from(WorkCredit).where(WorkCredit.author_id == old)
+            select(func.count()).select_from(SourceCredit).where(SourceCredit.author_id == old)
         )
         if not still_used:
             orphan = await session.get(Author, old)

@@ -49,7 +49,7 @@ class FoundBook:
     title: str  # the work's, or the edition's when it has no work
     edition_title: str | None
     subtitle: str | None
-    work_id: str | None  # "OL29227890W"
+    open_library_work_id: str | None  # "OL29227890W"
     edition_id: str  # "OL40203348M", or "" for a work alone
     publisher: str | None
     published_year: int | None
@@ -247,7 +247,7 @@ async def find(
         if kind == "edition":
             edition = await _get(client, f"/books/{key}.json")
             return await _read(client, edition, None)
-        return await _read(client, {}, None, work_id=key)
+        return await _read(client, {}, None, ol_work_id=key)
 
 
 def _edition_isbn(edition: dict[str, Any]) -> str | None:
@@ -263,10 +263,10 @@ async def _read(
     client: httpx2.AsyncClient,
     edition: dict[str, Any],
     isbn13: str | None,
-    work_id: str | None = None,
+    ol_work_id: str | None = None,
 ) -> FoundBook:
-    work_id = work_id or _key_id((edition.get("works") or [{}])[0].get("key"))
-    work = await _get(client, f"/works/{work_id}.json") if work_id else {}
+    ol_work_id = ol_work_id or _key_id((edition.get("works") or [{}])[0].get("key"))
+    work = await _get(client, f"/works/{ol_work_id}.json") if ol_work_id else {}
 
     # The work's authors are the book's; an edition's list is a fallback
     # for editions not attached to a work.
@@ -284,7 +284,7 @@ async def _read(
 
     title = _text(work.get("title")) or _text(edition.get("title"))
     if not title:
-        raise NotFound(f"{work_id or isbn13} has no title")
+        raise NotFound(f"{ol_work_id or isbn13} has no title")
     publishers = edition.get("publishers") or []
     covers = [c for c in (edition.get("covers") or work.get("covers") or []) if c and c > 0]
     return FoundBook(
@@ -292,7 +292,7 @@ async def _read(
         title=title,
         edition_title=_text(edition.get("title")),
         subtitle=_text(work.get("subtitle")) or _text(edition.get("subtitle")),
-        work_id=work_id,
+        open_library_work_id=ol_work_id,
         edition_id=_key_id(edition.get("key")) or "",
         # The first listed. Open Library sometimes lists one publisher in
         # several forms; which reads best is not something to guess at here.

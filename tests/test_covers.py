@@ -32,9 +32,9 @@ def covers(configure) -> FakeCovers:
 
 @pytest.fixture
 async def catalogued(adb) -> int:
-    work = await adb.scalar(text("INSERT INTO works (title) VALUES ('Pink Cake') RETURNING id"))
+    work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     await adb.execute(
-        text("INSERT INTO editions (work_id, open_library_cover_id) VALUES (:w, 14125211)"),
+        text("INSERT INTO editions (source_id, open_library_cover_id) VALUES (:w, 14125211)"),
         {"w": work},
     )
     return 14125211

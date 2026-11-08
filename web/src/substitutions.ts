@@ -17,7 +17,7 @@ export interface Swap {
   use: Thing;
   diet: Diet | null;
   // null: contributed rather than printed in a book.
-  source: { book_id: string; book_title: string; edition_id: string; page: string | null } | null;
+  source: { source_id: string; source_title: string; edition_id: string; page: string | null } | null;
   note: string | null;
 }
 

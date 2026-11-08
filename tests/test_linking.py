@@ -46,19 +46,21 @@ async def admin(client, broker, adb, heritage):
 
 async def _manual(client, title="The Heritage Cookbook", authors=("Russ Crandall",), **extra):
     body = {"title": title, "authors": list(authors), "isbn": HERITAGE, **extra}
-    response = await client.post("/api/books/manual", json=body)
+    response = await client.post("/api/sources/manual", json=body)
     assert response.status_code == 200, response.text
     return response.json()["id"]
 
 
-async def _preview(client, book_id, reference):
+async def _preview(client, source_id, reference):
     return await client.post(
-        f"/api/books/{book_id}/open-library/preview", json={"reference": reference}
+        f"/api/sources/{source_id}/open-library/preview", json={"reference": reference}
     )
 
 
-async def _link(client, book_id, reference):
-    return await client.post(f"/api/books/{book_id}/open-library", json={"reference": reference})
+async def _link(client, source_id, reference):
+    return await client.post(
+        f"/api/sources/{source_id}/open-library", json={"reference": reference}
+    )
 
 
 async def _row(adb, sql, **params):
@@ -128,8 +130,8 @@ async def test_the_preview_shows_what_linking_would_do_and_writes_nothing(admin,
             "credited_as": "Russ Crandall",
         }
     ]
-    work_id = await adb.scalar(text("SELECT open_library_work_id FROM works"))
-    assert work_id is None
+    source_id = await adb.scalar(text("SELECT open_library_work_id FROM sources"))
+    assert source_id is None
 
 
 async def test_linking_fills_in_the_edition_and_ties_the_author(admin, adb) -> None:
@@ -137,9 +139,9 @@ async def test_linking_fills_in_the_edition_and_ties_the_author(admin, adb) -> N
     response = await _link(admin, book, HERITAGE)
     assert response.status_code == 200, response.text
 
-    title, work_id = await _row(adb, "SELECT title, open_library_work_id FROM works")
+    title, source_id = await _row(adb, "SELECT title, open_library_work_id FROM sources")
     # Linking doesn't rewrite the book's own title with Open Library's.
-    assert (title, work_id) == ("The Heritage Cookbook", WORK)
+    assert (title, source_id) == ("The Heritage Cookbook", WORK)
     editions = (
         await adb.execute(
             text("SELECT isbn13, publisher, published_year, open_library_edition_id FROM editions")
@@ -149,11 +151,11 @@ async def test_linking_fills_in_the_edition_and_ties_the_author(admin, adb) -> N
     credit, name, author_id = await _row(
         adb,
         "SELECT c.credited_as, a.name, a.open_library_author_id"
-        " FROM work_credits c JOIN authors a ON a.id = c.author_id",
+        " FROM source_credits c JOIN authors a ON a.id = c.author_id",
     )
     assert (credit, name, author_id) == ("Russ Crandall", "Russ Crandall", CRANDALL)
 
-    shown = (await admin.get(f"/api/books/{book}")).json()
+    shown = (await admin.get(f"/api/sources/{book}")).json()
     assert shown["open_library_url"] == f"https://openlibrary.org/works/{WORK}"
 
 
@@ -175,25 +177,25 @@ async def test_the_other_printing_joins_as_another_edition(admin, adb) -> None:
 
     isbns = (await adb.scalars(text("SELECT isbn13 FROM editions ORDER BY isbn13"))).all()
     assert isbns == [HERITAGE, VICTORY_BELT]
-    assert await adb.scalar(text("SELECT count(*) FROM works")) == 1
-    assert await adb.scalar(text("SELECT count(*) FROM work_credits")) == 1
+    assert await adb.scalar(text("SELECT count(*) FROM sources")) == 1
+    assert await adb.scalar(text("SELECT count(*) FROM source_credits")) == 1
 
 
 async def test_once_linked_the_add_box_joins_the_book_too(admin, adb) -> None:
     """The problem the issue describes: adding the Victory Belt ISBN made a second book."""
     book = await _manual(admin)
     assert (await _link(admin, book, HERITAGE)).status_code == 200
-    response = await admin.post("/api/books", json={"isbn": VICTORY_BELT})
+    response = await admin.post("/api/sources", json={"isbn": VICTORY_BELT})
     assert response.status_code == 201
     assert response.json()["id"] == book
-    assert await adb.scalar(text("SELECT count(*) FROM works")) == 1
+    assert await adb.scalar(text("SELECT count(*) FROM sources")) == 1
 
 
 async def test_recipes_and_their_pages_are_left_alone(admin, adb) -> None:
     book = await _manual(admin)
     edition = await adb.scalar(text("SELECT id FROM editions"))
     response = await admin.post(
-        f"/api/books/{book}/recipes",
+        f"/api/sources/{book}/recipes",
         json={
             "title": "Ajiaco",
             "editions": [{"edition_id": str(edition), "page": "634"}],
@@ -202,7 +204,7 @@ async def test_recipes_and_their_pages_are_left_alone(admin, adb) -> None:
     )
     assert response.status_code == 201, response.text
     assert (await _link(admin, book, HERITAGE)).status_code == 200
-    page = await adb.scalar(text("SELECT page FROM recipe_pages"))
+    page = await adb.scalar(text("SELECT page FROM recipe_locations"))
     assert page == "634"
 
 
@@ -211,7 +213,7 @@ async def test_a_work_link_sets_the_work_without_adding_an_edition(admin, adb) -
     preview = (await _preview(admin, book, f"https://openlibrary.org/works/{WORK}")).json()
     assert preview["edition"] is None
     assert (await _link(admin, book, WORK)).status_code == 200
-    assert await adb.scalar(text("SELECT open_library_work_id FROM works")) == WORK
+    assert await adb.scalar(text("SELECT open_library_work_id FROM sources")) == WORK
     assert await adb.scalar(text("SELECT open_library_edition_id FROM editions")) is None
 
 
@@ -226,7 +228,7 @@ async def test_a_book_with_no_authors_is_given_open_librarys(admin, adb) -> None
     row = await _row(
         adb,
         "SELECT c.credited_as, c.position, a.open_library_author_id"
-        " FROM work_credits c JOIN authors a ON a.id = c.author_id",
+        " FROM source_credits c JOIN authors a ON a.id = c.author_id",
     )
     assert tuple(row) == ("Russ Crandall", 1, CRANDALL)
 
@@ -237,7 +239,7 @@ async def test_an_author_written_backwards_still_matches(admin, adb) -> None:
     credit, author_id = await _row(
         adb,
         "SELECT c.credited_as, a.open_library_author_id"
-        " FROM work_credits c JOIN authors a ON a.id = c.author_id",
+        " FROM source_credits c JOIN authors a ON a.id = c.author_id",
     )
     # Tied to Open Library's record, still credited as the book has it.
     assert (credit, author_id) == ("Crandall, Russ (Author)", CRANDALL)
@@ -252,7 +254,7 @@ async def test_an_author_open_library_has_that_the_book_does_not_is_left_off(adm
         await adb.execute(
             text(
                 "SELECT c.credited_as, a.open_library_author_id"
-                " FROM work_credits c JOIN authors a ON a.id = c.author_id"
+                " FROM source_credits c JOIN authors a ON a.id = c.author_id"
             )
         )
     ).all()
@@ -267,13 +269,13 @@ async def test_an_author_already_here_from_another_book_is_merged(admin, adb) ->
         {"id": CRANDALL},
     )
     book = await _manual(admin, authors=("Crandall, Russ",))
-    plain = await adb.scalar(text("SELECT author_id FROM work_credits"))
+    plain = await adb.scalar(text("SELECT author_id FROM source_credits"))
     assert (await _link(admin, book, HERITAGE)).status_code == 200
 
     tied = await adb.scalar(
         text(
             "SELECT a.open_library_author_id"
-            " FROM work_credits c JOIN authors a ON a.id = c.author_id"
+            " FROM source_credits c JOIN authors a ON a.id = c.author_id"
         )
     )
     assert tied == CRANDALL
@@ -316,7 +318,7 @@ async def test_an_open_library_work_that_is_another_book_here_is_refused(admin, 
     assert response.status_code == 409
     assert (
         await adb.scalar(
-            text("SELECT open_library_work_id FROM works WHERE id = :id"), {"id": second}
+            text("SELECT open_library_work_id FROM sources WHERE id = :id"), {"id": second}
         )
         is None
     )
@@ -324,7 +326,7 @@ async def test_an_open_library_work_that_is_another_book_here_is_refused(admin, 
 
 async def test_a_book_linked_to_another_work_is_refused(admin, adb) -> None:
     book = await _manual(admin)
-    await adb.execute(text("UPDATE works SET open_library_work_id = 'OL9W'"))
+    await adb.execute(text("UPDATE sources SET open_library_work_id = 'OL9W'"))
     response = await _link(admin, book, HERITAGE)
     assert response.status_code == 409
     assert "OL9W" in response.json()["detail"]
@@ -369,7 +371,7 @@ async def test_only_an_admin_can_link(client, broker, heritage, adb) -> None:
 async def test_another_sites_page_cannot_link(admin) -> None:
     book = await _manual(admin)
     response = await admin.post(
-        f"/api/books/{book}/open-library",
+        f"/api/sources/{book}/open-library",
         json={"reference": HERITAGE},
         headers={"Origin": "https://auth.openlarder.com"},
     )

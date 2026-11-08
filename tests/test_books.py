@@ -24,7 +24,7 @@ async def admin(client, broker, adb, openlib):
 
 
 async def _add(client, raw: str) -> httpx2.Response:
-    return await client.post("/api/books", json={"isbn": raw})
+    return await client.post("/api/sources", json={"isbn": raw})
 
 
 # ISBNs
@@ -59,7 +59,7 @@ async def test_the_lookup_reads_real_open_library_records(openlib) -> None:
     found = await openlibrary.find_by_isbn(PINK_CAKE, httpx2.MockTransport(openlib.handle))
     assert found.title == "Love Is a Pink Cake"
     assert found.subtitle == "Irresistible Bakes and Treats for Morning, Noon, and Night"
-    assert (found.work_id, found.edition_id) == ("OL29227890W", "OL40203348M")
+    assert (found.open_library_work_id, found.edition_id) == ("OL29227890W", "OL40203348M")
     assert [a.name for a in found.authors] == ["Claire Ptak"]
     assert (found.published_year, found.cover_id) == (2023, 14125211)
     assert found.publisher == "Norton & Company, Incorporated, W. W."
@@ -85,9 +85,9 @@ def test_publication_years_are_read_from_free_text(publish_date, year) -> None:
 async def test_adding_a_book_stores_work_edition_and_author(admin, adb) -> None:
     response = await _add(admin, "978-0-393-54111-3")
     assert response.status_code == 201
-    work_id = response.json()["id"]
+    source_id = response.json()["id"]
 
-    book = (await admin.get(f"/api/books/{work_id}")).json()
+    book = (await admin.get(f"/api/sources/{source_id}")).json()
     assert book["title"] == "Love Is a Pink Cake"
     assert [c["credited_as"] for c in book["credits"]] == ["Claire Ptak"]
     (edition,) = book["editions"]
@@ -104,9 +104,9 @@ async def test_a_second_isbn_of_the_same_work_joins_it(admin, adb, openlib) -> N
     second = (await _add(admin, "9781399611329")).json()["id"]
 
     assert first == second
-    assert await adb.scalar(text("SELECT count(*) FROM works")) == 1
+    assert await adb.scalar(text("SELECT count(*) FROM sources")) == 1
     assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
-    titles = {e["title"] for e in (await admin.get(f"/api/books/{first}")).json()["editions"]}
+    titles = {e["title"] for e in (await admin.get(f"/api/sources/{first}")).json()["editions"]}
     assert titles == {None, "Love Is a Pink Cake (UK)"}
 
 
@@ -118,7 +118,7 @@ async def test_an_author_is_shared_across_books(admin, adb, openlib) -> None:
     await _add(admin, PINK_CAKE)
     await _add(admin, "9780306406157")
 
-    assert await adb.scalar(text("SELECT count(*) FROM works")) == 2
+    assert await adb.scalar(text("SELECT count(*) FROM sources")) == 2
     assert await adb.scalar(text("SELECT count(*) FROM authors")) == 1
 
 
@@ -128,7 +128,7 @@ async def test_adding_the_same_isbn_twice_points_at_the_book(admin, openlib) -> 
     again = await _add(admin, "0393541118")  # the same book's ISBN-10
 
     assert again.status_code == 409
-    assert again.json()["detail"]["work_id"] == first
+    assert again.json()["detail"]["source_id"] == first
     assert len(openlib.requests) == lookups  # answered without asking Open Library
 
 
@@ -143,7 +143,7 @@ async def test_an_isbn_open_library_does_not_know(admin) -> None:
 async def test_open_library_down_is_a_502_and_stores_nothing(admin, adb, openlib) -> None:
     openlib.fail_with = 503
     assert (await _add(admin, PINK_CAKE)).status_code == 502
-    assert await adb.scalar(text("SELECT count(*) FROM works")) == 0
+    assert await adb.scalar(text("SELECT count(*) FROM sources")) == 0
 
 
 async def test_a_bad_isbn_is_refused_before_any_lookup(admin, openlib) -> None:
@@ -161,7 +161,7 @@ async def test_only_an_admin_can_add(client, broker, openlib) -> None:
 
 async def test_another_sites_page_cannot_add(admin) -> None:
     response = await admin.post(
-        "/api/books", json={"isbn": PINK_CAKE}, headers={"Origin": "https://auth.openlarder.com"}
+        "/api/sources", json={"isbn": PINK_CAKE}, headers={"Origin": "https://auth.openlarder.com"}
     )
     assert response.status_code == 403
 
@@ -178,7 +178,7 @@ async def test_the_list_is_public_and_alphabetical(admin, client, openlib) -> No
     await _add(admin, "9780306406157")
     await admin.post("/api/auth/logout")
 
-    books = (await client.get("/api/books")).json()
+    books = (await client.get("/api/sources")).json()
     assert [b["title"] for b in books] == ["apple pies", "Love Is a Pink Cake"]
     assert books[0]["cover_url"] == "/covers/14125211-M.jpg"
     assert books[1]["authors"] == ["Claire Ptak"]
@@ -186,15 +186,17 @@ async def test_the_list_is_public_and_alphabetical(admin, client, openlib) -> No
 
 
 async def test_an_unknown_book_is_a_404(client) -> None:
-    response = await client.get("/api/books/00000000-0000-0000-0000-000000000000")
+    response = await client.get("/api/sources/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
 
 
 def test_the_database_refuses_a_cover_id_that_is_not_positive(db) -> None:
     from sqlalchemy.exc import IntegrityError
 
-    work = db.execute(text("INSERT INTO works (title) VALUES ('Covers') RETURNING id")).scalar_one()
-    insert = "INSERT INTO editions (work_id, open_library_cover_id) VALUES (:w, :c)"
+    work = db.execute(
+        text("INSERT INTO sources (title) VALUES ('Covers') RETURNING id")
+    ).scalar_one()
+    insert = "INSERT INTO editions (source_id, open_library_cover_id) VALUES (:w, :c)"
     for bad in (0, -1):
         with pytest.raises(IntegrityError), db.begin_nested():
             db.execute(text(insert), {"w": work, "c": bad})

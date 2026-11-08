@@ -26,7 +26,7 @@ const cover = computed(() => book.value?.editions.find((e) => e.cover_url)?.cove
 
 async function load() {
   try {
-    const res = await fetch(`/api/books/${props.id}`);
+    const res = await fetch(`/api/sources/${props.id}`);
     if (res.status === 404 || res.status === 422) missing.value = true;
     else if (!res.ok) failed.value = true;
     else {
@@ -43,7 +43,7 @@ onMounted(load);
 
 <template>
   <article>
-    <p><a href="/books">← All books</a></p>
+    <p><a href="/sources">← All books</a></p>
     <p v-if="missing">There's no book here. It may have been removed, or the link is wrong.</p>
     <p v-else-if="failed" role="alert">This book couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!book" class="status">Loading…</p>
@@ -63,7 +63,7 @@ onMounted(load);
             <a :href="book.open_library_url">On Open Library</a>
           </p>
           <p v-if="user?.is_admin" class="byline">
-            <a :href="`/books/${book.id}/edit`">Edit book</a>
+            <a :href="`/sources/${book.id}/edit`">Edit book</a>
           </p>
         </div>
       </div>
@@ -72,18 +72,18 @@ onMounted(load);
         <h2>Ingredients</h2>
         <p class="status">
           The ones its recipes use most. Open one for the recipes here that use it, or
-          <a :href="`/search?book=${book.id}`">search this book by ingredient</a>.
+          <a :href="`/search?source=${book.id}`">search this book by ingredient</a>.
         </p>
         <ul class="chosen">
           <li v-for="i in book.ingredients" :key="i.id">
-            <a :href="`/search?book=${book.id}&i=${i.id}`">{{ i.name }}</a>
+            <a :href="`/search?source=${book.id}&i=${i.id}`">{{ i.name }}</a>
             <span class="page-ref">{{ i.recipes }}</span>
           </li>
         </ul>
       </template>
 
       <h2>Recipes</h2>
-      <p v-if="user?.is_admin"><a :href="`/books/${book.id}/recipes/new`">Add a recipe</a></p>
+      <p v-if="user?.is_admin"><a :href="`/sources/${book.id}/recipes/new`">Add a recipe</a></p>
       <ul v-if="book.recipes.length" class="recipe-list">
         <li v-for="r in book.recipes" :key="r.id">
           <a :href="`/recipes/${r.id}`">{{ r.title }}</a>

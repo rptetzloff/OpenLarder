@@ -34,7 +34,7 @@ watch(filter, () => {
 
 onMounted(async () => {
   try {
-    const res = await fetch("/api/books");
+    const res = await fetch("/api/sources");
     books.value = res.ok ? await res.json() : null;
     failed.value = !res.ok;
   } catch {
@@ -48,7 +48,7 @@ async function add() {
   try {
     const { id } = await addByIsbn(isbn.value);
     // A full load, so the new book's page fetches what was just stored.
-    location.href = `/books/${id}`;
+    location.href = `/sources/${id}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     adding.value = false;
@@ -106,7 +106,7 @@ async function add() {
     </template>
     <ul v-if="shown?.length" class="book-list">
       <li v-for="book in shown" :key="book.id">
-        <a :href="`/books/${book.id}`" class="book-card">
+        <a :href="`/sources/${book.id}`" class="book-card">
           <img v-if="book.cover_url" :src="book.cover_url" alt="" loading="lazy" />
           <span v-else class="no-cover" aria-hidden="true"></span>
           <span>

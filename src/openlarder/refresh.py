@@ -28,7 +28,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import books, openlibrary
-from openlarder.models import Author, Edition, Work, WorkCredit
+from openlarder.models import Author, Edition, Source, SourceCredit
 
 
 @dataclass
@@ -53,7 +53,7 @@ def _cover(cover_id: int | None) -> str | None:
 
 
 async def check(
-    session: AsyncSession, work: Work, transport: httpx2.AsyncBaseTransport | None = None
+    session: AsyncSession, work: Source, transport: httpx2.AsyncBaseTransport | None = None
 ) -> list[Difference]:
     """Every difference between the book as stored and Open Library now.
     Raises NotLinked, or openlibrary's NotFound and Unavailable."""
@@ -63,7 +63,7 @@ async def check(
     editions = (
         await session.scalars(
             select(Edition)
-            .where(Edition.work_id == work.id, Edition.open_library_edition_id.is_not(None))
+            .where(Edition.source_id == work.id, Edition.open_library_edition_id.is_not(None))
             .order_by(Edition.published_year.desc().nulls_last(), Edition.isbn13)
         )
     ).all()
@@ -103,10 +103,10 @@ async def check(
 
     credits = (
         await session.execute(
-            select(WorkCredit, Author)
-            .join(Author, Author.id == WorkCredit.author_id)
-            .where(WorkCredit.work_id == work.id)
-            .order_by(WorkCredit.position)
+            select(SourceCredit, Author)
+            .join(Author, Author.id == SourceCredit.author_id)
+            .where(SourceCredit.source_id == work.id)
+            .order_by(SourceCredit.position)
         )
     ).all()
     ours = [a.open_library_author_id for _, a in credits]
@@ -184,13 +184,15 @@ async def check(
 
 
 async def _take_credits(
-    session: AsyncSession, work: Work, found: list[openlibrary.FoundAuthor]
+    session: AsyncSession, work: Source, found: list[openlibrary.FoundAuthor]
 ) -> None:
     """Credit the book as Open Library does, in its order, as authors."""
     before = list(
-        await session.scalars(select(WorkCredit.author_id).where(WorkCredit.work_id == work.id))
+        await session.scalars(
+            select(SourceCredit.author_id).where(SourceCredit.source_id == work.id)
+        )
     )
-    await session.execute(delete(WorkCredit).where(WorkCredit.work_id == work.id))
+    await session.execute(delete(SourceCredit).where(SourceCredit.source_id == work.id))
     for position, found_author in enumerate(found, start=1):
         author = await session.scalar(
             select(Author).where(Author.open_library_author_id == found_author.open_library_id)
@@ -204,8 +206,8 @@ async def _take_credits(
             session.add(author)
             await session.flush()
         session.add(
-            WorkCredit(
-                work_id=work.id,
+            SourceCredit(
+                source_id=work.id,
                 author_id=author.id,
                 position=position,
                 credited_as=found_author.name,
@@ -217,7 +219,7 @@ async def _take_credits(
 
 async def apply(
     session: AsyncSession,
-    work: Work,
+    work: Source,
     keys: set[str],
     transport: httpx2.AsyncBaseTransport | None = None,
 ) -> int:

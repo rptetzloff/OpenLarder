@@ -47,7 +47,7 @@ const saving = ref(false);
 onMounted(async () => {
   try {
     diets.value = await listDiets();
-    const res = await fetch("/api/books");
+    const res = await fetch("/api/sources");
     if (res.ok) books.value = await res.json();
   } catch {
     error.value = "The form couldn't load its lists. Try reloading the page.";
@@ -59,7 +59,7 @@ watch(
   async (id, before) => {
     editions.value = [];
     if (!id) return;
-    const res = await fetch(`/api/books/${id}`);
+    const res = await fetch(`/api/sources/${id}`);
     if (!res.ok) return;
     editions.value = (await res.json()).editions;
     // A different book: its first edition, and the page starts over.
@@ -170,7 +170,7 @@ async function save() {
         <ul v-if="recipeHits.length" class="merge-candidates">
           <li v-for="r in recipeHits" :key="r.id">
             <button type="button" class="link" @click="pickRecipe(r)">{{ r.title }}</button>
-            <span class="page-ref">{{ r.book_title }}</span>
+            <span class="page-ref">{{ r.source_title }}</span>
           </li>
         </ul>
       </div>

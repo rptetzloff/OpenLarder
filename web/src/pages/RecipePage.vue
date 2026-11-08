@@ -24,7 +24,7 @@ onMounted(async () => {
     else {
       recipe.value = await res.json();
       if (props.user !== null) flags.value = await recipeFlags(props.id);
-      document.title = `${recipe.value!.title} · ${recipe.value!.book.title} · OpenLarder`;
+      document.title = `${recipe.value!.title} · ${recipe.value!.source.title} · OpenLarder`;
     }
   } catch {
     failed.value = true;
@@ -60,7 +60,7 @@ async function remove() {
   if (!recipe.value || !confirm(`Remove “${recipe.value.title}” from the index?`)) return;
   try {
     await removeRecipe(recipe.value.id);
-    location.href = `/books/${recipe.value.book.id}`;
+    location.href = `/sources/${recipe.value.source.id}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   }
@@ -73,10 +73,10 @@ async function remove() {
     <p v-else-if="failed" role="alert">This recipe couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!recipe" class="status">Loading…</p>
     <template v-else>
-      <p><a :href="`/books/${recipe.book.id}`">← {{ recipe.book.title }}</a></p>
+      <p><a :href="`/sources/${recipe.source.id}`">← {{ recipe.source.title }}</a></p>
       <h1>{{ recipe.title }}</h1>
       <p class="byline">
-        In <a :href="`/books/${recipe.book.id}`">{{ recipe.book.title }}</a>,
+        In <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>,
         {{ recipe.pages.map(where).join("; ") }}
       </p>
 
@@ -122,7 +122,7 @@ async function remove() {
           <SwapForm
             v-else
             :choices="swapChoices"
-            :book-id="recipe.book.id"
+            :book-id="recipe.source.id"
             :edition-id="firstPage?.edition_id"
             :page="firstPage?.page"
             @added="(s) => recipe!.swaps.push(s)"

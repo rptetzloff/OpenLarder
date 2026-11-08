@@ -32,9 +32,9 @@ onMounted(async () => {
       const res = await fetch(`/api/recipes/${props.recipeId}`);
       if (!res.ok) throw new Error();
       existing = await res.json();
-      bookId = existing!.book.id;
+      bookId = existing!.source.id;
     }
-    const res = await fetch(`/api/books/${bookId}`);
+    const res = await fetch(`/api/sources/${bookId}`);
     if (!res.ok) throw new Error();
     book.value = await res.json();
     const pages = new Map(existing?.pages.map((p) => [p.edition_id, p.page]) ?? []);
@@ -110,7 +110,7 @@ async function save() {
 
 <template>
   <article>
-    <p v-if="book"><a :href="`/books/${book.id}`">← {{ book.title }}</a></p>
+    <p v-if="book"><a :href="`/sources/${book.id}`">← {{ book.title }}</a></p>
     <h1>{{ heading }}</h1>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="book" class="recipe-form" @submit.prevent="save">

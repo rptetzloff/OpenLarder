@@ -67,9 +67,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function addBook(book: ParsedBook): Promise<{ id: string; how: string }> {
   if (book.isbn13) {
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const { status, body } = await post("/api/books", { isbn: book.isbn13 });
+      const { status, body } = await post("/api/sources", { isbn: book.isbn13 });
       if (status === 201) return { id: body.id, how: "added from Open Library" };
-      if (status === 409 && body.detail?.work_id) return { id: body.detail.work_id, how: "already here" };
+      if (status === 409 && body.detail?.source_id) return { id: body.detail.source_id, how: "already here" };
       if (status === 404) break; // not on Open Library: fall back to the list's details
       if (status !== 502) throw new Error(reason(body, `Adding it failed (${status}).`));
       await sleep(2000 * attempt); // Open Library didn't answer; give it a moment
@@ -77,7 +77,7 @@ export async function addBook(book: ParsedBook): Promise<{ id: string; how: stri
   }
   // Keeps the ISBN when Open Library doesn't know it: the recipes name
   // their book by ISBN, and would find no edition without it.
-  const { status, body } = await post("/api/books/manual", {
+  const { status, body } = await post("/api/sources/manual", {
     title: book.source_title,
     authors: book.authors,
     year: book.year,
@@ -119,7 +119,7 @@ export async function importBatch(
   runId: string | null,
   items: {
     row: number;
-    work_id: string;
+    source_id: string;
     isbn13: string | null;
     title: string;
     page: string | null;

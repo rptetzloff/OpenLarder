@@ -17,10 +17,10 @@ async def admin(client, broker, adb):
 
 async def _book(client, title, credits):
     """A book added by hand, then given its credits as (name, role)."""
-    added = await client.post("/api/books/manual", json={"title": title, "authors": []})
-    book = (await client.get(f"/api/books/{added.json()['id']}")).json()
+    added = await client.post("/api/sources/manual", json={"title": title, "authors": []})
+    book = (await client.get(f"/api/sources/{added.json()['id']}")).json()
     response = await client.put(
-        f"/api/books/{book['id']}",
+        f"/api/sources/{book['id']}",
         json={
             "title": title,
             "credits": [{"name": n, "role": r} for n, r in credits],
@@ -28,7 +28,7 @@ async def _book(client, title, credits):
         },
     )
     assert response.status_code == 200, response.text
-    return (await client.get(f"/api/books/{book['id']}")).json()
+    return (await client.get(f"/api/sources/{book['id']}")).json()
 
 
 def _author(book, name):
@@ -57,13 +57,13 @@ async def test_an_author_page_lists_books_and_coauthors(admin, client) -> None:
         "person",
         None,
     )
-    assert [(b["title"], b["roles"], b["credited_as"]) for b in page["books"]] == [
+    assert [(b["title"], b["roles"], b["credited_as"]) for b in page["sources"]] == [
         ("Jerusalem", ["author"], "Yotam Ottolenghi"),
         ("Plenty", ["author"], "Yotam Ottolenghi"),
     ]
     # Most books shared first, then by name. "Ottolenghi" on Simple is another
     # record: a different printed name is matched as a new name.
-    assert [(c["name"], c["books"]) for c in page["coauthors"]] == [
+    assert [(c["name"], c["sources"]) for c in page["coauthors"]] == [
         ("Sami Tamimi", 2),
         ("Jonathan Lovekin", 1),
     ]
@@ -74,7 +74,7 @@ async def test_one_person_in_two_roles_is_one_book(admin, client) -> None:
         admin, "Camino", [("Russell Moore", "author"), ("Russell Moore", "photographer")]
     )
     page = (await client.get(f"/api/authors/{_author(book, 'Russell Moore')}")).json()
-    assert [(b["title"], b["roles"]) for b in page["books"]] == [
+    assert [(b["title"], b["roles"]) for b in page["sources"]] == [
         ("Camino", ["author", "photographer"])
     ]
     assert page["coauthors"] == []
@@ -110,7 +110,7 @@ async def test_the_list_is_by_name_with_book_counts(admin, client) -> None:
     )
     await _book(admin, "Jerusalem", [("Yotam Ottolenghi", "author"), ("Sami Tamimi", "author")])
     listed = (await client.get("/api/authors")).json()
-    assert [(a["name"], a["books"]) for a in listed["authors"]] == [
+    assert [(a["name"], a["sources"]) for a in listed["authors"]] == [
         ("Jonathan Lovekin", 1),
         ("Sami Tamimi", 1),
         ("Yotam Ottolenghi", 2),
@@ -151,11 +151,11 @@ async def test_an_admin_fixes_the_name_and_kind(admin, client) -> None:
     response = await admin.patch(
         f"/api/authors/{atk}", json={"name": " America's  Test Kitchen ", "kind": "organisation"}
     )
-    assert response.json() == {"id": atk, "name": "America's Test Kitchen", "books": 1}
+    assert response.json() == {"id": atk, "name": "America's Test Kitchen", "sources": 1}
     page = (await client.get(f"/api/authors/{atk}")).json()
     assert (page["name"], page["kind"]) == ("America's Test Kitchen", "organisation")
     # The book still prints what it printed.
-    shown = (await client.get(f"/api/books/{book['id']}")).json()
+    shown = (await client.get(f"/api/sources/{book['id']}")).json()
     assert shown["credits"][0]["credited_as"] == "America's Test Kitchen (Firm)"
 
 

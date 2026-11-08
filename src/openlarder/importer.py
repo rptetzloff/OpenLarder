@@ -36,7 +36,7 @@ from openlarder.models import (
     Recipe,
     RecipeFlag,
     RecipeIngredient,
-    RecipePage,
+    RecipeLocation,
 )
 
 BOOK_COLUMNS = ("Source Title", "Author(s)", "ISBN", "Year Published")
@@ -193,7 +193,7 @@ def prepare(title: str, edition_id: uuid.UUID, page: str | None, lines: list[str
 @dataclass
 class Item:
     row: int
-    work_id: uuid.UUID
+    source_id: uuid.UUID
     isbn13: str | None
     title: str
     page: str | None
@@ -212,10 +212,14 @@ class Outcome:
 async def _edition(session: AsyncSession, item: Item) -> uuid.UUID | None:
     if item.isbn13:
         return await session.scalar(
-            select(Edition.id).where(Edition.isbn13 == item.isbn13, Edition.work_id == item.work_id)
+            select(Edition.id).where(
+                Edition.isbn13 == item.isbn13, Edition.source_id == item.source_id
+            )
         )
     # A book without an ISBN has one edition, the one added with it.
-    ids = (await session.scalars(select(Edition.id).where(Edition.work_id == item.work_id))).all()
+    ids = (
+        await session.scalars(select(Edition.id).where(Edition.source_id == item.source_id))
+    ).all()
     return ids[0] if len(ids) == 1 else None
 
 
@@ -252,12 +256,12 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
         # another recipe, kept and flagged.
         same_title = (
             await session.execute(
-                select(Recipe.id, RecipePage.page)
-                .join(RecipePage, RecipePage.recipe_id == Recipe.id)
+                select(Recipe.id, RecipeLocation.page)
+                .join(RecipeLocation, RecipeLocation.recipe_id == Recipe.id)
                 .where(
-                    Recipe.work_id == item.work_id,
+                    Recipe.source_id == item.source_id,
                     func.lower(Recipe.title) == entry.title.lower(),
-                    RecipePage.edition_id == edition_id,
+                    RecipeLocation.edition_id == edition_id,
                 )
             )
         ).all()
@@ -266,7 +270,7 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
             outcome.skipped += 1
             continue
 
-        recipe = await recipes.create(session, item.work_id, entry)
+        recipe = await recipes.create(session, item.source_id, entry)
         recipe.created_by = admin_id
         flags = list(prepared.flags)
         if same_title:
@@ -279,8 +283,8 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
     await session.flush()
     # A batch can hold a recipe that earlier ones cited, so their whole books
     # are linked again, not just the new rows.
-    for work_id in sorted({i.work_id for i in items}):
-        await references.relink(session, work_id)
+    for source_id in sorted({i.source_id for i in items}):
+        await references.relink(session, source_id)
     return outcome
 
 

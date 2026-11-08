@@ -1,6 +1,6 @@
 """Adding a book to the catalog from what Open Library returned.
 
-A book is a Work with one or more Editions. An ISBN names one edition, so a
+A book is a Source with one or more Editions. An ISBN names one edition, so a
 second ISBN for a book already in the catalog joins it as another edition,
 matched by Open Library's work ID. Authors are matched by Open Library's
 author ID and created when new; a work's credits are written when the work
@@ -13,20 +13,20 @@ from dataclasses import dataclass
 from sqlalchemy import delete, exists, false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder.models import Author, Edition, Work, WorkCredit
+from openlarder.models import Author, Edition, Source, SourceCredit
 from openlarder.openlibrary import FoundBook
 
 
 class AlreadyIndexed(Exception):
-    def __init__(self, work_id: uuid.UUID) -> None:
-        super().__init__(str(work_id))
-        self.work_id = work_id
+    def __init__(self, source_id: uuid.UUID) -> None:
+        super().__init__(str(source_id))
+        self.source_id = source_id
 
 
 async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
     """Store the edition, and its work and authors if new; return the work's ID."""
     existing = await session.scalar(
-        select(Edition.work_id).where(
+        select(Edition.source_id).where(
             ((Edition.isbn13 == found.isbn13) if found.isbn13 else false())
             | (
                 (Edition.open_library_edition_id == found.edition_id)
@@ -39,10 +39,16 @@ async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
         raise AlreadyIndexed(existing)
 
     work = None
-    if found.work_id:
-        work = await session.scalar(select(Work).where(Work.open_library_work_id == found.work_id))
+    if found.open_library_work_id:
+        work = await session.scalar(
+            select(Source).where(Source.open_library_work_id == found.open_library_work_id)
+        )
     if work is None:
-        work = Work(title=found.title, subtitle=found.subtitle, open_library_work_id=found.work_id)
+        work = Source(
+            title=found.title,
+            subtitle=found.subtitle,
+            open_library_work_id=found.open_library_work_id,
+        )
         session.add(work)
         await session.flush()
         for position, found_author in enumerate(found.authors, start=1):
@@ -58,8 +64,8 @@ async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
                 session.add(author)
                 await session.flush()
             session.add(
-                WorkCredit(
-                    work_id=work.id,
+                SourceCredit(
+                    source_id=work.id,
                     author_id=author.id,
                     position=position,
                     credited_as=found_author.name,
@@ -68,7 +74,7 @@ async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
 
     session.add(
         Edition(
-            work_id=work.id,
+            source_id=work.id,
             # Only when it differs from the work's, as for a retitled edition.
             title=(
                 found.edition_title
@@ -109,21 +115,23 @@ async def add_without_isbn(
     review.
     """
     if isbn13:
-        by_isbn = await session.scalar(select(Edition.work_id).where(Edition.isbn13 == isbn13))
+        by_isbn = await session.scalar(select(Edition.source_id).where(Edition.isbn13 == isbn13))
         if by_isbn is not None:
             return by_isbn, True
     existing = await session.scalar(
-        select(Work.id).where(
-            func.lower(Work.title) == title.lower(), Work.open_library_work_id.is_(None)
+        select(Source.id).where(
+            func.lower(Source.title) == title.lower(), Source.open_library_work_id.is_(None)
         )
     )
     if existing is not None:
-        editions = (await session.scalars(select(Edition).where(Edition.work_id == existing))).all()
+        editions = (
+            await session.scalars(select(Edition).where(Edition.source_id == existing))
+        ).all()
         if isbn13 and len(editions) == 1 and editions[0].isbn13 is None:
             editions[0].isbn13 = isbn13
             await session.flush()
         return existing, True
-    work = Work(title=title)
+    work = Source(title=title)
     session.add(work)
     await session.flush()
     for position, name in enumerate(authors, start=1):
@@ -137,9 +145,11 @@ async def add_without_isbn(
             session.add(author)
             await session.flush()
         session.add(
-            WorkCredit(work_id=work.id, author_id=author.id, position=position, credited_as=name)
+            SourceCredit(
+                source_id=work.id, author_id=author.id, position=position, credited_as=name
+            )
         )
-    session.add(Edition(work_id=work.id, published_year=year, isbn13=isbn13))
+    session.add(Edition(source_id=work.id, published_year=year, isbn13=isbn13))
     await session.flush()
     return work.id, False
 
@@ -176,7 +186,7 @@ def _squash(text: str | None) -> str | None:
 
 async def edit_book(
     session: AsyncSession,
-    work: Work,
+    work: Source,
     title: str,
     subtitle: str | None,
     credits: list[CreditEdit],
@@ -199,7 +209,9 @@ async def edit_book(
 
     current = {
         c.author_id: c
-        for c in await session.scalars(select(WorkCredit).where(WorkCredit.work_id == work.id))
+        for c in await session.scalars(
+            select(SourceCredit).where(SourceCredit.source_id == work.id)
+        )
     }
     rows: list[tuple[Author, str, str]] = []
     for credit in credits:
@@ -234,11 +246,15 @@ async def edit_book(
             raise InvalidBook(f"{name} is credited twice as {role}.")
         seen.add((author.id, role))
 
-    await session.execute(delete(WorkCredit).where(WorkCredit.work_id == work.id))
+    await session.execute(delete(SourceCredit).where(SourceCredit.source_id == work.id))
     for position, (author, name, role) in enumerate(rows, start=1):
         session.add(
-            WorkCredit(
-                work_id=work.id, author_id=author.id, position=position, role=role, credited_as=name
+            SourceCredit(
+                source_id=work.id,
+                author_id=author.id,
+                position=position,
+                role=role,
+                credited_as=name,
             )
         )
     await session.flush()
@@ -246,7 +262,7 @@ async def edit_book(
     await drop_uncredited(session, [a for a in current if a not in kept])
 
     own = {
-        e.id: e for e in await session.scalars(select(Edition).where(Edition.work_id == work.id))
+        e.id: e for e in await session.scalars(select(Edition).where(Edition.source_id == work.id))
     }
     for change in editions:
         edition = own.get(change.id)
@@ -263,10 +279,14 @@ async def edit_book(
     await session.flush()
 
 
-async def _elsewhere(session: AsyncSession, author_id: uuid.UUID, work_id: uuid.UUID) -> bool:
+async def _elsewhere(session: AsyncSession, author_id: uuid.UUID, source_id: uuid.UUID) -> bool:
     return bool(
         await session.scalar(
-            select(exists().where(WorkCredit.author_id == author_id, WorkCredit.work_id != work_id))
+            select(
+                exists().where(
+                    SourceCredit.author_id == author_id, SourceCredit.source_id != source_id
+                )
+            )
         )
     )
 
@@ -280,6 +300,6 @@ async def drop_uncredited(session: AsyncSession, author_ids: list[uuid.UUID]) ->
                 Author.id.in_(author_ids),
                 Author.open_library_author_id.is_(None),
                 Author.wikidata_id.is_(None),
-                ~exists().where(WorkCredit.author_id == Author.id),
+                ~exists().where(SourceCredit.author_id == Author.id),
             )
         )
