@@ -107,9 +107,6 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
-- [ ] **Books page at scale**: it loads every book and filters in the
-      browser; past a few hundred it needs server-side paging (the API's `q`
-      exists, from #50).
 - [ ] **Merge two books**: nothing can merge two records of one book yet.
       (The two "How can it be gluten free" books are volumes 1 and 2, not a
       duplicate; the second's title needs "Volume 2", in the book editor.)
@@ -150,6 +147,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Sources page at scale: searched on the server, a hundred at a time;
+      the swap form's book list became a book finder (#59)
 - [x] Merge two authors from the author page, which lists others with the
       same name; a typed name now matches Open Library's authors too (#58)
 - [x] Ray: archive.org account and keys in Coolify

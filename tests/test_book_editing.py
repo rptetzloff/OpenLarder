@@ -255,7 +255,7 @@ async def test_books_are_found_by_title_subtitle_or_credit(admin, client) -> Non
     camino = await _book(admin, title="This Is Camino", authors=["Russell Moore"])
     await _edit(admin, camino, subtitle="Recipes from the Oakland restaurant")
     await _book(admin, title="100% Rye", authors=[])
-    titles = lambda r: [b["title"] for b in r.json()]  # noqa: E731
+    titles = lambda r: [b["title"] for b in r.json()["sources"]]  # noqa: E731
     assert titles(await client.get("/api/sources", params={"q": "PLENTY"})) == ["Plenty"]
     assert titles(await client.get("/api/sources", params={"q": "lovekin"})) == ["Plenty"]
     assert titles(await client.get("/api/sources", params={"q": "oakland"})) == ["This Is Camino"]
@@ -275,9 +275,24 @@ async def test_books_are_found_by_title_subtitle_or_credit(admin, client) -> Non
 async def test_a_picker_asks_for_a_few(admin, client) -> None:
     for title in ("Bread A", "Bread B", "Bread C"):
         await _book(admin, title=title, authors=[])
-    found = await client.get("/api/sources", params={"q": "bread", "limit": 2})
-    assert [b["title"] for b in found.json()] == ["Bread A", "Bread B"]
-    assert (await client.get("/api/sources", params={"limit": 51})).status_code == 422
+    found = (await client.get("/api/sources", params={"q": "bread", "limit": 2})).json()
+    assert ([b["title"] for b in found["sources"]], found["total"]) == (["Bread A", "Bread B"], 3)
+    assert (await client.get("/api/sources", params={"limit": 101})).status_code == 422
+
+
+async def test_the_list_comes_in_pages(admin, client) -> None:
+    for n in range(5):
+        await _book(admin, title=f"Book {n}", authors=[])
+    page = (await client.get("/api/sources", params={"offset": 2, "limit": 2})).json()
+    assert ([b["title"] for b in page["sources"]], page["total"]) == (["Book 2", "Book 3"], 5)
+    rest = (await client.get("/api/sources", params={"offset": 4})).json()
+    assert [b["title"] for b in rest["sources"]] == ["Book 4"]
+
+
+async def test_a_website_is_found_by_its_address(admin, client) -> None:
+    await admin.post("/api/sources/websites", json={"address": "https://www.seriouseats.com/"})
+    found = (await client.get("/api/sources", params={"q": "seriouseats"})).json()
+    assert [b["host"] for b in found["sources"]] == ["seriouseats.com"]
 
 
 async def test_accents_and_name_order_dont_make_a_second_author(admin, adb) -> None:

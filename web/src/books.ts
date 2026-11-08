@@ -123,8 +123,20 @@ export async function saveBook(bookId: string, body: BookIn): Promise<void> {
 // A few books with every word of q in the title, subtitle or a credited
 // name, for type-to-find pickers.
 export async function findBooks(q: string, limit = 8): Promise<BookSummary[]> {
-  const res = await fetch(`/api/sources?${new URLSearchParams({ q, limit: String(limit) })}`);
-  if (!res.ok) throw new Error("The books couldn't be searched.");
+  return (await listSources(q, 0, limit)).sources;
+}
+
+// A page of sources, narrowed by q; total is how many match in all.
+export async function listSources(
+  q: string,
+  offset = 0,
+  limit?: number,
+): Promise<{ sources: BookSummary[]; total: number }> {
+  const query = new URLSearchParams({ q });
+  if (offset) query.set("offset", String(offset));
+  if (limit) query.set("limit", String(limit));
+  const res = await fetch(`/api/sources?${query}`);
+  if (!res.ok) throw new Error("The sources couldn't be loaded.");
   return res.json();
 }
 

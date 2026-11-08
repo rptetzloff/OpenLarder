@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import type { BookSummary } from "../books";
+import { type BookSummary, listSources } from "../books";
 import { archiveMissing } from "../recipes";
 import type { Me } from "../me";
 
@@ -18,9 +18,14 @@ async function linkAll() {
   linking.value = true;
   linkError.value = "";
   try {
-    const res = await fetch("/api/sources");
-    if (!res.ok) throw new Error("The books couldn't be loaded.");
-    const books: BookSummary[] = await res.json();
+    // Every source, a page at a time.
+    const books: BookSummary[] = [];
+    for (let total = 1; books.length < total; ) {
+      const page = await listSources("", books.length);
+      books.push(...page.sources);
+      total = page.total;
+      if (!page.sources.length) break;
+    }
     let linked = 0;
     for (const [i, book] of books.entries()) {
       progress.value = `${i + 1} of ${books.length}: ${book.title}`;
