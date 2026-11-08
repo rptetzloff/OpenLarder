@@ -118,3 +118,37 @@ export async function findBooks(q: string, limit = 8): Promise<BookSummary[]> {
   if (!res.ok) throw new Error("The books couldn't be searched.");
   return res.json();
 }
+
+// One way the book here differs from Open Library now; for a cover, ours
+// and theirs are image addresses.
+export interface Difference {
+  key: string;
+  label: string;
+  ours: string | null;
+  theirs: string | null;
+  cover: boolean;
+}
+
+export async function checkOpenLibrary(
+  bookId: string,
+): Promise<{ open_library_url: string; differences: Difference[] }> {
+  const res = await fetch(`/api/books/${bookId}/open-library/check`, { method: "POST" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
+// Takes the ticked differences; resolves to how many, and what still differs.
+export async function takeFromOpenLibrary(
+  bookId: string,
+  keys: string[],
+): Promise<{ taken: number; differences: Difference[] }> {
+  const res = await fetch(`/api/books/${bookId}/open-library/take`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keys }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}

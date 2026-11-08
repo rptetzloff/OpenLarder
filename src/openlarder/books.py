@@ -51,7 +51,9 @@ async def add_book(session: AsyncSession, found: FoundBook) -> uuid.UUID:
             )
             if author is None:
                 author = Author(
-                    name=found_author.name, open_library_author_id=found_author.open_library_id
+                    name=found_author.name,
+                    kind=found_author.kind,
+                    open_library_author_id=found_author.open_library_id,
                 )
                 session.add(author)
                 await session.flush()
@@ -241,16 +243,7 @@ async def edit_book(
         )
     await session.flush()
     kept = {author.id for author, _, _ in rows}
-    gone = [a for a in current if a not in kept]
-    if gone:
-        await session.execute(
-            delete(Author).where(
-                Author.id.in_(gone),
-                Author.open_library_author_id.is_(None),
-                Author.wikidata_id.is_(None),
-                ~exists().where(WorkCredit.author_id == Author.id),
-            )
-        )
+    await drop_uncredited(session, [a for a in current if a not in kept])
 
     own = {
         e.id: e for e in await session.scalars(select(Edition).where(Edition.work_id == work.id))
@@ -276,3 +269,17 @@ async def _elsewhere(session: AsyncSession, author_id: uuid.UUID, work_id: uuid.
             select(exists().where(WorkCredit.author_id == author_id, WorkCredit.work_id != work_id))
         )
     )
+
+
+async def drop_uncredited(session: AsyncSession, author_ids: list[uuid.UUID]) -> None:
+    """Delete those of these authors no book credits now, unless an outside
+    record (Open Library, Wikidata) says who they are."""
+    if author_ids:
+        await session.execute(
+            delete(Author).where(
+                Author.id.in_(author_ids),
+                Author.open_library_author_id.is_(None),
+                Author.wikidata_id.is_(None),
+                ~exists().where(WorkCredit.author_id == Author.id),
+            )
+        )

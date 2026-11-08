@@ -44,6 +44,11 @@ def database_url() -> Iterator[str]:
     admin = create_engine(base.set(database="postgres"), isolation_level="AUTOCOMMIT")
     with admin.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{name}"'))
+        # A query that never ends dies in Postgres, not just in pytest: on
+        # 2026-11-08 a deliberately broken recursive query outlived its killed
+        # test and wrote 350 GB of temp files before anyone noticed.
+        conn.execute(text(f"ALTER DATABASE \"{name}\" SET statement_timeout = '60s'"))
+        conn.execute(text(f"ALTER DATABASE \"{name}\" SET temp_file_limit = '1GB'"))
     url = base.set(database=name).render_as_string(hide_password=False)
     try:
         yield url

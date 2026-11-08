@@ -180,7 +180,9 @@ async def apply(session: AsyncSession, work: Work, steps: Plan) -> None:
         if step.outcome == "add":
             if known is None:
                 known = Author(
-                    name=step.found.name, open_library_author_id=step.found.open_library_id
+                    name=step.found.name,
+                    kind=step.found.kind,
+                    open_library_author_id=step.found.open_library_id,
                 )
                 session.add(known)
                 await session.flush()
