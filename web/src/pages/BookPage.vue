@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { type Book, issueName, KIND_NAMES, removeFamily, renameFamily } from "../books";
+import { type GroupSummary, listGroups, shareCollection } from "../groups";
 import OpenLibraryCheck from "../components/OpenLibraryCheck.vue";
 import OpenLibraryLink from "../components/OpenLibraryLink.vue";
 import type { Me } from "../me";
@@ -64,7 +65,31 @@ async function remove() {
   }
 }
 
-onMounted(load);
+// Its owner picks which of their groups see it.
+const myGroups = ref<GroupSummary[] | null>(null);
+const sharing = ref<string[]>([]);
+const shareNote = ref("");
+async function loadSharing() {
+  if (!book.value?.manageable || !book.value.private) return;
+  sharing.value = book.value.shared_with.map((g) => g.id);
+  myGroups.value = await listGroups().catch(() => []);
+}
+async function saveSharing() {
+  shareNote.value = "";
+  actionError.value = "";
+  try {
+    book.value!.shared_with = await shareCollection(book.value!.id, sharing.value);
+    shareNote.value = "Saved.";
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+const sharedNames = computed(() => (book.value?.shared_with ?? []).map((g) => g.name).join(", "));
+
+onMounted(async () => {
+  await load();
+  await loadSharing();
+});
 </script>
 
 <template>
@@ -92,13 +117,20 @@ onMounted(load);
           <p v-if="book.open_library_url" class="byline">
             <a :href="book.open_library_url">On Open Library</a>
           </p>
-          <p v-if="book.private" class="byline">
-            A private family collection: only you see it.
+          <p v-if="book.private && book.manageable" class="byline">
+            A private family collection: only you{{
+              sharedNames ? ` and ${sharedNames}` : ""
+            }}
+            see it.
+          </p>
+          <p v-else-if="book.private" class="byline">
+            {{ book.owner_name ?? "Someone" }}'s private family collection, shared with you
+            through {{ sharedNames }}.
           </p>
           <p v-if="user?.is_admin && book.kind !== 'family'" class="byline">
             <a :href="`/sources/${book.id}/edit`">Edit {{ KIND_NAMES[book.kind] }}</a>
           </p>
-          <template v-if="book.kind === 'family' && book.editable">
+          <template v-if="book.manageable">
             <form v-if="renaming" class="inline-form" @submit.prevent="rename">
               <label for="family-rename" class="visually-hidden">New name</label>
               <input id="family-rename" v-model="newName" required maxlength="300" />
@@ -137,6 +169,24 @@ onMounted(load);
             <span class="page-ref">{{ i.recipes }}</span>
           </li>
         </ul>
+      </template>
+
+      <template v-if="book.manageable && book.private && myGroups">
+        <h2>Shared with</h2>
+        <form v-if="myGroups.length" class="recipe-form" @submit.prevent="saveSharing">
+          <label v-for="g in myGroups" :key="g.id" class="check"
+            ><input v-model="sharing" type="checkbox" :value="g.id" /> {{ g.name }}</label
+          >
+          <p class="help">
+            Everyone in a ticked group sees this collection; its editors and admins can add and
+            change recipes. Only you can rename, delete or share it.
+          </p>
+          <button type="submit" class="primary">Save</button>
+          <p v-if="shareNote" class="status" role="status">{{ shareNote }}</p>
+        </form>
+        <p v-else class="status">
+          To share it with your family, <a href="/groups">make a group</a> and invite them.
+        </p>
       </template>
 
       <h2>Recipes</h2>

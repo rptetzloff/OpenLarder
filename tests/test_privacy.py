@@ -6,8 +6,6 @@ A new route with a path parameter it doesn't know fails it too, so each one
 gets asked.
 """
 
-import contextlib
-import hashlib
 import uuid
 
 import httpx2
@@ -15,39 +13,10 @@ import pytest
 from sqlalchemy import text
 
 from openlarder import visibility
-from openlarder.auth import SESSION_COOKIE
 from openlarder.main import app
 from openlarder.models import Source, User
 
-SECRETS = ("Secret Box", "Secret Stew", "Zanzibar Moonsalt", "Nana Secretta")
-
-
-@pytest.fixture
-async def people(client, adb):
-    """Clients signed in as different people: people("ann", admin=True)."""
-    async with contextlib.AsyncExitStack() as stack:
-
-        async def person(name: str, admin: bool = False) -> httpx2.AsyncClient:
-            token = f"token-{name}-{uuid.uuid4().hex}"
-            await adb.execute(
-                text(
-                    "WITH u AS (INSERT INTO users (issuer, subject, display_name, is_admin)"
-                    " VALUES ('test', :n, :n, :a) RETURNING id)"
-                    " INSERT INTO user_sessions (user_id, token_hash, expires_at)"
-                    " SELECT id, :h, now() + interval '1 day' FROM u"
-                ),
-                {"n": name, "a": admin, "h": hashlib.sha256(token.encode()).digest()},
-            )
-            c = await stack.enter_async_context(
-                httpx2.AsyncClient(
-                    transport=httpx2.ASGITransport(app=app),
-                    base_url="http://testserver",
-                    cookies={SESSION_COOKIE: token},
-                )
-            )
-            return c
-
-        yield person
+SECRETS = ("Secret Box", "Secret Stew", "Zanzibar Moonsalt", "Nana Secretta", "Secret Family")
 
 
 async def _collection(c, title="Secret Box", **more):
@@ -122,8 +91,13 @@ async def secret(people, adb):
     await adb.execute(
         text("UPDATE ingredients SET parent_id = :a WHERE id = :s"), {"a": above, "s": salt}
     )
+    # Ann's group, which the box is shared with; nobody else is in it.
+    group = (await ann.post("/api/groups", json={"name": "Secret Family"})).json()["id"]
+    shared = await ann.put(f"/api/sources/{box}/groups", json={"groups": [group]})
+    assert shared.status_code == 200, shared.text
     return {
         "ann": ann,
+        "group": group,
         "box": box,
         "stew": stew,
         "salt": salt,
@@ -319,10 +293,11 @@ def test_an_admin_may_not_change_a_private_collection() -> None:
     rule says so anyway."""
     ann, ada = User(id=uuid.uuid4()), User(id=uuid.uuid4(), is_admin=True)
     box = Source(kind="family", owner_id=ann.id, private=True)
-    assert (visibility.may_edit(ann, box), visibility.may_edit(ada, box)) == (True, False)
+    assert (visibility.may_manage(ann, box), visibility.may_manage(ada, box)) == (True, False)
     box.private = False
-    assert visibility.may_edit(ada, box)
-    assert not visibility.may_edit(ann, Source(kind="book"))
+    assert visibility.may_manage(ada, box)
+    # Only a family collection is managed this way; a book is edited by admins.
+    assert not visibility.may_manage(ada, Source(kind="book"))
 
 
 async def test_the_owner_finds_their_own(secret) -> None:
@@ -355,6 +330,10 @@ def _fill(path: str, names: list[str], secret: dict) -> str:
         "recipe_id": secret["stew"],
         "ingredient_id": secret["salt"],
         "author_id": secret["author"],
+        "group_id": secret["group"],
+        # An invite's token is itself the secret: whoever has it may see the
+        # group's name. The sweep asks without one.
+        "code": "not-a-real-invite",
         "run_id": uuid.uuid4(),
     }
     for name in names:

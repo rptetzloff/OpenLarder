@@ -25,6 +25,7 @@ from openlarder.routers import (
     authors,
     covers,
     flags,
+    groups,
     health,
     imports,
     ingredients,
@@ -78,6 +79,7 @@ app.include_router(recipes.router)
 app.include_router(imports.router)
 app.include_router(covers.router)
 app.include_router(flags.router)
+app.include_router(groups.router)
 app.include_router(ingredients.router)
 app.include_router(search.router)
 app.include_router(substitutions.router)

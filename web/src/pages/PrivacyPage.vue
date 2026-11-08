@@ -51,9 +51,14 @@ document.title = "Privacy policy · OpenLarder";
       <li>
         the family collections you add: each one's name, whether it is private, when you ticked
         that you understand what is kept, and each of its recipes' titles and ingredient names,
-        never amounts or the method. A private collection is shown to no one else, admins
-        included; the people who run the site can reach anything stored on it, as on any
-        website;
+        never amounts or the method. A private collection is shown to no one but you and the
+        groups you share it with, admins included; the people who run the site can reach
+        anything stored on it, as on any website;
+      </li>
+      <li>
+        the groups you are in and your role in each, which collections are shared with them, and
+        for each invite link, a scrambled (hashed) copy of it, its role, when it expires, who
+        made it and who used it. A group's members see each other's display names and roles;
       </li>
       <li>
         which account added each recipe, so that its flags can be shown to you, who dealt with
@@ -104,7 +109,8 @@ document.title = "Privacy policy · OpenLarder";
       You can sign out at any time, which ends the session here and at Authgear. To see what
       OpenLarder holds about you, correct it, or delete your account, email
       <a href="mailto:privacy@openlarder.com">privacy@openlarder.com</a>. Deleting your account
-      removes your user record, your sessions and your family collections here; your Authgear
+      removes your user record, your sessions, your group memberships and your family
+      collections here; your Authgear
       account can be removed at the same time on request. You can delete a family collection
       yourself, from its page, at any time.
     </p>

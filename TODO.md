@@ -48,15 +48,21 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       ingredient or author only a private collection uses; a test asks
       every GET route as other people. Decided (Ray, 2026-11-08): privacy
       is per collection; public ones are open data like the rest.
-      **Next: household groups** (Ray, 2026-11-08): a person makes a group
-      and invites others by a link; members see each other's private
-      collections, with view-only, edit and admin roles. The larder will
-      share the same way. Found while building family collections:
+      **Household groups (#65):** a person makes a group and invites
+      others, each with a role: view, edit (also adds and changes recipes)
+      or admin (also manages the group). An owner picks which of their
+      groups see each private collection; joining shares nothing by itself
+      (Ray, 2026-11-08). An invite link is for one person, works once and
+      expires after 7 days (Ray). The larder can share the same way. Found while building family collections:
       - **A family recipe has no page**, like packaging; a church or school
         cookbook's page number could be wanted.
       - **Deleting an account** isn't built: an owner with collections is
         kept by the database (RESTRICT), and the privacy policy says
-        deletion removes their collections, so the deletion has to.
+        deletion removes their collections, so the deletion has to. A
+        group's last admin would leave it with none: deletion should hand
+        the group to another member or delete it.
+      - **Invites are links to pass on by hand**: OpenLarder sends no email,
+        and keeps no address to send one to.
       - **Credits on a family collection** can't be added through any
         route yet (the book editor is an admin's, and won't open a private
         collection); "Grandma" as an author would need the same privacy.
@@ -189,6 +195,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Household groups: invites by link, view, edit and admin roles, and
+      sharing a private collection with the groups its owner picks (#65)
 - [x] Family collections: anyone signed in adds their own, private, after
       a tick box; nothing private shows to anyone else on any route (#64)
 - [x] Social media accounts and products' packaging as sources: posts by

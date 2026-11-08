@@ -1,10 +1,15 @@
 """Who sees what: private family collections.
 
-A family collection can be private, seen only by its owner (migration 0026;
-household groups come next). Everything else is public. Every read that
-returns sources, recipes or ingredients narrows by these conditions, and
-every write to a recipe checks may_edit. A private collection is not shown
-to admins either: it isn't theirs.
+A family collection can be private (migration 0026): seen by its owner, and
+by the members of the household groups its owner shares it with (migration
+0027). Everything else is public. Every read that returns sources, recipes
+or ingredients narrows by these conditions, and every write to a recipe
+checks may_edit. A private collection is not shown to admins either: it
+isn't theirs.
+
+In a group, a viewer sees what's shared with it; an editor or a group admin
+also adds and changes its recipes. Renaming, deleting, making public and
+sharing a collection stay with its owner (may_manage).
 
 An ingredient is matched from every recipe's lines, private ones included,
 so a private recipe can bring a name into being ("Grandma's spice mix").
@@ -17,25 +22,42 @@ GET route in the app as other people and fails on anything private it
 finds, so a new route has to answer it.
 """
 
-from sqlalchemy import ColumnElement, exists, false, or_, select
+from sqlalchemy import ColumnElement, and_, exists, false, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from openlarder.models import (
     Author,
+    GroupMember,
     Ingredient,
     IngredientOption,
     Recipe,
     Source,
     SourceCredit,
+    SourceGroup,
     User,
 )
 
+# Group roles that may add and change recipes in what's shared with them.
+EDITING_ROLES = ("edit", "admin")
+
+
+def _shared_with(user: User):
+    """The IDs of sources shared with a group the user is in."""
+    member = and_(GroupMember.group_id == SourceGroup.group_id, GroupMember.user_id == user.id)
+    return select(SourceGroup.source_id).join(GroupMember, member)
+
 
 def sources_seen_by(viewer: User | None) -> ColumnElement[bool]:
-    """Every public source, and the viewer's own private ones."""
+    """Every public source, the viewer's own private ones, and those shared
+    with a group they're in."""
     if viewer is None:
         return Source.private.is_(false())
-    return or_(Source.private.is_(false()), Source.owner_id == viewer.id)
+    return or_(
+        Source.private.is_(false()),
+        Source.owner_id == viewer.id,
+        Source.id.in_(_shared_with(viewer)),
+    )
 
 
 def seen_source_ids(viewer: User | None):
@@ -71,13 +93,41 @@ def authors_seen_by(viewer: User | None) -> ColumnElement[bool]:
     )
 
 
-def can_see(viewer: User | None, source: Source) -> bool:
-    return not source.private or (viewer is not None and source.owner_id == viewer.id)
+async def _shared(
+    session: AsyncSession, user: User, source: Source, roles: tuple[str, ...] | None = None
+) -> bool:
+    """Whether the source is shared with a group the user is in (with one of
+    these roles)."""
+    member = [
+        SourceGroup.source_id == source.id,
+        GroupMember.group_id == SourceGroup.group_id,
+        GroupMember.user_id == user.id,
+    ]
+    if roles is not None:
+        member.append(GroupMember.role.in_(roles))
+    return bool(await session.scalar(select(exists().where(*member))))
 
 
-def may_edit(user: User, source: Source) -> bool:
-    """A family collection is its owner's to change, and an admin's too once
-    it's public; everything else is an admin's."""
+async def can_see(session: AsyncSession, viewer: User | None, source: Source) -> bool:
+    if not source.private:
+        return True
+    if viewer is None:
+        return False
+    return source.owner_id == viewer.id or await _shared(session, viewer, source)
+
+
+def may_manage(user: User, source: Source) -> bool:
+    """Rename, delete, make public or share a family collection: its owner,
+    and an admin once it's public."""
+    return source.kind == "family" and (
+        source.owner_id == user.id or (user.is_admin and not source.private)
+    )
+
+
+async def may_edit(session: AsyncSession, user: User, source: Source) -> bool:
+    """Add and change a source's recipes. A family collection's: whoever may
+    manage it, and the editors and admins of a group it's shared with;
+    everything else's: an admin."""
     if source.kind == "family":
-        return source.owner_id == user.id or (user.is_admin and not source.private)
+        return may_manage(user, source) or await _shared(session, user, source, EDITING_ROLES)
     return user.is_admin

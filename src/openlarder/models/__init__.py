@@ -23,6 +23,7 @@ from openlarder.models.catalog import (
     WebPage,
 )
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
+from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.imports import ImportRun, ImportRunLine
 
 __all__ = [
@@ -32,6 +33,9 @@ __all__ = [
     "Edition",
     "Episode",
     "FlagKind",
+    "Group",
+    "GroupInvite",
+    "GroupMember",
     "ImportRun",
     "ImportRunLine",
     "Ingredient",
@@ -52,6 +56,7 @@ __all__ = [
     "UserSession",
     "Source",
     "SourceCredit",
+    "SourceGroup",
     "SourceTag",
     "WebPage",
 ]
