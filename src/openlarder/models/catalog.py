@@ -82,11 +82,13 @@ def _trgm(table: str, column: str) -> Index:
 
 class Source(Timestamps, Base):
     """Where recipes come from: a book, across every printing of it, a
-    website, a magazine or newspaper, or a TV show, podcast or video channel.
+    website, a magazine or newspaper, a TV show, podcast or video channel, a
+    social media account, or a product's packaging.
 
     Each kind has its own parts in its own table: a book's are its editions,
-    a website's its pages, a magazine's its issues, a show's its episodes.
-    Migration 0019; Ray, 2026-11-08.
+    a website's and a social media account's its pages, a magazine's its
+    issues, a show's its episodes. Packaging has none: its recipes are just
+    on it. Migration 0019; Ray, 2026-11-08.
     """
 
     __tablename__ = "sources"
@@ -94,7 +96,7 @@ class Source(Timestamps, Base):
         CheckConstraint("title <> ''", name="title_not_empty"),
         CheckConstraint(
             "kind IN ('book', 'website', 'magazine', 'newspaper', 'tv_show', 'podcast',"
-            " 'video_channel')",
+            " 'video_channel', 'social', 'packaging')",
             name="kind_known",
         ),
         CheckConstraint("(kind = 'website') = (host IS NOT NULL)", name="host_for_websites"),

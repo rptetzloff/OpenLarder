@@ -37,9 +37,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       Internet Archive copy of each web page (#57). **Magazines and
       newspapers (#60):** recipes in issues, at a page. **TV shows,
       podcasts and video channels (#62):** recipes in episodes, by season
-      and number, title or a video's address, at a time. Next: social
-      media posts and packaging; then family recipes, with private recipes
-      and sharing. Found while building episodes:
+      and number, title or a video's address, at a time. **Social media
+      accounts and packaging (#63):** an account's recipes are on its
+      posts, by address, on any site, archived like a website's pages; a
+      product's recipes are simply on its packaging, with no page. Next:
+      family recipes, with private recipes and sharing. Found while
+      building social media and packaging:
+      - **Which social media pages archive at all** is still unchecked
+        against the real Internet Archive: Instagram and others may save
+        only a sign-in wall. The page's own link is kept either way.
+      - **Packaging changes**: a recipe printed on a 2019 bag may be gone
+        from the 2024 one. A product has no years or barcode (GTIN) yet;
+        add them if two printings need telling apart.
+      Found while building episodes:
       - **Search and ingredient pages say only a page**: a magazine's
         recipe shows "p. 42" without its issue, and a show's nothing about
         its episode. The source and recipe pages say both.
@@ -160,6 +170,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Social media accounts and products' packaging as sources: posts by
+      address on any site, archived; packaging recipes with no page (#63)
 - [x] TV shows, podcasts and video channels as sources: recipes in
       episodes, by number, title or address, at a time (#62)
 - [x] SCOPING.md caught up: site design, private family recipes and

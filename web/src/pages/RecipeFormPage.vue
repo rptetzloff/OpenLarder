@@ -11,7 +11,9 @@ const title = ref("");
 const ingredients = ref("");
 // A website's recipe: the page it's on.
 const webAddress = ref("");
-const onWeb = computed(() => book.value?.kind === "website");
+// A social media account's recipes are on its posts, by address, too.
+const onWeb = computed(() => ["website", "social"].includes(book.value?.kind ?? ""));
+const onPackaging = computed(() => book.value?.kind === "packaging");
 // A magazine's or newspaper's recipe: its issue (name or date) and page.
 const inIssue = computed(() => ["magazine", "newspaper"].includes(book.value?.kind ?? ""));
 const issue = ref("");
@@ -28,7 +30,17 @@ const airedOn = ref("");
 const at = ref("");
 // What the recipe is in, for the form's wording.
 const place = computed(() =>
-  onWeb.value ? "page" : inIssue.value ? "issue" : inEpisode.value ? "episode" : "book",
+  onWeb.value
+    ? book.value?.kind === "social"
+      ? "post"
+      : "page"
+    : inIssue.value
+      ? "issue"
+      : inEpisode.value
+        ? "episode"
+        : onPackaging.value
+          ? "packaging"
+          : "book",
 );
 // Per edition: is the recipe in it, and on which page.
 const editions = ref<{ id: string; label: string; included: boolean; page: string }[]>([]);
@@ -124,7 +136,7 @@ async function save() {
     const id = await saveRecipe(
       {
         title: title.value,
-        editions: onWeb.value || inIssue.value || inEpisode.value
+        editions: onWeb.value || inIssue.value || inEpisode.value || onPackaging.value
           ? []
           : editions.value
               .filter((e) => e.included)
@@ -174,9 +186,12 @@ async function save() {
           type="url"
           required
           maxlength="2000"
-          :placeholder="`https://${book.host}/…`"
+          :placeholder="book.host ? `https://${book.host}/…` : 'https://…'"
         />
-        <p class="help">A page on {{ book.host }}. OpenLarder links to it; it never copies it.</p>
+        <p class="help">
+          {{ book.host ? `A page on ${book.host}. ` : "The post's own address. " }}OpenLarder links to
+          it; it never copies it.
+        </p>
       </template>
       <template v-else-if="inIssue">
         <label for="recipe-issue">Issue, as the cover names it</label>
@@ -271,6 +286,7 @@ async function save() {
           title="Minutes and seconds, like 12:34, or 1:02:03"
         />
       </template>
+      <template v-else-if="onPackaging" />
       <fieldset v-else>
         <legend>Page</legend>
         <p class="help">Leave a page blank if you don't know it yet.</p>
@@ -302,7 +318,7 @@ async function save() {
       />
       <p id="recipe-ingredients-help" class="help">
         Just what goes in, as the {{ place }} names it: “rhubarb”, not “200g rhubarb”. Amounts
-        and the method stay {{ onWeb ? "on the page" : `in the ${place}` }}.
+        and the method stay {{ onWeb || onPackaging ? `on the ${place}` : `in the ${place}` }}.
       </p>
       <ul v-if="reviews.length" class="line-hints" aria-live="polite">
         <li v-for="r in reviews" :key="`${r.index}:${r.line}`">

@@ -2,7 +2,7 @@
 
 export interface BookSummary {
   id: string;
-  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel";
+  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging";
   // A website's, as "smittenkitchen.com".
   host: string | null;
   title: string;
@@ -24,7 +24,7 @@ export interface Edition {
 
 export interface Book {
   id: string;
-  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel";
+  kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging";
   host: string | null;
   // A website behind a subscription: linked, never copied.
   paywalled: boolean;
@@ -245,6 +245,22 @@ export async function addShow(
   return body;
 }
 
+// A social media account, or a product whose packaging prints recipes.
+export async function addNamed(
+  kind: "social" | "packaging",
+  title: string,
+  authors: string[] = [],
+): Promise<{ id: string; existing: boolean }> {
+  const res = await fetch(`/api/sources/${kind}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, authors }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
 export const SHOWS = ["tv_show", "podcast", "video_channel"];
 
 // What a kind of source is called in a sentence: "this magazine".
@@ -256,6 +272,8 @@ export const KIND_NAMES: Record<string, string> = {
   tv_show: "TV show",
   podcast: "podcast",
   video_channel: "video channel",
+  social: "social media account",
+  packaging: "product",
 };
 
 // An issue as people say it: one named by its date ("2024-09-18", as a

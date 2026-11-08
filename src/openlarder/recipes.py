@@ -270,11 +270,24 @@ async def _check_place(session: AsyncSession, source_id: uuid.UUID, entry: Recip
         return
     if entry.issue:
         raise InvalidRecipe("Only a magazine or newspaper has issues.")
-    if source.kind == "website":
+    if source.kind == "packaging":
+        if entry.pages or entry.web_address:
+            raise InvalidRecipe("A recipe on packaging is just on it: no page or address.")
+        return
+    if source.kind in ("website", "social"):
         if not entry.web_address:
             raise InvalidRecipe("Give the web address of the recipe.")
-        if web.site(entry.web_address) != source.host:
+        if source.kind == "website" and web.site(entry.web_address) != source.host:
             raise InvalidRecipe(f"That address isn't on {source.host}.")
+        # A social media account's posts can be on any site, so one could
+        # already be another account's; the database would refuse it too.
+        elsewhere = await session.scalar(
+            select(Source.title)
+            .join(WebPage, WebPage.source_id == Source.id)
+            .where(WebPage.url == entry.web_address, Source.id != source_id)
+        )
+        if elsewhere is not None:
+            raise InvalidRecipe(f"That page is already one of {elsewhere}'s.")
         return
     if entry.web_address:
         raise InvalidRecipe("A book's recipe is in its editions, not on a web page.")
