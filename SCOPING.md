@@ -68,7 +68,7 @@ The site stores facts about recipes, never the recipes themselves. Book text sta
 
 ## Entry rules
 
-What goes into a recipe's ingredient list, and what is left out. These are the rules the household index was built with, adopted for the whole catalog. *Adopted by Ray, 2026-11-07.* They are what the form asks for, what the bulk import checks, and what the detector in issue #26 will enforce.
+What goes into a recipe's ingredient list, and what is left out. These are the rules the household index was built with, adopted for the whole catalog. *Adopted by Ray, 2026-11-07.* They are what the form asks for, what the bulk import checks, and what the detector (issue #26) checks.
 
 **Leave out**
 
@@ -101,6 +101,8 @@ What goes into a recipe's ingredient list, and what is left out. These are the r
 - Ground versus whole spices, and fresh versus dried.
 - Rice: name the grain where it definitely matters (sushi, risotto).
 - Yogurt: say "Greek" where it is.
+
+**The detector** (built, issue #26, migration 0017). Each line is checked against these rules. The form shows what it finds under the ingredients as they're typed, with a one-click fix ("2 onions, finely diced" becomes "onions"; "Salt" is removed), and never blocks saving, since a line can be an exception. An import keeps every line and flags what it finds: "Usually left out" for salt, pepper, sugar and water and for anything optional, and "Amount or prep in a line" with the suggested bare ingredient. *Flagging the stop list on import too is Ray's call, 2026-11-08*; on the household index that is 420 lines in 396 recipes, and nothing else fires. The rules are narrow because a book's names look like amounts and prep ("Half-and-Half", "160 Bloom Gelatin", "Diced Tomato (Can)", "Large Shrimp"): prep counts only after a comma or behind an adverb, and a size only after a count. Brands aren't detected, which would need a list. A line repeating an earlier one, plurals and spelling aside ("Egg", "2 eggs"), is pointed out in the form; saving already drops exact repeats.
 
 ## Data model
 

@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import isbn, recipes, references
+from openlarder import detector, isbn, recipes, references
 from openlarder.models import (
     Edition,
     FlagKind,
@@ -176,6 +176,12 @@ def prepare(title: str, edition_id: uuid.UUID, page: str | None, lines: list[str
             flags.append((FlagKind.LINE_REMOVED, f"{line[:60]}…: too long"))
         else:
             kept.append(line)
+            # Kept and flagged: the line alone can't say if it's an exception.
+            found = detector.review(line)
+            if found.remove:
+                flags.append((FlagKind.USUALLY_LEFT_OUT, line))
+            elif found.suggestion:
+                flags.append((FlagKind.LINE_DETAIL, f"{line} → {found.suggestion}"))
     entry = recipes.clean(title, [(edition_id, page)], kept)
     if not entry.lines:
         flags.append((FlagKind.NO_INGREDIENTS, None))

@@ -11,8 +11,8 @@ A line that starts with an amount ("200g rhubarb", "2 cups milk", "½ cup
 milk") is refused: a number with a unit after it, or a fraction. A number
 alone is not an amount ("00 flour", "2% milk"). Counts ("3 eggs") and
 amounts in words ("a pinch of salt") get past it; the form's wording asks
-for the ingredient alone, issue #26's detector will catch them, and review
-is the backstop.
+for the ingredient alone, and detector.py points them out in the form and
+flags them on import.
 
 A recipe appears in the editions listed for it. A page left blank means it
 is in that edition but the page isn't recorded yet; an edition not listed
@@ -42,7 +42,7 @@ MAX_LINES = 150
 # "00 flour", "2% milk", "160 bloom gelatin", "7-minute frosting" and
 # "80-proof vodka" are ingredients, which the household index showed a
 # digit-only rule refusing. Counts without a unit ("3 eggs") get past this;
-# issue #26's detector is for those. "c" for cup is left out, since it would
+# detector.py points those out. "c" for cup is left out, since it would
 # catch temperatures ("63.5C eggs").
 _UNITS = (
     "g|gr|grams?|kg|kilos?|kilograms?|mg|ml|millilitres?|milliliters?|cl|dl|l|litres?|liters?"

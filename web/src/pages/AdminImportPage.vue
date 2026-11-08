@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { KIND_LABELS } from "../flags";
 import type { Me } from "../me";
 import {
   BATCH,
@@ -31,15 +32,7 @@ const report = ref<ReportLine[]>([]);
 const withIsbn = computed(() => parsed.value?.books.filter((b) => b.isbn13).length ?? 0);
 const recipeTotal = computed(() => parsed.value?.recipes.length ?? 0);
 
-const KINDS: Record<string, string> = {
-  duplicate_title: "Same title as another recipe",
-  no_ingredients: "No ingredients",
-  no_page: "No page",
-  line_removed: "Line removed",
-  line_fragment: "Fragment of a page reference",
-  reference_page: "Reference to the wrong page",
-  unknown_reference: "Reference to a missing recipe",
-};
+const KINDS = KIND_LABELS;
 
 async function read() {
   if (!booksFile.value || !recipesFile.value) return;

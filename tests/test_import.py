@@ -73,9 +73,20 @@ E = uuid.uuid4()
 
 
 def test_a_row_keeps_each_ingredient_once() -> None:
-    prepared = importer.prepare("Cake", E, "1", ["Rhubarb", "Sugar", "rhubarb"])
-    assert prepared.entry.lines == ["Rhubarb", "Sugar"]
+    prepared = importer.prepare("Cake", E, "1", ["Rhubarb", "Flour", "rhubarb"])
+    assert prepared.entry.lines == ["Rhubarb", "Flour"]
     assert prepared.flags == []
+
+
+def test_lines_the_entry_rules_would_change_are_kept_and_flagged() -> None:
+    lines = ["Rhubarb", "Sugar", "2 onions, diced", "Pecans (optional)", "Sea Salt"]
+    prepared = importer.prepare("Cake", E, "1", lines)
+    assert prepared.entry.lines == lines
+    assert prepared.flags == [
+        (FlagKind.USUALLY_LEFT_OUT, "Sugar"),
+        (FlagKind.LINE_DETAIL, "2 onions, diced → onions"),
+        (FlagKind.USUALLY_LEFT_OUT, "Pecans (optional)"),
+    ]
 
 
 def test_a_fragment_of_a_split_page_reference_is_flagged_and_dropped() -> None:
@@ -261,7 +272,7 @@ async def test_ingredients_in_another_order_are_another_recipe(admin, pink_cake,
 async def test_a_title_repeated_on_two_pages_names_each_once(admin, pink_cake) -> None:
     items = [
         _item(pink_cake, ingredients=["Rhubarb"]),
-        _item(pink_cake, row=3, ingredients=["Sugar"]),
+        _item(pink_cake, row=3, ingredients=["Butter"]),
         _item(pink_cake, row=4, page="140"),
     ]
     result = (await admin.post("/api/import/recipes", json={"items": items})).json()

@@ -381,6 +381,17 @@ button.primary:disabled {
 .recipe-form .error {
   color: var(--error);
 }
+.line-hints {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+}
+.line-hints li {
+  margin-bottom: 0.375rem;
+}
+.line-hints button {
+  margin-left: 0.375rem;
+}
 .edition-row {
   display: flex;
   gap: 0.75rem;

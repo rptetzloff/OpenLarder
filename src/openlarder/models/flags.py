@@ -30,6 +30,11 @@ class FlagKind(enum.StrEnum):
     REFERENCE_PAGE = "reference_page"
     # A page reference to a page the book has no recipe on.
     UNKNOWN_REFERENCE = "unknown_reference"
+    # A line the entry rules leave out: salt, pepper, sugar or water, or
+    # something optional (detector.py). Kept, since it may be an exception.
+    USUALLY_LEFT_OUT = "usually_left_out"
+    # A line with an amount or prep in it; the detail has the bare suggestion.
+    LINE_DETAIL = "line_detail"
 
 
 class Resolution(enum.StrEnum):
