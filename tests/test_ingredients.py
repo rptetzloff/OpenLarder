@@ -225,3 +225,253 @@ async def test_a_recipe_using_an_ingredient_twice_is_listed_once(admin, work, cl
 
 async def test_an_unknown_ingredient_is_a_404(client) -> None:
     assert (await client.get(f"/api/ingredients/{uuid.uuid4()}")).status_code == 404
+
+
+# Fixing the list
+
+
+async def _id(adb, name):
+    return await adb.scalar(text("SELECT id FROM ingredients WHERE name = :n"), {"n": name})
+
+
+async def _aliases(adb):
+    rows = await adb.execute(
+        text(
+            "SELECT i.name, a.name FROM ingredient_aliases a"
+            " JOIN ingredients i ON i.id = a.ingredient_id ORDER BY 1, 2"
+        )
+    )
+    return [tuple(r) for r in rows]
+
+
+async def _regional(adb, ingredient_id, name, region):
+    await adb.execute(
+        text(
+            "INSERT INTO ingredient_aliases (ingredient_id, name, match_key, region)"
+            " VALUES (:i, :n, :k, :r)"
+        ),
+        {"i": ingredient_id, "n": name, "k": match_key(name), "r": region},
+    )
+
+
+async def test_a_rename_keeps_the_old_name_matching(admin, work, adb) -> None:
+    recipe = await _add(admin, work, "Salsa", "1", ["Corriander"])
+    old = await _id(adb, "Corriander")
+    response = await admin.patch(f"/api/ingredients/{old}", json={"name": "  Coriander "})
+    assert response.json() == {"id": str(old), "name": "Coriander"}
+    assert await _aliases(adb) == [("Coriander", "Corriander")]
+    shown = (await admin.get(f"/api/recipes/{recipe}")).json()["lines"][0]["options"][0]
+    assert shown["ingredient"] == {"id": str(old), "name": "Coriander"}
+    # The book's spelling, and the new one, both still find it.
+    await _add(admin, work, "Curry", "2", ["Corrianders", "coriander"])
+    assert await _ingredients(adb) == ["Coriander"]
+
+
+async def test_a_rename_that_keeps_the_key_adds_no_alias(admin, work, adb) -> None:
+    await _add(admin, work, "Salsa", "1", ["green onions"])
+    onion = await _id(adb, "green onions")
+    await admin.patch(f"/api/ingredients/{onion}", json={"name": "Green Onion"})
+    assert await _ingredients(adb) == ["Green Onion"]
+    assert await _aliases(adb) == []
+
+
+async def test_renaming_back_takes_the_alias_back(admin, work, adb) -> None:
+    await _add(admin, work, "Salsa", "1", ["Corriander"])
+    i = await _id(adb, "Corriander")
+    await admin.patch(f"/api/ingredients/{i}", json={"name": "Coriander"})
+    await admin.patch(f"/api/ingredients/{i}", json={"name": "Corriander"})
+    assert await _aliases(adb) == [("Corriander", "Coriander")]
+
+
+async def test_a_rename_onto_another_ingredient_offers_it(admin, work, adb) -> None:
+    await _add(admin, work, "Salsa", "1", ["Cilantro", "Coriander Leaf", "Lime"])
+    cilantro, leaf, lime = [await _id(adb, n) for n in ("Cilantro", "Coriander Leaf", "Lime")]
+    await admin.post(f"/api/ingredients/{leaf}/merge", json={"into": str(cilantro)})
+    for name in ("cilantro", "coriander-leaf"):  # its name, then another name for it
+        response = await admin.patch(f"/api/ingredients/{lime}", json={"name": name})
+        assert response.status_code == 409
+        assert response.json()["detail"]["ingredient"] == {"id": str(cilantro), "name": "Cilantro"}
+    assert await _ingredients(adb) == ["Cilantro", "Lime"]
+
+
+@pytest.mark.parametrize("name", ["", "—"])
+async def test_a_name_needs_a_letter(admin, work, adb, name) -> None:
+    await _add(admin, work, "Salsa", "1", ["Lime"])
+    response = await admin.patch(f"/api/ingredients/{await _id(adb, 'Lime')}", json={"name": name})
+    assert response.status_code == 422
+    assert await _ingredients(adb) == ["Lime"]
+
+
+async def test_merging_moves_everything_and_keeps_the_name(admin, work, adb, client) -> None:
+    soup = await _add(admin, work, "Soup", "1", ["Ham Stock or Chicken Stock"])
+    stew = await _add(admin, work, "Stew", "2", ["Chicken Broth", "Ham"])
+    stock, broth = await _id(adb, "Chicken Stock"), await _id(adb, "Chicken Broth")
+    response = await admin.post(f"/api/ingredients/{broth}/merge", json={"into": str(stock)})
+    assert response.json() == {"id": str(stock), "name": "Chicken Stock"}
+    assert (await client.get(f"/api/ingredients/{broth}")).status_code == 404
+    shown = (await client.get(f"/api/ingredients/{stock}")).json()
+    assert [r["id"] for r in shown["recipes"]] == [soup, stew]
+    assert [a["name"] for a in shown["aliases"]] == ["Chicken Broth"]
+    # Found by its other name, and lines written that way match it.
+    listed = (await client.get("/api/ingredients", params={"q": "broth"})).json()
+    assert [i["name"] for i in listed["ingredients"]] == ["Chicken Stock"]
+    await _add(admin, work, "Rice", "3", ["chicken broth"])
+    assert await _ingredients(adb) == ["Chicken Stock", "Ham", "Ham Stock"]
+
+
+async def test_merging_carries_its_aliases(admin, work, adb, client) -> None:
+    await _add(admin, work, "Salsa", "1", ["Cilantro", "Coriander Leaf", "chinese parsley"])
+    cilantro, leaf, parsley = [
+        await _id(adb, n) for n in ("Cilantro", "Coriander Leaf", "chinese parsley")
+    ]
+    await admin.post(f"/api/ingredients/{parsley}/merge", json={"into": str(leaf)})
+    await admin.post(f"/api/ingredients/{leaf}/merge", json={"into": str(cilantro)})
+    shown = (await client.get(f"/api/ingredients/{cilantro}")).json()
+    assert [a["name"] for a in shown["aliases"]] == ["chinese parsley", "Coriander Leaf"]
+
+
+async def test_a_regional_alias_matches_no_lines(admin, work, adb) -> None:
+    await _add(admin, work, "Salad", "1", ["Green Onion"])
+    await _regional(adb, await _id(adb, "Green Onion"), "Spring Onion", "UK")
+    await _add(admin, work, "Stir-Fry", "2", ["Spring Onions"])
+    assert await _ingredients(adb) == ["Green Onion", "Spring Onions"]
+
+
+async def test_merging_moves_swaps_and_drops_what_no_longer_makes_sense(admin, work, adb):
+    await _add(admin, work, "Cake", "1", ["Butter", "Margarine", "Oil", "Lard"])
+    butter, marg, oil, lard = [await _id(adb, n) for n in ("Butter", "Margarine", "Oil", "Lard")]
+    swap = "INSERT INTO substitutions (from_ingredient_id, to_ingredient_id) VALUES (:f, :t)"
+    pairs = [
+        (marg, butter),
+        (butter, marg),
+        (marg, oil),
+        (butter, oil),
+        (lard, marg),
+        (lard, butter),
+        (marg, lard),
+    ]
+    for f, t in pairs:
+        await adb.execute(text(swap), {"f": f, "t": t})
+    response = await admin.post(f"/api/ingredients/{marg}/merge", json={"into": str(butter)})
+    assert response.status_code == 200
+    rows = await adb.execute(
+        text(
+            "SELECT f.name, t.name FROM substitutions s"
+            " JOIN ingredients f ON f.id = s.from_ingredient_id"
+            " JOIN ingredients t ON t.id = s.to_ingredient_id ORDER BY 1, 2"
+        )
+    )
+    # Margarine for Butter, either way, would be Butter for Butter;
+    # Margarine -> Oil is Butter -> Oil, and Lard -> Margarine is Lard ->
+    # Butter, which there are already.
+    assert [tuple(r) for r in rows] == [("Butter", "Lard"), ("Butter", "Oil"), ("Lard", "Butter")]
+
+
+async def test_merging_hands_over_the_family(admin, work, adb) -> None:
+    await _add(admin, work, "Plate", "1", ["Cheese", "Cheddar", "Aged Cheddar", "Old Cheddar"])
+    cheese, cheddar, aged, old = [
+        await _id(adb, n) for n in ("Cheese", "Cheddar", "Aged Cheddar", "Old Cheddar")
+    ]
+    parent = "UPDATE ingredients SET parent_id = :p WHERE id = :i"
+    await adb.execute(text(parent), {"p": cheese, "i": cheddar})
+    for i in (aged, old):
+        await adb.execute(text(parent), {"p": cheddar, "i": i})
+    # Old Cheddar takes Cheddar's place under Cheese; Aged Cheddar moves under it.
+    await admin.post(f"/api/ingredients/{cheddar}/merge", json={"into": str(old)})
+    rows = await adb.execute(
+        text(
+            "SELECT c.name, p.name FROM ingredients c"
+            " LEFT JOIN ingredients p ON p.id = c.parent_id ORDER BY 1"
+        )
+    )
+    assert [tuple(r) for r in rows] == [
+        ("Aged Cheddar", "Old Cheddar"),
+        ("Cheese", None),
+        ("Old Cheddar", "Cheese"),
+    ]
+
+
+@pytest.mark.parametrize("loop", [False, True])
+async def test_merging_a_parent_into_its_child_leaves_no_loop(admin, work, adb, loop) -> None:
+    await _add(admin, work, "Plate", "1", ["Cheese", "Cheddar"])
+    cheese, cheddar = await _id(adb, "Cheese"), await _id(adb, "Cheddar")
+    parent = "UPDATE ingredients SET parent_id = :p WHERE id = :i"
+    await adb.execute(text(parent), {"p": cheese, "i": cheddar})
+    if loop:  # Not prevented, so not assumed away.
+        await adb.execute(text(parent), {"p": cheddar, "i": cheese})
+    await admin.post(f"/api/ingredients/{cheese}/merge", json={"into": str(cheddar)})
+    assert await adb.scalar(text("SELECT parent_id FROM ingredients")) is None
+
+
+async def test_an_ingredient_is_not_merged_into_itself_or_nothing(admin, work, adb) -> None:
+    await _add(admin, work, "Salsa", "1", ["Lime"])
+    lime = await _id(adb, "Lime")
+    itself = await admin.post(f"/api/ingredients/{lime}/merge", json={"into": str(lime)})
+    assert itself.status_code == 422
+    nothing = await admin.post(f"/api/ingredients/{lime}/merge", json={"into": str(uuid.uuid4())})
+    assert nothing.status_code == 404
+    assert await _ingredients(adb) == ["Lime"]
+
+
+async def test_only_an_unused_ingredient_is_deleted(admin, work, adb) -> None:
+    recipe = await _add(admin, work, "Soup", "1", ["Ham or Chicken Stock"])
+    ham = await _id(adb, "Ham")
+    assert (await admin.delete(f"/api/ingredients/{ham}")).status_code == 409
+    # The line is what was wrong; fixed, Ham is used by nothing.
+    await admin.put(
+        f"/api/recipes/{recipe}",
+        json={
+            "title": "Soup",
+            "editions": [{"edition_id": str(E), "page": "1"}],
+            "ingredients": ["Ham Stock or Chicken Stock"],
+        },
+    )
+    assert (await admin.delete(f"/api/ingredients/{ham}")).status_code == 204
+    assert await _ingredients(adb) == ["Chicken Stock", "Ham Stock"]
+
+
+async def test_an_ingredient_with_a_swap_or_a_child_is_in_use(admin, work, adb) -> None:
+    await _add(admin, work, "Cake", "1", ["Butter", "Cheese", "Cheddar"])
+    butter, cheese, cheddar = [await _id(adb, n) for n in ("Butter", "Cheese", "Cheddar")]
+    await adb.execute(text("DELETE FROM recipes"))
+    await adb.execute(
+        text("INSERT INTO substitutions (from_ingredient_id, to_ingredient_id) VALUES (:f, :t)"),
+        {"f": cheddar, "t": butter},
+    )
+    await adb.execute(
+        text("UPDATE ingredients SET parent_id = :p WHERE id = :i"), {"p": cheese, "i": cheddar}
+    )
+    for i in (butter, cheese, cheddar):
+        assert (await admin.delete(f"/api/ingredients/{i}")).status_code == 409
+
+
+async def test_deleting_an_alias_stops_it_matching(admin, work, adb, client) -> None:
+    await _add(admin, work, "Salsa", "1", ["Cilantro", "Coriander"])
+    cilantro, coriander = await _id(adb, "Cilantro"), await _id(adb, "Coriander")
+    await admin.post(f"/api/ingredients/{coriander}/merge", json={"into": str(cilantro)})
+    alias = (await client.get(f"/api/ingredients/{cilantro}")).json()["aliases"][0]["id"]
+    other = await admin.delete(f"/api/ingredients/{uuid.uuid4()}/aliases/{alias}")
+    assert other.status_code == 404
+    response = await admin.delete(f"/api/ingredients/{cilantro}/aliases/{alias}")
+    assert response.status_code == 204
+    # Lines already matched stay; a new one is an ingredient of its own.
+    assert len((await client.get(f"/api/ingredients/{cilantro}")).json()["recipes"]) == 1
+    await _add(admin, work, "Curry", "2", ["Coriander"])
+    assert await _ingredients(adb) == ["Cilantro", "Coriander"]
+
+
+@pytest.mark.parametrize(
+    "method, path, body",
+    [
+        ("PATCH", "", {"name": "Lemon"}),
+        ("POST", "/merge", {"into": str(uuid.uuid4())}),
+        ("DELETE", "", None),
+    ],
+)
+async def test_only_admins_fix_ingredients(admin, work, adb, method, path, body) -> None:
+    await _add(admin, work, "Salsa", "1", ["Lime"])
+    await adb.execute(text("UPDATE users SET is_admin = false"))
+    lime = await _id(adb, "Lime")
+    response = await admin.request(method, f"/api/ingredients/{lime}{path}", json=body)
+    assert response.status_code == 403
+    assert await _ingredients(adb) == ["Lime"]

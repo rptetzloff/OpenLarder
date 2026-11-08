@@ -172,13 +172,30 @@ def test_alias_unique_per_region_including_unmarked(db: Connection) -> None:
     onion = _insert(
         db, "INSERT INTO ingredients (name, match_key) VALUES ('green onion', 'green onion')"
     )
-    alias = "INSERT INTO ingredient_aliases (ingredient_id, name, region) VALUES (:i, :n, :r)"
-    _insert(db, alias, i=onion, n="scallion", r=None)
-    _insert(db, alias, i=onion, n="spring onion", r="UK")
-    _insert(db, alias, i=onion, n="spring onion", r="AU")
-    _refused(db, lambda: _insert(db, alias, i=onion, n="Scallion", r=None))
-    _refused(db, lambda: _insert(db, alias, i=onion, n="spring onion", r="UK"))
-    _refused(db, lambda: _insert(db, alias, i=onion, n="shallot", r="FR"))
+    alias = (
+        "INSERT INTO ingredient_aliases (ingredient_id, name, match_key, region)"
+        " VALUES (:i, :n, :k, :r)"
+    )
+    _insert(db, alias, i=onion, n="scallion", k="scallion", r=None)
+    _insert(db, alias, i=onion, n="spring onion", k="spring onion", r="UK")
+    _insert(db, alias, i=onion, n="spring onion", k="spring onion", r="AU")
+    _refused(db, lambda: _insert(db, alias, i=onion, n="Scallion", k="other", r=None))
+    _refused(db, lambda: _insert(db, alias, i=onion, n="spring onion", k="x", r="UK"))
+    _refused(db, lambda: _insert(db, alias, i=onion, n="shallot", k="shallot", r="FR"))
+
+
+def test_one_unmarked_alias_per_match_key(db: Connection) -> None:
+    onion = _insert(
+        db, "INSERT INTO ingredients (name, match_key) VALUES ('green onion', 'green onion')"
+    )
+    alias = (
+        "INSERT INTO ingredient_aliases (ingredient_id, name, match_key, region)"
+        " VALUES (:i, :n, :k, :r)"
+    )
+    _insert(db, alias, i=onion, n="scallions", k="scallion", r=None)
+    _insert(db, alias, i=onion, n="scallion (UK)", k="scallion", r="UK")
+    _refused(db, lambda: _insert(db, alias, i=onion, n="Scallion!", k="scallion", r=None))
+    _refused(db, lambda: _insert(db, alias, i=onion, n="nothing", k="", r=None))
 
 
 def test_ingredient_in_use_cannot_be_deleted(db: Connection) -> None:
