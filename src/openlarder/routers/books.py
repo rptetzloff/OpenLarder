@@ -11,7 +11,7 @@ from typing import Annotated
 
 import httpx2
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from openlarder import books as books_module
@@ -444,3 +444,50 @@ async def relink_references(work_id: uuid.UUID, admin: AdminUser, session: Sessi
         .where(Recipe.work_id == work_id, IngredientOption.sub_recipe_id.is_not(None))
     )
     return Relinked(linked=linked or 0)
+
+
+class CreditIn(BaseModel):
+    # An author already credited on the book, or none for a new name.
+    author_id: uuid.UUID | None = None
+    name: str = Field(max_length=200)
+    role: str = "author"
+
+
+class EditionIn(BaseModel):
+    id: uuid.UUID
+    title: str | None = Field(default=None, max_length=300)
+    publisher: str | None = Field(default=None, max_length=200)
+    published_year: int | None = None
+
+
+class BookIn(BaseModel):
+    title: str = Field(max_length=300)
+    subtitle: str | None = Field(default=None, max_length=500)
+    credits: list[CreditIn] = Field(default=[], max_length=30)
+    # Editions left out are left as they are.
+    editions: list[EditionIn] = []
+
+
+@router.put("/{work_id}", response_model=Added, dependencies=[SameOrigin])
+async def edit_book(work_id: uuid.UUID, body: BookIn, admin: AdminUser, session: Session) -> Added:
+    """Fix what a book says about itself (books.edit_book)."""
+    work = await session.get(Work, work_id)
+    if work is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    try:
+        await books_module.edit_book(
+            session,
+            work,
+            body.title,
+            body.subtitle,
+            [books_module.CreditEdit(c.author_id, c.name, c.role) for c in body.credits],
+            [
+                books_module.EditionEdit(e.id, e.title, e.publisher, e.published_year)
+                for e in body.editions
+            ],
+        )
+    except books_module.InvalidBook as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await session.commit()
+    log.info("%s edited book %s", admin.id, work_id)
+    return Added(id=work.id)
