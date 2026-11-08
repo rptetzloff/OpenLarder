@@ -40,6 +40,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         label), and **family recipes** (cards, community cookbooks, class
         handouts), which **can be marked private**: seen only by the person
         who added them and whoever they share with, as with the larder.
+        Adding one is voluntary, and only its title and ingredient names
+        are kept, never amounts or method, so the realistic exposure is a
+        "secret ingredient". So the form says plainly what the site keeps
+        and who sees it, public unless marked private, and asks the person
+        to tick that they understand before it saves (Ray, 2026-11-08,
+        between a warning and a tick box; the tick box is Claude's pick, as
+        it records the choice).
       - **Each kind has its own shape**, in levels: a book's editions and
         pages; a magazine's issues and pages; a website's posts, by address;
         a social media account's posts; **a TV show's episodes, where the recipe
