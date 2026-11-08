@@ -97,7 +97,7 @@ onMounted(async () => {
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
     <IngredientsPage v-else-if="onIngredients" />
-    <IngredientPage v-else-if="ingredientId" :id="ingredientId" />
+    <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
     <AdminImportsPage v-else-if="onImports" :user="user" />
@@ -457,6 +457,26 @@ button.link {
   padding: 0;
   font: inherit;
   cursor: pointer;
+}
+.aliases {
+  color: var(--muted);
+}
+.remove-alias {
+  margin-left: 0.125rem;
+  padding: 0 0.25rem;
+  color: var(--muted);
+}
+.fix-ingredient {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--border);
+}
+.fix-ingredient .error {
+  color: var(--error);
+}
+.merge-candidates {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 footer {
   display: flex;

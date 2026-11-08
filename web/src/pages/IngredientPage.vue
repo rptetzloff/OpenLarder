@@ -1,8 +1,20 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { fetchIngredient, type Ingredient } from "../ingredients";
+import { onMounted, ref, watch } from "vue";
+import {
+  deleteAlias,
+  deleteIngredient,
+  fetchIngredient,
+  type Ingredient,
+  type IngredientSummary,
+  listIngredients,
+  mergeIngredient,
+  type Named,
+  renameIngredient,
+  Taken,
+} from "../ingredients";
+import type { Me } from "../me";
 
-const props = defineProps<{ id: string }>();
+const props = defineProps<{ id: string; user: Me | null | undefined }>();
 const ingredient = ref<Ingredient | null>(null);
 const missing = ref(false);
 const failed = ref(false);
@@ -17,6 +29,7 @@ async function load(more = false) {
     else if (more && ingredient.value) ingredient.value.recipes.push(...page.recipes);
     else {
       ingredient.value = page;
+      newName.value = page.name;
       document.title = `${page.name} · Ingredients · OpenLarder`;
     }
   } catch {
@@ -30,6 +43,99 @@ function where(r: Ingredient["recipes"][number]) {
   return r.pages.length ? `, p. ${r.pages.join(" / ")}` : "";
 }
 
+// Fixing it, for admins.
+
+const newName = ref("");
+const error = ref("");
+// Set when the new name is another ingredient's, to offer merging into it.
+const taken = ref<Named | null>(null);
+const busy = ref(false);
+
+async function rename() {
+  if (!ingredient.value || !newName.value.trim()) return;
+  error.value = "";
+  taken.value = null;
+  busy.value = true;
+  try {
+    const renamed = await renameIngredient(ingredient.value.id, newName.value);
+    await load();
+    newName.value = renamed.name;
+  } catch (e) {
+    if (e instanceof Taken) taken.value = e.ingredient;
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+const mergeQuery = ref("");
+const candidates = ref<IngredientSummary[]>([]);
+// The search they answer, so "no match" waits for the answer.
+const answered = ref("");
+let asked = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(mergeQuery, () => {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const mine = ++asked;
+    const q = mergeQuery.value.trim();
+    const found = q ? (await listIngredients(q).catch(() => null))?.ingredients : [];
+    if (mine === asked && found) {
+      candidates.value = found.filter((i) => i.id !== props.id).slice(0, 8);
+      answered.value = q;
+    }
+  }, 200);
+});
+
+async function merge(into: Named) {
+  const here = ingredient.value;
+  if (!here) return;
+  const n = here.total;
+  const uses = n === 1 ? "The recipe that uses it" : `The ${n.toLocaleString()} recipes that use it`;
+  const message =
+    `Merge “${here.name}” into “${into.name}”?\n\n` +
+    `${n ? `${uses} will use “${into.name}”, and ` : ""}` +
+    `“${here.name}” will be another name for it.`;
+  if (!confirm(message)) return;
+  error.value = "";
+  busy.value = true;
+  try {
+    const left = await mergeIngredient(here.id, into.id);
+    location.href = `/ingredients/${left.id}`;
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+    busy.value = false;
+  }
+}
+
+async function remove() {
+  const here = ingredient.value;
+  if (!here || !confirm(`Delete “${here.name}”? No recipe uses it.`)) return;
+  error.value = "";
+  try {
+    await deleteIngredient(here.id);
+    location.href = "/ingredients";
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function removeAlias(alias: Ingredient["aliases"][number]) {
+  const here = ingredient.value;
+  const message =
+    `Stop matching “${alias.name}” to “${here?.name}”?\n\n` +
+    "Recipes already matched keep it. Lines written that way from now on " +
+    "become an ingredient of their own.";
+  if (!here || !confirm(message)) return;
+  error.value = "";
+  try {
+    await deleteAlias(here.id, alias.id);
+    here.aliases = here.aliases.filter((a) => a.id !== alias.id);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
 onMounted(() => load());
 </script>
 
@@ -41,6 +147,22 @@ onMounted(() => load());
     <p v-else-if="!ingredient" class="status">Loading…</p>
     <template v-else>
       <h1>{{ ingredient.name }}</h1>
+      <p v-if="ingredient.aliases.length" class="aliases">
+        Also written as
+        <template v-for="(a, i) in ingredient.aliases" :key="a.id">
+          <template v-if="i > 0">, </template>
+          <span>{{ a.name }}</span>
+          <button
+            v-if="user?.is_admin"
+            type="button"
+            class="link remove-alias"
+            :aria-label="`Stop matching ${a.name}`"
+            @click="removeAlias(a)"
+          >
+            ×
+          </button>
+        </template>
+      </p>
       <p class="status">
         Used in {{ ingredient.total.toLocaleString() }}
         {{ ingredient.total === 1 ? "recipe" : "recipes" }}.
@@ -62,6 +184,63 @@ onMounted(() => load());
       >
         Show more ({{ (ingredient.total - ingredient.recipes.length).toLocaleString() }} left)
       </button>
+
+      <section v-if="user?.is_admin" class="fix-ingredient">
+        <h2>Fix this ingredient</h2>
+        <p class="status">
+          A recipe matched to the wrong ingredient is fixed on the recipe, by correcting its line.
+        </p>
+        <p v-if="error" class="error" role="alert">
+          {{ error }}
+          <template v-if="taken">
+            <button type="button" class="link" :disabled="busy" @click="merge(taken)">
+              Merge into “{{ taken.name }}”
+            </button>
+          </template>
+        </p>
+
+        <form class="isbn-form" @submit.prevent="rename">
+          <label for="ingredient-name">Name</label>
+          <div class="row">
+            <input id="ingredient-name" v-model="newName" required autocomplete="off" />
+            <button
+              type="submit"
+              class="primary"
+              :disabled="busy || newName.trim() === ingredient.name"
+            >
+              Rename
+            </button>
+          </div>
+        </form>
+
+        <div class="isbn-form">
+          <label for="merge-into">Merge into another ingredient</label>
+          <div class="row">
+            <input
+              id="merge-into"
+              v-model="mergeQuery"
+              type="search"
+              autocomplete="off"
+              placeholder="the one to keep"
+            />
+          </div>
+          <ul v-if="candidates.length" class="merge-candidates">
+            <li v-for="c in candidates" :key="c.id">
+              <button type="button" class="link" :disabled="busy" @click="merge(c)">
+                {{ c.name }}
+              </button>
+              <span class="page-ref">
+                {{ c.recipes.toLocaleString() }} {{ c.recipes === 1 ? "recipe" : "recipes" }}
+              </span>
+            </li>
+          </ul>
+          <p v-else-if="answered && answered === mergeQuery.trim()" class="status">No other ingredient matches.</p>
+        </div>
+
+        <p v-if="ingredient.total === 0">
+          <button type="button" class="link" @click="remove">Delete this ingredient</button>
+        </p>
+      </section>
     </template>
   </article>
 </template>

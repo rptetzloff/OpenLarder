@@ -1,18 +1,28 @@
-"""Canonical ingredients: the list, and the recipes that use one.
+"""Canonical ingredients: the list, the recipes that use one, and fixing them.
 
-Public, like the rest of the catalog. The list is ordered by how many
-recipes use each ingredient, so the ones worth checking come first, and
-can be narrowed by name as someone types.
+Reading is public, like the rest of the catalog. The list is ordered by how
+many recipes use each ingredient, so the ones worth checking come first,
+and can be narrowed by name, or by another name, as someone types.
+Renaming, merging and deleting are for admins.
 """
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel
-from sqlalchemy import func, select
+from fastapi import APIRouter, HTTPException, Query, Response, status
+from pydantic import BaseModel, Field
+from sqlalchemy import exists, func, select
 
+from openlarder import ingredients
+from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Ingredient, IngredientOption, Recipe, RecipePage, Work
+from openlarder.models import (
+    Ingredient,
+    IngredientAlias,
+    IngredientOption,
+    Recipe,
+    RecipePage,
+    Work,
+)
 
 router = APIRouter(prefix="/api/ingredients", tags=["ingredients"])
 
@@ -38,9 +48,16 @@ class UsedBy(BaseModel):
     pages: list[str]
 
 
+class AliasOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class IngredientOut(BaseModel):
     id: uuid.UUID
     name: str
+    # Other names lines are matched by: names it had, and ingredients merged in.
+    aliases: list[AliasOut]
     recipes: list[UsedBy]
     total: int
 
@@ -67,7 +84,14 @@ async def list_ingredients(
         uses, uses.c.ingredient_id == Ingredient.id
     )
     if q.strip():
-        query = query.where(Ingredient.name.ilike(_like(" ".join(q.split())), escape="\\"))
+        like = _like(" ".join(q.split()))
+        query = query.where(
+            Ingredient.name.ilike(like, escape="\\")
+            | exists().where(
+                IngredientAlias.ingredient_id == Ingredient.id,
+                IngredientAlias.name.ilike(like, escape="\\"),
+            )
+        )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.execute(
         query.order_by(func.coalesce(uses.c.n, 0).desc(), func.lower(Ingredient.name))
@@ -113,12 +137,119 @@ async def get_ingredient(
             .order_by(RecipePage.page)
         ):
             pages.setdefault(recipe_id, []).append(page)
+    aliases = await session.execute(
+        select(IngredientAlias.id, IngredientAlias.name)
+        .where(IngredientAlias.ingredient_id == ingredient_id)
+        .order_by(func.lower(IngredientAlias.name))
+    )
     return IngredientOut(
         id=ingredient.id,
         name=ingredient.name,
+        aliases=[AliasOut(id=a, name=n) for a, n in aliases],
         recipes=[
             UsedBy(id=r, title=t, book_id=b, book_title=bt, pages=pages.get(r, []))
             for r, t, b, bt in recipes
         ],
         total=total or 0,
     )
+
+
+# Fixing the list
+
+
+class Rename(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class MergeInto(BaseModel):
+    into: uuid.UUID
+
+
+class Named(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+async def _ingredient_or_404(session: Session, ingredient_id: uuid.UUID) -> Ingredient:
+    ingredient = await session.get(Ingredient, ingredient_id)
+    if ingredient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingredient.")
+    return ingredient
+
+
+def _taken(exc: ingredients.Taken) -> HTTPException:
+    # The other ingredient, so the page can offer to merge into it.
+    other = exc.ingredient
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        {
+            "message": f"“{other.name}” is already an ingredient, or another name for one.",
+            "ingredient": {"id": str(other.id), "name": other.name},
+        },
+    )
+
+
+@router.patch("/{ingredient_id}", response_model=Named, dependencies=[SameOrigin])
+async def rename_ingredient(
+    ingredient_id: uuid.UUID, body: Rename, admin: AdminUser, session: Session
+) -> Named:
+    ingredient = await _ingredient_or_404(session, ingredient_id)
+    try:
+        await ingredients.rename(session, ingredient, body.name)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    except ingredients.Taken as exc:
+        raise _taken(exc) from None
+    await session.commit()
+    return Named(id=ingredient.id, name=ingredient.name)
+
+
+@router.post("/{ingredient_id}/merge", response_model=Named, dependencies=[SameOrigin])
+async def merge_ingredient(
+    ingredient_id: uuid.UUID, body: MergeInto, admin: AdminUser, session: Session
+) -> Named:
+    """Merge this ingredient into another; answers with the one that's left."""
+    source = await _ingredient_or_404(session, ingredient_id)
+    target = await _ingredient_or_404(session, body.into)
+    try:
+        await ingredients.merge(session, source, target)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await session.commit()
+    return Named(id=target.id, name=target.name)
+
+
+@router.delete(
+    "/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[SameOrigin]
+)
+async def delete_ingredient(
+    ingredient_id: uuid.UUID, admin: AdminUser, session: Session
+) -> Response:
+    ingredient = await _ingredient_or_404(session, ingredient_id)
+    try:
+        await ingredients.remove(session, ingredient)
+    except ingredients.InUse:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Something still uses this ingredient. Merge it into another instead.",
+        ) from None
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/{ingredient_id}/aliases/{alias_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[SameOrigin],
+)
+async def delete_alias(
+    ingredient_id: uuid.UUID, alias_id: uuid.UUID, admin: AdminUser, session: Session
+) -> Response:
+    """Stop matching lines by this name. Lines already matched keep their
+    ingredient; new ones written this way become an ingredient of their own."""
+    alias = await session.get(IngredientAlias, alias_id)
+    if alias is None or alias.ingredient_id != ingredient_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such name for this ingredient.")
+    await session.delete(alias)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

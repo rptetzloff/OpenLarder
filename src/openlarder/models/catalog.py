@@ -279,6 +279,14 @@ class IngredientAlias(Timestamps, Base):
             unique=True,
             postgresql_nulls_not_distinct=True,
         ),
+        CheckConstraint("match_key <> ''", name="match_key_not_empty"),
+        # Unmarked aliases match lines (migration 0016), so one key, one meaning.
+        Index(
+            "uq_ingredient_aliases_match_key",
+            "match_key",
+            unique=True,
+            postgresql_where=text("region IS NULL"),
+        ),
         Index("ix_ingredient_aliases_ingredient_id", "ingredient_id"),
         _trgm("ingredient_aliases", "name"),
     )
@@ -286,6 +294,9 @@ class IngredientAlias(Timestamps, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     ingredient_id: Mapped[uuid.UUID] = _fk("ingredients.id", ondelete="CASCADE")
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Unmarked aliases match lines too, by the same key as ingredients
+    # (migration 0016); ingredients.py keeps one key from meaning two things.
+    match_key: Mapped[str] = mapped_column(Text, nullable=False)
     region: Mapped[str | None] = mapped_column(Text)
 
 
