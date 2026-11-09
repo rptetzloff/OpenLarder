@@ -322,7 +322,7 @@ Mostly they don't. They work on the database in the background, and the site onl
 - **Batch jobs (almost everything).** n8n, on a schedule or a button, reads ingredients and lines from Postgres; the embedding model finds near neighbours among vectors stored in Postgres; the language model judges each candidate pair; n8n writes rows to the `suggestion` table. The site's admin pages show a Suggestions queue with Accept and Dismiss, and Accept is an ordinary admin edit (rename, merge, set parent). Visitors never wait on a GPU: if the laptop is asleep or the A4000 is busy, nothing on the site breaks, and the queue just doesn't grow that night.
 - **Live, while someone types (optional, later).** "Did you mean…" for "sweet rice flower" in the contribute form or bulk entry has to answer in under a second. First choice: no model at all, as `pg_trgm` already handles typos. Then, if wanted, embeddings only: the backend sends the typed text to the embedding model, gets one vector back and asks Postgres for the nearest ingredients, which takes milliseconds and catches matches by meaning that trigrams miss ("cornflour" → cornstarch). Never the language model in this path: it's too slow, and the site would depend on the GPU being up. If the embedding server doesn't answer, the site falls back to `pg_trgm` without saying so.
 - **Plumbing.** Ollama runs on the A4000 box; the backend and n8n call it over the LAN (for example `http://gpu-box:11434`). It is not exposed through the Cloudflare tunnel.
-- **Enforced in Postgres.** n8n gets a database role that can read the catalog and write only to `suggestion`, never to the catalog tables, so "suggests, never writes" is the database's rule, not just a convention.
+- **Enforced in Postgres.** n8n gets a database role that can read the public catalog and write only to `suggestions` and the embeddings, never to the catalog tables, so "suggests, never writes" is the database's rule, not just a convention.
 
 So the site itself grows two things: an admin suggestion queue, and optionally a smarter "did you mean" that degrades gracefully when the GPU is off.
 
@@ -340,6 +340,38 @@ So the site itself grows two things: an admin suggestion queue, and optionally a
 - **The laptop 4080 (12 GB)** is for development: Llama 3.1 8B, E4B, or the 12B alone at a smaller context.
 - **What changes memory use:** context length (the KV cache grows with it; prompts are a few ingredient names, so `num_ctx` around 4096 rather than a large default); parallel requests (`OLLAMA_NUM_PARALLEL` multiplies the KV cache; start at 1–2 for batch jobs); quantization (Q8 roughly doubles the weights, the 12B to ~13 GB, for a small gain; Q4_K_M is the usual balance); and keeping both loaded (`OLLAMA_MAX_LOADED_MODELS=2` and a long `OLLAMA_KEEP_ALIVE`, so the embedding model isn't evicted whenever the language model loads).
 - **Choosing.** A test of 100 merges runs first on Llama 3.1 8B and Gemma 4 12B. If the 12B is clearly better, it is the production model; the 26B is worth the trouble only if both miss a lot.
+
+**The n8n workflows** *(Ray, 2026-11-09; adapted to the real schema, as noted)*
+
+Three workflows, plus one-time setup in Postgres. n8n reads the catalog and writes only embeddings and suggestions; accepting a suggestion happens on the site.
+
+*One-time setup*
+
+1. **pgvector.** The stock `postgres` image doesn't include it. The database image becomes `pgvector/pgvector:pg17` (OpenLarder runs Postgres 17; the data volume carries over within a major version), with the same image in docker-compose and CI so tests run against what production has. The migration then runs `CREATE EXTENSION IF NOT EXISTS vector`.
+2. **Two tables, by Alembic migration**, so the app owns the schema. Ids are UUIDs, as everywhere in OpenLarder:
+   - `ingredient_embeddings`: `ingredient_id` (primary key, references `ingredients` on delete cascade), `model`, `text_embedded` (the name embedded, so a rename is re-embedded), `embedding vector(768)` (EmbeddingGemma's size), `updated_at`; an HNSW index with `vector_cosine_ops`.
+   - `suggestions`: `id`, `kind` (`merge`, `parent`, `line_fix`, …), `target` (jsonb, such as two ingredient ids, the lower first), `proposal` (jsonb), `reason`, `confidence`, `model`, `prompt_version`, `status` (`open`, `accepted`, `dismissed`), `created_at`, `decided_by` (references `users`), `decided_at`. A partial unique index on (`kind`, `target`) where `status = 'open'` makes reruns safe: a duplicate fails to insert, and n8n uses `ON CONFLICT DO NOTHING`.
+3. **A restricted role, `n8n_suggester`**, created by hand with its password kept in Coolify, never in the repo. It may connect, read the catalog, read and write `ingredient_embeddings`, and only read and insert into `suggestions`. **It reads public data only**, through views rather than the tables (a change from the plan as first written, which granted the tables). An ingredient, line or flag used only by a private family collection must never reach a model's suggestion, because the suggestion queue is shown to admins, and an admin can't see a private collection. The views use the same rule as `visibility.py` (everything but what only private sources use), and a test checks them like the privacy sweep does.
+4. **In n8n:** a Postgres credential using that role, with Postgres reachable from the n8n host on the LAN only. Every model call is an HTTP Request node to `http://<a4000>:11434`, rather than n8n's Ollama nodes, which hide some of `format` and `options`.
+
+*Workflow 1: embed ingredients (nightly).* It finds ingredients with no embedding, a renamed one (`text_embedded` differs from the name), or one embedded by another model, up to 2,000 a run. It sends them 100 at a time to Ollama's `/api/embed` (`embeddinggemma`, `keep_alive: -1`), pairs each vector back with its ingredient, and upserts it.
+
+*Workflow 2: merge and hierarchy candidates (after Workflow 1).* For each ingredient it takes the five nearest by cosine distance, keeps pairs above 0.80 similarity, and skips any pair already suggested. It doesn't check status, so a dismissed pair stays dismissed. Each pair goes to `/api/chat` (`gemma4:12b`, `temperature: 0`, `num_ctx: 4096`, 120 s timeout) with a JSON schema: `decision` is one of `same`, `a_under_b`, `b_under_a` or `different`; `keep_name` is `a`, `b` or `neither`; plus `reason` and `confidence`. The system prompt is conservative:
+- "same" means interchangeable names for one thing you'd buy (scallion / green onion);
+- "a_under_b" means A is a kind of B (cheddar / cheese);
+- forms that change what you buy are "different" (fresh ginger / ground ginger, baking soda / baking powder);
+- when unsure, it answers "different".
+
+A reply that doesn't parse, or says "different", is dropped. "Same" becomes a `merge` suggestion and the others become `parent`, stored with `prompt_version` `merge-v1`. The version is bumped whenever the prompt changes, so a bad batch can be found and reverted.
+
+*Workflow 3: fixes for flagged lines (same pattern).* It takes open flags of the kinds a model can help with (typos, suspicious splits) on public recipes, and sends each with its line, its source and the nearest canonical names as context. The schema is `suggested_text`, `split`, `reason` and `confidence`, and results are stored as `line_fix`.
+
+*On the site*
+
+- **Admin → Suggestions:** filtered by kind and sorted by confidence, with Accept and Dismiss. Accept calls the existing rename, merge or set-parent code as the admin, so history and rules apply as if it were done by hand.
+- **"Run now" (optional):** an n8n Webhook node with header auth, triggered from the admin page. The secret is kept in Coolify.
+
+*Starting:* Workflows 1 and 2 run once by hand with a limit of 50, and the suggestions are read through before anything is scheduled.
 
 **Limits**
 

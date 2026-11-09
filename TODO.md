@@ -182,8 +182,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to
-      the catalog. Plan and open decisions in SCOPING.md. Needs a
-      `suggestion` table and pgvector when it starts.
+      the catalog. Plan and open decisions in SCOPING.md, now with the three
+      n8n workflows (Ray, 2026-11-09). In order: the pgvector image
+      (`pgvector/pgvector:pg17`, also in compose and CI); a migration for
+      `ingredient_embeddings` and `suggestions`; public-only views for the
+      `n8n_suggester` role, with a privacy test; the admin Suggestions
+      queue. Ray sets up the role's password in Coolify and the workflows in
+      n8n.
 
 ## Found along the way
 
