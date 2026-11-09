@@ -64,33 +64,67 @@ def seen_source_ids(viewer: User | None):
     return select(Source.id).where(sources_seen_by(viewer))
 
 
+# The rest is written in terms of what the viewer can't see: a handful of
+# private collections against a catalog of thousands, so each condition is a
+# small set checked once rather than a large one checked per row. Asking
+# per row whether a recipe's source was among those seen made the
+# ingredient list 2.5 times slower on a production-sized catalog (#64).
+
+
+def _hidden_source_ids(viewer: User | None):
+    return select(Source.id).where(~sources_seen_by(viewer))
+
+
+def _hidden_recipe_ids(viewer: User | None):
+    return select(Recipe.id).where(Recipe.source_id.in_(_hidden_source_ids(viewer)))
+
+
 def recipes_seen_by(viewer: User | None) -> ColumnElement[bool]:
-    return Recipe.source_id.in_(seen_source_ids(viewer))
+    return Recipe.source_id.not_in(_hidden_source_ids(viewer))
 
 
 def options_seen_by(viewer: User | None) -> ColumnElement[bool]:
-    return IngredientOption.recipe_id.in_(select(Recipe.id).where(recipes_seen_by(viewer)))
+    return IngredientOption.recipe_id.not_in(_hidden_recipe_ids(viewer))
 
 
 def ingredients_seen_by(viewer: User | None) -> ColumnElement[bool]:
     """Ingredients nothing uses yet, and those a recipe the viewer can see
-    uses."""
+    uses: all but those only recipes they can't see use."""
     # Aliased, so a query already joining options doesn't swallow these.
-    option = aliased(IngredientOption)
-    used = option.ingredient_id == Ingredient.id
-    seen = option.recipe_id.in_(select(Recipe.id).where(recipes_seen_by(viewer)))
-    return or_(~exists().where(used), exists().where(used, seen))
+    hidden_use = aliased(IngredientOption)
+    seen_use = aliased(IngredientOption)
+    # Starting from the hidden recipes' ingredients (usually none), then
+    # dropping any a recipe the viewer can see also uses, by the index on
+    # (ingredient_id, recipe_id): the other way round hashed every option.
+    used_in_hidden = select(hidden_use.ingredient_id).where(
+        # NOT IN with a NULL in the list matches nothing, and an option
+        # naming a sub-recipe has no ingredient.
+        hidden_use.ingredient_id.is_not(None),
+        hidden_use.recipe_id.in_(_hidden_recipe_ids(viewer)),
+    )
+    used_where_seen = select(seen_use.ingredient_id).where(
+        seen_use.ingredient_id.in_(used_in_hidden),
+        seen_use.recipe_id.not_in(_hidden_recipe_ids(viewer)),
+    )
+    return Ingredient.id.not_in(used_in_hidden.except_(used_where_seen))
 
 
 def authors_seen_by(viewer: User | None) -> ColumnElement[bool]:
     """As for ingredients: authors nothing credits yet, and those a source
-    the viewer can see credits."""
-    credit = aliased(SourceCredit)
-    credited = credit.author_id == Author.id
-    return or_(
-        ~exists().where(credited),
-        exists().where(credited, credit.source_id.in_(seen_source_ids(viewer))),
+    the viewer can see credits: all but those only hidden sources credit."""
+    hidden_credit = aliased(SourceCredit)
+    seen_credit = aliased(SourceCredit)
+    only_hidden = (
+        select(hidden_credit.author_id)
+        .where(hidden_credit.source_id.in_(_hidden_source_ids(viewer)))
+        .where(
+            ~exists().where(
+                seen_credit.author_id == hidden_credit.author_id,
+                seen_credit.source_id.not_in(_hidden_source_ids(viewer)),
+            )
+        )
     )
+    return Author.id.not_in(only_hidden)
 
 
 async def _shared(

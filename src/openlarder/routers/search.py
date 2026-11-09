@@ -177,10 +177,18 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
         IngredientOption.recipe_ingredient_id == RecipeIngredient.id,
         IngredientOption.ingredient_id.in_(yours),
     )
-    per_line = select(
-        RecipeIngredient.recipe_id.label("recipe_id"),
-        case((covered, 1), else_=0).label("covered"),
-    ).subquery()
+    # Only the lines of recipes using something you have: scoring every line
+    # in the catalog and then dropping the recipes with none took most of a
+    # search's time.
+    candidates = select(IngredientOption.recipe_id).where(IngredientOption.ingredient_id.in_(yours))
+    per_line = (
+        select(
+            RecipeIngredient.recipe_id.label("recipe_id"),
+            case((covered, 1), else_=0).label("covered"),
+        )
+        .where(RecipeIngredient.recipe_id.in_(candidates))
+        .subquery()
+    )
     tally = (
         select(
             per_line.c.recipe_id,

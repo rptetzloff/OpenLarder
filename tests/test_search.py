@@ -429,3 +429,27 @@ async def test_kinds_narrow_a_search(admin, work, adb, client) -> None:
     assert _titles(await _search(client, q="rhubarb", kind=["book"])) == ["Rhubarb Cake"]
     bad = await client.get("/api/search", params={"q": "rhubarb", "kind": ["zine"]})
     assert bad.status_code == 422
+
+
+async def test_the_apps_connections_run_without_jit(database_url) -> None:
+    """JIT compiling cost a search three times its running time."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from openlarder import db
+
+    engine = create_async_engine(database_url, connect_args=db.CONNECT_ARGS)
+    try:
+        async with engine.connect() as conn:
+            assert await conn.scalar(text("SHOW jit")) == "off"
+    finally:
+        await engine.dispose()
+
+
+def test_the_apps_engine_uses_those_connection_settings(monkeypatch) -> None:
+    from openlarder import db
+
+    made = {}
+    monkeypatch.setattr(db, "create_async_engine", lambda url, **kw: made.update(kw) or "engine")
+    monkeypatch.setattr(db, "_engine", None)
+    assert db.get_engine() == "engine"
+    assert made["connect_args"] == db.CONNECT_ARGS

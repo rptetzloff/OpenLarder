@@ -519,7 +519,9 @@ class IngredientOption(Timestamps, Base):
             "num_nonnulls(ingredient_id, sub_recipe_id) <= 1", name="one_target_at_most"
         ),
         CheckConstraint("sub_recipe_id <> recipe_id", name="not_own_sub_recipe"),
-        Index("ix_ingredient_options_ingredient_id", "ingredient_id"),
+        # Counting the recipes that use an ingredient reads it in order
+        # (migration 0028).
+        Index("ix_ingredient_options_ingredient_id_recipe_id", "ingredient_id", "recipe_id"),
         Index("ix_ingredient_options_sub_recipe_id", "sub_recipe_id"),
     )
 
