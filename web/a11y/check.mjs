@@ -140,6 +140,7 @@ function pages(s) {
     [`/sources/${s.book.id}/recipes/new`, "admin"],
     [`/sources/${s.show.id}/recipes/new`, "admin"],
     [`/sources/${s.box.id}/recipes/new`, "cook"],
+    [`/sources/${s.book.id}/bulk`, "admin"],
     [`/recipes/${s.biscuits.id}`, null],
     [`/recipes/${s.biscuits.id}`, "admin"],
     [`/recipes/${s.web.id}`, null],

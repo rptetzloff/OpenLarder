@@ -128,6 +128,8 @@ export interface LineReview {
   suggestion: string | null;
   // The rules would leave the whole line out.
   remove: boolean;
+  // Saving refuses it as it is: it starts with an amount and a unit.
+  refused: boolean;
   // How the line reads, once the rules have nothing to say about it: its
   // options in the source's order.
   options: LineOption[];
@@ -139,11 +141,21 @@ export interface LineOption {
   page: string | null;
   recipe: { id: string; name: string } | null;
   recipe_pages: string[];
+  // Unlinked: whether the page it cites holds other recipes.
+  page_used: boolean;
   // Otherwise the ingredient it will be matched to, and whether by another
   // of its names; or, with none, ingredients named like it.
   ingredient: { id: string; name: string } | null;
   alias: boolean;
   similar: { id: string; name: string }[];
+}
+
+// Every recipe's ingredient lines as typed, for entering a whole book.
+export async function recipeLines(sourceId: string): Promise<Map<string, string[]>> {
+  const res = await fetch(`/api/sources/${sourceId}/recipe-lines`);
+  if (!res.ok) throw new Error("The recipes couldn't be loaded.");
+  const found: { id: string; lines: string[] }[] = await res.json();
+  return new Map(found.map((r) => [r.id, r.lines]));
 }
 
 // Each line's review. With the source, page references are looked up in

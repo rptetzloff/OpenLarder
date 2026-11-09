@@ -215,7 +215,7 @@ function hintFor(row: Row): Hint | null {
   if (!row.text.trim() || !found || found.text !== row.text) return null;
   const review = found.review;
   if (review.problems.length) {
-    if (kept.value.get(row.key) === row.text) return null;
+    if (kept.value.get(row.key) === row.text && !review.refused) return null;
     return { tone: "warn", text: review.problems.join(" "), review };
   }
   const options = review.options;
@@ -233,7 +233,9 @@ function hintFor(row: Row): Hint | null {
         }
       : {
           tone: "warn",
-          text: `No recipe here of that name or on p. ${only.page} yet; it links when one is added.`,
+          text: only.page_used
+            ? `Not linked: p. ${only.page} has no recipe of that name.`
+            : `No recipe on p. ${only.page} yet; it links when one is added.`,
           review,
         };
   }
@@ -258,6 +260,8 @@ function optionText(o: LineOption): string {
 
 const hints = computed(() => rows.value.map((r) => hintFor(r)));
 const checksLeft = computed(() => hints.value.filter((h) => h?.tone === "warn").length);
+// Lines saving would refuse, which do stop it.
+const refusedLeft = computed(() => hints.value.filter((h) => h?.review.refused).length);
 
 const rowInputs = ref<HTMLInputElement[]>([]);
 
@@ -617,9 +621,15 @@ async function save(another = false) {
                       >
                         Change to “{{ hints[i]!.review.suggestion }}”
                       </button>
-                      <button type="button" class="secondary small" @click="kept.set(row.key, row.text)">
+                      <button
+                        v-if="!hints[i]!.review.refused"
+                        type="button"
+                        class="secondary small"
+                        @click="kept.set(row.key, row.text)"
+                      >
                         Keep as typed
                       </button>
+                      <span v-else>Saving refuses an amount with a unit.</span>
                     </template>
                     <template v-else-if="hints[i]!.review.remove">
                       <button type="button" class="secondary small" @click="removeRow(i)">
@@ -669,7 +679,12 @@ async function save(another = false) {
               <ol class="review-lines">
                 <li v-for="row in filled" :key="row.key">{{ row.text.trim() }}</li>
               </ol>
-              <p v-if="checksLeft" class="muted">
+              <p v-if="refusedLeft" class="muted">
+                {{ refusedLeft }} line{{ refusedLeft === 1 ? " starts" : "s start" }} with an amount,
+                which saving refuses.
+                <button type="button" class="link" @click="go(3)">Fix them</button>
+              </p>
+              <p v-else-if="checksLeft" class="muted">
                 {{ checksLeft }} line{{ checksLeft === 1 ? " has" : "s have" }} a check on
                 {{ checksLeft === 1 ? "it" : "them" }}; they save as typed.
                 <button type="button" class="link" @click="go(3)">Look again</button>
@@ -701,6 +716,11 @@ async function save(another = false) {
         </div>
 
         <aside v-if="user?.is_admin" class="add-aside" aria-label="Other ways to add">
+          <div v-if="book.kind === 'book' && !recipeId" class="aside-card">
+            <h2>Enter a whole book</h2>
+            <p>One row per recipe: page, title, ingredients. Each row saves as you go.</p>
+            <a :href="`/sources/${book.id}/bulk`" class="button-primary">Open bulk entry</a>
+          </div>
           <div class="aside-card">
             <h2>Bulk import</h2>
             <p>
