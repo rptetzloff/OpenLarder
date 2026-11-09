@@ -108,6 +108,18 @@ cd web && A11Y_BASE=http://localhost:8001 npm run a11y
 
 It needs Chrome (`CHROME` points at it if it isn't where the script looks).
 
+For speed, `scripts/perf/scale.sql` turns a copy of the catalog into one the
+size of production's (every recipe 19 more times), and `scripts/perf/bench.sh`
+times the search endpoints for any images against it. Local figures are a
+fraction of production's, whose CPUs are slower; compare images, not numbers.
+
+```sh
+docker compose exec -T db psql -U openlarder -d postgres -c "CREATE DATABASE openlarder_perf"
+docker compose exec -T db sh -c "pg_dump -U openlarder openlarder | psql -q -U openlarder -d openlarder_perf"
+docker compose exec -T db psql -U openlarder -d openlarder_perf < scripts/perf/scale.sql
+sh scripts/perf/bench.sh openlarder-api:latest
+```
+
 Once per clone, turn on the repo's git hooks:
 
 ```sh

@@ -213,6 +213,10 @@ OCR import of index pages, magazines and web sources, the write API.
       table to filter and sort (#70)
 - [x] Site design, part 2: the search page, with a source-kind filter and
       results that say where each recipe is (#69)
+- [x] Search and the ingredient picker made fast again: privacy filters
+      checked by what's hidden, an index for counting, the picker counting
+      only what matches, and no JIT; 3 to 6 times faster on a
+      production-sized copy (#71)
 - [x] An accessibility check in CI: every kind of page through axe-core's
       WCAG 2.1 AA rules in light and dark, and at phone width (#68)
 - [x] A light, dark or same-as-device theme choice in the footer (#67)

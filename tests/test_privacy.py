@@ -300,6 +300,23 @@ def test_an_admin_may_not_change_a_private_collection() -> None:
     assert not visibility.may_manage(ada, Source(kind="book"))
 
 
+async def test_a_private_sub_recipe_hides_nothing_else(secret, people, client) -> None:
+    """An option naming a sub-recipe has no ingredient; a NULL in the hidden
+    list must not hide every ingredient from everyone."""
+    ann = secret["ann"]
+    await _recipe(ann, secret["box"], "Pastry", ["Flour"])
+    await _recipe(ann, secret["box"], "Pie", ["Pastry (p. 1)", "Apples"])
+    admin = await people("ada", admin=True)
+    book = (await admin.post("/api/sources/manual", json={"title": "Open Book 2"})).json()["id"]
+    edition = (await admin.get(f"/api/sources/{book}")).json()["editions"][0]["id"]
+    await admin.post(
+        f"/api/sources/{book}/recipes",
+        json={"title": "Toast", "editions": [{"edition_id": edition}], "ingredients": ["Bread"]},
+    )
+    listed = (await client.get("/api/ingredients", params={"q": "Bread"})).json()
+    assert [i["name"] for i in listed["ingredients"]] == ["Bread"]
+
+
 async def test_the_owner_finds_their_own(secret) -> None:
     ann = secret["ann"]
     found = (await ann.get("/api/search", params={"q": "secret"})).json()

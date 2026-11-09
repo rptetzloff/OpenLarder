@@ -201,29 +201,31 @@ async def with_pages(
 async def list_ingredients(
     session: Session, viewer: Viewer, q: str = "", offset: int = Query(0, ge=0)
 ) -> IngredientList:
-    uses = (
-        select(
-            IngredientOption.ingredient_id,
-            func.count(func.distinct(IngredientOption.recipe_id)).label("n"),
-        )
-        .where(IngredientOption.ingredient_id.is_not(None), visibility.options_seen_by(viewer))
-        .group_by(IngredientOption.ingredient_id)
-        .subquery()
-    )
-    query = (
-        select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0))
-        .outerjoin(uses, uses.c.ingredient_id == Ingredient.id)
-        .where(visibility.ingredients_seen_by(viewer))
-    )
+    named: list[ColumnElement[bool]] = [visibility.ingredients_seen_by(viewer)]
     if q.strip():
         like = contains_pattern(" ".join(q.split()))
-        query = query.where(
+        named.append(
             Ingredient.name.ilike(like, escape="\\")
             | exists().where(
                 IngredientAlias.ingredient_id == Ingredient.id,
                 IngredientAlias.name.ilike(like, escape="\\"),
             )
         )
+    uses = select(
+        IngredientOption.ingredient_id,
+        func.count(func.distinct(IngredientOption.recipe_id)).label("n"),
+    ).where(IngredientOption.ingredient_id.is_not(None), visibility.options_seen_by(viewer))
+    if q.strip():
+        # Counting only the ingredients that match what's typed: the picker
+        # asks at every keystroke, and counting all of them first made each
+        # answer as slow as the whole list.
+        uses = uses.where(IngredientOption.ingredient_id.in_(select(Ingredient.id).where(*named)))
+    uses = uses.group_by(IngredientOption.ingredient_id).subquery()
+    query = (
+        select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0))
+        .outerjoin(uses, uses.c.ingredient_id == Ingredient.id)
+        .where(*named)
+    )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.execute(
         query.order_by(func.coalesce(uses.c.n, 0).desc(), func.lower(Ingredient.name))

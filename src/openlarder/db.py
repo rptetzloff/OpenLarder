@@ -13,6 +13,13 @@ from sqlalchemy.ext.asyncio import (
 
 from openlarder.config import get_settings
 
+# Postgres compiles a query it estimates as costly (JIT) before running it.
+# For this app's queries that only costs: a search by ingredient on a
+# production-sized catalog spent 290 ms compiling and 98 ms running. Off
+# for every connection the app makes, so nothing depends on the server's
+# settings.
+CONNECT_ARGS = {"options": "-c jit=off"}
+
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
@@ -22,7 +29,10 @@ def get_engine() -> AsyncEngine:
     if _engine is None:
         settings = get_settings()
         _engine = create_async_engine(
-            settings.database_url, echo=settings.database_echo, pool_pre_ping=True
+            settings.database_url,
+            echo=settings.database_echo,
+            pool_pre_ping=True,
+            connect_args=CONNECT_ARGS,
         )
     return _engine
 
