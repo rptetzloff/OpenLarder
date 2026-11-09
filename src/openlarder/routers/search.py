@@ -30,7 +30,8 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import case, exists, func, select
+from sqlalchemy import case, exists, func, or_, select
+from sqlalchemy.orm import aliased
 
 from openlarder import visibility
 from openlarder.auth import Viewer
@@ -88,6 +89,8 @@ class Found(BaseModel):
     sources: list[Named]
     # The ingredients searched for, in the order asked.
     ingredients: list[Named]
+    # Those you don't have or want: recipes needing one are left out.
+    without: list[Named] = []
     # Ingredient and source IDs asked for that name nothing now.
     missing: list[uuid.UUID]
     missing_sources: list[uuid.UUID]
@@ -115,9 +118,12 @@ async def search(
     source: Annotated[list[uuid.UUID] | None, Query()] = None,
     # Only these kinds of source: books, websites and so on.
     kind: Annotated[list[Kind] | None, Query()] = None,
+    # Ingredients you don't have or want (Ray, 2026-11-08).
+    without: Annotated[list[uuid.UUID] | None, Query()] = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     asked = list(dict.fromkeys(ingredient or []))
+    unwanted = list(dict.fromkeys(without or []))
     words = list(dict.fromkeys(q.casefold().split()))
     shelf = list(dict.fromkeys(source or []))
     if not asked and not words:
@@ -127,10 +133,11 @@ async def search(
     _too_many(len(asked), MAX_INGREDIENTS, "ingredients")
     _too_many(len(words), MAX_WORDS, "words of a title")
     _too_many(len(shelf), MAX_SOURCES, "sources")
+    _too_many(len(unwanted), MAX_INGREDIENTS, "ingredients to leave out")
 
     found_names = await session.execute(
         select(Ingredient.id, Ingredient.name).where(
-            Ingredient.id.in_(asked), visibility.ingredients_seen_by(viewer)
+            Ingredient.id.in_(asked + unwanted), visibility.ingredients_seen_by(viewer)
         )
     )
     names = {i: n for i, n in found_names}
@@ -145,7 +152,8 @@ async def search(
     found = Found(
         sources=[Named(id=i, name=titles[i]) for i in books],
         ingredients=[Named(id=i, name=names[i]) for i in known],
-        missing=[i for i in asked if i not in names],
+        without=[Named(id=i, name=names[i]) for i in unwanted if i in names],
+        missing=[i for i in asked + unwanted if i not in names],
         missing_sources=[i for i in shelf if i not in titles],
         q=" ".join(q.split()),
         recipes=[],
@@ -162,12 +170,36 @@ async def search(
         conditions.append(Recipe.source_id.in_(select(Source.id).where(Source.kind.in_(kind))))
     if books:
         conditions.append(Recipe.source_id.in_(books))
+    left_out = [i for i in unwanted if i in names]
+    if left_out:
+        conditions.append(~_needs_any(left_out))
     if not known:
         page, found.total = await recipes_where(session, *conditions, offset=offset, limit=PAGE)
         found.recipes = [Hit(**r.model_dump()) for r in page]
         return found
     found.recipes, found.total = await _best_match(session, known, conditions, offset)
     return found
+
+
+def _needs_any(unwanted: list[uuid.UUID]):
+    """A recipe needs one of these when a line of it names one (or one under
+    it) and offers nothing else: "Butter or Coconut Oil" doesn't need butter.
+    A sub-recipe as a choice is something else."""
+    banned = family(*unwanted, name="unwanted")
+    line = aliased(RecipeIngredient)
+    banned_choice = aliased(IngredientOption)
+    other_choice = aliased(IngredientOption)
+    return exists().where(
+        line.recipe_id == Recipe.id,
+        exists().where(
+            banned_choice.recipe_ingredient_id == line.id,
+            banned_choice.ingredient_id.in_(banned),
+        ),
+        ~exists().where(
+            other_choice.recipe_ingredient_id == line.id,
+            or_(other_choice.ingredient_id.is_(None), other_choice.ingredient_id.not_in(banned)),
+        ),
+    )
 
 
 async def _best_match(session: Session, have: list[uuid.UUID], conditions, offset: int):

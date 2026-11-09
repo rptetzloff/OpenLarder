@@ -452,6 +452,14 @@ button.secondary[aria-current="page"] {
   font-weight: 600;
   font-size: 0.9375rem;
 }
+.search-panel .panel-gap {
+  margin-top: 0.75rem;
+}
+/* What you're leaving out: struck through, so it reads as "not this". */
+.chip-unwanted {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
 .search-panel .help {
   margin: 0;
   color: var(--muted);
