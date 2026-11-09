@@ -127,6 +127,8 @@ onMounted(async () => {
       </div>
     </div>
   </header>
+  <!-- A page's admin tools go here, under the header (BookPage's Teleport). -->
+  <div id="admin-bar"></div>
   <main>
     <component :is="page" v-if="page" />
     <section v-else-if="needsName && user">
@@ -573,6 +575,272 @@ button.secondary[aria-current="page"] {
   align-items: center;
   justify-content: center;
   margin: 1.25rem 0 0;
+}
+
+/* The yellow band of admin tools under the header, from the wireframes. */
+.admin-bar {
+  background: var(--admin-bg);
+  border-bottom: 1px solid var(--admin-line);
+  font-size: 0.9375rem;
+}
+.admin-bar .bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 1.25rem;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0.5rem 1.5rem;
+}
+.admin-bar a {
+  color: var(--fg);
+}
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.crumbs a {
+  color: var(--link);
+}
+
+/* A source's page. */
+.source-head {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) 16rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 56rem) {
+  .source-head {
+    grid-template-columns: 6rem minmax(0, 1fr);
+  }
+  .source-elsewhere {
+    grid-column: 1 / -1;
+  }
+}
+.source-cover {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+.source-about h1 {
+  margin: 0.125rem 0 0.25rem;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.2;
+}
+.source-about p {
+  margin: 0.25rem 0;
+}
+.source-about .kind {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.source-about .credits a,
+.source-elsewhere a,
+.source-section a,
+.credit-line a {
+  color: var(--link);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+.tags li {
+  margin: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 0.8125rem;
+}
+.source-about .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.source-elsewhere {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.source-elsewhere h2 {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+}
+.source-elsewhere p {
+  margin: 0.25rem 0;
+}
+.source-section {
+  margin-top: 2rem;
+}
+.source-section h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+}
+.edition-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.edition-tabs button {
+  font: inherit;
+  font-size: 0.9375rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.edition-tabs button[aria-pressed="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--fg);
+  font-weight: 700;
+}
+.edition-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin: 0.75rem 0 0;
+}
+.edition-facts dt {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.edition-facts dd {
+  margin: 0;
+}
+.ingredient-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.ingredient-chips li {
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.9375rem;
+}
+.ingredient-chips .count {
+  margin-left: 0.375rem;
+  color: var(--muted);
+}
+.chip-toggle {
+  font: inherit;
+  border: none;
+  background: none;
+  color: var(--fg);
+  padding: 0;
+  cursor: pointer;
+}
+.table-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.table-head h2 {
+  margin: 0;
+}
+.table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.table-controls input,
+.table-controls select {
+  font: inherit;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+}
+.recipe-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  font-size: 0.9375rem;
+}
+.recipe-table th {
+  background: var(--surface);
+  text-align: left;
+  font-weight: 600;
+}
+.recipe-table th,
+.recipe-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.recipe-table td:first-child {
+  white-space: nowrap;
+}
+.recipe-table .lines {
+  color: var(--muted);
+}
+/* On a phone each row becomes a small card. */
+@media (max-width: 40rem) {
+  .recipe-table thead {
+    display: none;
+  }
+  .recipe-table tr {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .recipe-table td {
+    display: block;
+    padding: 0.125rem 0;
+    border: none;
+  }
+}
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.375rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.table-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+}
+.table-foot .status {
+  margin: 0;
+}
+.table-foot button.link {
+  color: var(--link);
+}
+.credit-line {
+  margin-top: 2rem;
 }
 
 /* The front page. */
