@@ -195,6 +195,11 @@ function goTo(n: number) {
   document.getElementById("results")?.scrollIntoView();
 }
 
+// "Onion", "Onion and Frog's Legs", "Onion, Garlic and Frog's Legs".
+function inWords(names: string[]) {
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "");
+}
+
 const summary = computed(() => {
   const r = result.value;
   if (!r) return "";
@@ -360,7 +365,7 @@ onMounted(async () => {
         <template v-else-if="result">
           <h2 class="results-head">
             {{ summary }}
-            <span v-if="chosen.length" class="muted"> · most of your ingredients first</span>
+            <span v-if="chosen.length" class="muted"> · closest to made first</span>
           </h2>
           <ul class="hits">
             <li v-for="r in result.recipes" :key="r.id" class="hit">
@@ -373,11 +378,9 @@ onMounted(async () => {
                   ><template v-if="whereItIs(r)"> · {{ whereItIs(r) }}</template>
                 </p>
                 <template v-if="r.lines !== null">
-                  <p class="hit-have">
-                    {{ r.needs.length ? `You have ${r.have} of its ${r.lines}` : `You have all ${r.lines}` }}
-                  </p>
-                  <p v-if="r.needs.length" class="hit-needs">
-                    Still needs: {{ r.needs.join(", ") }}
+                  <p class="hit-have">Uses your {{ inWords(r.uses) }}</p>
+                  <p class="hit-needs">
+                    {{ r.needs.length ? `Still needs: ${r.needs.join(", ")}` : "Nothing else on its list" }}
                   </p>
                 </template>
               </div>
