@@ -15,6 +15,8 @@ export interface ParsedRecipe {
   title: string;
   page: string | null;
   ingredients: string[];
+  // The book's chapter, from the list's Tag column.
+  chapter: string | null;
 }
 
 export interface Parsed {
@@ -124,6 +126,7 @@ export async function importBatch(
     title: string;
     page: string | null;
     ingredients: string[];
+    chapter: string | null;
   }[],
 ): Promise<{
   created: number;

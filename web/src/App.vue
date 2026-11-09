@@ -821,6 +821,14 @@ button.secondary[aria-current="page"] {
 .recipe-table .lines {
   color: var(--muted);
 }
+.recipe-table .chapter-note {
+  font-size: 0.8125rem;
+}
+.find-chapter {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
 /* On a phone each row becomes a small card. */
 @media (max-width: 40rem) {
   .recipe-table thead {
@@ -2135,6 +2143,15 @@ button.primary.small {
 .bulk-grid {
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+.bulk-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.bulk-row input.bulk-chapter {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
 }
 .bulk-row {
   display: grid;

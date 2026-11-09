@@ -114,6 +114,11 @@ Ingredient lines name the ingredient as the book does, without an amount ("caste
 
 Tags set on a Source (such as a diet focus like Gluten-Free) are inherited by every recipe in it, in addition to any tags set on the recipe itself.
 
+*Decided by Ray, 2026-11-09:*
+- **Chapters are not tags.** A recipe has a chapter: the section of its book it's in, as the book names it ("Yeast Breads", "Building Blocks"). Each book names its own, so a chapter is text on the recipe, shown on it and used to filter the book's recipe table. The household index's Tag column is the chapter (694 different values across 19,165 rows), and the importer reads it.
+- **Tags come from a fixed list**, one per kind (course, cuisine, diet, technique), which only admins add to, so search filters stay clean.
+- **The existing recipes are tagged by hand first**, by tagging whole sources (a gluten-free book tags all its recipes) and single recipes. **Then a local model suggests tags** (an n8n workflow like the merge one, using the title, chapter and ingredients), into the Suggestions queue for an admin to accept.
+
 A Recipe Ingredient holds one or more ranked Ingredient Options. Each option points to either a canonical Ingredient or another Recipe (a sub-recipe, such as a flour blend used throughout a gluten-free book). Sub-recipe links let users jump to the component recipe and its page, and shopping lists expand them into their own ingredients.
 
 Most lines have a single option. A line the book prints as "grapeseed oil or olive oil" has two: grapeseed oil first, then olive oil as the fallback. "Cheddar or any cheese" works the same way, even though cheddar sits under cheese in the hierarchy. Shopping lists use the first option. *Decided by Ray, 2026-11-06, because books print lines like this often.*

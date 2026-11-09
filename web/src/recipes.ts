@@ -14,6 +14,8 @@ export interface RecipePage {
 export interface Recipe {
   id: string;
   title: string;
+  // The chapter or section of its book, as the book names it.
+  chapter: string | null;
   source: {
     id: string;
     title: string;
@@ -91,6 +93,8 @@ export interface RecipeIn {
     aired_on: string | null;
     at: string | null;
   } | null;
+  // The chapter or section it's in, as the book names it.
+  chapter?: string | null;
   ingredients: string[];
 }
 

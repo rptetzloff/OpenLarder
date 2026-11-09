@@ -42,6 +42,8 @@ from openlarder.models import (
 )
 
 MAX_TITLE = 200
+# A chapter's name, as the book prints it.
+MAX_CHAPTER = 100
 MAX_PAGE = 20
 # An ingredient's name, not a line of method: "grapeseed oil or olive oil".
 # 150, not 100: the household index's longest lines, long "A or B" choices,
@@ -136,6 +138,8 @@ class RecipeEntry:
     issue_page: str | None = None
     # For a TV show's, podcast's or video channel's: the episode.
     episode: EpisodeEntry | None = None
+    # The chapter or section it's in, as the book names it.
+    chapter: str | None = None
 
 
 def _squash(text: str) -> str:
@@ -151,6 +155,7 @@ def clean(
     issue_date: date | None = None,
     issue_page: str | None = None,
     episode: EpisodeEntry | None = None,
+    chapter: str | None = None,
 ) -> RecipeEntry:
     """Normalise what was typed, or raise InvalidRecipe. Which of pages or
     web_address the recipe needs depends on its source (create, replace)."""
@@ -159,6 +164,9 @@ def clean(
         raise InvalidRecipe("Give the recipe its title as the book prints it.")
     if len(title) > MAX_TITLE:
         raise InvalidRecipe(f"Titles are at most {MAX_TITLE} characters.")
+    chapter = _squash(chapter or "") or None
+    if chapter and len(chapter) > MAX_CHAPTER:
+        raise InvalidRecipe(f"A chapter's name is at most {MAX_CHAPTER} characters.")
 
     label = _squash(issue or "") or (issue_date.isoformat() if issue_date else None)
     if label and len(label) > MAX_TITLE:
@@ -213,6 +221,7 @@ def clean(
         issue_date=issue_date,
         issue_page=in_issue if label else None,
         episode=episode,
+        chapter=chapter,
     )
 
 
@@ -402,7 +411,7 @@ async def _write_parts(session: AsyncSession, recipe: Recipe, entry: RecipeEntry
 
 async def create(session: AsyncSession, source_id: uuid.UUID, entry: RecipeEntry) -> Recipe:
     await _check_place(session, source_id, entry)
-    recipe = Recipe(source_id=source_id, title=entry.title)
+    recipe = Recipe(source_id=source_id, title=entry.title, chapter=entry.chapter)
     session.add(recipe)
     await session.flush()
     await _write_parts(session, recipe, entry)
@@ -418,6 +427,7 @@ async def replace(session: AsyncSession, recipe: Recipe, entry: RecipeEntry) -> 
     """
     await _check_place(session, recipe.source_id, entry)
     recipe.title = entry.title
+    recipe.chapter = entry.chapter
     await session.execute(delete(RecipeLocation).where(RecipeLocation.recipe_id == recipe.id))
     await session.execute(delete(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe.id))
     await _write_parts(session, recipe, entry)

@@ -11,6 +11,12 @@ const props = defineProps<{ bookId?: string; recipeId?: string; user?: Me | null
 
 const book = ref<Book | null>(null);
 const title = ref("");
+// The chapter or section it's in, as the book names it; the ones this
+// source has already are offered as you type.
+const chapter = ref("");
+const chapters = computed(() =>
+  [...new Set((book.value?.recipes ?? []).map((r) => r.chapter).filter(Boolean))].sort(),
+);
 // The title as saved, for the breadcrumbs while it's being changed.
 const savedTitle = ref("");
 // A website's recipe: the page it's on.
@@ -124,6 +130,7 @@ onMounted(async () => {
     }));
     if (existing) {
       title.value = savedTitle.value = existing.title;
+      chapter.value = existing.chapter ?? "";
       webAddress.value = existing.web_address ?? "";
       issue.value = existing.issue?.label ?? "";
       issueDate.value = existing.issue?.published_on ?? "";
@@ -328,6 +335,7 @@ async function save(another = false) {
               at: at.value || null,
             }
           : null,
+        chapter: chapter.value.trim() || null,
         ingredients: lines.value,
       },
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
@@ -386,6 +394,10 @@ async function save(another = false) {
                 <dt>Recipe</dt>
                 <dd>{{ title }}</dd>
               </div>
+              <div v-if="chapter.trim()">
+                <dt>Chapter</dt>
+                <dd>{{ chapter }}</dd>
+              </div>
               <div>
                 <dt>Where</dt>
                 <dd>{{ where }}</dd>
@@ -422,6 +434,20 @@ async function save(another = false) {
                   : `Title, as the ${place} prints it`
             }}</label>
             <input id="recipe-title" v-model="title" required maxlength="200" />
+            <template v-if="!onWeb && !inEpisode">
+              <label for="recipe-chapter">Chapter or section (optional)</label>
+              <input
+                id="recipe-chapter"
+                v-model="chapter"
+                maxlength="100"
+                list="recipe-chapters"
+                autocomplete="off"
+                :placeholder="chapters[0] ?? 'Yeast Breads'"
+              />
+              <datalist id="recipe-chapters">
+                <option v-for="c in chapters" :key="c!" :value="c!" />
+              </datalist>
+            </template>
 
             <template v-if="onWeb">
               <label for="recipe-address">Web address of the recipe</label>

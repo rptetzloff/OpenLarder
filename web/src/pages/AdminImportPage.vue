@@ -109,6 +109,7 @@ async function run() {
           title: r.title,
           page: r.page,
           ingredients: r.ingredients,
+          chapter: r.chapter,
         })),
       );
       totals.value.created += result.created;
