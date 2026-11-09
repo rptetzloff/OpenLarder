@@ -52,7 +52,7 @@ def _titles(found):
     return [r["title"] for r in found["recipes"]]
 
 
-async def test_recipes_needing_least_come_first(admin, work, adb, client) -> None:
+async def test_recipes_using_most_of_yours_come_first(admin, work, adb, client) -> None:
     await _add(admin, work, "Rhubarb Crumble", "12", ["Rhubarb", "Butter", "Ginger", "Oats"])
     await _add(admin, work, "Rhubarb Fool", "14", ["Rhubarb", "Cream"])
     await _add(admin, work, "Ginger Biscuits", "30", ["Ginger", "Rhubarb"])
@@ -67,16 +67,17 @@ async def test_recipes_needing_least_come_first(admin, work, adb, client) -> Non
     ]
     assert found["missing"] == []
     assert found["total"] == 4
-    # Nothing else needed first, using more of yours before less; then the
-    # fewest lines still needed.
+    # Using both of yours before one (Ray, 2026-11-08: frog's legs and
+    # garlic should put the recipes with both first); then the most of the
+    # recipe you have, then the fewest lines still needed.
     assert [
         (r["title"], r["pages"], r["have"], r["lines"], r["needs"]) for r in found["recipes"]
     ] == [
         ("Ginger Biscuits", ["30"], 2, 2, []),
-        ("Candied Ginger", ["31"], 1, 1, []),
-        ("Rhubarb Fool", ["14"], 1, 2, ["Cream"]),
         # Missing lines in the book's order.
         ("Rhubarb Crumble", ["12"], 2, 4, ["Butter", "Oats"]),
+        ("Candied Ginger", ["31"], 1, 1, []),
+        ("Rhubarb Fool", ["14"], 1, 2, ["Cream"]),
     ]
 
 
