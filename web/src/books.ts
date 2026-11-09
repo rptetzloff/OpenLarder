@@ -46,6 +46,13 @@ export interface Book {
     issue: string | null;
     episode: string | null;
     at: string | null;
+    // A book's recipe: its page in each edition it's in (null, not recorded).
+    editions: { edition_id: string; page: string | null }[];
+    // The first of its ingredient lines, and how many there are.
+    lines: string[];
+    line_count: number;
+    // Another recipe here uses it as a component.
+    component: boolean;
   }[];
   // A magazine's or newspaper's issues, newest first.
   issues: { id: string; label: string; published_on: string | null }[];
@@ -331,6 +338,12 @@ export const KIND_NAMES: Record<string, string> = {
   packaging: "product",
   family: "family collection",
 };
+
+// A kind of source in the plural, as a heading says it: "Books", "TV shows".
+export function kindPlural(kind: string): string {
+  const name = KIND_NAMES[kind] ?? "source";
+  return `${name[0].toUpperCase()}${name.slice(1)}s`;
+}
 
 // An issue as people say it: one named by its date ("2024-09-18", as a
 // newspaper's is) in words, "September 18, 2024"; any other as named.

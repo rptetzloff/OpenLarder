@@ -35,6 +35,7 @@ from openlarder.models import (
     IngredientOption,
     Issue,
     Recipe,
+    RecipeIngredient,
     RecipeLocation,
     Source,
     SourceCredit,
@@ -86,6 +87,15 @@ class EditionOut(BaseModel):
     open_library_url: str | None
 
 
+class PlaceSummary(BaseModel):
+    edition_id: uuid.UUID
+    page: str | None
+
+
+# Ingredient lines a recipe list shows before "+N".
+FIRST_LINES = 3
+
+
 class RecipeSummary(BaseModel):
     id: uuid.UUID
     title: str
@@ -98,6 +108,13 @@ class RecipeSummary(BaseModel):
     # in it.
     episode: str | None = None
     at: str | None = None
+    # A book's recipe: its page in each edition it's in (None, not recorded).
+    editions: list[PlaceSummary] = []
+    # The first of its ingredient lines as written, and how many there are.
+    lines: list[str] = []
+    line_count: int = 0
+    # Another recipe here uses it as a component ("Biscuit Blend (p. 14)").
+    component: bool = False
 
 
 class IssueSummary(BaseModel):
@@ -342,6 +359,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
             recipes_module.clock(at) if at is not None else None,
         )
     pages: dict[uuid.UUID, list[tuple[int, str | None]]] = {}
+    placed: dict[uuid.UUID, list[PlaceSummary]] = {}
     for recipe_id, edition_id, page in (
         await session.execute(
             select(RecipeLocation.recipe_id, RecipeLocation.edition_id, RecipeLocation.page).where(
@@ -350,6 +368,25 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         )
     ).all():
         pages.setdefault(recipe_id, []).append((edition_order.get(edition_id, 0), page))
+        if edition_id is not None:
+            placed.setdefault(recipe_id, []).append(PlaceSummary(edition_id=edition_id, page=page))
+    lines: dict[uuid.UUID, list[str]] = {}
+    for recipe_id, line in await session.execute(
+        select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
+        .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
+        .where(Recipe.source_id == source_id)
+        .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
+    ):
+        lines.setdefault(recipe_id, []).append(line)
+    components = set(
+        (
+            await session.scalars(
+                select(IngredientOption.sub_recipe_id)
+                .join(Recipe, Recipe.id == IngredientOption.sub_recipe_id)
+                .where(Recipe.source_id == source_id)
+            )
+        ).all()
+    )
     uses = func.count(func.distinct(IngredientOption.recipe_id))
     top = await session.execute(
         select(Ingredient.id, Ingredient.name, uses)
@@ -405,6 +442,10 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
                 issue=issue_of.get(r.id),
                 episode=episode_of[r.id][0] if r.id in episode_of else None,
                 at=episode_of[r.id][1] if r.id in episode_of else None,
+                editions=placed.get(r.id, []),
+                lines=lines.get(r.id, [])[:FIRST_LINES],
+                line_count=len(lines.get(r.id, [])),
+                component=r.id in components,
             )
             for r in recipes
         ],

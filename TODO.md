@@ -17,8 +17,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       sections and footer, and the front page's search, "cook with what you
       have" and recently added sources. **Search (#69):** the panel, a
       source-kind filter, result cards with where each recipe is, numbered
-      pages. Next, in order: a source's
-      page (with the admin bar and breadcrumbs); a recipe's page; the
+      pages. **A source's page (#70):** the admin bar and breadcrumbs, the
+      edition tabs, most-used ingredients, and the recipes as a table
+      (page, title, first ingredients, components) to filter and sort.
+      Next, in order: a recipe's page; the
       ingredient and author pages; then adding a recipe and entering a whole
       book, which are contribution features too. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
@@ -207,6 +209,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Site design, part 3: a source's page, with edition tabs and a recipe
+      table to filter and sort (#70)
 - [x] Site design, part 2: the search page, with a source-kind filter and
       results that say where each recipe is (#69)
 - [x] An accessibility check in CI: every kind of page through axe-core's
