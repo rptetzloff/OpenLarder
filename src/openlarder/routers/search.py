@@ -203,12 +203,24 @@ def _needs_any(unwanted: list[uuid.UUID]):
 
 
 async def _best_match(session: Session, have: list[uuid.UUID], conditions, offset: int):
-    """Recipes covering any line with what you have, by the share of lines
-    covered (so complete ones come first), then fewest still needed, most of
-    yours used, then book and title."""
+    """Recipes covering any line with what you have: those using the most of
+    your ingredients first, then by the share of their lines you have (so
+    complete ones come first), fewest still needed, then book and title.
+    *Ray, 2026-11-08:* frog's legs and garlic should put the recipes using
+    both first; ranking by share alone put one-line garlic pastes there."""
     yours = family(*have, name="yours")
-    # Which of yours each match is under, to say which a recipe uses.
+    # Which of yours each match is under: to count how many of yours a
+    # recipe uses, and to say which.
     roots = rooted_family(*have, name="yours_by_root")
+    used = (
+        select(
+            IngredientOption.recipe_id.label("recipe_id"),
+            func.count(func.distinct(roots.c.root)).label("used"),
+        )
+        .join(roots, roots.c.id == IngredientOption.ingredient_id)
+        .group_by(IngredientOption.recipe_id)
+        .subquery()
+    )
     covered = exists().where(
         IngredientOption.recipe_ingredient_id == RecipeIngredient.id,
         IngredientOption.ingredient_id.in_(yours),
@@ -238,6 +250,7 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
     matching = (
         select(Recipe.id, Recipe.title, Source.id, Source.title, tally.c.have, tally.c.lines)
         .join(tally, tally.c.recipe_id == Recipe.id)
+        .join(used, used.c.recipe_id == Recipe.id)
         .join(Source, Source.id == Recipe.source_id)
         .where(*conditions)
     )
@@ -245,6 +258,7 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
     rows = (
         await session.execute(
             matching.order_by(
+                used.c.used.desc(),
                 # True division: SQLAlchemy makes / between integers a real one.
                 (tally.c.have / tally.c.lines).desc(),
                 (tally.c.lines - tally.c.have).asc(),

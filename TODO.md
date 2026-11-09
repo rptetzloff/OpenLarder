@@ -216,6 +216,8 @@ OCR import of index pages, magazines and web sources, the write API.
       list, and who added it (#75)
 - [x] "I don't have or don't want": search leaves out recipes that need an
       ingredient you name, keeping those that offer another choice (#73)
+- [x] Search ranks the recipes using the most of your ingredients first,
+      then the most of the recipe you have (#76)
 - [x] Search results say which of your ingredients each recipe uses, and
       what it still needs, instead of "You have all 1" (#72)
 - [x] Site design, part 3: a source's page, with edition tabs and a recipe
