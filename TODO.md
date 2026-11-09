@@ -167,6 +167,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         larder, or both; and whether shared means view or edit;
       - whether a book shelf ("books I own", Phase 2) lives alongside it.
 
+- [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
+      through n8n suggest ingredient merges, hierarchy, fixes for flagged
+      lines and author names, for an admin to accept; they never write to
+      the catalog. Plan and open decisions in SCOPING.md. Needs a
+      `suggestion` table and pgvector when it starts.
+
 ## Found along the way
 
 - [ ] **Merge two books**: nothing can merge two records of one book yet.

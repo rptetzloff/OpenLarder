@@ -294,6 +294,39 @@ The flag pages are built: Admin → Flagged recipes lists every open flag, filte
 - Duplicate detection on books (ISBN) and recipes (title + work)
 - Report button on all user content
 
+## LLM-assisted data processing
+
+Local models help clean and extend the catalog; they never write to it directly. Every output is a suggestion with a reason, applied by an admin or sent through review like any other edit. Rules come first: the entry rules, the detector and key-based matching stay the source of truth, and a model is asked only about what they can't settle. *Ray, 2026-11-08: local LLMs through n8n, on an RTX A4000 (16 GB) and a laptop RTX 4080 (12 GB).*
+
+**Uses**
+
+- **Merging ingredient variants.** Embeddings find near-duplicate canonical ingredients; the model proposes "merge X into Y", "X is another name for Y" or "leave apart", with a reason.
+- **Hierarchy.** Proposed parent links ("Fresh Ginger" under "Ginger"), checked against Wikidata's "is a kind of" where it has one.
+- **Flagged lines.** Suggested fixes for typos ("Lemon Jucie"), lines an "or" split wrongly ("Ham or Chicken Stock"), and tags that read like notes. These attach to the existing flags as a suggested fix.
+- **Allergen seeding** (Phase 2). A first pass per canonical ingredient, reviewed before use, shown under the crowdsourced notice like any other allergen data.
+- **Index-page OCR** (Phase 3). A vision model reads photos of a book's index into rows for bulk entry, for review before saving.
+- **Author names.** Cleanup the catalogue-form rules miss.
+
+**How it runs**
+
+- n8n calls a local model server (Ollama or vLLM) and an embedding model. Matching is done with embeddings stored in Postgres (pgvector); only ambiguous cases go to the language model.
+- Output is structured JSON against a fixed schema. Anything that doesn't parse is discarded, not repaired.
+- Suggestions go to a `suggestion` table, or onto an existing flag: the target record, the proposed change, a reason, a confidence score, the model and prompt version, and when it ran. An admin accepts or dismisses each, individually or in batches by type and confidence.
+- Accepted suggestions are applied as the admin's edit, so they follow the same history and review rules as anything else. A bad batch can be found and reverted by model and prompt version.
+- Jobs run in batches off-peak and are safe to rerun: a record that already has an open suggestion of the same kind is skipped.
+
+**Limits**
+
+- Prompts carry catalog data only: names, ingredient lines, pages. Never a book's method, headnotes or other text, so none ends up stored or reproduced.
+- Nothing a model produces is shown to users as fact until a person has accepted it.
+- Model output that a person accepts becomes ordinary catalog data under the ODbL.
+
+**Open decisions**
+
+- [ ] Which models (language, embedding, vision), and where each runs
+- [ ] Confidence threshold for batch-accepting, if any
+- [ ] Whether the A4000 hosts a model server permanently, or n8n starts jobs on demand
+
 ## Open API and data licensing
 
 Decision: the catalog is open data under the ODbL (Open Database License), the same license OpenStreetMap uses. Contributors agree to it at signup, before the first public contribution.
