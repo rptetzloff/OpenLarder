@@ -315,6 +315,32 @@ Local models help clean and extend the catalog; they never write to it directly.
 - Accepted suggestions are applied as the admin's edit, so they follow the same history and review rules as anything else. A bad batch can be found and reverted by model and prompt version.
 - Jobs run in batches off-peak and are safe to rerun: a record that already has an open suggestion of the same kind is skipped.
 
+**Where the models touch the site** *(Ray, 2026-11-08)*
+
+Mostly they don't. They work on the database in the background, and the site only shows what they leave behind.
+
+- **Batch jobs (almost everything).** n8n, on a schedule or a button, reads ingredients and lines from Postgres; the embedding model finds near neighbours among vectors stored in Postgres; the language model judges each candidate pair; n8n writes rows to the `suggestion` table. The site's admin pages show a Suggestions queue with Accept and Dismiss, and Accept is an ordinary admin edit (rename, merge, set parent). Visitors never wait on a GPU: if the laptop is asleep or the A4000 is busy, nothing on the site breaks, and the queue just doesn't grow that night.
+- **Live, while someone types (optional, later).** "Did you mean…" for "sweet rice flower" in the contribute form or bulk entry has to answer in under a second. First choice: no model at all, as `pg_trgm` already handles typos. Then, if wanted, embeddings only: the backend sends the typed text to the embedding model, gets one vector back and asks Postgres for the nearest ingredients, which takes milliseconds and catches matches by meaning that trigrams miss ("cornflour" → cornstarch). Never the language model in this path: it's too slow, and the site would depend on the GPU being up. If the embedding server doesn't answer, the site falls back to `pg_trgm` without saying so.
+- **Plumbing.** Ollama runs on the A4000 box; the backend and n8n call it over the LAN (for example `http://gpu-box:11434`). It is not exposed through the Cloudflare tunnel.
+- **Enforced in Postgres.** n8n gets a database role that can read the catalog and write only to `suggestion`, never to the catalog tables, so "suggests, never writes" is the database's rule, not just a convention.
+
+So the site itself grows two things: an admin suggestion queue, and optionally a smarter "did you mean" that degrades gracefully when the GPU is off.
+
+**Models and memory** *(Ray, 2026-11-08; estimates for 4-bit quantization, Q4_K_M, with a modest context, to be checked with `ollama ps` or `nvidia-smi`)*
+
+| Model | Role | Approx. VRAM | Where |
+| --- | --- | --- | --- |
+| Gemma 4 12B (Q4) | Language model: judges merges and hierarchy, fixes lines | ~8 GB weights + 1–2 GB context ≈ 9–10 GB | A4000 |
+| EmbeddingGemma 2 (740M) | Embeddings: similarity | ~0.5–1.5 GB | A4000, beside the 12B |
+| Llama 3.1 8B (Q4) | Language model: development, testing, a baseline to compare | ~5 GB + context ≈ 6–7 GB | Laptop 4080 |
+| Gemma 4 E4B (Q4) | Small language model: high-volume simple jobs | ~3–5 GB | Either |
+| Gemma 4 26B A4B (Q4) | Bigger language model if the 12B isn't good enough | ~15–17 GB: too tight for 16 GB with context | Not without offloading |
+
+- **The A4000 (16 GB)** holds the production pair: the 12B and the embedding model together come to about 11 GB, so both stay loaded with headroom.
+- **The laptop 4080 (12 GB)** is for development: Llama 3.1 8B, E4B, or the 12B alone at a smaller context.
+- **What changes memory use:** context length (the KV cache grows with it; prompts are a few ingredient names, so `num_ctx` around 4096 rather than a large default); parallel requests (`OLLAMA_NUM_PARALLEL` multiplies the KV cache; start at 1–2 for batch jobs); quantization (Q8 roughly doubles the weights, the 12B to ~13 GB, for a small gain; Q4_K_M is the usual balance); and keeping both loaded (`OLLAMA_MAX_LOADED_MODELS=2` and a long `OLLAMA_KEEP_ALIVE`, so the embedding model isn't evicted whenever the language model loads).
+- **Choosing.** A test of 100 merges runs first on Llama 3.1 8B and Gemma 4 12B. If the 12B is clearly better, it is the production model; the 26B is worth the trouble only if both miss a lot.
+
 **Limits**
 
 - Prompts carry catalog data only: names, ingredient lines, pages. Never a book's method, headnotes or other text, so none ends up stored or reproduced.
@@ -323,9 +349,9 @@ Local models help clean and extend the catalog; they never write to it directly.
 
 **Open decisions**
 
-- [ ] Which models (language, embedding, vision), and where each runs
+- [ ] Which models (language, embedding, vision), and where each runs. *Proposed above: Gemma 4 12B and EmbeddingGemma 2 on the A4000, chosen after the 100-merge test; a vision model for index OCR is still open.*
 - [ ] Confidence threshold for batch-accepting, if any
-- [ ] Whether the A4000 hosts a model server permanently, or n8n starts jobs on demand
+- [ ] Whether the A4000 hosts a model server permanently, or n8n starts jobs on demand. *The live "did you mean" path wants the embedding model up whenever the site is; batch jobs don't care.*
 
 ## Open API and data licensing
 
