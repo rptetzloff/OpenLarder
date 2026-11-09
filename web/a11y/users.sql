@@ -14,3 +14,27 @@ SELECT id, sha256(('a11y-check-token-' || subject || '-0123456789abcdef')::bytea
        now() + interval '1 day'
 FROM people
 ON CONFLICT (token_hash) DO UPDATE SET expires_at = EXCLUDED.expires_at;
+
+-- Suggestions for the admin queue, as n8n writes them; nothing in the API
+-- adds one. The ingredients are used by nothing, so anyone may see them; the
+-- third suggestion names one that has gone.
+WITH i AS (
+  INSERT INTO ingredients (name, match_key)
+  VALUES ('Quick-Cooking Oats', 'a11y quick cooking oat'), ('Quick-Cook Oats', 'a11y quick cook oat')
+  ON CONFLICT DO NOTHING
+  RETURNING id, name
+), pair AS (
+  SELECT (SELECT id FROM i WHERE name = 'Quick-Cooking Oats') AS a,
+         (SELECT id FROM i WHERE name = 'Quick-Cook Oats') AS b
+)
+INSERT INTO suggestions (kind, target, proposal, reason, confidence, model, prompt_version)
+SELECT kind, jsonb_build_array(LEAST(a, x)::text, GREATEST(a, x)::text),
+       jsonb_build_object('a_id', a, 'b_id', x, 'a_name', 'Quick-Cooking Oats', 'b_name', b_name,
+                          'decision', decision, 'keep_name', 'a', 'similarity', similarity),
+       'Interchangeable names for the same product.', 1, 'gemma4:12b', 'merge-v1'
+FROM pair, (VALUES ('merge', 'same', '0.9875', 'Quick-Cook Oats', true),
+                   ('parent', 'b_under_a', '0.84', 'Quick-Cook Oats', true),
+                   ('merge', 'same', '0.81', 'Rolled Oats', false)) AS v(kind, decision, similarity, b_name, real),
+     LATERAL (SELECT CASE WHEN real THEN b ELSE gen_random_uuid() END AS x) AS other
+WHERE a IS NOT NULL
+ON CONFLICT DO NOTHING;

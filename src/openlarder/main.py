@@ -33,6 +33,7 @@ from openlarder.routers import (
     search,
     sources,
     substitutions,
+    suggestions,
     web_pages,
 )
 
@@ -83,6 +84,7 @@ app.include_router(groups.router)
 app.include_router(ingredients.router)
 app.include_router(search.router)
 app.include_router(substitutions.router)
+app.include_router(suggestions.router)
 app.include_router(web_pages.router)
 
 

@@ -65,6 +65,7 @@ async function archiveAll() {
         <li><a href="/admin/import">Import</a>: add books and recipes from a book list and a recipe list.</li>
         <li><a href="/admin/imports">Import history</a>: every import, with its totals and report.</li>
         <li><a href="/admin/flags">Flagged recipes</a>: everything an entry or import flagged for a look.</li>
+        <li><a href="/admin/suggestions">Suggestions</a>: ingredients a local model thinks are the same, or belong under another.</li>
       </ul>
       <h2>References and ingredients</h2>
       <p class="status">

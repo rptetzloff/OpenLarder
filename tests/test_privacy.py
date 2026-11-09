@@ -6,6 +6,7 @@ A new route with a path parameter it doesn't know fails it too, so each one
 gets asked.
 """
 
+import json
 import uuid
 
 import httpx2
@@ -502,3 +503,32 @@ async def test_an_owner_with_a_collection_is_kept(secret, adb) -> None:
     with pytest.raises(Exception, match="fk_sources_owner_id_users"):
         async with adb.begin_nested():
             await adb.execute(text("DELETE FROM users WHERE subject = 'ann'"))
+
+
+async def test_a_suggestion_naming_a_private_ingredient_stays_hidden(secret, people, adb) -> None:
+    """n8n read only public data, but a suggestion outlives that: the salt
+    is used only by Ann's box now, so an admin is neither shown nor able to
+    act on a suggestion naming it."""
+    proposal = {
+        "a_id": str(secret["above"]),
+        "b_id": str(secret["salt"]),
+        "decision": "same",
+        "keep_name": "a",
+        "similarity": "0.9",
+    }
+    suggestion = await adb.scalar(
+        text(
+            "INSERT INTO suggestions (kind, target, proposal, model, prompt_version)"
+            " VALUES ('merge', CAST(:t AS jsonb), CAST(:p AS jsonb), 'm', 'v') RETURNING id"
+        ),
+        {
+            "t": json.dumps(sorted([str(secret["above"]), str(secret["salt"])])),
+            "p": json.dumps(proposal),
+        },
+    )
+    admin = await people("ada", admin=True)
+    page = (await admin.get("/api/suggestions")).json()
+    assert page["suggestions"] == [] and page["open_by_kind"] == {}
+    for action in ("accept", "dismiss"):
+        refused = await admin.post(f"/api/suggestions/{suggestion}/{action}", json={})
+        assert refused.status_code == 404
