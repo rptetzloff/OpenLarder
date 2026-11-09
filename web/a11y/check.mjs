@@ -120,6 +120,7 @@ function pages(s) {
     ["/search", null],
     [`/search?i=${s.cheddar}`, null],
     ["/search?q=biscuits", null],
+    ["/search?q=biscuits&kind=book&kind=website", null],
     ["/sources", null],
     ["/sources", "cook"],
     [`/sources/${s.book.id}`, null],
