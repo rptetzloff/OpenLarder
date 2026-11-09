@@ -46,7 +46,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       to Z, and "Top level only" to browse the hierarchy. **Authors (#83):** a
       table with what each is known for (their source with the most
       recipes) and their sources and recipes, people or organisations, A to
-      Z or most recipes. Every page is now in the redesigned style. #17's sign-in screens
+      Z or most recipes. Every page is now in the redesigned style. Then the
+      admin and account pages, in three PRs (Ray, 2026-11-09): **Admin
+      (#87):** one admin band on every admin page and Sources, the current
+      page marked; the overview as cards with what's waiting and the
+      catch-up tools as panels; flagged recipes and import history as
+      tables; suggestions as cards; filters as buttons with counts. Next:
+      your account and My flagged recipes; then groups, a group and
+      invites. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).

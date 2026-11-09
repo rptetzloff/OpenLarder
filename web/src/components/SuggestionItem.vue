@@ -37,9 +37,9 @@ async function act(action: "accept" | "dismiss") {
 </script>
 
 <template>
-  <li class="flag suggestion">
+  <li class="suggestion">
     <template v-if="s.kind === 'merge' && s.a && s.b">
-      <p class="flag-what"><strong>Same ingredient?</strong></p>
+      <h2>Same ingredient?</h2>
       <fieldset v-if="s.status === 'open' && s.actionable" class="keep-name">
         <legend>Keep the name</legend>
         <label v-for="side in (['a', 'b'] as const)" :key="side">
@@ -57,7 +57,7 @@ async function act(action: "accept" | "dismiss") {
       </p>
     </template>
     <template v-else-if="s.kind === 'parent' && child && parent">
-      <p class="flag-what"><strong>One under another?</strong></p>
+      <h2>One under another?</h2>
       <p>
         <a v-if="child.exists" :href="`/ingredients/${child.id}`">{{ child.name }}</a>
         <span v-else>{{ child.name }} (gone)</span>
@@ -66,7 +66,7 @@ async function act(action: "accept" | "dismiss") {
         <span v-else>{{ parent.name }} (gone)</span>
       </p>
     </template>
-    <p v-else class="flag-what"><strong>{{ s.kind }}</strong></p>
+    <h2 v-else>{{ s.kind }}</h2>
     <p v-if="s.reason" class="suggestion-reason">{{ s.reason }}</p>
     <p class="byline">
       <span v-if="s.certainty" :class="['certainty', s.certainty === 'certain' ? 'tone-ok' : 'tone-info']">{{ s.certainty === "certain" ? "Certain" : "Likely" }}</span>
@@ -83,11 +83,13 @@ async function act(action: "accept" | "dismiss") {
         An ingredient this names has been merged or deleted since, so it can only be dismissed.
       </p>
       <p v-else-if="!s.actionable" class="status">This can't be accepted here yet.</p>
-      <div class="admin-actions">
-        <button v-if="s.actionable" type="button" class="link" :disabled="busy" @click="act('accept')">
+      <div class="row-actions">
+        <button v-if="s.actionable" type="button" class="primary small" :disabled="busy" @click="act('accept')">
           Accept
         </button>
-        <button type="button" class="link" :disabled="busy" @click="act('dismiss')">Dismiss</button>
+        <button type="button" class="secondary small" :disabled="busy" @click="act('dismiss')">
+          Dismiss
+        </button>
       </div>
     </template>
     <p v-if="error" class="error" role="alert">{{ error }}</p>

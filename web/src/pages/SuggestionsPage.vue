@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import AdminBar from "../components/AdminBar.vue";
 import SuggestionItem from "../components/SuggestionItem.vue";
 import { KIND_LABELS, type Suggestion, type SuggestionPage, fetchSuggestions } from "../suggestions";
 import type { Me } from "../me";
@@ -17,6 +18,12 @@ const loading = ref(false);
 const allowed = computed(() => !!props.user?.is_admin);
 const openTotal = computed(() =>
   Object.values(page.value?.open_by_kind ?? {}).reduce((a, b) => a + b, 0),
+);
+// The kinds worth a button: those with open suggestions, and the one chosen.
+const kindChoices = computed(() =>
+  Object.keys(KIND_LABELS).filter(
+    (k) => (page.value?.open_by_kind[k] ?? 0) > 0 || k === kind.value || state.value !== "open",
+  ),
 );
 
 async function load(more = false) {
@@ -51,48 +58,70 @@ watch(allowed, (yes) => {
 </script>
 
 <template>
-  <article>
-    <p><a href="/admin">← Admin</a></p>
-    <h1>Suggestions</h1>
-    <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see suggestions.</p>
-    <p v-else-if="!allowed" class="status">This is for admins.</p>
-    <template v-else>
-      <p class="status">
+  <AdminBar v-if="user?.is_admin" current="/admin/suggestions" />
+  <article class="wide">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/admin">Admin</a>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">Suggestions</span>
+    </nav>
+    <div class="list-head">
+      <h1>Suggestions</h1>
+      <p class="muted">
         A local model compared ingredients that look alike and suggests what to do with them.
         Accepting does it as if you'd done it on the ingredient's page; a merged name stays as
         another name for the one kept, so lines written that way still find it. Those the model is
         certain of come first, then those it thinks likely, each with the closest pairs first.
       </p>
-      <div class="flag-filters">
-        <label>
-          Show
-          <select v-model="state">
-            <option value="open">Open ({{ openTotal.toLocaleString() }})</option>
-            <option value="decided">Decided</option>
-          </select>
-        </label>
-        <label>
-          Kind
-          <select v-model="kind">
-            <option value="">Any</option>
-            <option v-for="(label, k) in KIND_LABELS" :key="k" :value="k">
-              {{ label }}{{ state === "open" ? ` (${(page?.open_by_kind[k] ?? 0).toLocaleString()})` : "" }}
-            </option>
-          </select>
-        </label>
+    </div>
+    <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see suggestions.</p>
+    <p v-else-if="!allowed" class="status">This is for admins.</p>
+    <template v-else>
+      <div class="list-filters">
+        <div class="kind-filter" role="group" aria-label="Show">
+          <button type="button" class="secondary small" :aria-pressed="state === 'open'" @click="state = 'open'">
+            Open <span class="count">{{ openTotal.toLocaleString() }}</span>
+          </button>
+          <button
+            type="button"
+            class="secondary small"
+            :aria-pressed="state === 'decided'"
+            @click="state = 'decided'"
+          >
+            Decided
+          </button>
+        </div>
+        <div v-if="kindChoices.length" class="kind-filter" role="group" aria-label="Kind">
+          <button type="button" class="secondary small" :aria-pressed="!kind" @click="kind = ''">
+            Any kind
+          </button>
+          <button
+            v-for="k in kindChoices"
+            :key="k"
+            type="button"
+            class="secondary small"
+            :aria-pressed="kind === k"
+            @click="kind = kind === k ? '' : k"
+          >
+            {{ KIND_LABELS[k] }}
+            <span v-if="state === 'open'" class="count">
+              {{ (page?.open_by_kind[k] ?? 0).toLocaleString() }}
+            </span>
+          </button>
+        </div>
       </div>
       <p v-if="failed" role="alert">The suggestions couldn't be loaded. Try reloading the page.</p>
       <p v-else-if="!page" class="status">Loading…</p>
       <p v-else-if="items.length === 0" class="status">
         {{ state === "open" ? "No open suggestions." : "None decided yet." }}
       </p>
-      <ul v-else class="flag-list">
+      <ul v-else class="suggestion-cards">
         <SuggestionItem v-for="s in items" :key="s.id" :suggestion="s" @decided="decided" />
       </ul>
       <button
         v-if="page && items.length < page.total"
         type="button"
-        class="primary"
+        class="secondary show-more"
         :disabled="loading"
         @click="load(true)"
       >

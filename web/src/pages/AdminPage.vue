@@ -1,11 +1,41 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import AdminBar from "../components/AdminBar.vue";
 import { type BookSummary, listSources } from "../books";
+import { fetchFlags } from "../flags";
+import { fetchSuggestions } from "../suggestions";
 import { archiveMissing } from "../recipes";
 import type { Me } from "../me";
 
-defineProps<{ user: Me | null | undefined }>();
+const props = defineProps<{ user: Me | null | undefined }>();
 document.title = "Admin · OpenLarder";
+
+// What's waiting, on each card; null until known, or if it couldn't be.
+const openFlags = ref<number | null>(null);
+const openSuggestions = ref<number | null>(null);
+const imports = ref<number | null>(null);
+const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
+
+async function loadCounts() {
+  const [flags, suggestions, runs] = await Promise.allSettled([
+    fetchFlags({ scope: "all", state: "open" }),
+    fetchSuggestions({ state: "open" }),
+    fetch("/api/import/runs").then((r) => (r.ok ? r.json() : Promise.reject())),
+  ]);
+  if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
+  if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
+  if (runs.status === "fulfilled") imports.value = runs.value.length;
+}
+// Who's signed in arrives after the page mounts.
+watch(
+  () => props.user?.is_admin,
+  (yes) => {
+    if (yes) loadCounts();
+  },
+  { immediate: true },
+);
+const n = (v: number | null, one: string, many: string) =>
+  v === null ? "" : `${v.toLocaleString()} ${v === 1 ? one : many}`;
 
 // Links page references and matches ingredients in recipes stored before
 // either existed. One
@@ -57,35 +87,69 @@ async function archiveAll() {
 </script>
 
 <template>
-  <article>
-    <h1>Admin</h1>
+  <AdminBar v-if="user?.is_admin" current="/admin" />
+  <article class="wide admin-page">
+    <div class="list-head">
+      <h1>Admin</h1>
+      <p class="muted">Keeping the catalog in order: what's been flagged or suggested, and imports.</p>
+    </div>
     <p v-if="!user?.is_admin" class="status">This is for admins.</p>
     <template v-else>
-      <ul>
-        <li><a href="/admin/import">Import</a>: add books and recipes from a book list and a recipe list.</li>
-        <li><a href="/admin/imports">Import history</a>: every import, with its totals and report.</li>
-        <li><a href="/admin/flags">Flagged recipes</a>: everything an entry or import flagged for a look.</li>
-        <li><a href="/admin/suggestions">Suggestions</a>: ingredients a local model thinks are the same, or belong under another.</li>
+      <ul class="link-cards">
+        <li>
+          <a href="/admin/flags">
+            <h2>Flagged recipes</h2>
+            <p class="count">{{ n(openFlags, "open", "open") }}</p>
+            <p>Anything an entry or import flagged for a look.</p>
+          </a>
+        </li>
+        <li>
+          <a href="/admin/suggestions">
+            <h2>Suggestions</h2>
+            <p class="count">{{ n(openSuggestions, "open", "open") }}</p>
+            <p>Ingredients a local model thinks are the same, or belong under another.</p>
+          </a>
+        </li>
+        <li>
+          <a href="/admin/import">
+            <h2>Bulk import</h2>
+            <p>Add books and recipes from a book list and a recipe list.</p>
+          </a>
+        </li>
+        <li>
+          <a href="/admin/imports">
+            <h2>Import history</h2>
+            <p class="count">{{ n(imports, "import", "imports") }}</p>
+            <p>Every import, with its totals and report.</p>
+          </a>
+        </li>
       </ul>
-      <h2>References and ingredients</h2>
-      <p class="status">
-        Links each “(p. 269)” in an ingredient list to the recipe on that page, and matches every
-        other ingredient to its canonical ingredient, in every book. New and edited recipes are
-        done as they're saved; this catches up the ones stored before.
-      </p>
-      <button type="button" class="primary" :disabled="linking" @click="linkAll">
-        {{ linking ? "Linking…" : "Link references and ingredients" }}
-      </button>
-      <p v-if="progress" class="status" aria-live="polite">{{ progress }}</p>
-      <p v-if="linkError" class="error" role="alert">{{ linkError }}</p>
 
-      <h2>Internet Archive</h2>
-      <p class="status">
-        Each web recipe's page is copied to the Internet Archive when it's added, so a page that
-        disappears can still be read. This asks again for the pages with no copy yet.
-      </p>
-      <button type="button" class="primary" @click="archiveAll">Archive pages without a copy</button>
-      <p v-if="archiveNote" class="status" aria-live="polite">{{ archiveNote }}</p>
+      <h2 class="section-title">Catching up</h2>
+      <div class="tool-panels">
+        <section class="tool-panel" aria-labelledby="link-title">
+          <h3 id="link-title">References and ingredients</h3>
+          <p class="muted">
+            Links each “(p. 269)” in an ingredient list to the recipe on that page, and matches
+            every other ingredient to its canonical ingredient, in every book. New and edited
+            recipes are done as they're saved; this catches up the ones stored before.
+          </p>
+          <button type="button" class="primary" :disabled="linking" @click="linkAll">
+            {{ linking ? "Linking…" : "Link references and ingredients" }}
+          </button>
+          <p v-if="progress" class="status" aria-live="polite">{{ progress }}</p>
+          <p v-if="linkError" class="error" role="alert">{{ linkError }}</p>
+        </section>
+        <section class="tool-panel" aria-labelledby="archive-title">
+          <h3 id="archive-title">Internet Archive</h3>
+          <p class="muted">
+            Each web recipe's page is copied to the Internet Archive when it's added, so a page that
+            disappears can still be read. This asks again for the pages with no copy yet.
+          </p>
+          <button type="button" class="primary" @click="archiveAll">Archive pages without a copy</button>
+          <p v-if="archiveNote" class="status" aria-live="polite">{{ archiveNote }}</p>
+        </section>
+      </div>
     </template>
   </article>
 </template>

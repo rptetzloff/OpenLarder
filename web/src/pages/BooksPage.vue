@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import AdminBar from "../components/AdminBar.vue";
 import {
   addByIsbn,
   addFamily,
@@ -193,16 +194,7 @@ async function add() {
 </script>
 
 <template>
-  <Teleport v-if="user?.is_admin" to="#admin-bar" defer>
-    <div class="admin-bar">
-      <div class="bar">
-        <strong>Admin</strong>
-        <a href="/admin/import">Bulk import</a>
-        <a href="/admin/imports">Import history</a>
-        <a href="/admin/flags">Flagged recipes</a>
-      </div>
-    </div>
-  </Teleport>
+  <AdminBar v-if="user?.is_admin" />
   <article class="wide sources-page">
     <div class="list-head">
       <div>
