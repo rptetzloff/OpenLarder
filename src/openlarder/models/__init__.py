@@ -25,6 +25,7 @@ from openlarder.models.catalog import (
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.imports import ImportRun, ImportRunLine
+from openlarder.models.suggestions import IngredientEmbedding, Suggestion
 
 __all__ = [
     "Author",
@@ -38,6 +39,7 @@ __all__ = [
     "GroupMember",
     "ImportRun",
     "ImportRunLine",
+    "IngredientEmbedding",
     "Ingredient",
     "IngredientAlias",
     "IngredientOption",
@@ -50,6 +52,7 @@ __all__ = [
     "RecipeTag",
     "Resolution",
     "Substitution",
+    "Suggestion",
     "Tag",
     "TagKind",
     "User",

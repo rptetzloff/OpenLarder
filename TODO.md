@@ -195,12 +195,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to
       the catalog. Plan and open decisions in SCOPING.md, now with the three
-      n8n workflows (Ray, 2026-11-09). In order: the pgvector image
-      (`pgvector/pgvector:pg17`, also in compose and CI); a migration for
-      `ingredient_embeddings` and `suggestions`; public-only views for the
-      `n8n_suggester` role, with a privacy test; the admin Suggestions
-      queue. Ray sets up the role's password in Coolify and the workflows in
-      n8n.
+      n8n workflows (Ray, 2026-11-09). **Groundwork (#84):** the
+      `pgvector/pgvector:pg18-trixie` image in compose and CI; migration
+      0029 with `ingredient_embeddings`, `suggestions` and the public-only
+      views; `scripts/n8n_role.sql`, tested. **Before #84 deploys, on
+      production (Ray):** OpenLarder moves off the shared
+      `postgres:18-alpine` server to its own Postgres on
+      `pgvector/pgvector:pg18-trixie`: create its login, database and
+      `CREATE EXTENSION vector` there as superuser; stop the app;
+      `pg_dump -Fc --no-owner` from the shared server and `pg_restore
+      --no-owner` as the login; point `OPENLARDER_DATABASE_URL` at it and
+      start. Not an image swap on the shared server: Alpine sorts text
+      differently, so every app's indexes would need rebuilding. **After
+      it deploys (Ray):** run `scripts/n8n_role.sql` against the new
+      server with the password from Coolify, then the n8n workflows; drop
+      `openlarder` from the shared server once settled. Next to build: the
+      admin Suggestions queue.
 
 ## Found along the way
 

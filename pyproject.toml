@@ -15,6 +15,8 @@ dependencies = [
     # platforms hand out.
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
+    # The vector column type for ingredient embeddings (migration 0029).
+    "pgvector>=0.3",
     "pydantic-settings>=2.6",
     # Sign-in. Authlib implements the OpenID Connect client: PKCE, state,
     # nonce, and checking the ID token's signature, issuer, audience and
