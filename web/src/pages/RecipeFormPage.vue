@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { type Book, SHOWS } from "../books";
-import { checkLines, type LineReview, type Recipe, saveRecipe } from "../recipes";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { type Book, issueName, KIND_NAMES, SHOWS } from "../books";
+import type { Me } from "../me";
+import { checkLines, type LineOption, type LineReview, type Recipe, saveRecipe } from "../recipes";
 
-// New when bookId is given, editing when recipeId is.
-const props = defineProps<{ bookId?: string; recipeId?: string }>();
+// New when bookId is given, editing when recipeId is. Ray's wireframe: four
+// steps, the source, the recipe and where it is, its ingredients, then a
+// look over it all before saving.
+const props = defineProps<{ bookId?: string; recipeId?: string; user?: Me | null }>();
 
 const book = ref<Book | null>(null);
 const title = ref("");
-const ingredients = ref("");
+// The title as saved, for the breadcrumbs while it's being changed.
+const savedTitle = ref("");
 // A website's recipe: the page it's on.
 const webAddress = ref("");
 // A social media account's recipes are on its posts, by address, too.
@@ -52,13 +56,49 @@ const error = ref("");
 const saving = ref(false);
 const loadFailed = ref(false);
 
-const example = ["rhubarb", "caster sugar", "vanilla pod"].join("\n");
-const heading = computed(() => (props.recipeId ? "Edit recipe" : "Add a recipe"));
+// The summary's "Book: …".
+const kindName = computed(() => {
+  const name = KIND_NAMES[book.value?.kind ?? ""] ?? "source";
+  return name[0].toUpperCase() + name.slice(1);
+});
+const heading = computed(() => (props.recipeId ? "Change a recipe" : "Add a recipe"));
 
 function label(e: { title: string | null; published_year: number | null; isbn13: string | null }) {
   return [e.title ?? book.value?.title, e.published_year, e.isbn13 && `ISBN ${e.isbn13}`]
     .filter(Boolean)
     .join(" · ");
+}
+
+// The ingredient lines, a box each; key keeps the boxes apart as lines come
+// and go.
+interface Row {
+  key: number;
+  text: string;
+}
+let nextKey = 0;
+const newRow = (text = ""): Row => ({ key: nextKey++, text });
+const rows = ref<Row[]>([newRow()]);
+const lines = computed(() => rows.value.map((r) => r.text));
+
+// The steps. Each one reached stays open to go back to.
+const step = ref(2);
+const reached = ref(2);
+const steps = computed(() => [
+  "Source",
+  onPackaging.value || inFamily.value
+    ? "Recipe"
+    : `Recipe and ${onWeb.value ? "address" : inIssue.value ? "issue" : inEpisode.value ? "episode" : "page"}`,
+  "Ingredients",
+  "Review and save",
+]);
+const stepHeading = ref<HTMLElement | null>(null);
+
+async function go(to: number) {
+  step.value = to;
+  reached.value = Math.max(reached.value, to);
+  // Where the new step starts, for a screen reader and the keyboard.
+  await nextTick();
+  stepHeading.value?.focus();
 }
 
 onMounted(async () => {
@@ -83,7 +123,7 @@ onMounted(async () => {
       page: pages.get(e.id) ?? "",
     }));
     if (existing) {
-      title.value = existing.title;
+      title.value = savedTitle.value = existing.title;
       webAddress.value = existing.web_address ?? "";
       issue.value = existing.issue?.label ?? "";
       issueDate.value = existing.issue?.published_on ?? "";
@@ -94,7 +134,10 @@ onMounted(async () => {
       episodeAddress.value = existing.episode?.url ?? "";
       airedOn.value = existing.episode?.aired_on ?? "";
       at.value = existing.episode?.at ?? "";
-      ingredients.value = existing.ingredients.join("\n");
+      rows.value = [...existing.ingredients.map((t) => newRow(t)), newRow()];
+      // Changing one usually means its ingredients.
+      step.value = 3;
+      reached.value = 4;
     }
     document.title = `${heading.value} · ${book.value!.title} · OpenLarder`;
   } catch {
@@ -102,38 +145,159 @@ onMounted(async () => {
   }
 });
 
-// The entry rules, checked as the lines are typed (issue #26). Advice only:
-// a line can be an exception, so saving never waits on it.
-const reviews = ref<{ index: number; line: string; review: LineReview }[]>([]);
-let asked = 0;
-let timer: ReturnType<typeof setTimeout> | undefined;
-watch(ingredients, () => {
-  clearTimeout(timer);
-  timer = setTimeout(async () => {
-    const mine = ++asked;
-    const lines = ingredients.value.split("\n");
-    try {
-      const found = await checkLines(lines);
-      if (mine !== asked) return;
-      reviews.value = found
-        .map((review, index) => ({ index, line: lines[index].trim(), review }))
-        .filter((r) => r.review.problems.length);
-    } catch {
-      if (mine === asked) reviews.value = [];
-    }
-  }, 400);
+// Where the recipe is, as the summary says it.
+const where = computed(() => {
+  if (onWeb.value) return webAddress.value || "No address yet";
+  if (inIssue.value) {
+    const which = issue.value ? issueName(issue.value) : issueDate.value && issueName(issueDate.value);
+    return [which, issuePage.value && `p. ${issuePage.value}`].filter(Boolean).join(", ") || "No issue yet";
+  }
+  if (inEpisode.value) {
+    const which = [
+      season.value !== "" && `Season ${season.value}`,
+      episodeNumber.value !== "" && `episode ${episodeNumber.value}`,
+      episodeTitle.value && `“${episodeTitle.value}”`,
+      !episodeTitle.value && episodeAddress.value,
+    ].filter(Boolean);
+    return [which.join(", "), at.value && `at ${at.value}`].filter(Boolean).join(" ") || "No episode yet";
+  }
+  if (onPackaging.value) return "On the packaging";
+  if (inFamily.value) return "In the family's copy";
+  const inIt = editions.value.filter((e) => e.included);
+  if (!inIt.length) return "In no edition";
+  return inIt
+    .map((e) => `${editions.value.length > 1 ? `${e.label}: ` : ""}${e.page ? `p. ${e.page}` : "page not recorded"}`)
+    .join(" · ");
 });
 
-// Replaces (or with null removes) a line, if it still reads as it did.
-function fix(index: number, line: string, replacement: string | null) {
-  const lines = ingredients.value.split("\n");
-  if (lines[index]?.trim() !== line) return;
-  if (replacement === null) lines.splice(index, 1);
-  else lines[index] = replacement;
-  ingredients.value = lines.join("\n");
+// The entry rules and what each line will be matched to, checked as the
+// lines are typed (issue #26). Advice only: a line can be an exception, so
+// saving never waits on it. Kept by row, with the text it was given for, so
+// a row typed into since shows nothing rather than an old answer.
+const reviews = ref(new Map<number, { text: string; review: LineReview }>());
+let asked = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  [lines, book],
+  () => {
+    if (!book.value) return;
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const mine = ++asked;
+      const sent = rows.value.map((r) => ({ key: r.key, text: r.text }));
+      try {
+        const found = await checkLines(
+          sent.map((r) => r.text),
+          { sourceId: book.value!.id, recipeId: props.recipeId },
+        );
+        if (mine !== asked) return;
+        reviews.value = new Map(sent.map((r, i) => [r.key, { text: r.text, review: found[i] }]));
+      } catch {
+        if (mine === asked) reviews.value = new Map();
+      }
+    }, 400);
+  },
+  { deep: true },
+);
+
+// Hints someone has answered "keep it" to, by row, for the text they kept.
+const kept = ref(new Map<number, string>());
+
+type Tone = "ok" | "info" | "warn";
+interface Hint {
+  tone: Tone;
+  text: string;
+  review: LineReview;
 }
 
-async function save() {
+function hintFor(row: Row): Hint | null {
+  const found = reviews.value.get(row.key);
+  if (!row.text.trim() || !found || found.text !== row.text) return null;
+  const review = found.review;
+  if (review.problems.length) {
+    if (kept.value.get(row.key) === row.text) return null;
+    return { tone: "warn", text: review.problems.join(" "), review };
+  }
+  const options = review.options;
+  if (!options.length) return null;
+  if (options.length > 1) {
+    return { tone: "ok", text: `${options.length} options, in the ${place.value}'s order`, review };
+  }
+  const only = options[0];
+  if (only.page !== null) {
+    return only.recipe
+      ? {
+          tone: "info",
+          text: `Recipe here: ${only.recipe.name}${only.recipe_pages.length ? `, p. ${only.recipe_pages.join(" / ")}` : ""}`,
+          review,
+        }
+      : {
+          tone: "warn",
+          text: `No recipe here of that name or on p. ${only.page} yet; it links when one is added.`,
+          review,
+        };
+  }
+  if (only.ingredient) {
+    return {
+      tone: "ok",
+      text: `Matched: ${only.ingredient.name}${only.alias ? " (another name for it)" : ""}`,
+      review,
+    };
+  }
+  if (kept.value.get(row.key) === row.text) {
+    return { tone: "ok", text: "New ingredient", review };
+  }
+  return { tone: "warn", text: "No exact match", review };
+}
+
+// How an option of a line with several reads.
+function optionText(o: LineOption): string {
+  if (o.page !== null) return o.recipe ? `${o.recipe.name} (recipe here)` : `${o.name} (p. ${o.page})`;
+  return o.ingredient ? o.ingredient.name : `${o.name} (new)`;
+}
+
+const hints = computed(() => rows.value.map((r) => hintFor(r)));
+const checksLeft = computed(() => hints.value.filter((h) => h?.tone === "warn").length);
+
+const rowInputs = ref<HTMLInputElement[]>([]);
+
+async function focusRow(index: number) {
+  await nextTick();
+  rowInputs.value[index]?.focus();
+}
+
+function addRow(after = rows.value.length - 1) {
+  rows.value.splice(after + 1, 0, newRow());
+  focusRow(after + 1);
+}
+
+function removeRow(index: number) {
+  rows.value.splice(index, 1);
+  if (!rows.value.length) rows.value.push(newRow());
+  focusRow(Math.min(index, rows.value.length - 1));
+}
+
+function replace(index: number, text: string) {
+  rows.value[index].text = text;
+}
+
+// Pasting several lines into a box fills that many.
+function paste(index: number, event: ClipboardEvent) {
+  const pasted = event.clipboardData?.getData("text") ?? "";
+  if (!pasted.includes("\n")) return;
+  event.preventDefault();
+  const found = pasted.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!found.length) return;
+  const row = rows.value[index];
+  const added = row.text.trim() ? found : found.slice(1);
+  if (!row.text.trim()) row.text = found[0];
+  rows.value.splice(index + 1, 0, ...added.map((t) => newRow(t)));
+  focusRow(index + added.length);
+}
+
+const filled = computed(() => rows.value.filter((r) => r.text.trim()));
+
+async function save(another = false) {
   saving.value = true;
   error.value = "";
   try {
@@ -142,10 +306,10 @@ async function save() {
         title: title.value,
         editions:
           onWeb.value || inIssue.value || inEpisode.value || onPackaging.value || inFamily.value
-          ? []
-          : editions.value
-              .filter((e) => e.included)
-              .map((e) => ({ edition_id: e.id, page: e.page.trim() || null })),
+            ? []
+            : editions.value
+                .filter((e) => e.included)
+                .map((e) => ({ edition_id: e.id, page: e.page.trim() || null })),
         web_address: onWeb.value ? webAddress.value : null,
         issue: inIssue.value ? issue.value : null,
         issue_date: inIssue.value && issueDate.value ? issueDate.value : null,
@@ -160,11 +324,11 @@ async function save() {
               at: at.value || null,
             }
           : null,
-        ingredients: ingredients.value.split("\n"),
+        ingredients: lines.value,
       },
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
     );
-    location.href = `/recipes/${id}`;
+    location.href = another ? `/sources/${book.value!.id}/recipes/new` : `/recipes/${id}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     saving.value = false;
@@ -173,189 +337,382 @@ async function save() {
 </script>
 
 <template>
-  <article>
-    <p v-if="book"><a :href="`/sources/${book.id}`">← {{ book.title }}</a></p>
+  <article class="wide add-recipe">
+    <nav v-if="book" class="crumbs" aria-label="Breadcrumb">
+      <a href="/sources">Sources</a>
+      <span aria-hidden="true">/</span>
+      <a :href="`/sources/${book.id}`">{{ book.title }}</a>
+      <template v-if="recipeId">
+        <span aria-hidden="true">/</span>
+        <a :href="`/recipes/${recipeId}`">{{ savedTitle }}</a>
+      </template>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{ recipeId ? "Change" : "Add a recipe" }}</span>
+    </nav>
     <h1>{{ heading }}</h1>
+    <p class="muted">Where it is and what goes in it. No amounts, method or headnotes.</p>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
-    <form v-else-if="book" class="recipe-form" @submit.prevent="save">
-      <label for="recipe-title">{{
-        inFamily
-          ? "Title, as your family calls it"
-          : onWeb || inEpisode
-            ? `Title, as the ${place} gives it`
-            : `Title, as the ${place} prints it`
-      }}</label>
-      <input id="recipe-title" v-model="title" required maxlength="200" />
-
-      <template v-if="onWeb">
-        <label for="recipe-address">Web address of the recipe</label>
-        <input
-          id="recipe-address"
-          v-model="webAddress"
-          type="url"
-          required
-          maxlength="2000"
-          :placeholder="book.host ? `https://${book.host}/…` : 'https://…'"
-        />
-        <p class="help">
-          {{ book.host ? `A page on ${book.host}. ` : "The post's own address. " }}OpenLarder links to
-          it; it never copies it.
-        </p>
-      </template>
-      <template v-else-if="inIssue">
-        <label for="recipe-issue">Issue, as the cover names it</label>
-        <input
-          id="recipe-issue"
-          v-model="issue"
-          list="known-issues"
-          maxlength="200"
-          :required="!issueDate"
-          :placeholder="book.kind === 'newspaper' ? 'or leave blank and give the date' : 'May 2024'"
-        />
-        <datalist id="known-issues">
-          <option v-for="i in book.issues" :key="i.id" :value="i.label" />
-        </datalist>
-        <label for="recipe-issue-date">Date of the issue (optional for a magazine)</label>
-        <input id="recipe-issue-date" v-model="issueDate" type="date" class="page-input" />
-        <label for="recipe-issue-page">Page</label>
-        <input id="recipe-issue-page" v-model="issuePage" maxlength="20" class="page-input" placeholder="42" />
-      </template>
-      <template v-else-if="inEpisode">
-        <p class="form-heading">{{ book.kind === "video_channel" ? "Which video" : "Which episode" }}</p>
-        <p class="help">
-          {{
-            book.kind === "video_channel"
-              ? "The video's address, and its title if you like."
-              : "Its number, its title, or both."
-          }}
-        </p>
-        <template v-if="book.kind !== 'video_channel'">
-          <div class="episode-numbers">
-            <span v-if="book.kind === 'tv_show'">
-              <label for="recipe-season">Season</label>
-              <input
-                id="recipe-season"
-                v-model="season"
-                type="number"
-                min="0"
-                class="page-input"
-              />
-            </span>
-            <span>
-              <label for="recipe-episode-number">Episode</label>
-              <input
-                id="recipe-episode-number"
-                v-model="episodeNumber"
-                type="number"
-                min="0"
-                class="page-input"
-                :required="season !== ''"
-              />
-            </span>
-          </div>
-        </template>
-        <template v-if="book.kind !== 'tv_show'">
-          <label for="recipe-episode-address">{{
-            book.kind === "video_channel" ? "The video's address" : "Its address (optional)"
-          }}</label>
-          <input
-            id="recipe-episode-address"
-            v-model="episodeAddress"
-            type="url"
-            maxlength="2000"
-            :required="book.kind === 'video_channel'"
-            placeholder="https://…"
-          />
-        </template>
-        <label for="recipe-episode-title">{{
-          book.kind === "video_channel" ? "The video's title" : "The episode's title"
-        }}</label>
-        <input
-          id="recipe-episode-title"
-          v-model="episodeTitle"
-          list="known-episodes"
-          maxlength="200"
-          :required="book.kind !== 'video_channel' && episodeNumber === '' && !episodeAddress"
-        />
-        <datalist id="known-episodes">
-          <template v-for="e in book.episodes" :key="e.id">
-            <option v-if="e.title" :value="e.title" />
-          </template>
-        </datalist>
-        <label for="recipe-aired-on">When it aired (optional)</label>
-        <input id="recipe-aired-on" v-model="airedOn" type="date" class="page-input" />
-        <label for="recipe-at">Where in it the recipe starts (optional)</label>
-        <input
-          id="recipe-at"
-          v-model="at"
-          maxlength="8"
-          class="page-input"
-          placeholder="12:34"
-          pattern="(\d{1,2}:)?\d{1,3}:[0-5]\d"
-          title="Minutes and seconds, like 12:34, or 1:02:03"
-        />
-      </template>
-      <template v-else-if="onPackaging || inFamily" />
-      <fieldset v-else>
-        <legend>Page</legend>
-        <p class="help">Leave a page blank if you don't know it yet.</p>
-        <div v-for="e in editions" :key="e.id" class="edition-row">
-          <label v-if="editions.length > 1" class="check">
-            <input v-model="e.included" type="checkbox" />
-            {{ e.label }}
-          </label>
-          <span v-else class="only-edition">{{ e.label }}</span>
-          <input
-            v-model="e.page"
-            :disabled="!e.included"
-            :aria-label="`Page in ${e.label}`"
-            class="page-input"
-            maxlength="20"
-            placeholder="112"
-          />
-        </div>
-      </fieldset>
-
-      <label for="recipe-ingredients">Ingredients, one per line, without amounts</label>
-      <textarea
-        id="recipe-ingredients"
-        v-model="ingredients"
-        rows="10"
-        spellcheck="false"
-        :placeholder="example"
-        aria-describedby="recipe-ingredients-help"
-      />
-      <p id="recipe-ingredients-help" class="help">
-        Just what goes in, as the {{ place }} names it: “rhubarb”, not “200g rhubarb”. Amounts
-        and the method stay {{ onWeb || onPackaging ? `on the ${place}` : `in the ${place}` }}.
-      </p>
-      <ul v-if="reviews.length" class="line-hints" aria-live="polite">
-        <li v-for="r in reviews" :key="`${r.index}:${r.line}`">
-          <strong>{{ r.line }}</strong>: {{ r.review.problems.join(" ") }}
+    <template v-else-if="book">
+      <ol class="steps" aria-label="Steps">
+        <li v-for="(name, i) in steps" :key="i">
           <button
-            v-if="r.review.suggestion"
             type="button"
-            class="link"
-            @click="fix(r.index, r.line, r.review.suggestion)"
+            class="step"
+            :aria-current="step === i + 1 ? 'step' : undefined"
+            :disabled="i + 1 > reached"
+            @click="go(i + 1)"
           >
-            Use “{{ r.review.suggestion }}”
-          </button>
-          <button
-            v-else-if="r.review.remove"
-            type="button"
-            class="link"
-            @click="fix(r.index, r.line, null)"
-          >
-            Remove it
+            {{ i + 1 }} · {{ name
+            }}<template v-if="i + 1 < reached && step !== i + 1"
+              ><span aria-hidden="true"> ✓</span><span class="visually-hidden"> (done)</span></template
+            >
           </button>
         </li>
-      </ul>
+      </ol>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <button type="submit" class="primary" :disabled="saving">
-        {{ saving ? "Saving…" : "Save" }}
-      </button>
-    </form>
+      <div class="add-layout" :class="{ solo: !user?.is_admin }">
+        <div>
+          <div v-if="step > 2" class="add-summary">
+            <dl>
+              <div>
+                <dt>Source</dt>
+                <dd>{{ kindName }}: {{ book.title }}</dd>
+              </div>
+              <div>
+                <dt>Recipe</dt>
+                <dd>{{ title }}</dd>
+              </div>
+              <div>
+                <dt>Where</dt>
+                <dd>{{ where }}</dd>
+              </div>
+            </dl>
+            <button type="button" class="link" @click="go(2)">Change</button>
+          </div>
+
+          <section v-if="step === 1" aria-labelledby="step-heading">
+            <h2 id="step-heading" ref="stepHeading" tabindex="-1">Source</h2>
+            <p>
+              This recipe goes in <a :href="`/sources/${book.id}`">{{ book.title }}</a>, a
+              {{ KIND_NAMES[book.kind] ?? "source" }}.
+              <template v-if="!recipeId">
+                To add one somewhere else, find it under <a href="/sources">Sources</a> and choose
+                Add a recipe there.
+              </template>
+            </p>
+            <button type="button" class="primary" @click="go(2)">Next</button>
+          </section>
+
+          <form
+            v-else-if="step === 2"
+            class="recipe-form"
+            aria-labelledby="step-heading"
+            @submit.prevent="go(3)"
+          >
+            <h2 id="step-heading" ref="stepHeading" tabindex="-1">{{ steps[1] }}</h2>
+            <label for="recipe-title">{{
+              inFamily
+                ? "Title, as your family calls it"
+                : onWeb || inEpisode
+                  ? `Title, as the ${place} gives it`
+                  : `Title, as the ${place} prints it`
+            }}</label>
+            <input id="recipe-title" v-model="title" required maxlength="200" />
+
+            <template v-if="onWeb">
+              <label for="recipe-address">Web address of the recipe</label>
+              <input
+                id="recipe-address"
+                v-model="webAddress"
+                type="url"
+                required
+                maxlength="2000"
+                :placeholder="book.host ? `https://${book.host}/…` : 'https://…'"
+              />
+              <p class="help">
+                {{ book.host ? `A page on ${book.host}. ` : "The post's own address. " }}OpenLarder
+                links to it; it never copies it.
+              </p>
+            </template>
+            <template v-else-if="inIssue">
+              <label for="recipe-issue">Issue, as the cover names it</label>
+              <input
+                id="recipe-issue"
+                v-model="issue"
+                list="known-issues"
+                maxlength="200"
+                :required="!issueDate"
+                :placeholder="book.kind === 'newspaper' ? 'or leave blank and give the date' : 'May 2024'"
+              />
+              <datalist id="known-issues">
+                <option v-for="i in book.issues" :key="i.id" :value="i.label" />
+              </datalist>
+              <label for="recipe-issue-date">Date of the issue (optional for a magazine)</label>
+              <input id="recipe-issue-date" v-model="issueDate" type="date" class="page-input" />
+              <label for="recipe-issue-page">Page</label>
+              <input
+                id="recipe-issue-page"
+                v-model="issuePage"
+                maxlength="20"
+                class="page-input"
+                placeholder="42"
+              />
+            </template>
+            <template v-else-if="inEpisode">
+              <p class="form-heading">
+                {{ book.kind === "video_channel" ? "Which video" : "Which episode" }}
+              </p>
+              <p class="help">
+                {{
+                  book.kind === "video_channel"
+                    ? "The video's address, and its title if you like."
+                    : "Its number, its title, or both."
+                }}
+              </p>
+              <template v-if="book.kind !== 'video_channel'">
+                <div class="episode-numbers">
+                  <span v-if="book.kind === 'tv_show'">
+                    <label for="recipe-season">Season</label>
+                    <input
+                      id="recipe-season"
+                      v-model="season"
+                      type="number"
+                      min="0"
+                      class="page-input"
+                    />
+                  </span>
+                  <span>
+                    <label for="recipe-episode-number">Episode</label>
+                    <input
+                      id="recipe-episode-number"
+                      v-model="episodeNumber"
+                      type="number"
+                      min="0"
+                      class="page-input"
+                      :required="season !== ''"
+                    />
+                  </span>
+                </div>
+              </template>
+              <template v-if="book.kind !== 'tv_show'">
+                <label for="recipe-episode-address">{{
+                  book.kind === "video_channel" ? "The video's address" : "Its address (optional)"
+                }}</label>
+                <input
+                  id="recipe-episode-address"
+                  v-model="episodeAddress"
+                  type="url"
+                  maxlength="2000"
+                  :required="book.kind === 'video_channel'"
+                  placeholder="https://…"
+                />
+              </template>
+              <label for="recipe-episode-title">{{
+                book.kind === "video_channel" ? "The video's title" : "The episode's title"
+              }}</label>
+              <input
+                id="recipe-episode-title"
+                v-model="episodeTitle"
+                list="known-episodes"
+                maxlength="200"
+                :required="book.kind !== 'video_channel' && episodeNumber === '' && !episodeAddress"
+              />
+              <datalist id="known-episodes">
+                <template v-for="e in book.episodes" :key="e.id">
+                  <option v-if="e.title" :value="e.title" />
+                </template>
+              </datalist>
+              <label for="recipe-aired-on">When it aired (optional)</label>
+              <input id="recipe-aired-on" v-model="airedOn" type="date" class="page-input" />
+              <label for="recipe-at">Where in it the recipe starts (optional)</label>
+              <input
+                id="recipe-at"
+                v-model="at"
+                maxlength="8"
+                class="page-input"
+                placeholder="12:34"
+                pattern="(\d{1,2}:)?\d{1,3}:[0-5]\d"
+                title="Minutes and seconds, like 12:34, or 1:02:03"
+              />
+            </template>
+            <template v-else-if="onPackaging || inFamily" />
+            <fieldset v-else>
+              <legend>Page</legend>
+              <p class="help">Leave a page blank if you don't know it yet.</p>
+              <div v-for="e in editions" :key="e.id" class="edition-row">
+                <label v-if="editions.length > 1" class="check">
+                  <input v-model="e.included" type="checkbox" />
+                  {{ e.label }}
+                </label>
+                <span v-else class="only-edition">{{ e.label }}</span>
+                <input
+                  v-model="e.page"
+                  :disabled="!e.included"
+                  :aria-label="`Page in ${e.label}`"
+                  class="page-input"
+                  maxlength="20"
+                  placeholder="112"
+                />
+              </div>
+            </fieldset>
+            <button type="submit" class="primary">Next</button>
+          </form>
+
+          <form v-else-if="step === 3" aria-labelledby="step-heading" @submit.prevent="go(4)">
+            <h2 id="step-heading" ref="stepHeading" tabindex="-1">Ingredients</h2>
+            <p class="help">
+              Name each one as the {{ place }} does: “rhubarb”, not “200g rhubarb”. Amounts and the
+              method stay {{ onWeb || onPackaging ? `on the ${place}` : `in the ${place}` }}. Checks
+              show beside a line as you type and never stop you saving. A recipe printed elsewhere in
+              it is written as its name and page: “Biscuit Blend (p. 14)”.
+            </p>
+            <ol class="line-rows">
+              <li v-for="(row, i) in rows" :key="row.key" class="line-row">
+                <div class="line-main">
+                  <div class="line-input">
+                    <input
+                      :ref="(el) => (rowInputs[i] = el as HTMLInputElement)"
+                      v-model="row.text"
+                      :aria-label="`Ingredient ${i + 1}`"
+                      :aria-describedby="hints[i] ? `line-hint-${row.key}` : undefined"
+                      maxlength="150"
+                      spellcheck="false"
+                      :placeholder="i === 0 ? 'rhubarb' : ''"
+                      @keydown.enter.prevent="addRow(i)"
+                      @paste="paste(i, $event)"
+                    />
+                    <button
+                      v-if="rows.length > 1"
+                      type="button"
+                      class="link remove-line"
+                      :aria-label="`Remove ingredient ${i + 1}`"
+                      title="Remove"
+                      @click="removeRow(i)"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <p
+                    v-if="hints[i]"
+                    :id="`line-hint-${row.key}`"
+                    class="line-tag"
+                    :class="`tone-${hints[i]!.tone}`"
+                  >
+                    {{ hints[i]!.text }}
+                  </p>
+                </div>
+                <template v-if="hints[i]">
+                  <ol v-if="hints[i]!.review.options.length > 1" class="line-options">
+                    <li v-for="(o, n) in hints[i]!.review.options" :key="n">
+                      {{ optionText(o) }}
+                      <span class="muted">· {{ n === 0 ? "first choice" : "or this" }}</span>
+                    </li>
+                  </ol>
+                  <div v-if="hints[i]!.tone === 'warn'" class="line-actions">
+                    <template v-if="hints[i]!.review.suggestion">
+                      <button
+                        type="button"
+                        class="secondary small"
+                        @click="replace(i, hints[i]!.review.suggestion!)"
+                      >
+                        Change to “{{ hints[i]!.review.suggestion }}”
+                      </button>
+                      <button type="button" class="secondary small" @click="kept.set(row.key, row.text)">
+                        Keep as typed
+                      </button>
+                    </template>
+                    <template v-else-if="hints[i]!.review.remove">
+                      <button type="button" class="secondary small" @click="removeRow(i)">
+                        Remove
+                      </button>
+                      <button type="button" class="secondary small" @click="kept.set(row.key, row.text)">
+                        Keep: it matters here
+                      </button>
+                    </template>
+                    <template v-else-if="hints[i]!.review.options[0]?.page === null">
+                      <template v-if="hints[i]!.review.options[0].similar.length">
+                        <span>Did you mean</span>
+                        <button
+                          v-for="s in hints[i]!.review.options[0].similar"
+                          :key="s.id"
+                          type="button"
+                          class="secondary small"
+                          @click="replace(i, s.name)"
+                        >
+                          {{ s.name }}
+                        </button>
+                      </template>
+                      <button type="button" class="secondary small" @click="kept.set(row.key, row.text)">
+                        It's new
+                      </button>
+                    </template>
+                  </div>
+                </template>
+              </li>
+            </ol>
+            <p class="line-add">
+              <button type="button" class="secondary" @click="addRow()">+ Add ingredient</button>
+              <span class="help">Enter starts a new line; pasting several lines fills that many.</span>
+            </p>
+            <button type="submit" class="primary">Next</button>
+          </form>
+
+          <section v-else aria-labelledby="step-heading">
+            <h2 id="step-heading" ref="stepHeading" tabindex="-1">Review and save</h2>
+            <p v-if="!filled.length" class="muted">
+              No ingredients yet. It saves without them, and is flagged until they're added.
+            </p>
+            <template v-else>
+              <h3 class="review-heading">
+                {{ filled.length }} ingredient{{ filled.length === 1 ? "" : "s" }}
+              </h3>
+              <ol class="review-lines">
+                <li v-for="row in filled" :key="row.key">{{ row.text.trim() }}</li>
+              </ol>
+              <p v-if="checksLeft" class="muted">
+                {{ checksLeft }} line{{ checksLeft === 1 ? " has" : "s have" }} a check on
+                {{ checksLeft === 1 ? "it" : "them" }}; they save as typed.
+                <button type="button" class="link" @click="go(3)">Look again</button>
+              </p>
+            </template>
+            <div class="add-actions">
+              <p v-if="error" class="error" role="alert">{{ error }}</p>
+              <button type="button" class="primary" :disabled="saving" @click="save()">
+                {{ saving ? "Saving…" : "Save" }}
+              </button>
+              <button
+                v-if="!recipeId"
+                type="button"
+                class="secondary"
+                :disabled="saving"
+                @click="save(true)"
+              >
+                Save and add another
+              </button>
+              <p class="help">
+                {{
+                  book.private
+                    ? "Only you, and the groups you share it with, see it."
+                    : "It publishes as soon as it's saved, as open data under the ODbL."
+                }}
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <aside v-if="user?.is_admin" class="add-aside" aria-label="Other ways to add">
+          <div class="aside-card">
+            <h2>Bulk import</h2>
+            <p>
+              Upload a list of sources and their recipes. Every line is kept; anything doubtful is
+              flagged on its recipe.
+            </p>
+            <a href="/admin/import" class="button-primary">Open bulk import</a>
+            <p><a href="/admin/imports">Import history</a></p>
+          </div>
+        </aside>
+      </div>
+    </template>
     <p v-else class="status">Loading…</p>
   </article>
 </template>

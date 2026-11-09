@@ -16,6 +16,7 @@ from sqlalchemy import select
 from openlarder import (
     archiving,
     detector,
+    ingredients,
     openlibrary,
     recipes,
     references,
@@ -48,26 +49,99 @@ router = APIRouter(tags=["recipes"])
 class LinesIn(BaseModel):
     # Blank lines count here, though saving drops them.
     lines: list[str] = Field(max_length=2 * recipes.MAX_LINES)
+    # The source the recipe is in, to say which of its recipes a page
+    # reference means; and the recipe, when it's being changed, so it
+    # doesn't cite itself.
+    source_id: uuid.UUID | None = None
+    recipe_id: uuid.UUID | None = None
+
+
+class Named(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class OptionRead(BaseModel):
+    name: str
+    page: str | None
+    # A page reference: the recipe in the source it means, and its pages.
+    recipe: Named | None = None
+    recipe_pages: list[str] = []
+    # Otherwise the ingredient it will be matched to, if there is one, and
+    # whether by another of its names.
+    ingredient: Named | None = None
+    alias: bool = False
+    # When there isn't: ingredients named like it.
+    similar: list[Named] = []
 
 
 class LineReview(BaseModel):
     problems: list[str]
     suggestion: str | None
     remove: bool
+    # How the line reads, once the rules have nothing to say about it.
+    options: list[OptionRead] = []
 
 
 class LinesReviewed(BaseModel):
     lines: list[LineReview]
 
 
+# Looking for names like each unmatched option is a query apiece.
+MAX_SIMILAR = 30
+
+
 @router.post("/api/ingredient-lines/check", response_model=LinesReviewed, dependencies=[SameOrigin])
-async def check_lines(body: LinesIn, user: CurrentUser) -> LinesReviewed:
-    """What the entry rules say about each line, for the form to show as
-    it's typed. Changes nothing; saving doesn't depend on it."""
+async def check_lines(body: LinesIn, session: Session, user: CurrentUser) -> LinesReviewed:
+    """What the entry rules say about each line, and what each will be
+    matched to, for the form to show as it's typed. Changes nothing; saving
+    doesn't depend on it.
+
+    An ingredient only a recipe the person can't see uses is left out, as
+    everywhere: they're told the line is new."""
+    entered = [line[: recipes.MAX_LINE] for line in body.lines]
+    reviews = detector.review_all(entered)
+    book: list[line_reading.BookRecipe] = []
+    by_title: dict = {}
+    if body.source_id:
+        await _editable_source(session, body.source_id, user)
+        book, by_title = await references.book_recipes(session, body.source_id)
+    titles = {r.id: r.title for r in book}
+    citing = body.recipe_id or uuid.uuid4()
+
+    read: list[list[OptionRead]] = []
+    for line, review in zip(entered, reviews, strict=True):
+        options = []
+        if line.strip() and not review.problems:
+            for option in line_reading.options(" ".join(line.split())):
+                found = OptionRead(name=option.name, page=option.page)
+                if option.page is not None and book:
+                    resolved = line_reading.resolve(citing, option, book, by_title)
+                    if resolved.recipe_id:
+                        found.recipe = Named(id=resolved.recipe_id, name=titles[resolved.recipe_id])
+                        found.recipe_pages = sorted(
+                            next(r.pages for r in book if r.id == resolved.recipe_id)
+                        )
+                options.append(found)
+        read.append(options)
+
+    seen = visibility.ingredients_seen_by(user)
+    named = [o for options in read for o in options if o.page is None]
+    matched = await ingredients.known(session, {ingredients.match_key(o.name) for o in named}, seen)
+    looked = 0
+    for option in named:
+        if hit := matched.get(ingredients.match_key(option.name)):
+            option.ingredient = Named(id=hit[0], name=hit[1])
+            option.alias = hit[2]
+        elif looked < MAX_SIMILAR:
+            looked += 1
+            option.similar = [
+                Named(id=i, name=n) for i, n in await ingredients.like(session, option.name, seen)
+            ]
     return LinesReviewed(
         lines=[
-            LineReview(problems=r.problems, suggestion=r.suggestion, remove=r.remove)
-            for r in detector.review_all([line[: recipes.MAX_LINE] for line in body.lines])
+            LineReview(problems=r.problems, suggestion=r.suggestion, remove=r.remove, options=o)
+            for r, o in zip(reviews, read, strict=True)
         ]
     )
 

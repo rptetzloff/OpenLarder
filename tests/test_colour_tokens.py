@@ -24,6 +24,8 @@ PAIRS = [
     ("muted", "surface", TEXT),
     ("fg", "chip", TEXT),  # chosen ingredients
     ("fg", "admin-bg", TEXT),
+    ("fg", "ok-bg", TEXT),  # a line's check that's fine
+    ("error", "surface", TEXT),  # a failed save, in the save band
     ("on-accent", "accent", TEXT),  # button text
     ("on-accent", "accent-hover", TEXT),
     ("error", "bg", TEXT),

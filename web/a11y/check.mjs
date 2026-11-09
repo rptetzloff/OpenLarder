@@ -139,6 +139,7 @@ function pages(s) {
     [`/sources/${s.book.id}/edit`, "admin"],
     [`/sources/${s.book.id}/recipes/new`, "admin"],
     [`/sources/${s.show.id}/recipes/new`, "admin"],
+    [`/sources/${s.box.id}/recipes/new`, "cook"],
     [`/recipes/${s.biscuits.id}`, null],
     [`/recipes/${s.biscuits.id}`, "admin"],
     [`/recipes/${s.web.id}`, null],
@@ -273,11 +274,13 @@ async function check(b, path, who, theme, width) {
       httpOnly: true,
     });
   await b.send("Page.navigate", { url: `${BASE}${path}` });
-  // Pages load their data after they're drawn; wait for "Loading…" to go.
+  // Pages load their data after they're drawn; wait for "Loading…" to go,
+  // and for a recipe's ingredient lines to be checked.
   for (let i = 0; i < 40; i++) {
     await sleep(250);
     const busy = await b.evaluate(
-      `document.readyState !== "complete" || /Loading…/.test(document.querySelector("main")?.innerText ?? "")`,
+      `document.readyState !== "complete" || /Loading…/.test(document.querySelector("main")?.innerText ?? "")` +
+        ` || (!!document.querySelector(".line-row input:not(:placeholder-shown)") && !document.querySelector(".line-tag"))`,
     );
     if (!busy && i > 3) break;
   }
