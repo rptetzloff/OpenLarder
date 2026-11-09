@@ -1182,7 +1182,104 @@ a.button-primary:hover {
 .value-cards a {
   color: var(--link);
 }
-.cover-grid {
+/* The list pages: Sources, Ingredients, Authors. */
+.list-head h1 {
+  margin: 0 0 0.25rem;
+}
+.list-head .muted a {
+  color: var(--link);
+}
+.add-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin: 1.25rem 0 0;
+}
+.add-panel {
+  flex: 0 1 auto;
+}
+.add-panel[open] {
+  flex: 1 1 100%;
+  padding: 0 1rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.add-panel > summary {
+  display: inline-block;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  list-style: none;
+}
+.add-panel > summary::-webkit-details-marker {
+  display: none;
+}
+.add-panel > summary::before {
+  content: "+ ";
+}
+.add-panel[open] > summary {
+  margin: 0.75rem 0;
+  padding: 0;
+  border: none;
+  font-weight: 600;
+}
+.add-panel[open] > summary::before {
+  content: "− ";
+}
+.add-panel .isbn-form {
+  max-width: 32rem;
+  margin-bottom: 0;
+}
+.list-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.75rem 1.5rem;
+  margin: 1.5rem 0 0.75rem;
+}
+.list-find {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1 1 18rem;
+  max-width: 32rem;
+}
+.list-find label {
+  font-weight: 600;
+}
+.list-find input {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.kind-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.kind-filter .count {
+  margin-left: 0.25rem;
+  color: var(--muted);
+}
+button.secondary[aria-pressed="true"] {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+button.secondary[aria-pressed="true"] .count {
+  color: inherit;
+}
+.results-count {
+  margin: 0 0 1rem;
+}.cover-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
   gap: 1.5rem 1.25rem;
@@ -1780,11 +1877,6 @@ button.secondary.small {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-.bulk-filter button[aria-pressed="true"] {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--bg);
 }
 .bulk-grid {
   border: 1px solid var(--line);

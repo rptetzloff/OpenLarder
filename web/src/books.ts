@@ -172,13 +172,17 @@ export async function listSources(
   q: string,
   offset = 0,
   limit?: number,
-  // "recent": newest added first, for the front page.
-  sort?: "recent",
-): Promise<{ sources: BookSummary[]; total: number }> {
+  // "recent": newest added first, for the front page; "recipes": the most
+  // recipes first; by title otherwise.
+  sort?: "recent" | "recipes",
+  // Only these kinds; every kind when empty.
+  kinds: string[] = [],
+): Promise<{ sources: BookSummary[]; total: number; kinds: Record<string, number> }> {
   const query = new URLSearchParams({ q });
   if (offset) query.set("offset", String(offset));
   if (limit) query.set("limit", String(limit));
   if (sort) query.set("sort", sort);
+  for (const kind of kinds) query.append("kind", kind);
   const res = await fetch(`/api/sources?${query}`);
   if (!res.ok) throw new Error("The sources couldn't be loaded.");
   return res.json();

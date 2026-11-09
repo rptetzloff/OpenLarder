@@ -272,6 +272,34 @@ async def test_books_are_found_by_title_subtitle_or_credit(admin, client) -> Non
     ]
 
 
+async def test_sources_are_narrowed_by_kind_and_counted_by_it(admin, client, adb) -> None:
+    await _book(admin, title="Plenty", authors=[])
+    await _book(admin, title="Simple", authors=[])
+    made = await admin.post(
+        "/api/sources/periodicals", json={"kind": "magazine", "title": "Saveur"}
+    )
+    assert made.status_code == 200, made.text
+    both = (await client.get("/api/sources", params={"q": "e"})).json()
+    assert both["kinds"] == {"book": 2, "magazine": 1}
+    only = (await client.get("/api/sources", params={"q": "e", "kind": "magazine"})).json()
+    assert [s["title"] for s in only["sources"]] == ["Saveur"]
+    assert only["total"] == 1
+    # The counts are for the words, whichever kinds were asked for.
+    assert only["kinds"] == {"book": 2, "magazine": 1}
+    assert (await client.get("/api/sources", params={"kind": "nonsense"})).status_code == 422
+
+
+async def test_sources_can_come_most_recipes_first(admin, client, adb) -> None:
+    for title in ("Apple", "Banana"):
+        await _book(admin, title=title, authors=[])
+    banana = await adb.scalar(text("SELECT id FROM sources WHERE title = 'Banana'"))
+    await adb.execute(
+        text("INSERT INTO recipes (source_id, title) VALUES (:s, 'Bread')"), {"s": banana}
+    )
+    found = (await client.get("/api/sources", params={"sort": "recipes"})).json()
+    assert [s["title"] for s in found["sources"]] == ["Banana", "Apple"]
+
+
 async def test_a_picker_asks_for_a_few(admin, client) -> None:
     for title in ("Bread A", "Bread B", "Bread C"):
         await _book(admin, title=title, authors=[])

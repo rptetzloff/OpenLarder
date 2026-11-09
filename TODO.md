@@ -38,7 +38,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       ingredients), each saving when you leave it, with the line checks as
       chips to fix from, a filter for rows with checks, and page order.
       No "N of 135" yet: nothing records how many recipes a book holds.
-      The site design's pages are all built. #17's sign-in screens
+      The wireframes' pages are all built. Next, the list pages in the same
+      style (Ray, 2026-11-09), one PR each: **Sources (#81):** the add forms
+      as panels, a search box, kind filters with counts, sorting by title,
+      most recipes or newest, and covers in a grid. Then Ingredients and
+      Authors. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).
