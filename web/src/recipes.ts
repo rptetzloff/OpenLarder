@@ -8,12 +8,19 @@ export interface RecipePage {
   isbn13: string | null;
   published_year: number | null;
   page: string | null;
+  cover_url: string | null;
 }
 
 export interface Recipe {
   id: string;
   title: string;
-  source: { id: string; title: string; kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" | "family" };
+  source: {
+    id: string;
+    title: string;
+    kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" | "family";
+    // Who it credits, in order, as it prints them.
+    credits: { author_id: string; credited_as: string }[];
+  };
   pages: RecipePage[];
   // A website's recipe: the page it's on.
   web_address: string | null;
@@ -54,11 +61,15 @@ export interface Recipe {
     }[];
   }[];
   // Recipes in the book that use this one.
-  used_in: { id: string; title: string }[];
+  // Its page, where it has one.
+  used_in: { id: string; title: string; page: string | null }[];
   // What can stand in for its ingredients, the recipes it cites, or itself.
   swaps: Swap[];
   // Whether you may change or remove it.
   editable: boolean;
+  // Who added it (their public display name), and when.
+  added_by: string | null;
+  added_on: string | null;
 }
 
 export interface RecipeIn {

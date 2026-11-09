@@ -67,3 +67,35 @@ async def test_each_recipe_says_its_pages_lines_and_whether_its_a_component(
     )
     assert (blend["lines"], blend["line_count"]) == (["Rice flour", "Starch"], 2)
     assert (blend["component"], biscuits["component"]) == (True, False)
+
+
+async def test_a_recipe_says_who_wrote_its_source_where_its_used_and_who_added_it(
+    admin, book, adb, client
+) -> None:
+    author = await adb.scalar(
+        text(
+            "INSERT INTO authors (name, name_key) VALUES ('Ann Author', 'ann author') RETURNING id"
+        )
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO source_credits (source_id, author_id, position, credited_as)"
+            " VALUES (:b, :a, 1, 'Ann Author, PhD')"
+        ),
+        {"b": book, "a": author},
+    )
+    await adb.execute(text("UPDATE users SET display_name = 'Ada'"))
+    await _add(admin, book, "Biscuit Blend", [(NEW, "14")], ["Rice flour"])
+    await _add(
+        admin, book, "Cheddar Biscuits", [(OLD, "30"), (NEW, "31")], ["Biscuit Blend (p. 14)"]
+    )
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    blend = next(r["id"] for r in shown["recipes"] if r["title"] == "Biscuit Blend")
+    recipe = (await client.get(f"/api/recipes/{blend}")).json()
+    assert recipe["source"]["credits"] == [
+        {"author_id": str(author), "credited_as": "Ann Author, PhD"}
+    ]
+    # The newest edition's page.
+    assert [(u["title"], u["page"]) for u in recipe["used_in"]] == [("Cheddar Biscuits", "31")]
+    assert recipe["added_by"] == "Ada"
+    assert recipe["added_on"] is not None

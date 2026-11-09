@@ -13,7 +13,15 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from openlarder import archiving, detector, recipes, references, substitutions, visibility
+from openlarder import (
+    archiving,
+    detector,
+    openlibrary,
+    recipes,
+    references,
+    substitutions,
+    visibility,
+)
 from openlarder import lines as line_reading
 from openlarder.archiving import ArchiverDep
 from openlarder.auth import CurrentUser, SameOrigin, Viewer
@@ -28,6 +36,8 @@ from openlarder.models import (
     RecipeIngredient,
     RecipeLocation,
     Source,
+    SourceCredit,
+    User,
     WebPage,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
@@ -101,6 +111,7 @@ class PageOut(BaseModel):
     isbn13: str | None
     published_year: int | None
     page: str | None
+    cover_url: str | None = None
 
 
 class WebPageOut(BaseModel):
@@ -134,15 +145,27 @@ class EpisodeOut(BaseModel):
     at: str | None
 
 
+class CreditRef(BaseModel):
+    author_id: uuid.UUID
+    credited_as: str
+
+
 class SourceRef(BaseModel):
     id: uuid.UUID
     title: str
     kind: str
+    # Who it credits, in order, as it prints them.
+    credits: list[CreditRef] = []
 
 
 class RecipeLink(BaseModel):
     id: uuid.UUID
     title: str
+
+
+class UsedIn(RecipeLink):
+    # Its page, where it has one: the newest edition's it's in.
+    page: str | None = None
 
 
 class IngredientLink(BaseModel):
@@ -182,11 +205,15 @@ class RecipeOut(BaseModel):
     # The same lines read into their options, with page references linked.
     lines: list[LineOut]
     # Recipes in the book that use this one as a component.
-    used_in: list[RecipeLink]
+    used_in: list[UsedIn]
     # What can stand in for its ingredients, the recipes it cites, or itself.
     swaps: list[SwapOut]
     # Whether the viewer may change or remove it.
     editable: bool
+    # Who added it (their display name, public as on everything they add),
+    # and when.
+    added_by: str | None = None
+    added_on: date | None = None
 
 
 class Created(BaseModel):
@@ -324,10 +351,34 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             .order_by(Recipe.title)
         )
     ).all()
+    used_pages: dict[uuid.UUID, str] = {}
+    for user_id, its_page in await session.execute(
+        select(RecipeLocation.recipe_id, RecipeLocation.page)
+        .join(Edition, Edition.id == RecipeLocation.edition_id)
+        .where(
+            RecipeLocation.recipe_id.in_([u for u, _ in used_in]),
+            RecipeLocation.page.is_not(None),
+        )
+        .order_by(Edition.published_year.desc().nulls_last())
+    ):
+        used_pages.setdefault(user_id, its_page)
+    credits = (
+        await session.execute(
+            select(SourceCredit.author_id, SourceCredit.credited_as)
+            .where(SourceCredit.source_id == work.id)
+            .order_by(SourceCredit.position)
+        )
+    ).all()
+    adder = await session.get(User, recipe.created_by) if recipe.created_by else None
     return RecipeOut(
         id=recipe.id,
         title=recipe.title,
-        source=SourceRef(id=work.id, title=work.title, kind=work.kind),
+        source=SourceRef(
+            id=work.id,
+            title=work.title,
+            kind=work.kind,
+            credits=[CreditRef(author_id=a, credited_as=n) for a, n in credits],
+        ),
         web_address=page.url if page else None,
         issue=IssueOut(
             id=in_issue[0].id,
@@ -354,6 +405,11 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
                 isbn13=e.isbn13,
                 published_year=e.published_year,
                 page=page,
+                cover_url=(
+                    openlibrary.cover_url(e.open_library_cover_id)
+                    if e.open_library_cover_id
+                    else None
+                ),
             )
             for page, e in pages
         ],
@@ -373,7 +429,9 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             )
             for line_id, text in lines
         ],
-        used_in=[RecipeLink(id=i, title=t) for i, t in used_in],
+        used_in=[UsedIn(id=i, title=t, page=used_pages.get(i)) for i, t in used_in],
+        added_by=adder.display_name if adder else None,
+        added_on=recipe.created_at.date() if recipe.created_at else None,
         swaps=[
             swap_out(x)
             for x in await substitutions.listed(session, substitutions.for_recipe(recipe.id))

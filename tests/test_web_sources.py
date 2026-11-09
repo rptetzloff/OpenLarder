@@ -115,7 +115,12 @@ async def test_a_recipe_is_on_a_page_of_its_site(admin, client) -> None:
     )
     assert response.status_code == 201, response.text
     recipe = (await client.get(f"/api/recipes/{response.json()['id']}")).json()
-    assert recipe["source"] == {"id": site, "title": "smittenkitchen.com", "kind": "website"}
+    assert recipe["source"] == {
+        "id": site,
+        "title": "smittenkitchen.com",
+        "kind": "website",
+        "credits": [],
+    }
     assert recipe["web_address"] == "https://smittenkitchen.com/2024/04/rhubarb-cake/"
     assert recipe["pages"] == []
     # Its ingredients are matched like any recipe's.

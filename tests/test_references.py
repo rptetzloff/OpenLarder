@@ -259,7 +259,7 @@ async def test_a_reference_links_once_its_recipe_is_added(admin, work, adb) -> N
     # The flag no longer applies, so it went.
     assert await _flags(adb) == []
     used = (await admin.get(f"/api/recipes/{rice}")).json()["used_in"]
-    assert used == [{"id": curry, "title": "Curry"}]
+    assert used == [{"id": curry, "title": "Curry", "page": "101"}]
 
 
 async def test_options_are_stored_in_order(admin, work, adb) -> None:
