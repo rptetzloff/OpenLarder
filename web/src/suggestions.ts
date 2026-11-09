@@ -16,6 +16,8 @@ export interface Suggestion {
   b: Side | null;
   reason: string | null;
   similarity: number | null;
+  // merge-v2 on: the model's word for how sure it is.
+  certainty: "certain" | "likely" | null;
   confidence: number | null;
   model: string;
   prompt_version: string;

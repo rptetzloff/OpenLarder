@@ -146,7 +146,9 @@ async def test_the_role_writes_embeddings_and_adds_suggestions(n8n, adb) -> None
 # The admin queue (routers/suggestions.py).
 
 
-async def _suggest(adb, kind, a, b, *, decision="same", keep="a", similarity="0.95"):
+async def _suggest(
+    adb, kind, a, b, *, decision="same", keep="a", similarity="0.95", certainty=None
+):
     """A suggestion as Workflow 2 writes it."""
     proposal = {
         "a_id": str(a),
@@ -157,6 +159,8 @@ async def _suggest(adb, kind, a, b, *, decision="same", keep="a", similarity="0.
         "keep_name": keep,
         "similarity": similarity,
     }
+    if certainty:
+        proposal["certainty"] = certainty
     return await adb.scalar(
         text(
             "INSERT INTO suggestions (kind, target, proposal, reason, confidence, model,"
@@ -269,3 +273,21 @@ async def test_one_naming_a_gone_ingredient_can_only_be_dismissed(people, adb) -
     assert (await admin.get("/api/suggestions")).json()["total"] == 0
     decided = (await admin.get("/api/suggestions", params={"state": "decided"})).json()
     assert [s["status"] for s in decided["suggestions"]] == ["dismissed"]
+
+
+async def test_certain_comes_first_then_likely_then_the_closest(people, adb) -> None:
+    """merge-v2 says how sure it is in a word; merge-v1 rows don't say."""
+    names = ["Oats", "Oat", "Flax", "Flaxseed", "Chile", "Chili", "Gochugaru", "Korean Chile"]
+    ids = [await _ingredient(adb, n) for n in names]
+    await _suggest(adb, "merge", ids[0], ids[1], similarity="0.99")  # v1: no word
+    await _suggest(adb, "merge", ids[2], ids[3], similarity="0.85", certainty="likely")
+    await _suggest(adb, "merge", ids[4], ids[5], similarity="0.82", certainty="certain")
+    await _suggest(adb, "merge", ids[6], ids[7], similarity="0.90", certainty="likely")
+    admin = await people("ada", admin=True)
+    listed = (await admin.get("/api/suggestions")).json()["suggestions"]
+    assert [(s["a"]["name"], s["certainty"]) for s in listed] == [
+        ("Chile", "certain"),
+        ("Gochugaru", "likely"),
+        ("Flax", "likely"),
+        ("Oats", None),
+    ]
