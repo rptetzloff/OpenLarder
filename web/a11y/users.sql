@@ -30,11 +30,12 @@ WITH i AS (
 INSERT INTO suggestions (kind, target, proposal, reason, confidence, model, prompt_version)
 SELECT kind, jsonb_build_array(LEAST(a, x)::text, GREATEST(a, x)::text),
        jsonb_build_object('a_id', a, 'b_id', x, 'a_name', 'Quick-Cooking Oats', 'b_name', b_name,
-                          'decision', decision, 'keep_name', 'a', 'similarity', similarity),
+                          'decision', decision, 'keep_name', 'a', 'similarity', similarity,
+                          'certainty', certainty),
        'Interchangeable names for the same product.', 1, 'gemma4:12b', 'merge-v1'
-FROM pair, (VALUES ('merge', 'same', '0.9875', 'Quick-Cook Oats', true),
-                   ('parent', 'b_under_a', '0.84', 'Quick-Cook Oats', true),
-                   ('merge', 'same', '0.81', 'Rolled Oats', false)) AS v(kind, decision, similarity, b_name, real),
+FROM pair, (VALUES ('merge', 'same', '0.9875', 'Quick-Cook Oats', true, 'certain'),
+                   ('parent', 'b_under_a', '0.84', 'Quick-Cook Oats', true, 'likely'),
+                   ('merge', 'same', '0.81', 'Rolled Oats', false, NULL)) AS v(kind, decision, similarity, b_name, real, certainty),
      LATERAL (SELECT CASE WHEN real THEN b ELSE gen_random_uuid() END AS x) AS other
 WHERE a IS NOT NULL
 ON CONFLICT DO NOTHING;

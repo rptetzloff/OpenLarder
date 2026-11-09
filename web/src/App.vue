@@ -2130,6 +2130,12 @@ progress {
   display: block;
   padding: 0.2rem 0;
 }
+/* How sure the model says it is, as a small tag in the byline. */
+.certainty {
+  padding: 0.0625rem 0.375rem;
+  border-radius: 4px;
+  color: var(--fg);
+}
 .flag-filters {
   display: flex;
   flex-wrap: wrap;

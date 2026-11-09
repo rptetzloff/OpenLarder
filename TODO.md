@@ -209,8 +209,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       closest pairs first; Accept runs the merge (with the name to keep,
       the model's or the other) or set-parent; a suggestion naming an
       ingredient that has gone can only be dismissed, and one naming an
-      ingredient the admin can't see isn't shown. Still to come: Workflow
-      3 and accepting line fixes; the "Run now" webhook.
+      ingredient the admin can't see isn't shown. **Certainty (#86):** from
+      merge-v2 the model answers certain, likely or unsure in a word (a
+      12B model gave 1 to nearly every number it was asked for); the page
+      shows the word and puts certain first, then likely. Still to come:
+      accepting line fixes, once Workflow 3 has flags to work on (open
+      flags on public recipes are all no_ingredients, reference and
+      duplicate-title ones as of 2026-11-09, none of them a model's job);
+      the "Run now" webhook.
 
 ## Found along the way
 

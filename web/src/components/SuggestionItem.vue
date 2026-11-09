@@ -69,6 +69,8 @@ async function act(action: "accept" | "dismiss") {
     <p v-else class="flag-what"><strong>{{ s.kind }}</strong></p>
     <p v-if="s.reason" class="suggestion-reason">{{ s.reason }}</p>
     <p class="byline">
+      <span v-if="s.certainty" :class="['certainty', s.certainty === 'certain' ? 'tone-ok' : 'tone-info']">{{ s.certainty === "certain" ? "Certain" : "Likely" }}</span>
+      <span v-if="s.certainty"> · </span>
       <span v-if="s.similarity !== null">{{ Math.round(s.similarity * 100) }}% alike · </span>
       {{ s.model }}, {{ s.prompt_version }}
     </p>

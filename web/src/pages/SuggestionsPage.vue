@@ -60,8 +60,8 @@ watch(allowed, (yes) => {
       <p class="status">
         A local model compared ingredients that look alike and suggests what to do with them.
         Accepting does it as if you'd done it on the ingredient's page; a merged name stays as
-        another name for the one kept, so lines written that way still find it. The closest pairs
-        come first.
+        another name for the one kept, so lines written that way still find it. Those the model is
+        certain of come first, then those it thinks likely, each with the closest pairs first.
       </p>
       <div class="flag-filters">
         <label>

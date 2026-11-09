@@ -47,6 +47,10 @@ class SuggestionOut(BaseModel):
     b: Side | None
     reason: str | None
     similarity: float | None
+    # merge-v2 on: the model's word for how sure it is. A 12B model asked
+    # for a number said 1 to nearly everything (merge-v1), so that's kept
+    # but not shown.
+    certainty: Literal["certain", "likely"] | None
     confidence: float | None
     model: str
     prompt_version: str
@@ -82,6 +86,15 @@ def _similarity():
     # n8n writes it as a string ("0.9888"); anything else sorts last.
     raw = Suggestion.proposal["similarity"].astext
     return case((raw.regexp_match(r"^[0-9]*\.?[0-9]+$"), func.cast(raw, Float)), else_=None)
+
+
+def _certainty_rank():
+    # Certain first, then likely, then those that don't say (merge-v1).
+    return case(
+        (Suggestion.proposal["certainty"].astext == "certain", 0),
+        (Suggestion.proposal["certainty"].astext == "likely", 1),
+        else_=2,
+    )
 
 
 def _hidden_ingredient_ids(viewer: User):
@@ -143,6 +156,7 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
         except (KeyError, TypeError, ValueError):
             similarity = None
         keep = p.get("keep_name")
+        certainty = p.get("certainty")
         out.append(
             SuggestionOut(
                 id=r.id,
@@ -153,6 +167,7 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 b=b,
                 reason=r.reason,
                 similarity=similarity,
+                certainty=certainty if certainty in ("certain", "likely") else None,
                 confidence=r.confidence,
                 model=r.model,
                 prompt_version=r.prompt_version,
@@ -186,7 +201,11 @@ async def list_suggestions(
         await session.scalars(
             query.order_by(
                 *(
-                    (_similarity().desc().nulls_last(), Suggestion.created_at)
+                    (
+                        _certainty_rank(),
+                        _similarity().desc().nulls_last(),
+                        Suggestion.created_at,
+                    )
                     if state == "open"
                     else (Suggestion.decided_at.desc(),)
                 )
