@@ -9,6 +9,7 @@ import {
   addWebsite,
   type BookSummary,
   KIND_NAMES,
+  kindPlural,
   listSources,
 } from "../books";
 import type { Me } from "../me";
@@ -27,7 +28,16 @@ const error = ref("");
 // A page of sources at a time, narrowed on the server as someone types (by
 // title, subtitle, author or a website's address): the whole catalog is too
 // much for one answer.
-const filter = ref(new URLSearchParams(location.search).get("q") ?? "");
+const params = new URLSearchParams(location.search);
+const filter = ref(params.get("q") ?? "");
+// Which kinds to show (all when none), and in what order.
+const kinds = ref<string[]>(params.getAll("kind").filter((k) => k in KIND_NAMES));
+const sort = ref<"title" | "recipes" | "recent">(
+  (["recipes", "recent"] as const).find((s) => s === params.get("sort")) ?? "title",
+);
+// How many of each kind match the words.
+const kindCounts = ref<Record<string, number>>({});
+const anyKind = computed(() => Object.values(kindCounts.value).reduce((a, b) => a + b, 0));
 // Answers can arrive out of order as someone types; only the latest counts.
 let asked = 0;
 
@@ -36,10 +46,17 @@ async function load(more = false) {
   loading.value = true;
   failed.value = false;
   try {
-    const page = await listSources(filter.value, more ? (books.value?.length ?? 0) : 0);
+    const page = await listSources(
+      filter.value,
+      more ? (books.value?.length ?? 0) : 0,
+      undefined,
+      sort.value === "title" ? undefined : sort.value,
+      kinds.value,
+    );
     if (mine !== asked) return;
     books.value = more ? [...(books.value ?? []), ...page.sources] : page.sources;
     total.value = page.total;
+    kindCounts.value = page.kinds;
   } catch {
     if (mine === asked) failed.value = true;
   } finally {
@@ -47,18 +64,47 @@ async function load(more = false) {
   }
 }
 
+// The address keeps what's chosen, so a filtered list can be shared.
+function remember() {
+  const url = new URL(location.href);
+  url.searchParams.delete("q");
+  url.searchParams.delete("kind");
+  url.searchParams.delete("sort");
+  if (filter.value.trim()) url.searchParams.set("q", filter.value.trim());
+  for (const kind of kinds.value) url.searchParams.append("kind", kind);
+  if (sort.value !== "title") url.searchParams.set("sort", sort.value);
+  history.replaceState(null, "", url);
+}
+
 let timer: ReturnType<typeof setTimeout> | undefined;
 watch(filter, () => {
   clearTimeout(timer);
   timer = setTimeout(() => {
-    const url = new URL(location.href);
-    if (filter.value.trim()) url.searchParams.set("q", filter.value.trim());
-    else url.searchParams.delete("q");
-    history.replaceState(null, "", url);
+    remember();
     load();
   }, 200);
 });
+watch([kinds, sort], () => {
+  remember();
+  load();
+});
 onMounted(() => load());
+
+function toggleKind(kind: string) {
+  kinds.value = kinds.value.includes(kind)
+    ? kinds.value.filter((k) => k !== kind)
+    : [...kinds.value, kind];
+}
+// The kinds there are, most first, and any chosen that has none now.
+const kindChoices = computed(() => {
+  const found = Object.entries(kindCounts.value).sort((a, b) => b[1] - a[1]);
+  for (const kind of kinds.value) if (!(kind in kindCounts.value)) found.push([kind, 0]);
+  return found;
+});
+const capitalised = (kind: string) => {
+  const name = KIND_NAMES[kind] ?? "source";
+  return name[0].toUpperCase() + name.slice(1);
+};
 
 // A family collection: anyone signed in adds one, private unless an admin
 // makes it public; the tick box is required.
@@ -147,165 +193,209 @@ async function add() {
 </script>
 
 <template>
-  <article>
-    <h1>Sources</h1>
-    <p class="status">Cookbooks, websites, magazines, shows and more, with the recipes indexed from them.</p>
-    <p class="status"><a href="/authors">Browse by author</a></p>
-
-    <details v-if="user" class="family-add">
-      <summary>Add a family collection</summary>
-    <form class="recipe-form family-form" @submit.prevent="addCollection">
-      <label for="family-name">Its name</label>
-      <input
-        id="family-name"
-        v-model="familyName"
-        required
-        maxlength="300"
-        placeholder="Grandma's recipe box"
-      />
-      <p class="help">
-        A recipe box, a church or school cookbook, a class's handouts: recipes your family keeps.
-      </p>
-      <div class="notice">
-        <p>
-          <strong>What OpenLarder keeps:</strong> the collection's name, each recipe's title and
-          the names of its ingredients. Never amounts or the method.
-        </p>
-        <p v-if="familyPrivate">
-          <strong>Who sees it:</strong> only you. It isn't listed, searched or counted for anyone
-          else, admins included. The people who run the site can reach anything stored on it, as on
-          any website.
-        </p>
-        <p v-else>
-          <strong>Who sees it:</strong> everyone. It becomes part of OpenLarder's open data, which
-          anyone may copy under the ODbL.
+  <Teleport v-if="user?.is_admin" to="#admin-bar" defer>
+    <div class="admin-bar">
+      <div class="bar">
+        <strong>Admin</strong>
+        <a href="/admin/import">Bulk import</a>
+        <a href="/admin/imports">Import history</a>
+        <a href="/admin/flags">Flagged recipes</a>
+      </div>
+    </div>
+  </Teleport>
+  <article class="wide sources-page">
+    <div class="list-head">
+      <div>
+        <h1>Sources</h1>
+        <p class="muted">
+          Cookbooks, websites, magazines, shows and more, with the recipes indexed from them.
+          <a href="/authors">Browse by author</a>
         </p>
       </div>
-      <label v-if="user.is_admin" class="check"
-        ><input v-model="familyPublic" type="checkbox" /> Public, for everyone</label
-      >
-      <label class="check"
-        ><input v-model="familyAcknowledged" type="checkbox" required /> I understand what
-        OpenLarder keeps and who sees it</label
-      >
-      <p v-if="familyError" class="error" role="alert">{{ familyError }}</p>
-      <button type="submit" class="primary">Add the collection</button>
-    </form>
-    </details>
+    </div>
 
-    <form v-if="user?.is_admin" class="isbn-form" @submit.prevent="add">
-      <label for="isbn">Add a book by ISBN</label>
-      <div class="row">
-        <input
-          id="isbn"
-          v-model="isbn"
-          inputmode="numeric"
-          autocomplete="off"
-          placeholder="978-0-393-54111-3"
-          required
-          :aria-invalid="error ? 'true' : undefined"
-          aria-describedby="isbn-error"
-        />
-        <button type="submit" class="primary" :disabled="adding">
-          {{ adding ? "Looking it up…" : "Add" }}
-        </button>
-      </div>
-      <p v-if="error" id="isbn-error" class="error" role="alert">{{ error }}</p>
-    </form>
+    <div v-if="user" class="add-panels">
+      <details v-if="user.is_admin" class="add-panel">
+        <summary>Add a book by ISBN</summary>
+        <form class="isbn-form" @submit.prevent="add">
+          <label for="isbn">ISBN</label>
+          <div class="row">
+            <input
+              id="isbn"
+              v-model="isbn"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="978-0-393-54111-3"
+              required
+              :aria-invalid="error ? 'true' : undefined"
+              aria-describedby="isbn-error"
+            />
+            <button type="submit" class="primary" :disabled="adding">
+              {{ adding ? "Looking it up…" : "Add" }}
+            </button>
+          </div>
+          <p v-if="error" id="isbn-error" class="error" role="alert">{{ error }}</p>
+        </form>
+      </details>
+      <details v-if="user.is_admin" class="add-panel">
+        <summary>Add another kind of source</summary>
+        <form class="recipe-form site-form" @submit.prevent="addSite">
+          <label for="site-kind">What it is</label>
+          <select id="site-kind" v-model="siteKind">
+            <option value="website">A website</option>
+            <option value="magazine">A magazine</option>
+            <option value="newspaper">A newspaper</option>
+            <option value="tv_show">A TV show</option>
+            <option value="podcast">A podcast</option>
+            <option value="video_channel">A video channel</option>
+            <option value="social">A social media account</option>
+            <option value="packaging">A product's packaging</option>
+          </select>
+          <template v-if="siteKind === 'website'">
+            <label for="site-address">Any page on it</label>
+            <input
+              id="site-address"
+              v-model="siteAddress"
+              required
+              autocomplete="off"
+              placeholder="https://smittenkitchen.com"
+            />
+            <label for="site-name">What it calls itself (optional)</label>
+            <input id="site-name" v-model="siteName" maxlength="300" placeholder="Smitten Kitchen" />
+          </template>
+          <template v-else>
+            <label for="site-name">Its name</label>
+            <input
+              id="site-name"
+              v-model="siteName"
+              required
+              maxlength="300"
+              :placeholder="NAME_EXAMPLES[siteKind]"
+            />
+          </template>
+          <label for="site-authors"
+            >{{ WHO[siteKind] ?? "Who writes it" }} (optional; separate names with
+            commas)</label
+          >
+          <input id="site-authors" v-model="siteAuthors" maxlength="500" placeholder="Deb Perelman" />
+          <label v-if="siteKind === 'website'" class="check"
+            ><input v-model="sitePaywalled" type="checkbox" /> Behind a subscription</label
+          >
+          <p v-if="siteError" class="error" role="alert">{{ siteError }}</p>
+          <button type="submit" class="primary">Add the {{ KIND_NAMES[siteKind] }}</button>
+        </form>
+      </details>
+      <details class="add-panel">
+        <summary>Add a family collection</summary>
+        <form class="recipe-form family-form" @submit.prevent="addCollection">
+          <label for="family-name">Its name</label>
+          <input
+            id="family-name"
+            v-model="familyName"
+            required
+            maxlength="300"
+            placeholder="Grandma's recipe box"
+          />
+          <p class="help">
+            A recipe box, a church or school cookbook, a class's handouts: recipes your family keeps.
+          </p>
+          <div class="notice">
+            <p>
+              <strong>What OpenLarder keeps:</strong> the collection's name, each recipe's title and
+              the names of its ingredients. Never amounts or the method.
+            </p>
+            <p v-if="familyPrivate">
+              <strong>Who sees it:</strong> only you. It isn't listed, searched or counted for anyone
+              else, admins included. The people who run the site can reach anything stored on it, as
+              on any website.
+            </p>
+            <p v-else>
+              <strong>Who sees it:</strong> everyone. It becomes part of OpenLarder's open data,
+              which anyone may copy under the ODbL.
+            </p>
+          </div>
+          <label v-if="user.is_admin" class="check"
+            ><input v-model="familyPublic" type="checkbox" /> Public, for everyone</label
+          >
+          <label class="check"
+            ><input v-model="familyAcknowledged" type="checkbox" required /> I understand what
+            OpenLarder keeps and who sees it</label
+          >
+          <p v-if="familyError" class="error" role="alert">{{ familyError }}</p>
+          <button type="submit" class="primary">Add the collection</button>
+        </form>
+      </details>
+    </div>
 
-    <form v-if="user?.is_admin" class="recipe-form site-form" @submit.prevent="addSite">
-      <label for="site-kind">Add another kind of source</label>
-      <select id="site-kind" v-model="siteKind">
-        <option value="website">A website</option>
-        <option value="magazine">A magazine</option>
-        <option value="newspaper">A newspaper</option>
-        <option value="tv_show">A TV show</option>
-        <option value="podcast">A podcast</option>
-        <option value="video_channel">A video channel</option>
-        <option value="social">A social media account</option>
-        <option value="packaging">A product's packaging</option>
-      </select>
-      <template v-if="siteKind === 'website'">
-        <label for="site-address">Any page on it</label>
-        <input
-          id="site-address"
-          v-model="siteAddress"
-          required
-          autocomplete="off"
-          placeholder="https://smittenkitchen.com"
-        />
-        <label for="site-name">What it calls itself (optional)</label>
-        <input id="site-name" v-model="siteName" maxlength="300" placeholder="Smitten Kitchen" />
-      </template>
-      <template v-else>
-        <label for="site-name">Its name</label>
-        <input
-          id="site-name"
-          v-model="siteName"
-          required
-          maxlength="300"
-          :placeholder="NAME_EXAMPLES[siteKind]"
-        />
-      </template>
-      <label for="site-authors"
-        >{{ WHO[siteKind] ?? "Who writes it" }} (optional; separate names with
-        commas)</label
-      >
-      <input id="site-authors" v-model="siteAuthors" maxlength="500" placeholder="Deb Perelman" />
-      <label v-if="siteKind === 'website'" class="check"
-        ><input v-model="sitePaywalled" type="checkbox" /> Behind a subscription</label
-      >
-      <p v-if="siteError" class="error" role="alert">{{ siteError }}</p>
-      <button type="submit" class="primary">Add the {{ KIND_NAMES[siteKind] }}</button>
-    </form>
-
-    <div class="isbn-form">
-      <label for="book-filter">Find a source</label>
-      <div class="row">
+    <div class="list-tools">
+      <div class="list-find">
+        <label for="book-filter">Find a source</label>
         <input
           id="book-filter"
           v-model="filter"
           type="search"
           autocomplete="off"
-          placeholder="title, author or website"
+          placeholder="Title, author or website"
         />
       </div>
+      <div class="table-controls">
+        <label for="source-sort">Sort</label>
+        <select id="source-sort" v-model="sort">
+          <option value="title">Title</option>
+          <option value="recipes">Most recipes</option>
+          <option value="recent">Newest added</option>
+        </select>
+      </div>
     </div>
+    <div v-if="kindChoices.length > 1 || kinds.length" class="kind-filter" role="group" aria-label="Kinds">
+      <button type="button" class="secondary small" :aria-pressed="!kinds.length" @click="kinds = []">
+        All <span class="count">{{ anyKind.toLocaleString() }}</span>
+      </button>
+      <button
+        v-for="[kind, count] in kindChoices"
+        :key="kind"
+        type="button"
+        class="secondary small"
+        :aria-pressed="kinds.includes(kind)"
+        @click="toggleKind(kind)"
+      >
+        {{ kindPlural(kind) }} <span class="count">{{ count.toLocaleString() }}</span>
+      </button>
+    </div>
+
     <p v-if="failed" role="alert">The sources couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="books === null" class="status">Loading…</p>
-    <p v-else-if="total === 0 && !filter.trim()">No sources yet.</p>
-    <p v-else class="status">
+    <p v-else-if="total === 0 && !filter.trim() && !kinds.length">No sources yet.</p>
+    <p v-else class="status results-count" role="status">
       {{ total.toLocaleString() }} {{ total === 1 ? "source" : "sources" }}<template
         v-if="filter.trim()"
       >
         {{ total === 1 ? "matches" : "match" }} “{{ filter.trim() }}”</template
       >.
-      <a v-if="total === 0" :href="`/search?q=${encodeURIComponent(filter.trim())}`"
+      <a v-if="total === 0 && filter.trim()" :href="`/search?q=${encodeURIComponent(filter.trim())}`"
         >Look for recipes with “{{ filter.trim() }}” in the title instead</a
       >
     </p>
-    <ul v-if="books?.length" class="book-list">
+    <ul v-if="books?.length" class="cover-grid">
       <li v-for="book in books" :key="book.id">
-        <a :href="`/sources/${book.id}`" class="book-card">
+        <a :href="`/sources/${book.id}`" class="cover-card">
           <img v-if="book.cover_url" :src="book.cover_url" alt="" loading="lazy" />
-          <span v-else class="no-cover" aria-hidden="true"></span>
-          <span>
-            <strong>{{ book.title }}</strong>
-            <span v-if="book.authors.length" class="byline">{{ book.authors.join(", ") }}</span>
-            <span v-else-if="book.host" class="byline">{{ book.host }}</span>
-            <span v-if="book.private" class="byline">Private: only you see it</span>
-          </span>
+          <span v-else class="cover-blank" aria-hidden="true">{{ capitalised(book.kind) }}</span>
+          <span class="kind">{{ KIND_NAMES[book.kind] ?? "source" }}</span>
+          <strong>{{ book.title }}</strong>
+          <span v-if="book.authors.length" class="byline">{{ book.authors.join(", ") }}</span>
+          <span v-else-if="book.host" class="byline">{{ book.host }}</span>
+          <span class="byline"
+            >{{ book.recipes.toLocaleString() }} {{ book.recipes === 1 ? "recipe" : "recipes"
+            }}<template v-if="book.private"> · private</template></span
+          >
         </a>
       </li>
     </ul>
-    <button
-      v-if="books && books.length < total"
-      type="button"
-      class="primary"
-      :disabled="loading"
-      @click="load(true)"
-    >
-      Show more ({{ (total - books.length).toLocaleString() }} left)
-    </button>
+    <p v-if="books && books.length < total" class="show-more">
+      <button type="button" class="secondary" :disabled="loading" @click="load(true)">
+        Show more ({{ (total - books.length).toLocaleString() }} left)
+      </button>
+    </p>
   </article>
 </template>

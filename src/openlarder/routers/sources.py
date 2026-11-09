@@ -194,6 +194,23 @@ class SourceList(BaseModel):
     sources: list[BookSummary]
     # How many match, however many this page holds.
     total: int
+    # How many of each kind match the words, whichever kinds were asked
+    # for, for the Sources page's filter.
+    kinds: dict[str, int] = {}
+
+
+SourceKind = Literal[
+    "book",
+    "website",
+    "magazine",
+    "newspaper",
+    "tv_show",
+    "podcast",
+    "video_channel",
+    "social",
+    "packaging",
+    "family",
+]
 
 
 PAGE = 100
@@ -206,8 +223,11 @@ async def list_books(
     q: str = Query("", max_length=200),
     offset: int = Query(0, ge=0),
     limit: int = Query(PAGE, ge=1, le=PAGE),
-    # "recent": newest added first, for the front page; otherwise by title.
-    sort: Literal["title", "recent"] = "title",
+    # "recent": newest added first, for the front page; "recipes": the most
+    # recipes first; otherwise by title.
+    sort: Literal["title", "recent", "recipes"] = "title",
+    # Only these kinds; every kind when none are given.
+    kind: Annotated[list[SourceKind] | None, Query()] = None,
 ) -> SourceList:
     """Sources by title, a page at a time; with q, those with every word of
     it in the title, subtitle, a credited name or a website's address,
@@ -226,14 +246,21 @@ async def list_books(
                 SourceCredit.credited_as.ilike(like, escape="\\"),
             )
         )
-    total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    order = (
-        (Source.created_at.desc(), Source.id)
-        if sort == "recent"
-        else (func.lower(Source.title), Source.id)
+    counted = query.subquery()
+    kinds = dict(
+        (await session.execute(select(counted.c.kind, func.count()).group_by(counted.c.kind))).all()
     )
+    if kind:
+        query = query.where(Source.kind.in_(kind))
+    total = await session.scalar(select(func.count()).select_from(query.subquery()))
+    recipe_count = select(func.count()).where(Recipe.source_id == Source.id).scalar_subquery()
+    order = {
+        "recent": (Source.created_at.desc(), Source.id),
+        "recipes": (recipe_count.desc(), func.lower(Source.title), Source.id),
+        "title": (func.lower(Source.title), Source.id),
+    }[sort]
     page = await session.scalars(query.order_by(*order).offset(offset).limit(limit))
-    return SourceList(sources=await summaries(session, page.all()), total=total or 0)
+    return SourceList(sources=await summaries(session, page.all()), total=total or 0, kinds=kinds)
 
 
 async def summaries(session: Session, works: Sequence[Source]) -> list[BookSummary]:
