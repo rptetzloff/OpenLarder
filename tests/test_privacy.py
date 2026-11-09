@@ -290,6 +290,18 @@ async def test_the_list_hides_a_parent_you_cant_see(secret, people) -> None:
     assert mine["ingredients"][0]["parent"]["name"] == "Zanzibar Moonsalt"
 
 
+async def test_the_author_list_counts_only_what_you_see(secret, people) -> None:
+    """Pat is credited on a public book and on the private box: to anyone
+    else, Pat is known for the book and has none of the box's recipes."""
+    bob = await people("bob")
+    listed = (await bob.get("/api/authors", params={"q": "pat public"})).json()["authors"]
+    assert [(a["sources"], a["recipes"], a["known_for"]["title"]) for a in listed] == [
+        (1, 0, "Open Book")
+    ]
+    mine = (await secret["ann"].get("/api/authors", params={"q": "pat public"})).json()
+    assert [(a["sources"], a["recipes"]) for a in mine["authors"]] == [(2, 1)]
+
+
 async def test_counts_leave_out_what_you_cant_see(secret, people, adb) -> None:
     """Counts carry no names, so the sweep can't see them: the flags an
     admin is told of, and the recipes under an ingredient."""

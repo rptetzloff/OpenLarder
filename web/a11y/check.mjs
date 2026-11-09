@@ -155,6 +155,7 @@ function pages(s) {
     [`/ingredients/${s.cheddar}`, null],
     [`/ingredients/${s.cheddar}`, "admin"],
     ["/authors", null],
+    ["/authors?sort=recipes&kind=person", null],
     [`/authors/${s.author}`, null],
     [`/authors/${s.author}`, "admin"],
     ["/groups", "cook"],

@@ -118,6 +118,37 @@ async def test_the_list_is_by_name_with_book_counts(admin, client) -> None:
     assert listed["total"] == 3
 
 
+async def test_the_list_says_what_each_is_known_for(admin, adb, client) -> None:
+    plenty = await _book(admin, "Plenty", [("Yotam Ottolenghi", "author")])
+    jerusalem = await _book(
+        admin, "Jerusalem", [("Yotam Ottolenghi", "author"), ("Test Kitchen", "author")]
+    )
+    for title in ("Shakshuka", "Hummus"):
+        await adb.execute(
+            text("INSERT INTO recipes (source_id, title) VALUES (:s, :t)"),
+            {"s": uuid.UUID(jerusalem["id"]), "t": title},
+        )
+    await adb.execute(
+        text("INSERT INTO recipes (source_id, title) VALUES (:s, 'Salad')"),
+        {"s": uuid.UUID(plenty["id"])},
+    )
+    await adb.execute(text("UPDATE authors SET kind = 'organisation' WHERE name = 'Test Kitchen'"))
+    listed = {a["name"]: a for a in (await client.get("/api/authors")).json()["authors"]}
+    yotam = listed["Yotam Ottolenghi"]
+    assert (yotam["kind"], yotam["sources"], yotam["recipes"]) == ("person", 2, 3)
+    assert yotam["known_for"] == {"id": jerusalem["id"], "title": "Jerusalem"}
+    assert (listed["Test Kitchen"]["kind"], listed["Test Kitchen"]["recipes"]) == (
+        "organisation",
+        2,
+    )
+    names = lambda r: [a["name"] for a in r.json()["authors"]]  # noqa: E731
+    most = await client.get("/api/authors", params={"sort": "recipes"})
+    assert names(most) == ["Yotam Ottolenghi", "Test Kitchen"]
+    people = await client.get("/api/authors", params={"kind": "person"})
+    assert names(people) == ["Yotam Ottolenghi"]
+    assert people.json()["total"] == 1
+
+
 async def test_the_list_narrows_by_name_or_printed_name(admin, adb, client) -> None:
     book = await _book(
         admin, "Camino", [("Russell Moore", "author"), ("Allison Hopelain", "author")]
