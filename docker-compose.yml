@@ -6,12 +6,11 @@
 
 services:
   db:
-    # Postgres 17 with pgvector, for the ingredient embeddings (0029). The
-    # same image as CI and production. Trixie, not the plain pg17 tag: that
-    # one is Debian 12, whose older glibc sorts text differently from the
-    # postgres:17 image's, so a database made by one is unsafe under the
-    # other (Postgres warns of a collation version mismatch).
-    image: pgvector/pgvector:pg17-trixie
+    # Postgres 18 with pgvector, for the ingredient embeddings (0029): the
+    # major version production runs, and the same image as CI. Trixie, so it
+    # sorts text like the stock Debian postgres:18 image; production's own
+    # move to it from Alpine is in SCOPING.md, LLM-assisted data processing.
+    image: pgvector/pgvector:pg18-trixie
     environment:
       POSTGRES_USER: openlarder
       POSTGRES_PASSWORD: openlarder
@@ -21,7 +20,9 @@ services:
       # already hold.
       - "54320:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Postgres 18 images keep their data under /var/lib/postgresql, and a
+      # new volume name keeps an old Postgres 17 volume out of it.
+      - pgdata18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U openlarder -d openlarder"]
       interval: 2s
@@ -40,4 +41,4 @@ services:
       - "8000:8000"
 
 volumes:
-  pgdata:
+  pgdata18:

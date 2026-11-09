@@ -196,14 +196,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       lines and author names, for an admin to accept; they never write to
       the catalog. Plan and open decisions in SCOPING.md, now with the three
       n8n workflows (Ray, 2026-11-09). **Groundwork (#84):** the
-      `pgvector/pgvector:pg17-trixie` image in compose and CI; migration
+      `pgvector/pgvector:pg18-trixie` image in compose and CI; migration
       0029 with `ingredient_embeddings`, `suggestions` and the public-only
       views; `scripts/n8n_role.sql`, tested. **Before #84 deploys, on
-      production (Ray):** switch the database image to
-      `pgvector/pgvector:pg17-trixie` (trixie, to keep glibc 2.41), then as
-      a superuser `CREATE EXTENSION IF NOT EXISTS vector;` in the
-      openlarder database; the app migrates on start and stops if 0029
-      can't. **After it deploys (Ray):** run `scripts/n8n_role.sql` with the
+      production (Ray):** back up, switch the database image from
+      `postgres:18-alpine` to `pgvector/pgvector:pg18-trixie`, then as a
+      superuser in the openlarder database `REINDEX DATABASE openlarder;`
+      (Alpine sorts text differently, so its indexes are out of order) and
+      `CREATE EXTENSION IF NOT EXISTS vector;`; the app migrates on start
+      and stops if 0029 can't. **After it deploys (Ray):** run `scripts/n8n_role.sql` with the
       password from Coolify, then the n8n workflows. Next to build: the
       admin Suggestions queue.
 
