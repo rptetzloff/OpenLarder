@@ -21,6 +21,13 @@ export interface Author {
   name: string;
   kind: "person" | "organisation";
   open_library_url: string | null;
+  // From Wikidata, when the author is on it. For an organisation, born is
+  // when it was founded.
+  wikidata_url: string | null;
+  born_year: number | null;
+  died_year: number | null;
+  country: string | null;
+  website: string | null;
   links: { id: string; url: string; label: string | null }[];
   // This author's roles on each book, and the name it prints for them.
   sources: (BookSummary & { roles: string[]; credited_as: string })[];
@@ -83,4 +90,31 @@ export async function removeLink(id: string, linkId: string): Promise<void> {
 // Merges this author into another; resolves to the one that's left.
 export async function mergeAuthor(id: string, into: string): Promise<AuthorSummary> {
   return send(`/api/authors/${id}/merge`, "POST", { into });
+}
+
+// Says which Wikidata item the author is (an ID or a link), fetching its
+// facts; null takes it off. Resolves to the author as it now stands.
+export async function setWikidata(id: string, reference: string | null): Promise<Author> {
+  return send(`/api/authors/${id}/wikidata`, "PUT", { reference });
+}
+
+export interface WikidataRun {
+  checked: number;
+  found: number;
+  // Authors whose item another author has: probably one person twice.
+  clashes: { author: AuthorSummary; other: AuthorSummary }[];
+  remaining: number;
+}
+
+// Asks Wikidata about the next batch of authors not asked lately.
+export async function checkWikidata(): Promise<WikidataRun> {
+  return send("/api/authors/wikidata", "POST");
+}
+
+// "1912–2004", "Born 1950", "Founded 1993": the years an author's facts give.
+export function lifespan(a: Pick<Author, "kind" | "born_year" | "died_year">): string {
+  if (a.kind === "organisation") return a.born_year ? `Founded ${a.born_year}` : "";
+  if (a.born_year && a.died_year) return `${a.born_year}–${a.died_year}`;
+  if (a.born_year) return `Born ${a.born_year}`;
+  return a.died_year ? `Died ${a.died_year}` : "";
 }

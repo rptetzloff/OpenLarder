@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
+import { type WikidataRun, checkWikidata } from "../authors";
 import { type BookSummary, listSources } from "../books";
 import { fetchFlags } from "../flags";
 import { fetchSuggestions } from "../suggestions";
@@ -34,6 +35,37 @@ watch(
   },
   { immediate: true },
 );
+// Wikidata's facts for every author it may know (by Open Library or
+// Wikidata ID), a batch at a time; each batch is one query.
+const asking = ref(false);
+const asked = ref("");
+const askError = ref("");
+const clashes = ref<WikidataRun["clashes"]>([]);
+async function askWikidata() {
+  asking.value = true;
+  askError.value = "";
+  clashes.value = [];
+  let checked = 0;
+  let found = 0;
+  try {
+    for (;;) {
+      const run = await checkWikidata();
+      checked += run.checked;
+      found += run.found;
+      clashes.value.push(...run.clashes);
+      asked.value = `${checked.toLocaleString()} asked about, ${found.toLocaleString()} found; ${run.remaining.toLocaleString()} to go.`;
+      if (!run.remaining || !run.checked) break;
+    }
+    asked.value = checked
+      ? `Done: ${n(checked, "author", "authors")} asked about, ${found.toLocaleString()} found on Wikidata.`
+      : "Every author has been asked about lately.";
+  } catch (e) {
+    askError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    asking.value = false;
+  }
+}
+
 const n = (v: number | null, one: string, many: string) =>
   v === null ? "" : `${v.toLocaleString()} ${v === 1 ? one : many}`;
 
@@ -148,6 +180,30 @@ async function archiveAll() {
           </p>
           <button type="button" class="primary" @click="archiveAll">Archive pages without a copy</button>
           <p v-if="archiveNote" class="status" aria-live="polite">{{ archiveNote }}</p>
+        </section>
+        <section class="tool-panel" aria-labelledby="wikidata-title">
+          <h3 id="wikidata-title">Wikidata facts</h3>
+          <p class="muted">
+            Born and died, country and website for each author Wikidata knows, found by their Open
+            Library record. Each is asked about again after a month, since Wikidata grows.
+          </p>
+          <button type="button" class="primary" :disabled="asking" @click="askWikidata">
+            {{ asking ? "Asking…" : "Fetch Wikidata facts" }}
+          </button>
+          <p v-if="asked" class="status" aria-live="polite">{{ asked }}</p>
+          <p v-if="askError" class="error" role="alert">{{ askError }}</p>
+          <template v-if="clashes.length">
+            <p class="status">
+              These fit an item another author has already; probably one person twice. Merge them
+              from the author's page:
+            </p>
+            <ul class="clash-list">
+              <li v-for="c in clashes" :key="c.author.id">
+                <a :href="`/authors/${c.author.id}`">{{ c.author.name }}</a> and
+                <a :href="`/authors/${c.other.id}`">{{ c.other.name }}</a>
+              </li>
+            </ul>
+          </template>
         </section>
       </div>
     </template>

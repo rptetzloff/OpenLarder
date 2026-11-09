@@ -52,6 +52,10 @@ async def merge(session: AsyncSession, gone: Author, kept: Author) -> None:
         for column in ("open_library_author_id", "wikidata_id")
         if getattr(kept, column) is None and getattr(gone, column) is not None
     }
+    # Wikidata's facts go with the Wikidata ID they came from.
+    if "wikidata_id" in moving:
+        for column in ("born_year", "died_year", "country", "website", "wikidata_checked_at"):
+            moving[column] = getattr(gone, column)
     await session.delete(gone)
     await session.flush()
     for column, value in moving.items():

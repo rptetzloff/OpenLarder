@@ -63,8 +63,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).
-- [ ] **Wikidata facts on author pages** (born, nationality, website). The
-      pages themselves are built (#52).
+- [x] **Wikidata facts on author pages** (#90): born and died (years
+      only), country and website, from Wikidata's query service, found by
+      the author's Open Library ID or a Wikidata item an admin gives on the
+      author's page. Admin's "Fetch Wikidata facts" works through every
+      author Wikidata could know, 50 to a query, asking again after a month;
+      authors who fit an item another author has are listed to merge.
 - [ ] **Recipe tags** (course, cuisine, diet): the tables exist, with nothing
       to set or show them. Book-level tags are inherited by its recipes.
 - [ ] **Bookshop.org affiliate links**: the purchase_links table exists, with

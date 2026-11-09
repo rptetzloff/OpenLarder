@@ -163,6 +163,18 @@ class Author(Timestamps, Base):
     kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="person")
     open_library_author_id: Mapped[str | None] = mapped_column(Text, unique=True)
     wikidata_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    # Facts from Wikidata (CC0), as of wikidata_checked_at (wikidata.py).
+    # Years only: most authors are living people, and a year is all the page
+    # says. For an organisation, born is when it was founded.
+    born_year: Mapped[int | None] = mapped_column(SmallInteger)
+    died_year: Mapped[int | None] = mapped_column(SmallInteger)
+    # Country of citizenship, or an organisation's country, as Wikidata
+    # labels it ("United States"); two at most, joined by " and ".
+    country: Mapped[str | None] = mapped_column(Text)
+    website: Mapped[str | None] = mapped_column(Text)
+    # When Wikidata was last asked; null if never. Asked again after a while
+    # even when nothing was found, since items are added.
+    wikidata_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuthorLink(Timestamps, Base):

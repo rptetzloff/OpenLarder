@@ -27,11 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from fake_archive import FakeArchive
 from fake_broker import CLIENT_ID, CLIENT_SECRET, ISSUER, FakeBroker, _settings
 from fake_openlibrary import FakeOpenLibrary
+from fake_wikidata import FakeWikidata
 from openlarder.archiving import Archiver, get_archiver
 from openlarder.auth import SESSION_COOKIE, build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
 from openlarder.main import app
+from openlarder.routers.authors import wikidata_transport
 from openlarder.routers.sources import openlibrary_transport
 
 if sys.platform == "win32":
@@ -194,6 +196,16 @@ def _open_library_unpaced(monkeypatch):
 def openlib(configure) -> FakeOpenLibrary:
     fake = FakeOpenLibrary()
     app.dependency_overrides[openlibrary_transport] = lambda: httpx2.MockTransport(fake.handle)
+    return fake
+
+
+@pytest.fixture
+def wikidata(configure, monkeypatch) -> FakeWikidata:
+    from openlarder import wikidata as client
+
+    monkeypatch.setattr(client, "MIN_INTERVAL", 0.0)
+    fake = FakeWikidata()
+    app.dependency_overrides[wikidata_transport] = lambda: httpx2.MockTransport(fake.handle)
     return fake
 
 

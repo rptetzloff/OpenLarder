@@ -1,0 +1,41 @@
+{
+ "head": {
+  "vars": [
+   "item",
+   "ol",
+   "born",
+   "died",
+   "countryLabel",
+   "website"
+  ]
+ },
+ "results": {
+  "bindings": [
+   {
+    "item": {
+     "type": "uri",
+     "value": "http://www.wikidata.org/entity/Q214477"
+    },
+    "born": {
+     "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+     "type": "literal",
+     "value": "1912-08-15T00:00:00Z"
+    },
+    "ol": {
+     "type": "literal",
+     "value": "OL218264A"
+    },
+    "died": {
+     "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+     "type": "literal",
+     "value": "2004-08-13T00:00:00Z"
+    },
+    "countryLabel": {
+     "xml:lang": "en",
+     "type": "literal",
+     "value": "United States"
+    }
+   }
+  ]
+ }
+}
