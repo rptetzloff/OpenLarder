@@ -35,7 +35,7 @@ from sqlalchemy import case, exists, func, select
 from openlarder import visibility
 from openlarder.auth import Viewer
 from openlarder.db import Session
-from openlarder.ingredients import family
+from openlarder.ingredients import family, rooted_family
 from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Source
 from openlarder.routers.ingredients import (
     UsedBy,
@@ -65,6 +65,8 @@ class Hit(UsedBy):
     have: int | None = None
     lines: int | None = None
     needs: list[str] = []
+    # Which of the ingredients you have it uses, in the order you gave them.
+    uses: list[str] = []
 
 
 Kind = Literal[
@@ -173,6 +175,8 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
     covered (so complete ones come first), then fewest still needed, most of
     yours used, then book and title."""
     yours = family(*have, name="yours")
+    # Which of yours each match is under, to say which a recipe uses.
+    roots = rooted_family(*have, name="yours_by_root")
     covered = exists().where(
         IngredientOption.recipe_ingredient_id == RecipeIngredient.id,
         IngredientOption.ingredient_id.in_(yours),
@@ -231,8 +235,30 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
             .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
         ):
             needs.setdefault(recipe_id, []).append(text)
+    names = dict(
+        (
+            await session.execute(
+                select(Ingredient.id, Ingredient.name).where(Ingredient.id.in_(have))
+            )
+        ).all()
+    )
+    using: dict[uuid.UUID, set[uuid.UUID]] = {}
+    if rows:
+        for recipe_id, root in await session.execute(
+            select(IngredientOption.recipe_id, roots.c.root)
+            .join(roots, roots.c.id == IngredientOption.ingredient_id)
+            .where(IngredientOption.recipe_id.in_([r[0] for r in rows]))
+            .distinct()
+        ):
+            using.setdefault(recipe_id, set()).add(root)
     hits = [
-        Hit(**u.model_dump(), have=r[4], lines=r[5], needs=needs.get(u.id, []))
+        Hit(
+            **u.model_dump(),
+            have=r[4],
+            lines=r[5],
+            needs=needs.get(u.id, []),
+            uses=[names[i] for i in have if i in using.get(u.id, set())],
+        )
         for u, r in zip(listed, rows, strict=True)
     ]
     return hits, total or 0

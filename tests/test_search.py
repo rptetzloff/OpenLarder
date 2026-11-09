@@ -453,3 +453,21 @@ def test_the_apps_engine_uses_those_connection_settings(monkeypatch) -> None:
     monkeypatch.setattr(db, "_engine", None)
     assert db.get_engine() == "engine"
     assert made["connect_args"] == db.CONNECT_ARGS
+
+
+async def test_a_hit_says_which_of_yours_it_uses(admin, work, adb, client) -> None:
+    """By the names you chose, in your order: cheddar counts as cheese."""
+    await _add(admin, work, "Cheese Scones", "1", ["Aged Cheddar", "Onion", "Flour"])
+    await _add(admin, work, "Onion Powder", "2", ["Onion"])
+    await _add(admin, work, "Cheese Board", "3", ["Cheese"])
+    cheese, cheddar = await _id(adb, "Cheese"), await _id(adb, "Aged Cheddar")
+    await adb.execute(
+        text("UPDATE ingredients SET parent_id = :p WHERE id = :i"), {"p": cheese, "i": cheddar}
+    )
+    onion = await _id(adb, "Onion")
+    found = await _search(client, cheese, onion)
+    assert {r["title"]: r["uses"] for r in found["recipes"]} == {
+        "Cheese Scones": ["Cheese", "Onion"],
+        "Onion Powder": ["Onion"],
+        "Cheese Board": ["Cheese"],
+    }

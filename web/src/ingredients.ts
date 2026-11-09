@@ -139,6 +139,8 @@ export interface SearchResult {
     have: number | null;
     lines: number | null;
     needs: string[];
+    // Which of the ingredients you have it uses, in your order.
+    uses: string[];
   })[];
   total: number;
   // Recipes a page holds.

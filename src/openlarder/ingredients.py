@@ -232,6 +232,17 @@ def family(*ingredient_ids: uuid.UUID, name: str = "family"):
     return select(tree.c.id)
 
 
+def rooted_family(*ingredient_ids: uuid.UUID, name: str = "rooted"):
+    """As family, but each row says which of the given ingredients it is
+    under (root, id), so a match on cheddar counts as a match on cheese."""
+    tree = (
+        select(Ingredient.id.label("root"), Ingredient.id.label("id"))
+        .where(Ingredient.id.in_(ingredient_ids))
+        .cte(name=name, recursive=True)
+    )
+    return tree.union(select(tree.c.root, Ingredient.id).where(Ingredient.parent_id == tree.c.id))
+
+
 async def set_parent(
     session: AsyncSession, ingredient: Ingredient, parent: Ingredient | None
 ) -> None:

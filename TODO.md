@@ -209,6 +209,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Search results say which of your ingredients each recipe uses, and
+      what it still needs, instead of "You have all 1" (#72)
 - [x] Site design, part 3: a source's page, with edition tabs and a recipe
       table to filter and sort (#70)
 - [x] Site design, part 2: the search page, with a source-kind filter and
