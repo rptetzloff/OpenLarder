@@ -1,6 +1,7 @@
 """Copies of web recipes' pages from the Internet Archive."""
 
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import httpx2
@@ -8,8 +9,9 @@ import pytest
 from sqlalchemy import text
 
 from fake_archive import FakeArchive
-from fake_broker import _sign_in
+from fake_broker import _settings, _sign_in
 from openlarder import archive
+from openlarder.archiving import Archiver, get_archiver
 
 PAGE = "https://smittenkitchen.com/2024/04/rhubarb-cake/"
 SNAPSHOT = f"https://web.archive.org/web/20261108153000/{PAGE}"
@@ -210,3 +212,20 @@ async def test_a_failed_capture_stops_asking(ia: FakeArchive) -> None:
 async def test_a_copy_marked_unavailable_is_no_copy(ia: FakeArchive) -> None:
     ia.closest = {"available": False, "url": SNAPSHOT, "timestamp": "20261108153000"}
     assert await archive.copy_of(PAGE, ADDED, None, httpx2.MockTransport(ia.handle)) is None
+
+
+async def test_turned_off_it_asks_nothing(adb, ia) -> None:
+    """For checks that add web recipes without asking the real Archive."""
+
+    @asynccontextmanager
+    async def same_session():
+        yield adb
+
+    off = Archiver(same_session, None, httpx2.MockTransport(ia.handle), enabled=False)
+    await off.run([uuid.uuid4()])
+    assert ia.requests == []
+
+
+def test_the_setting_reaches_the_archiver() -> None:
+    assert get_archiver(_settings(archive_web_pages=False)).enabled is False
+    assert get_archiver(_settings()).enabled is True

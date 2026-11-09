@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # anonymous visitor, with lower limits.
     archive_access_key: str | None = None
     archive_secret_key: str | None = None
+    # Off for checks that add web recipes but shouldn't ask the real Internet
+    # Archive for anything (the accessibility job in CI, a local run of it).
+    archive_web_pages: bool = True
 
     @field_validator("database_url")
     @classmethod
