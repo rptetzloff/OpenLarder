@@ -19,6 +19,7 @@ import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
 import BookEditPage from "./pages/BookEditPage.vue";
 import BookPage from "./pages/BookPage.vue";
+import BulkEntryPage from "./pages/BulkEntryPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
 import RecipePage from "./pages/RecipePage.vue";
@@ -53,6 +54,7 @@ const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.
 const bookId = match(`/sources/${UUID}`);
 const newRecipeFor = match(`/sources/${UUID}/recipes/new`);
 const editBookId = match(`/sources/${UUID}/edit`);
+const bulkFor = match(`/sources/${UUID}/bulk`);
 const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
 const authorId = match(`/authors/${UUID}`);
@@ -157,6 +159,7 @@ onMounted(async () => {
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
     <BookEditPage v-else-if="editBookId" :id="editBookId" />
+    <BulkEntryPage v-else-if="bulkFor" :id="bulkFor" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" :user="user" />
     <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
     <template v-else>
@@ -1725,7 +1728,156 @@ button.secondary.small {
 .add-actions .error {
   color: var(--error);
 }
-.aside-card {
+/* Entering a whole book: a row per recipe (Ray's wireframe). */
+.bulk-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+}
+.bulk-head h1 {
+  margin: 0 0 0.25rem;
+}
+.bulk-head .muted a {
+  color: var(--link);
+}
+.bulk-edition {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  max-width: 100%;
+}
+.bulk-edition select,
+.bulk-row input,
+.bulk-row textarea {
+  font: inherit;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.bulk-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 1.25rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.9375rem;
+}
+.bulk-entry .help {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.bulk-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.bulk-filter button[aria-pressed="true"] {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+.bulk-grid {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.bulk-row {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 2fr) 10rem;
+  gap: 0.5rem 0.75rem;
+  align-items: start;
+  padding: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.bulk-row:first-child {
+  border-top: none;
+}
+.bulk-row.has-checks {
+  background: var(--admin-bg);
+}
+.bulk-row.fresh:last-child {
+  background: var(--chip);
+}
+.bulk-labels {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.bulk-lines textarea {
+  width: 100%;
+  resize: vertical;
+}
+.bulk-summary {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.bulk-row.has-checks .bulk-summary,
+.bulk-row.fresh:last-child .bulk-summary {
+  color: var(--fg);
+}
+.bulk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.375rem 0 0;
+}
+.bulk-chips li {
+  margin: 0;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.8125rem;
+}
+.bulk-chips button.link {
+  margin-left: 0.25rem;
+  color: var(--fg);
+  font-weight: 600;
+}
+.bulk-status {
+  margin: 0.375rem 0 0;
+  font-size: 0.875rem;
+}
+.bulk-status.error {
+  color: var(--error);
+}
+.bulk-row.has-checks .bulk-status.error {
+  color: var(--fg);
+}
+.bulk-empty {
+  margin: 0;
+  padding: 1rem;
+}
+@media (max-width: 48rem) {
+  .bulk-row {
+    grid-template-columns: 5rem minmax(0, 1fr);
+  }
+  .bulk-lines,
+  .bulk-status {
+    grid-column: 1 / -1;
+  }
+  .bulk-labels {
+    display: none;
+  }
+  .bulk-row:nth-child(2) {
+    border-top: none;
+  }
+}.aside-card {
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 8px;

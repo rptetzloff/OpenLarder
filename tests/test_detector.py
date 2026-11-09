@@ -156,6 +156,8 @@ async def test_the_form_can_check_its_lines(client, broker) -> None:
         {"problems": [LEFT_OUT], "suggestion": None, "remove": True},
         {"problems": [TWICE], "suggestion": None, "remove": True},
     ]
+    # Saving would refuse none of these; it does refuse an amount with a unit.
+    assert [r["refused"] for r in reviews] == [False] * 4
     # Only a line the rules are happy with is read into its options.
     assert [[o["name"] for o in r["options"]] for r in reviews] == [[], ["Rhubarb"], [], []]
 
@@ -236,12 +238,26 @@ async def test_a_page_reference_names_the_recipe_in_the_source(admin, adb) -> No
         },
     )
     blend = added.json()["id"]
-    lines = ["Biscuit Blend (p. 14)", "Mystery Mix (p. 99)"]
+    # A second recipe on page 14, so a reference to it by another name is
+    # ambiguous and stays unlinked.
+    curd = await admin.post(
+        f"/api/sources/{book}/recipes",
+        json={
+            "title": "Lemon Curd",
+            "editions": [{"edition_id": str(edition), "page": "14"}],
+            "ingredients": ["lemons"],
+        },
+    )
+    assert curd.status_code == 201, curd.text
+    lines = ["Biscuit Blend (p. 14)", "Mystery Mix (p. 99)", "Shortbread (p. 14)"]
     body = {"lines": lines, "source_id": str(book)}
     read = _read(await admin.post("/api/ingredient-lines/check", json=body))
     assert read[0][0]["recipe"] == {"id": blend, "name": "Biscuit Blend"}
     assert read[0][0]["recipe_pages"] == ["14"]
     assert read[1][0]["recipe"] is None
+    assert not read[1][0]["page_used"]
+    # Page 14 has a recipe, just not that one.
+    assert read[2][0]["recipe"] is None and read[2][0]["page_used"]
     # A component is never an ingredient.
     assert read[0][0]["ingredient"] is None and read[0][0]["similar"] == []
     # Changing the recipe itself, it doesn't cite itself.
@@ -257,3 +273,10 @@ async def test_the_source_must_be_one_you_may_add_to(client, broker, adb) -> Non
         "/api/ingredient-lines/check", json={"lines": ["x"], "source_id": str(book)}
     )
     assert response.status_code == 403
+
+
+async def test_the_check_says_which_lines_saving_refuses(client, broker) -> None:
+    await _sign_in(client, broker)
+    lines = ["200g rhubarb", "2 eggs", "00 flour"]
+    response = await client.post("/api/ingredient-lines/check", json={"lines": lines})
+    assert [r["refused"] for r in response.json()["lines"]] == [True, False, False]

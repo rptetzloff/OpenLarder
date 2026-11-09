@@ -234,6 +234,12 @@ onMounted(async () => {
               class="button-outline"
               >Add a recipe</a
             >
+            <a
+              v-if="book.editable && isBook"
+              :href="`/sources/${book.id}/bulk`"
+              class="button-outline"
+              >Enter a whole book</a
+            >
           </p>
           <template v-if="book.manageable">
             <form v-if="renaming" class="inline-form" @submit.prevent="rename">

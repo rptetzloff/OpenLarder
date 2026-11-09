@@ -34,7 +34,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       and for no match, ingredients named like it; admins see bulk import
       beside it. Left out until they exist: the contributor-agreement tick,
       "Submit for review", your contributions, and an entry-rules page to
-      link. Next: entering a whole book, a contribution feature too. #17's sign-in screens
+      link. **Entering a whole book (#80):** a row per recipe (page, title,
+      ingredients), each saving when you leave it, with the line checks as
+      chips to fix from, a filter for rows with checks, and page order.
+      No "N of 135" yet: nothing records how many recipes a book holds.
+      The site design's pages are all built. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).
@@ -187,6 +191,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
+- [x] **A line saving refuses was offered "Keep as typed"** (#78): fixed in
+      #80; the check now says which lines saving refuses.
+- [ ] **Splitting "A or B, or C, D, or E"**: "Lamb Shank or Shoulder, or
+      Beef Shank, Shin, Cheek, or Chuck" gives an option "Beef Shank, Shin,
+      Cheek," with its comma (The Heritage Cookbook). lines.py's comma rule
+      only expects one "or".
 - [ ] **Merge two books**: nothing can merge two records of one book yet.
       (The two "How can it be gluten free" books are volumes 1 and 2, not a
       duplicate; the second's title needs "Volume 2", in the book editor.)

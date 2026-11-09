@@ -67,6 +67,9 @@ class OptionRead(BaseModel):
     # A page reference: the recipe in the source it means, and its pages.
     recipe: Named | None = None
     recipe_pages: list[str] = []
+    # Unlinked, whether the page it cites holds other recipes: "isn't
+    # linked" rather than "nothing there yet".
+    page_used: bool = False
     # Otherwise the ingredient it will be matched to, if there is one, and
     # whether by another of its names.
     ingredient: Named | None = None
@@ -79,6 +82,8 @@ class LineReview(BaseModel):
     problems: list[str]
     suggestion: str | None
     remove: bool
+    # Saving refuses the line as it is: it starts with an amount and a unit.
+    refused: bool = False
     # How the line reads, once the rules have nothing to say about it.
     options: list[OptionRead] = []
 
@@ -122,6 +127,10 @@ async def check_lines(body: LinesIn, session: Session, user: CurrentUser) -> Lin
                         found.recipe_pages = sorted(
                             next(r.pages for r in book if r.id == resolved.recipe_id)
                         )
+                    else:
+                        found.page_used = any(
+                            option.page in r.pages for r in book if r.id != body.recipe_id
+                        )
                 options.append(found)
         read.append(options)
 
@@ -140,8 +149,14 @@ async def check_lines(body: LinesIn, session: Session, user: CurrentUser) -> Lin
             ]
     return LinesReviewed(
         lines=[
-            LineReview(problems=r.problems, suggestion=r.suggestion, remove=r.remove, options=o)
-            for r, o in zip(reviews, read, strict=True)
+            LineReview(
+                problems=r.problems,
+                suggestion=r.suggestion,
+                remove=r.remove,
+                refused=bool(recipes.AMOUNT.match(" ".join(line.split()))),
+                options=o,
+            )
+            for line, r, o in zip(entered, reviews, read, strict=True)
         ]
     )
 
@@ -517,6 +532,33 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
 @router.get("/api/recipes/{recipe_id}", response_model=RecipeOut)
 async def get_recipe(recipe_id: uuid.UUID, session: Session, viewer: Viewer) -> RecipeOut:
     return await _out(session, await _recipe_or_404(session, recipe_id, viewer), viewer)
+
+
+class RecipeLines(BaseModel):
+    id: uuid.UUID
+    lines: list[str]
+
+
+@router.get("/api/sources/{source_id}/recipe-lines", response_model=list[RecipeLines])
+async def source_recipe_lines(
+    source_id: uuid.UUID, session: Session, viewer: Viewer
+) -> list[RecipeLines]:
+    """Every recipe's ingredient lines as typed, for entering a whole book:
+    the source's page gives only the first few of each."""
+    source = await session.get(Source, source_id)
+    if source is None or not await visibility.can_see(session, viewer, source):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
+    found: dict[uuid.UUID, list[str]] = {
+        r: [] for r in await session.scalars(select(Recipe.id).where(Recipe.source_id == source_id))
+    }
+    for recipe_id, text in await session.execute(
+        select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
+        .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
+        .where(Recipe.source_id == source_id)
+        .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
+    ):
+        found[recipe_id].append(text)
+    return [RecipeLines(id=r, lines=lines) for r, lines in found.items()]
 
 
 @router.post(

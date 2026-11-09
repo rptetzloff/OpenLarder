@@ -284,3 +284,21 @@ def test_migration_0011_refuses_to_drop_an_amount(engine, alembic_config) -> Non
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM works WHERE title = 'Amounts'"))
         command.upgrade(alembic_config, "head")
+
+
+# Entering a whole book
+
+
+async def test_every_recipes_lines_come_in_order(admin, client, book) -> None:
+    first = (await _add(admin, book["work"])).json()["id"]
+    second = (await _add(admin, book["work"], title="Bare", ingredients=[])).json()["id"]
+    response = await client.get(f"/api/sources/{book['work']}/recipe-lines")
+    assert {r["id"]: r["lines"] for r in response.json()} == {
+        first: ["rhubarb", "vanilla pod", "caster sugar"],
+        second: [],
+    }
+
+
+async def test_lines_for_a_source_that_does_not_exist(client) -> None:
+    response = await client.get(f"/api/sources/{uuid.uuid4()}/recipe-lines")
+    assert response.status_code == 404
