@@ -71,6 +71,12 @@ async function seed() {
     "Butter or coconut oil",
     "Pie crust (p. 99)",
   ]);
+  // A long title, so a table that can't wrap shows up at phone width (the
+  // ingredient page's did, with real titles, before this was here).
+  await recipe("Slow-Roasted Aged Cheddar and Caramelised Onion Biscuits with Brown Butter", "30", [
+    "Aged cheddar",
+    "Onion",
+  ]);
   const ids = await api("/api/ingredients?q=cheddar", "admin");
   const cheddar = ids.ingredients.find((i) => i.name === "Aged cheddar").id;
   const cheese = (await api("/api/ingredients?q=butter", "admin")).ingredients[0].id;
@@ -218,7 +224,10 @@ async function runAxe(b) {
   );
 }
 
-const overflowOf = (b) => b.evaluate("document.documentElement.scrollWidth - innerWidth");
+// Against the width asked for, not innerWidth: with a phone's emulation the
+// browser widens its layout viewport to fit what's too wide, so innerWidth
+// grows with the overflow and hides anything short of extreme.
+const overflowOf = (b, width) => b.evaluate(`document.documentElement.scrollWidth - ${width}`);
 
 // The control: a page with problems planted in it must fail, or a clean run
 // means nothing (the checker isn't running, or isn't looking).
@@ -232,10 +241,10 @@ async function control(b) {
   await b.send("Page.navigate", { url: `${BASE}/privacy` });
   await sleep(2000);
   await b.evaluate(
-    `document.querySelector("main").insertAdjacentHTML("beforeend", '<p style="color:#ccc;background:#fff">faint</p><img src="/x.png"><div style="width:2000px">wide</div>')`,
+    `document.querySelector("main").insertAdjacentHTML("beforeend", '<p style="color:#ccc;background:#fff">faint</p><img src="/x.png"><div style="width:500px">wide</div>')`,
   );
   const found = (await runAxe(b)).violations.map((v) => v.id);
-  const wide = await overflowOf(b);
+  const wide = await overflowOf(b, 390);
   const missed = ["color-contrast", "image-alt"].filter((id) => !found.includes(id));
   if (missed.length || wide <= 0)
     throw new Error(
@@ -273,7 +282,7 @@ async function check(b, path, who, theme, width) {
     if (!busy && i > 3) break;
   }
   const problems = [];
-  const overflow = await overflowOf(b);
+  const overflow = await overflowOf(b, width);
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px at ${width}px wide`);
   // axe once per theme and page, at desktop width; the phone pass is for
   // layout.

@@ -22,8 +22,11 @@ export interface Ingredient {
   // Broader and narrower: cheese above cheddar, aged cheddar below it.
   parent: { id: string; name: string } | null;
   children: { id: string; name: string }[];
-  recipes: Listed[];
+  // With the line naming it, as written.
+  recipes: (Listed & { line: string | null })[];
+  // Recipes using exactly this one; and how many the list holds in all.
   total: number;
+  listed_total: number;
   // Recipes using it or anything under it, as search counts them.
   family_total: number;
   // What can stand in for it.
@@ -70,8 +73,16 @@ export async function listIngredients(q: string, offset = 0): Promise<Ingredient
   return res.json();
 }
 
-export async function fetchIngredient(id: string, offset = 0): Promise<Ingredient | null> {
-  const res = await fetch(`/api/ingredients/${id}${offset ? `?offset=${offset}` : ""}`);
+// under: list the recipes using anything under it too.
+export async function fetchIngredient(
+  id: string,
+  offset = 0,
+  under = false,
+): Promise<Ingredient | null> {
+  const query = new URLSearchParams();
+  if (offset) query.set("offset", String(offset));
+  if (under) query.set("under", "true");
+  const res = await fetch(`/api/ingredients/${id}?${query}`);
   if (res.status === 404 || res.status === 422) return null;
   if (!res.ok) throw new Error("This ingredient couldn't be loaded.");
   return res.json();

@@ -23,8 +23,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       **A recipe's page (#75):** breadcrumbs, a "Find it in" box (cover,
       source, authors, page with an edition picker, or the issue, episode
       or web page), the ingredients with Copy list, Used in with pages,
-      swaps, and flags and actions beside. Next, in order: the
-      ingredient and author pages; then adding a recipe and entering a whole
+      swaps, and flags and actions beside. **The ingredient and author pages
+      (#77):** admin bars, breadcrumbs, the ingredient's cards and its
+      recipes counting what's under it with each line as written, the
+      author's sources as covers and who they're credited with. Next, in
+      order: adding a recipe and entering a whole
       book, which are contribution features too. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
@@ -218,6 +221,7 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Site design, part 5: the ingredient and author pages (#77)
 - [x] Site design, part 4: a recipe's page, with where to find it, Copy
       list, and who added it (#75)
 - [x] "I don't have or don't want": search leaves out recipes that need an
