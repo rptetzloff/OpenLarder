@@ -199,13 +199,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       `pgvector/pgvector:pg18-trixie` image in compose and CI; migration
       0029 with `ingredient_embeddings`, `suggestions` and the public-only
       views; `scripts/n8n_role.sql`, tested. **Before #84 deploys, on
-      production (Ray):** back up, switch the database image from
-      `postgres:18-alpine` to `pgvector/pgvector:pg18-trixie`, then as a
-      superuser in the openlarder database `REINDEX DATABASE openlarder;`
-      (Alpine sorts text differently, so its indexes are out of order) and
-      `CREATE EXTENSION IF NOT EXISTS vector;`; the app migrates on start
-      and stops if 0029 can't. **After it deploys (Ray):** run `scripts/n8n_role.sql` with the
-      password from Coolify, then the n8n workflows. Next to build: the
+      production (Ray):** OpenLarder moves off the shared
+      `postgres:18-alpine` server to its own Postgres on
+      `pgvector/pgvector:pg18-trixie`: create its login, database and
+      `CREATE EXTENSION vector` there as superuser; stop the app;
+      `pg_dump -Fc --no-owner` from the shared server and `pg_restore
+      --no-owner` as the login; point `OPENLARDER_DATABASE_URL` at it and
+      start. Not an image swap on the shared server: Alpine sorts text
+      differently, so every app's indexes would need rebuilding. **After
+      it deploys (Ray):** run `scripts/n8n_role.sql` against the new
+      server with the password from Coolify, then the n8n workflows; drop
+      `openlarder` from the shared server once settled. Next to build: the
       admin Suggestions queue.
 
 ## Found along the way

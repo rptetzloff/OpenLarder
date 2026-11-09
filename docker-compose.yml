@@ -8,8 +8,8 @@ services:
   db:
     # Postgres 18 with pgvector, for the ingredient embeddings (0029): the
     # major version production runs, and the same image as CI. Trixie, so it
-    # sorts text like the stock Debian postgres:18 image; production's own
-    # move to it from Alpine is in SCOPING.md, LLM-assisted data processing.
+    # sorts text like the stock Debian postgres:18 image; production's move
+    # to its own server on it is in SCOPING.md, LLM-assisted data processing.
     image: pgvector/pgvector:pg18-trixie
     environment:
       POSTGRES_USER: openlarder
