@@ -1893,6 +1893,73 @@ button.primary.small {
 .account-panels {
   margin-top: 2rem;
 }
+/* Groups: the list, a group's page and an invite. */
+.group-form {
+  max-width: 32rem;
+}
+.group-table .numeric {
+  text-align: right;
+}
+.group-table {
+  margin-top: 1.25rem;
+}
+.group-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem 1.5rem;
+}
+.group-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 0 2rem;
+  align-items: start;
+}
+.group-layout > .tool-panel {
+  margin-top: 2.5rem;
+}
+.group-layout > .tool-panel h3 {
+  margin-top: 1.25rem;
+}
+@media (max-width: 56rem) {
+  .group-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 40rem) {
+  .group-table .numeric {
+    text-align: left;
+  }
+}
+.member-table select {
+  font: inherit;
+  max-width: 100%;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.invite-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.invite-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.invite-panel {
+  max-width: 36rem;
+  margin-top: 1rem;
+}
+.invite-panel p {
+  margin: 0 0 0.75rem;
+}
 .account-panels .tool-panel a {
   color: var(--link);
 }

@@ -54,7 +54,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       tables; suggestions as cards; filters as buttons with counts; My flagged
       recipes, the same page, came with it. **Your account (#88):** cards
       to My flagged recipes and Groups with what's waiting, the name form
-      and signing in as panels. Next: groups, a group and invites. #17's sign-in screens
+      and signing in as panels. **Groups
+      (#89):** your groups as a table with Make a group as a panel; a
+      group's collections and members as tables, its admin's Rename and
+      Delete as buttons, and inviting in a panel beside them; an invite as
+      a panel. Every page but Privacy and Terms, which stay a column for
+      reading, is now in the redesigned style. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).

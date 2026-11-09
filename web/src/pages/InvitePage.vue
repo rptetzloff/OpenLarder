@@ -38,27 +38,27 @@ async function join() {
 </script>
 
 <template>
-  <article>
-    <h1>An invite</h1>
+  <article class="wide">
+    <div class="list-head">
+      <h1>An invite</h1>
+    </div>
     <p v-if="problem" role="alert">{{ problem }}</p>
     <p v-else-if="!invite" class="status">Loading…</p>
-    <template v-else>
+    <section v-else class="tool-panel invite-panel" aria-label="The invite">
       <p>
         You're invited to join <strong>{{ invite.group }}</strong> on OpenLarder:
         {{ ROLE_NAMES[invite.role].toLowerCase() }}.
       </p>
-      <p class="status">
+      <p class="muted">
         Its members share private family collections with it. Joining shares nothing of yours;
         you choose that for each of your collections.
       </p>
-      <p v-if="user === null">
-        <button type="button" class="primary" @click="signIn">Sign in to join</button>
-      </p>
-      <p v-else-if="user">
-        <button type="button" class="primary" :disabled="joining" @click="join">
-          Join {{ invite.group }}
-        </button>
-      </p>
-    </template>
+      <button v-if="user === null" type="button" class="primary" @click="signIn">
+        Sign in to join
+      </button>
+      <button v-else-if="user" type="button" class="primary" :disabled="joining" @click="join">
+        Join {{ invite.group }}
+      </button>
+    </section>
   </article>
 </template>
