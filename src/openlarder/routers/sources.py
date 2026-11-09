@@ -99,6 +99,7 @@ FIRST_LINES = 3
 class RecipeSummary(BaseModel):
     id: uuid.UUID
     title: str
+    chapter: str | None = None
     # One per edition it is in, newest edition first; None = page not recorded.
     # A magazine's or newspaper's: its page in its issue.
     pages: list[str | None]
@@ -465,6 +466,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
             RecipeSummary(
                 id=r.id,
                 title=r.title,
+                chapter=r.chapter,
                 pages=[p for _, p in sorted(pages.get(r.id, []))],
                 issue=issue_of.get(r.id),
                 episode=episode_of[r.id][0] if r.id in episode_of else None,

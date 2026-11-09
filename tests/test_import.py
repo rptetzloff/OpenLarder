@@ -64,6 +64,10 @@ def test_the_recipe_list_is_read_and_blank_rows_counted() -> None:
         (6, "Mystery Book", "Lost Recipe", "1"),
     ]
     assert rows[0].lines == ["Rhubarb", "Caster Sugar", "rhubarb", "Egg"]
+    # The Tag column is the chapter; a list without it imports none.
+    assert [r.chapter for r in rows] == ["Cakes", "Cakes", "Mains", None]
+    plain = importer.parse_recipes("Source,Recipe Name,Pg #,Ingredients\nA,B,1,C\n")
+    assert plain.rows[0].chapter is None
 
 
 # The rules applied to one row
@@ -222,6 +226,20 @@ async def test_running_a_batch_again_skips_what_it_added(admin, pink_cake, adb) 
     again = (await admin.post("/api/import/recipes", json=batch)).json()
     assert (again["created"], again["skipped"]) == (0, 1)
     assert await adb.scalar(text("SELECT count(*) FROM recipes")) == 1
+
+
+async def test_a_chapter_is_stored_and_filled_in_when_run_again(admin, pink_cake, adb) -> None:
+    """Recipes imported before chapters were get theirs on the next run;
+    one already given a chapter keeps it."""
+    await admin.post("/api/import/recipes", json={"items": [_item(pink_cake)]})
+    sponge = _item(pink_cake, row=3, title="Sponge", chapter="Cakes")
+    await admin.post("/api/import/recipes", json={"items": [sponge]})
+    assert await adb.scalar(text("SELECT chapter FROM recipes WHERE title = 'Sponge'")) == "Cakes"
+    again = [_item(pink_cake, chapter="Cakes"), {**sponge, "chapter": "Sponges"}]
+    result = (await admin.post("/api/import/recipes", json={"items": again})).json()
+    assert (result["created"], result["skipped"]) == (0, 2)
+    rows = await adb.execute(text("SELECT title, chapter FROM recipes ORDER BY title"))
+    assert [tuple(r) for r in rows] == [("Rhubarb Cake", "Cakes"), ("Sponge", "Cakes")]
 
 
 async def test_the_same_title_on_another_page_is_flagged(admin, pink_cake) -> None:

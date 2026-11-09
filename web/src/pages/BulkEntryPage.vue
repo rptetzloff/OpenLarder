@@ -18,9 +18,12 @@ interface Row {
   id: string | null;
   page: string;
   title: string;
+  // The chapter it's in; a new row starts in the one above's, since books
+  // go a chapter at a time.
+  chapter: string;
   text: string;
   // What was last saved, to tell whether it needs saving again.
-  saved: { page: string; title: string; text: string } | null;
+  saved: { page: string; title: string; chapter: string; text: string } | null;
   // The recipe's pages in every edition, kept when the row saves.
   editions: { edition_id: string; page: string | null }[];
   status: "idle" | "saving" | "saved" | "error";
@@ -40,6 +43,7 @@ function newRow(fields: Partial<Row> = {}): Row {
     id: null,
     page: "",
     title: "",
+    chapter: "",
     text: "",
     saved: null,
     editions: [],
@@ -53,6 +57,11 @@ function newRow(fields: Partial<Row> = {}): Row {
   };
 }
 const rows = ref<Row[]>([]);
+const nextRow = () => newRow({ chapter: rows.value[rows.value.length - 1]?.chapter ?? "" });
+// The chapters typed so far, offered as you type one.
+const chapters = computed(() =>
+  [...new Set(rows.value.map((r) => r.chapter.trim()).filter(Boolean))].sort(),
+);
 
 // Lines are separated by semicolons or new lines; shown joined by "; "
 // unless one holds a semicolon of its own.
@@ -78,14 +87,16 @@ onMounted(async () => {
       const fields = {
         id: r.id,
         title: r.title,
+        chapter: r.chapter ?? "",
         text: join(lines.get(r.id) ?? []),
         editions: r.editions,
         page: "",
       };
       fields.page = pageOf(r.editions);
-      return newRow({ ...fields, saved: { page: fields.page, title: r.title, text: fields.text } });
+      const saved = { page: fields.page, title: r.title, chapter: fields.chapter, text: fields.text };
+      return newRow({ ...fields, saved });
     });
-    rows.value.push(newRow());
+    rows.value.push(nextRow());
     // The saved rows' lines, checked a few at a time.
     for (let i = 0; i < rows.value.length; i += 8) {
       await Promise.all(rows.value.slice(i, i + 8).filter((r) => r.id).map(check));
@@ -99,13 +110,16 @@ function changeEdition() {
   for (const row of rows.value) {
     if (!row.id || dirty(row)) continue;
     row.page = pageOf(row.editions);
-    row.saved = { page: row.page, title: row.title, text: row.text };
+    row.saved = { page: row.page, title: row.title, chapter: row.chapter, text: row.text };
   }
 }
 
 const dirty = (row: Row) =>
   row.saved
-    ? row.page !== row.saved.page || row.title !== row.saved.title || row.text !== row.saved.text
+    ? row.page !== row.saved.page ||
+      row.title !== row.saved.title ||
+      row.chapter !== row.saved.chapter ||
+      row.text !== row.saved.text
     : !!(row.page.trim() || row.title.trim() || row.text.trim());
 const blank = (row: Row) => !row.id && !row.page.trim() && !row.title.trim() && !row.text.trim();
 
@@ -135,7 +149,7 @@ async function save(row: Row) {
     row.error = "A title is needed.";
     return;
   }
-  const sent = { page: row.page, title: row.title, text: row.text };
+  const sent = { page: row.page, title: row.title, chapter: row.chapter, text: row.text };
   const page = row.page.trim() || null;
   // A new recipe is in every edition, with its page in this one; a saved one
   // keeps its other editions' pages.
@@ -152,7 +166,12 @@ async function save(row: Row) {
   row.error = "";
   try {
     const id = await saveRecipe(
-      { title: row.title, editions, ingredients: split(row.text) },
+      {
+        title: row.title,
+        editions,
+        chapter: row.chapter.trim() || null,
+        ingredients: split(row.text),
+      },
       row.id ? { recipeId: row.id } : { bookId: props.id },
     );
     row.id = id;
@@ -167,7 +186,7 @@ async function save(row: Row) {
     row.status = "error";
     row.error = e instanceof Error ? e.message : String(e);
   }
-  if (rows.value[rows.value.length - 1] === row) rows.value.push(newRow());
+  if (rows.value[rows.value.length - 1] === row) rows.value.push(nextRow());
 }
 
 // A row saves when focus leaves it, not when it moves between its boxes.
@@ -180,7 +199,7 @@ function left(row: Row, event: FocusEvent) {
 const pageInputs = ref(new Map<number, HTMLInputElement>());
 
 async function focusRow(index: number) {
-  if (index >= rows.value.length) rows.value.push(newRow());
+  if (index >= rows.value.length) rows.value.push(nextRow());
   await nextTick();
   pageInputs.value.get(rows.value[index].key)?.focus();
 }
@@ -204,16 +223,16 @@ function pasteTitles(index: number, event: ClipboardEvent) {
   let at = index;
   for (const title of titles) {
     while (at < rows.value.length && rows.value[at].title.trim()) at++;
-    if (at >= rows.value.length) rows.value.push(newRow());
+    if (at >= rows.value.length) rows.value.push(nextRow());
     rows.value[at].title = title;
     at++;
   }
-  if (!blank(rows.value[rows.value.length - 1])) rows.value.push(newRow());
+  if (!blank(rows.value[rows.value.length - 1])) rows.value.push(nextRow());
 }
 
 function addTen() {
   const at = rows.value.length;
-  for (let i = 0; i < 10; i++) rows.value.push(newRow());
+  for (let i = 0; i < 10; i++) rows.value.push(nextRow());
   focusRow(at);
 }
 
@@ -402,9 +421,13 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
           </div>
         </div>
 
+        <datalist id="bulk-chapters">
+          <option v-for="c in chapters" :key="c" :value="c" />
+        </datalist>
         <div class="bulk-grid">
           <div class="bulk-row bulk-labels" aria-hidden="true">
-            <span>Page</span><span>Recipe title</span><span>Ingredients</span><span>Status</span>
+            <span>Page</span><span>Recipe title and chapter</span><span>Ingredients</span
+            ><span>Status</span>
           </div>
           <p v-if="!visible.length" class="bulk-empty">No rows have checks.</p>
           <div
@@ -423,13 +446,24 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
               maxlength="20"
               placeholder="Page"
             />
-            <input
-              v-model="row.title"
-              aria-label="Recipe title"
-              maxlength="200"
-              placeholder="Recipe title"
-              @paste="pasteTitles(rows.indexOf(row), $event)"
-            />
+            <div class="bulk-title">
+              <input
+                v-model="row.title"
+                aria-label="Recipe title"
+                maxlength="200"
+                placeholder="Recipe title"
+                @paste="pasteTitles(rows.indexOf(row), $event)"
+              />
+              <input
+                v-model="row.chapter"
+                class="bulk-chapter"
+                aria-label="Chapter"
+                maxlength="100"
+                list="bulk-chapters"
+                autocomplete="off"
+                placeholder="Chapter"
+              />
+            </div>
             <div class="bulk-lines">
               <textarea
                 v-model="row.text"

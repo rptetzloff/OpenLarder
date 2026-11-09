@@ -232,6 +232,7 @@ async function remove() {
                   <span v-else class="find-edition-only">{{ editionLabel(edition) }}</span>
                 </div>
               </template>
+              <p v-if="recipe.chapter" class="find-chapter">In “{{ recipe.chapter }}”</p>
             </div>
           </section>
 

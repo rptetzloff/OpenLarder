@@ -39,6 +39,7 @@ class RecipeOut(BaseModel):
     title: str
     page: str | None
     ingredients: list[str]
+    chapter: str | None = None
 
 
 class Parsed(BaseModel):
@@ -58,6 +59,7 @@ class ItemIn(BaseModel):
     title: str
     page: str | None = None
     ingredients: list[str] = []
+    chapter: str | None = Field(default=None, max_length=200)
 
 
 class Batch(BaseModel):
@@ -151,7 +153,14 @@ async def parse(files: Files, admin: AdminUser) -> Parsed:
             for b in books
         ],
         recipes=[
-            RecipeOut(row=r.row, source=r.source, title=r.title, page=r.page, ingredients=r.lines)
+            RecipeOut(
+                row=r.row,
+                source=r.source,
+                title=r.title,
+                page=r.page,
+                ingredients=r.lines,
+                chapter=r.chapter,
+            )
             for r in rows
         ],
         blank_rows=parsed.blank,
@@ -176,6 +185,7 @@ async def import_recipes(batch: Batch, admin: AdminUser, session: Session) -> Ba
                 title=i.title,
                 page=i.page,
                 lines=i.ingredients,
+                chapter=i.chapter,
             )
         )
     run = await _open_run(session, batch.run_id) if batch.run_id else None

@@ -191,6 +191,8 @@ class RecipeIn(BaseModel):
     issue_page: str | None = Field(default=None, max_length=40)
     # A TV show's, podcast's or video channel's: the episode.
     episode: EpisodeIn | None = None
+    # The chapter or section it's in, as the book names it.
+    chapter: str | None = Field(default=None, max_length=200)
     ingredients: list[str] = []
 
 
@@ -279,6 +281,8 @@ class LineOut(BaseModel):
 class RecipeOut(BaseModel):
     id: uuid.UUID
     title: str
+    # The chapter or section of its book, as the book names it.
+    chapter: str | None
     source: SourceRef
     # A book's recipe: where it is in each edition.
     pages: list[PageOut]
@@ -333,6 +337,7 @@ def _clean(body: RecipeIn) -> recipes.RecipeEntry:
             issue_date=body.issue_date,
             issue_page=body.issue_page,
             episode=episode,
+            chapter=body.chapter,
         )
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
@@ -462,6 +467,7 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
     return RecipeOut(
         id=recipe.id,
         title=recipe.title,
+        chapter=recipe.chapter,
         source=SourceRef(
             id=work.id,
             title=work.title,

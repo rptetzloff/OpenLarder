@@ -64,6 +64,8 @@ const ingredients = computed(() =>
 // book with several editions, the ones not in this edition on request.
 type Row = Book["recipes"][number];
 const filter = ref("");
+// One chapter, or all; the chapters in the book's order.
+const chapter = ref("");
 const order = ref<"page" | "title">("page");
 const showAbsent = ref(false);
 const pageIn = (r: Row) => r.editions.find((p) => p.edition_id === edition.value?.id);
@@ -91,7 +93,10 @@ const naturally = new Intl.Collator(undefined, { numeric: true, sensitivity: "ba
 const rows = computed(() => {
   const words = filter.value.trim().toLowerCase();
   const list = (book.value?.recipes ?? []).filter(
-    (r) => (showAbsent.value || inEdition(r)) && (!words || r.title.toLowerCase().includes(words)),
+    (r) =>
+      (showAbsent.value || inEdition(r)) &&
+      (!words || r.title.toLowerCase().includes(words)) &&
+      (!chapter.value || r.chapter === chapter.value),
   );
   if (order.value === "title" || !placeHeading.value) return list;
   // Page order: recorded pages first, as numbers where they are numbers.
@@ -104,6 +109,13 @@ const rows = computed(() => {
     if (kb === null) return -1;
     return naturally.compare(ka, kb);
   });
+});
+// The book's chapters, in the order of their first recipe by page.
+const chapters = computed(() => {
+  const byPage = [...(book.value?.recipes ?? [])].sort((a, b) =>
+    naturally.compare(pageIn(a)?.page ?? a.pages[0] ?? "~", pageIn(b)?.page ?? b.pages[0] ?? "~"),
+  );
+  return [...new Set(byPage.map((r) => r.chapter).filter((c): c is string => !!c))];
 });
 function lineSummary(r: Row) {
   const more = r.line_count - r.lines.length;
@@ -357,6 +369,13 @@ onMounted(async () => {
               autocomplete="off"
               placeholder="Filter by title"
             />
+            <template v-if="chapters.length">
+              <label for="recipe-chapter" class="visually-hidden">Chapter</label>
+              <select id="recipe-chapter" v-model="chapter">
+                <option value="">All chapters</option>
+                <option v-for="c in chapters" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </template>
             <template v-if="placeHeading">
               <label for="recipe-order" class="visually-hidden">Order</label>
               <select id="recipe-order" v-model="order">
@@ -382,12 +401,15 @@ onMounted(async () => {
               <td>
                 <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
                 <span v-if="r.component" class="badge">Component</span>
+                <div v-if="r.chapter && !chapter" class="muted chapter-note">{{ r.chapter }}</div>
               </td>
               <td class="lines">{{ lineSummary(r) || "None recorded yet" }}</td>
             </tr>
           </tbody>
         </table>
-        <p v-else-if="book.recipes.length" class="status">No recipe here matches “{{ filter }}”.</p>
+        <p v-else-if="book.recipes.length" class="status">
+          No recipe here matches{{ filter ? ` “${filter}”` : "" }}{{ chapter ? ` in “${chapter}”` : "" }}.
+        </p>
         <p v-else class="status">No recipes indexed yet.</p>
         <div v-if="isBook && book.editions.length > 1" class="table-foot">
           <p class="status">

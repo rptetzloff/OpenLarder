@@ -14,8 +14,11 @@ repeated: a book can print two recipes of one name, even on one page.
 *Ray, 2026-11-07: "nothing wrong with flagging them as confirmation, but
 not drop them".*
 
-The column names are the household index's (an Apple Numbers export). The
-Tag column is not imported for now. *Ray, 2026-11-07: tags to come later.*
+The column names are the household index's (an Apple Numbers export). Its
+Tag column is each recipe's chapter in its book ("Yeast Breads"), imported
+when the list has it; a recipe already added gets its chapter when the
+import runs again, if it has none. *Ray, 2026-11-09: chapters, not tags,
+which are one list across the catalog.*
 """
 
 import csv
@@ -24,7 +27,7 @@ import re
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import detector, isbn, recipes, references
@@ -41,6 +44,8 @@ from openlarder.models import (
 
 BOOK_COLUMNS = ("Source Title", "Author(s)", "ISBN", "Year Published")
 RECIPE_COLUMNS = ("Source", "Recipe Name", "Pg #", "Ingredients")
+# Optional: a list without it imports no chapters.
+CHAPTER_COLUMN = "Tag"
 MAX_BATCH = 250
 
 # What is left of a page reference split at a semicolon: "269)", "p. 42)".
@@ -84,6 +89,7 @@ class RecipeRow:
     title: str
     page: str | None
     lines: list[str]
+    chapter: str | None = None
 
 
 @dataclass
@@ -153,12 +159,19 @@ def parse_recipes(text: str) -> ParsedRecipes:
                 title=_squash(line["Recipe Name"]),
                 page=_squash(line["Pg #"]) or None,
                 lines=[_squash(x) for x in (line["Ingredients"] or "").split(";")],
+                chapter=_squash(line.get(CHAPTER_COLUMN) or "") or None,
             )
         )
     return ParsedRecipes(rows=rows, blank=blank, untitled=untitled)
 
 
-def prepare(title: str, edition_id: uuid.UUID, page: str | None, lines: list[str]) -> Prepared:
+def prepare(
+    title: str,
+    edition_id: uuid.UUID,
+    page: str | None,
+    lines: list[str],
+    chapter: str | None = None,
+) -> Prepared:
     """Apply the entry rules to one imported row, flagging what they remove.
 
     Raises recipes.InvalidRecipe only for what makes the row unusable (no
@@ -182,7 +195,7 @@ def prepare(title: str, edition_id: uuid.UUID, page: str | None, lines: list[str
                 flags.append((FlagKind.USUALLY_LEFT_OUT, line))
             elif found.suggestion:
                 flags.append((FlagKind.LINE_DETAIL, f"{line} → {found.suggestion}"))
-    entry = recipes.clean(title, [(edition_id, page)], kept)
+    entry = recipes.clean(title, [(edition_id, page)], kept, chapter=chapter)
     if not entry.lines:
         flags.append((FlagKind.NO_INGREDIENTS, None))
     if page is None:
@@ -198,6 +211,7 @@ class Item:
     title: str
     page: str | None
     lines: list[str]
+    chapter: str | None = None
 
 
 @dataclass
@@ -245,7 +259,7 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
             outcome.errors.append((item.row, "Its book isn't in the catalog yet."))
             continue
         try:
-            prepared = prepare(item.title, edition_id, item.page, item.lines)
+            prepared = prepare(item.title, edition_id, item.page, item.lines, item.chapter)
         except recipes.InvalidRecipe as exc:
             outcome.errors.append((item.row, str(exc)))
             continue
@@ -266,8 +280,17 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
             )
         ).all()
         same_page = [rid for rid, page in same_title if page == entry.pages[edition_id]]
-        if same_page and entry.lines in await _ingredients(session, same_page):
+        lines_of = dict(zip(same_page, await _ingredients(session, same_page), strict=True))
+        already = [rid for rid in same_page if lines_of[rid] == entry.lines]
+        if already:
             outcome.skipped += 1
+            # Added before chapters were imported: it gets its chapter now.
+            if entry.chapter:
+                await session.execute(
+                    update(Recipe)
+                    .where(Recipe.id.in_(already), Recipe.chapter.is_(None))
+                    .values(chapter=entry.chapter)
+                )
             continue
 
         recipe = await recipes.create(session, item.source_id, entry)

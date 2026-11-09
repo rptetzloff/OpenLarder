@@ -267,6 +267,7 @@ class Recipe(Timestamps, Base):
     __table_args__ = (
         UniqueConstraint("source_id", "id"),
         CheckConstraint("title <> ''", name="title_not_empty"),
+        CheckConstraint("chapter <> ''", name="chapter_not_empty"),
         # Not unique: one book can have two recipes called "Vinaigrette".
         # Duplicate detection warns on title + work; it does not refuse.
         Index("ix_recipes_source_id_title", "source_id", "title"),
@@ -277,6 +278,9 @@ class Recipe(Timestamps, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     source_id: Mapped[uuid.UUID] = _fk("sources.id", ondelete="CASCADE")
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    # The book's chapter or section it's in, as the book names it ("Yeast
+    # Breads"): each book's own, so not a tag (migration 0031).
+    chapter: Mapped[str | None] = mapped_column(Text)
     # Only where the publisher posted the recipe itself.
     online_url: Mapped[str | None] = mapped_column(Text)
     # Who added it, so they can see its flags. Null for recipes added before

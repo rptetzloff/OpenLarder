@@ -198,6 +198,19 @@ async def test_changing_a_recipe_rewrites_its_pages_and_lines(admin, book, adb) 
     assert await adb.scalar(text("SELECT count(*) FROM recipe_ingredients")) == 1
 
 
+async def test_a_chapter_is_kept_tidied_and_changed(admin, client, book) -> None:
+    added = await _add(admin, book["work"], chapter="  Yeast   Breads ")
+    recipe_id = added.json()["id"]
+    assert (await client.get(f"/api/recipes/{recipe_id}")).json()["chapter"] == "Yeast Breads"
+    listed = (await client.get(f"/api/sources/{book['work']}")).json()["recipes"]
+    assert [r["chapter"] for r in listed] == ["Yeast Breads"]
+    # Blank takes it off.
+    await admin.put(f"/api/recipes/{recipe_id}", json=_body(chapter=" "))
+    assert (await client.get(f"/api/recipes/{recipe_id}")).json()["chapter"] is None
+    too_long = await admin.put(f"/api/recipes/{recipe_id}", json=_body(chapter="x" * 101))
+    assert too_long.status_code == 422
+
+
 async def test_removing_a_recipe_removes_its_pages_and_lines(admin, book, adb) -> None:
     recipe_id = (await _add(admin, book["work"])).json()["id"]
     assert (await admin.delete(f"/api/recipes/{recipe_id}")).status_code == 204

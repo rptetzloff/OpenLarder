@@ -42,6 +42,8 @@ export interface Book {
   recipes: {
     id: string;
     title: string;
+    // The chapter or section it's in, as the book names it.
+    chapter: string | null;
     pages: (string | null)[];
     issue: string | null;
     episode: string | null;
