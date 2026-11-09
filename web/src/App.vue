@@ -1277,6 +1277,24 @@ button.secondary[aria-pressed="true"] {
 button.secondary[aria-pressed="true"] .count {
   color: inherit;
 }
+.ingredient-list .numeric {
+  text-align: right;
+}
+.cell-label {
+  display: none;
+}
+@media (max-width: 40rem) {
+  .cell-label {
+    display: inline;
+    color: var(--muted);
+  }
+  .ingredient-list td.empty {
+    display: none;
+  }
+  .ingredient-list .numeric {
+    text-align: left;
+  }
+}
 .results-count {
   margin: 0 0 1rem;
 }.cover-grid {

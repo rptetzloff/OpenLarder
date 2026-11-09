@@ -7,6 +7,9 @@ export interface IngredientSummary {
   id: string;
   name: string;
   recipes: number;
+  // What it comes under, and its other names ("Root Ginger (UK)").
+  parent?: { id: string; name: string } | null;
+  aliases?: string[];
 }
 
 export interface IngredientList {
@@ -65,9 +68,17 @@ export function whereItIs(r: Listed): string {
   return parts.join(" · ");
 }
 
-export async function listIngredients(q: string, offset = 0): Promise<IngredientList> {
+// sort "name": A to Z, rather than most used first; top: only those that
+// come under nothing.
+export async function listIngredients(
+  q: string,
+  offset = 0,
+  options: { sort?: "uses" | "name"; top?: boolean } = {},
+): Promise<IngredientList> {
   const query = new URLSearchParams({ q });
   if (offset) query.set("offset", String(offset));
+  if (options.sort === "name") query.set("sort", "name");
+  if (options.top) query.set("top", "true");
   const res = await fetch(`/api/ingredients?${query}`);
   if (!res.ok) throw new Error("The ingredients couldn't be loaded.");
   return res.json();

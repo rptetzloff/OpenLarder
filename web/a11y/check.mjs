@@ -151,6 +151,7 @@ function pages(s) {
     [`/recipes/${s.pie.id}`, "cook"],
     [`/recipes/${s.biscuits.id}/edit`, "admin"],
     ["/ingredients", null],
+    ["/ingredients?top=true&sort=name", null],
     [`/ingredients/${s.cheddar}`, null],
     [`/ingredients/${s.cheddar}`, "admin"],
     ["/authors", null],

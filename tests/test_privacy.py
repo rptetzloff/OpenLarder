@@ -278,6 +278,18 @@ async def test_checking_a_line_finds_only_what_you_see(secret, people) -> None:
     assert (await read(await people("cat"), source_id=secret["box"])).status_code == 404
 
 
+async def test_the_list_hides_a_parent_you_cant_see(secret, people) -> None:
+    """Smoked Flakes sits under the private salt: to anyone else it comes
+    under nothing, so it is top level."""
+    bob = await people("bob")
+    listed = (await bob.get("/api/ingredients", params={"q": "smoked"})).json()["ingredients"]
+    assert [(i["name"], i["parent"]) for i in listed] == [("Smoked Flakes", None)]
+    top = (await bob.get("/api/ingredients", params={"top": "true", "q": "smoked"})).json()
+    assert [i["name"] for i in top["ingredients"]] == ["Smoked Flakes"]
+    mine = (await secret["ann"].get("/api/ingredients", params={"q": "smoked"})).json()
+    assert mine["ingredients"][0]["parent"]["name"] == "Zanzibar Moonsalt"
+
+
 async def test_counts_leave_out_what_you_cant_see(secret, people, adb) -> None:
     """Counts carry no names, so the sweep can't see them: the flags an
     admin is told of, and the recipes under an ingredient."""
