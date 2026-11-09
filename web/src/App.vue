@@ -985,6 +985,9 @@ button.secondary[aria-current="page"] {
   justify-content: space-between;
   gap: 1rem;
 }
+.used-in .page-ref {
+  white-space: nowrap;
+}
 .recipe-aside {
   display: flex;
   flex-direction: column;

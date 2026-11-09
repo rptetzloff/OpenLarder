@@ -162,7 +162,6 @@ async function remove() {
         <div class="recipe-main">
           <section class="find-it" aria-labelledby="find-it-label">
             <img v-if="cover" :src="cover" alt="" class="find-cover" />
-            <span v-else class="find-cover" aria-hidden="true"></span>
             <div class="find-about">
               <p id="find-it-label" class="find-label">{{ findLabel }}</p>
               <p class="find-source">
