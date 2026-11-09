@@ -51,9 +51,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       (#87):** one admin band on every admin page and Sources, the current
       page marked; the overview as cards with what's waiting and the
       catch-up tools as panels; flagged recipes and import history as
-      tables; suggestions as cards; filters as buttons with counts. Next:
-      your account and My flagged recipes; then groups, a group and
-      invites. #17's sign-in screens
+      tables; suggestions as cards; filters as buttons with counts; My flagged
+      recipes, the same page, came with it. **Your account (#88):** cards
+      to My flagged recipes and Groups with what's waiting, the name form
+      and signing in as panels. Next: groups, a group and invites. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).

@@ -1885,9 +1885,16 @@ button.primary.small {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+.tool-panel h2,
 .tool-panel h3 {
   margin: 0 0 0.375rem;
   font-size: 1rem;
+}
+.account-panels {
+  margin-top: 2rem;
+}
+.account-panels .tool-panel a {
+  color: var(--link);
 }
 .tool-panel > p.muted {
   margin: 0 0 1rem;
