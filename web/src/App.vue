@@ -359,6 +359,222 @@ main > section {
   color: var(--error);
 }
 
+/* A page laid out to the full width, as the redesigned ones are. */
+main > article.wide {
+  max-width: var(--page);
+  padding: 2rem 1.5rem 0;
+  box-sizing: border-box;
+}
+button.secondary {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+button.secondary:hover {
+  background: var(--surface);
+}
+button.secondary[aria-current="page"] {
+  border-color: var(--fg);
+  font-weight: 700;
+}
+.chip-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: text;
+}
+.chip-input input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  border: none;
+  padding: 0.25rem;
+  font: inherit;
+  background: transparent;
+  color: var(--fg);
+}
+.chip-input input:focus {
+  outline: none;
+}
+.chip-input:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  border-radius: 6px;
+  background: var(--chip);
+  color: var(--fg);
+  font-size: 0.9375rem;
+}
+.chip button {
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  padding: 0 0.25rem;
+  cursor: pointer;
+}
+.suggestions {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem 0;
+}
+.suggestions li {
+  margin: 0;
+  padding: 0.125rem 0;
+}
+
+/* Search. */
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-radius: 8px;
+  background: var(--surface);
+}
+.search-panel label,
+.filters legend {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.search-panel .help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.search-panel .optional {
+  font-weight: normal;
+  color: var(--muted);
+}
+.panel-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+.panel-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.panel-row > div > input {
+  font: inherit;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.search-body {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+@media (max-width: 48rem) {
+  .search-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+}
+.filters fieldset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.filters legend {
+  margin-bottom: 0.375rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.filters .check {
+  font-weight: normal;
+}
+.filters button.link,
+.results a,
+.search-page .suggestions button.link {
+  color: var(--link);
+}
+.results-head {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+.muted {
+  color: var(--muted);
+  font-weight: normal;
+}
+.hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hits .hit {
+  display: flex;
+  gap: 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.hit-cover {
+  flex: none;
+  width: 3rem;
+  height: 4.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  object-fit: cover;
+}
+.hit h3 {
+  margin: 0 0 0.125rem;
+  font-size: 1.0625rem;
+}
+.hit p {
+  margin: 0.125rem 0 0;
+  font-size: 0.9375rem;
+}
+.hit-where,
+.hit-needs {
+  color: var(--muted);
+}
+.hit-have {
+  font-weight: 600;
+}
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+  justify-content: center;
+  margin: 1.25rem 0 0;
+}
+
 /* The front page. */
 .hero {
   background: var(--surface);

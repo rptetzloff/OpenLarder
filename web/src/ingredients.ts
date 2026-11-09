@@ -1,5 +1,6 @@
 // Canonical ingredients: what /api/ingredients returns.
 
+import { issueName } from "./books";
 import type { Swap } from "./substitutions";
 
 export interface IngredientSummary {
@@ -21,12 +22,44 @@ export interface Ingredient {
   // Broader and narrower: cheese above cheddar, aged cheddar below it.
   parent: { id: string; name: string } | null;
   children: { id: string; name: string }[];
-  recipes: { id: string; title: string; source_id: string; source_title: string; pages: string[] }[];
+  recipes: Listed[];
   total: number;
   // Recipes using it or anything under it, as search counts them.
   family_total: number;
   // What can stand in for it.
   swaps: Swap[];
+}
+
+// A recipe in a listing, and where it is: its source's kind, cover and
+// credits, and a magazine's issue, a show's episode and time, or a site.
+export interface Listed {
+  id: string;
+  title: string;
+  source_id: string;
+  source_title: string;
+  pages: string[];
+  source_kind: string;
+  cover_url: string | null;
+  authors: string[];
+  issue: string | null;
+  episode: string | null;
+  at: string | null;
+  site: string | null;
+}
+
+// Where a listed recipe is, after its source's name: "Claire Ptak · p. 112",
+// "May 2024 · p. 42", "Season 1, episode 2, at 12:34", "example.com".
+export function whereItIs(r: Listed): string {
+  const parts: string[] = [];
+  if (r.authors.length) parts.push(r.authors.length > 1 ? `${r.authors[0]} and others` : r.authors[0]);
+  if (r.issue) parts.push(issueName(r.issue));
+  if (r.episode) parts.push(r.at ? `${r.episode}, at ${r.at}` : r.episode);
+  if (r.site) parts.push(r.site);
+  if (r.source_kind === "packaging") parts.push("on the packaging");
+  if (r.source_kind === "family") parts.push("family collection");
+  const pages = [...new Set(r.pages)];
+  if (pages.length) parts.push(`p. ${pages.join(" / ")}`);
+  return parts.join(" · ");
 }
 
 export async function listIngredients(q: string, offset = 0): Promise<IngredientList> {
@@ -102,23 +135,31 @@ export interface SearchResult {
   q: string;
   // With ingredients: how many of the recipe's lines you have, of how many,
   // and the lines you don't. Null without ingredients.
-  recipes: (Ingredient["recipes"][number] & {
+  recipes: (Listed & {
     have: number | null;
     lines: number | null;
     needs: string[];
   })[];
   total: number;
+  // Recipes a page holds.
+  per_page: number;
 }
 
 // Recipes ranked by how much of them the ingredients cover, narrowed by
-// title words and books.
+// title words, sources and kinds of source.
 export async function searchRecipes(
   ids: string[],
-  { offset = 0, sources = [], q = "" }: { offset?: number; sources?: string[]; q?: string } = {},
+  {
+    offset = 0,
+    sources = [],
+    q = "",
+    kinds = [],
+  }: { offset?: number; sources?: string[]; q?: string; kinds?: string[] } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
   if (q.trim()) query.set("q", q.trim());
   for (const source of sources) query.append("source", source);
+  for (const kind of kinds) query.append("kind", kind);
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

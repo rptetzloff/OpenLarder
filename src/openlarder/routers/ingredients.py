@@ -13,17 +13,23 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Row, exists, func, select
 
-from openlarder import ingredients, substitutions, visibility
+from openlarder import ingredients, openlibrary, substitutions, visibility, web
+from openlarder import recipes as recipe_entries
 from openlarder.auth import AdminUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import (
+    Edition,
+    Episode,
     Ingredient,
     IngredientAlias,
     IngredientOption,
+    Issue,
     Recipe,
     RecipeLocation,
     Source,
+    SourceCredit,
     Substitution,
+    WebPage,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
 
@@ -49,6 +55,16 @@ class UsedBy(BaseModel):
     source_id: uuid.UUID
     source_title: str
     pages: list[str]
+    # Where it is, for a listing to say so: the source's kind, its newest
+    # cover, who it credits, and for a magazine's recipe its issue, a show's
+    # its episode and time, a website's or social account's its site.
+    source_kind: str = "book"
+    cover_url: str | None = None
+    authors: list[str] = []
+    issue: str | None = None
+    episode: str | None = None
+    at: str | None = None
+    site: str | None = None
 
 
 class AliasOut(BaseModel):
@@ -83,7 +99,7 @@ def contains_pattern(q: str) -> str:
 
 
 async def recipes_where(
-    session: Session, *conditions: ColumnElement[bool], offset: int
+    session: Session, *conditions: ColumnElement[bool], offset: int, limit: int | None = None
 ) -> tuple[list[UsedBy], int]:
     """A page of the recipes meeting the conditions, by book then title,
     with their pages, and how many there are in all."""
@@ -95,7 +111,7 @@ async def recipes_where(
             .where(*conditions)
             .order_by(func.lower(Source.title), func.lower(Recipe.title), Recipe.id)
             .offset(offset)
-            .limit(PAGE)
+            .limit(limit or PAGE)
         )
     ).all()
     return await with_pages(session, rows), total or 0
@@ -104,19 +120,79 @@ async def recipes_where(
 async def with_pages(
     session: Session, rows: Sequence[Row[tuple[uuid.UUID, str, uuid.UUID, str]]]
 ) -> list[UsedBy]:
-    """(recipe ID, title, book ID, book title) rows, in order, with pages."""
+    """(recipe ID, title, book ID, book title) rows, in order, with their
+    pages and where they are."""
+    if not rows:
+        return []
+    recipe_ids = [r[0] for r in rows]
+    source_ids = list({r[2] for r in rows})
     pages: dict[uuid.UUID, list[str]] = {}
-    if rows:
-        for recipe_id, page in await session.execute(
-            select(RecipeLocation.recipe_id, RecipeLocation.page)
-            .where(
-                RecipeLocation.recipe_id.in_([r[0] for r in rows]), RecipeLocation.page.is_not(None)
-            )
-            .order_by(RecipeLocation.page)
-        ):
+    issues: dict[uuid.UUID, str] = {}
+    episodes: dict[uuid.UUID, tuple[str, str | None]] = {}
+    sites: dict[uuid.UUID, str] = {}
+    for recipe_id, page, label, season, number, title, at, url in await session.execute(
+        select(
+            RecipeLocation.recipe_id,
+            RecipeLocation.page,
+            Issue.label,
+            Episode.season,
+            Episode.number,
+            Episode.title,
+            RecipeLocation.at_seconds,
+            WebPage.url,
+        )
+        .outerjoin(Issue, Issue.id == RecipeLocation.issue_id)
+        .outerjoin(Episode, Episode.id == RecipeLocation.episode_id)
+        .outerjoin(WebPage, WebPage.id == RecipeLocation.web_page_id)
+        .where(RecipeLocation.recipe_id.in_(recipe_ids))
+        .order_by(RecipeLocation.page)
+    ):
+        if page is not None:
             pages.setdefault(recipe_id, []).append(page)
+        if label is not None:
+            issues[recipe_id] = label
+        if season is not None or number is not None or title is not None:
+            episodes[recipe_id] = (
+                recipe_entries.episode_name(season, number, title),
+                recipe_entries.clock(at) if at is not None else None,
+            )
+        if url is not None:
+            sites[recipe_id] = web.site(url)
+    kinds = dict(
+        (
+            await session.execute(select(Source.id, Source.kind).where(Source.id.in_(source_ids)))
+        ).all()
+    )
+    credited: dict[uuid.UUID, list[str]] = {}
+    for source_id, name in await session.execute(
+        select(SourceCredit.source_id, SourceCredit.credited_as)
+        .where(SourceCredit.source_id.in_(source_ids))
+        .order_by(SourceCredit.source_id, SourceCredit.position)
+    ):
+        credited.setdefault(source_id, []).append(name)
+    covers: dict[uuid.UUID, int] = {}
+    for source_id, cover_id in await session.execute(
+        select(Edition.source_id, Edition.open_library_cover_id)
+        .where(Edition.source_id.in_(source_ids), Edition.open_library_cover_id.is_not(None))
+        .order_by(Edition.source_id, Edition.published_year.desc().nulls_last())
+    ):
+        # The newest edition with a cover stands for the book.
+        covers.setdefault(source_id, cover_id)
     return [
-        UsedBy(id=r, title=t, source_id=b, source_title=bt, pages=pages.get(r, []))
+        UsedBy(
+            id=r,
+            title=t,
+            source_id=b,
+            source_title=bt,
+            pages=pages.get(r, []),
+            source_kind=kinds[b],
+            cover_url=openlibrary.cover_url(covers[b]) if b in covers else None,
+            authors=credited.get(b, []),
+            issue=issues.get(r),
+            episode=episodes.get(r, (None, None))[0],
+            at=episodes.get(r, (None, None))[1],
+            site=sites.get(r),
+        )
         for r, t, b, bt in rows
     ]
 

@@ -1,61 +1,94 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { type BookSummary, findBooks } from "../books";
+import { findBooks } from "../books";
 import {
-  type IngredientSummary,
   listIngredients,
   type Named,
   type SearchResult,
   searchRecipes,
+  whereItIs,
 } from "../ingredients";
 
 document.title = "Search · OpenLarder";
 
-// What can I make from these books with what I have? Ingredients you have
-// rank the recipes (the more of a recipe you have, the higher), title words and books
-// narrow them. All of it is kept in the address (?book=…&q=…&i=…), so a
-// search can be bookmarked or shared.
+// What can I make from these sources with what I have? Ingredients you have
+// rank the recipes (the more of a recipe you have, the higher); title words,
+// sources and kinds of source narrow them. All of it is kept in the address
+// (?i=…&q=…&source=…&kind=…&page=…), so a search can be bookmarked or shared.
+// Laid out from Ray's wireframe, 2026-11-08.
 const MAX_INGREDIENTS = 30;
-const MAX_BOOKS = 10;
+const MAX_SOURCES = 10;
+// The wireframe's kinds of source, grouped as people think of them; the
+// first three show, the rest behind "More kinds".
+const KIND_GROUPS = [
+  { label: "Books", kinds: ["book"] },
+  { label: "Websites", kinds: ["website"] },
+  { label: "Magazines and newspapers", kinds: ["magazine", "newspaper"] },
+  { label: "TV, video and podcasts", kinds: ["tv_show", "video_channel", "podcast"] },
+  { label: "Social media", kinds: ["social"] },
+  { label: "Packaging", kinds: ["packaging"] },
+  { label: "Family collections", kinds: ["family"] },
+];
+const ALL_KINDS = KIND_GROUPS.flatMap((g) => g.kinds);
+
 const params = new URLSearchParams(location.search);
 const chosen = ref<Named[]>([]);
 const shelf = ref<Named[]>([]);
 const title = ref(params.get("q") ?? "");
+// Every kind until some are unticked; the address lists them only then.
+const asked = params.getAll("kind").filter((k) => ALL_KINDS.includes(k));
+const kinds = ref<string[]>(asked.length ? asked : [...ALL_KINDS]);
+const moreKinds = ref(KIND_GROUPS.slice(3).some((g) => g.kinds.some((k) => !kinds.value.includes(k))));
+const page = ref(Math.max(1, Number(params.get("page")) || 1));
 const result = ref<SearchResult | null>(null);
 const missing = ref(0);
 const failed = ref(false);
 const loading = ref(false);
-let asked = 0;
+let latest = 0;
 
-async function run(more = false) {
-  const mine = ++asked;
-  const ids = chosen.value.map((i) => i.id);
-  const books = shelf.value.map((b) => b.id);
+const narrowedKinds = computed(() =>
+  kinds.value.length === ALL_KINDS.length ? [] : kinds.value,
+);
+const searching = computed(() => !!chosen.value.length || !!title.value.trim());
+
+function toAddress() {
   const url = new URL(location.href);
-  url.searchParams.delete("i");
-  url.searchParams.delete("book");
-  url.searchParams.delete("source");
-  for (const id of books) url.searchParams.append("source", id);
-  for (const id of ids) url.searchParams.append("i", id);
+  for (const key of ["i", "book", "source", "q", "kind", "page"]) url.searchParams.delete(key);
+  for (const b of shelf.value) url.searchParams.append("source", b.id);
+  for (const i of chosen.value) url.searchParams.append("i", i.id);
   if (title.value.trim()) url.searchParams.set("q", title.value.trim());
-  else url.searchParams.delete("q");
+  for (const k of narrowedKinds.value) url.searchParams.append("kind", k);
+  if (page.value > 1) url.searchParams.set("page", String(page.value));
   history.replaceState(null, "", url);
+}
+
+async function run(toPage = 1) {
+  const mine = ++latest;
+  page.value = toPage;
+  toAddress();
   failed.value = false;
-  if (!ids.length && !title.value.trim()) {
+  if (!searching.value) {
     result.value = null;
     return;
   }
   loading.value = true;
   try {
-    const offset = more ? (result.value?.recipes.length ?? 0) : 0;
-    const page = await searchRecipes(ids, { offset, sources: books, q: title.value });
-    if (mine !== asked) return;
-    if (more && result.value) result.value.recipes.push(...page.recipes);
-    else result.value = page;
+    const perPage = result.value?.per_page ?? 0;
+    const found = await searchRecipes(
+      chosen.value.map((i) => i.id),
+      {
+        offset: perPage ? (toPage - 1) * perPage : 0,
+        sources: shelf.value.map((b) => b.id),
+        q: title.value,
+        kinds: narrowedKinds.value,
+      },
+    );
+    if (mine !== latest) return;
+    result.value = found;
   } catch {
-    if (mine === asked) failed.value = true;
+    if (mine === latest) failed.value = true;
   } finally {
-    if (mine === asked) loading.value = false;
+    if (mine === latest) loading.value = false;
   }
 }
 
@@ -64,13 +97,11 @@ watch(title, () => {
   clearTimeout(titleTimer);
   titleTimer = setTimeout(() => run(), 300);
 });
+watch(kinds, () => run(), { deep: true });
 
-// Type-to-find, for books and for ingredients: suggestions from the server,
-// leaving out what's already chosen.
-function finder<T extends Named>(
-  find: (q: string) => Promise<T[]>,
-  taken: () => Named[],
-) {
+// Type-to-find, for sources and for ingredients: suggestions from the
+// server, leaving out what's already chosen.
+function finder<T extends Named>(find: (q: string) => Promise<T[]>, taken: () => Named[]) {
   const query = ref("");
   const suggestions = ref<T[]>([]);
   let typed = 0;
@@ -93,75 +124,107 @@ const ingredientFind = finder(
   async (q) => (await listIngredients(q)).ingredients,
   () => chosen.value,
 );
-const bookFind = finder(
+const sourceFind = finder(
   async (q) => (await findBooks(q)).map((b) => ({ ...b, name: b.title })),
   () => shelf.value,
 );
 
-function addTo(list: Named[], item: Named, max: number) {
-  if (list.length < max) list.push({ id: item.id, name: item.name });
-}
-
 function addIngredient(item: Named) {
-  addTo(chosen.value, item, MAX_INGREDIENTS);
+  if (chosen.value.length < MAX_INGREDIENTS) chosen.value.push({ id: item.id, name: item.name });
   ingredientFind.query.value = "";
   ingredientFind.suggestions.value = [];
   document.getElementById("search-ingredient")?.focus();
   run();
 }
-
-function addBook(item: Named) {
-  addTo(shelf.value, item, MAX_BOOKS);
-  bookFind.query.value = "";
-  bookFind.suggestions.value = [];
-  document.getElementById("search-book")?.focus();
+function addSource(item: Named) {
+  if (shelf.value.length < MAX_SOURCES) shelf.value.push({ id: item.id, name: item.name });
+  sourceFind.query.value = "";
+  sourceFind.suggestions.value = [];
+  document.getElementById("search-source")?.focus();
   run();
 }
-
 function dropIngredient(id: string) {
   chosen.value = chosen.value.filter((i) => i.id !== id);
+  document.getElementById("search-ingredient")?.focus();
+  run();
+}
+function dropSource(id: string) {
+  shelf.value = shelf.value.filter((b) => b.id !== id);
+  document.getElementById("search-source")?.focus();
   run();
 }
 
-function dropBook(id: string) {
-  shelf.value = shelf.value.filter((b) => b.id !== id);
-  run();
+// A group is ticked when every kind in it is.
+const groupTicked = (kindsInGroup: string[]) => kindsInGroup.every((k) => kinds.value.includes(k));
+function toggleGroup(kindsInGroup: string[], on: boolean) {
+  const rest = kinds.value.filter((k) => !kindsInGroup.includes(k));
+  kinds.value = on ? [...rest, ...kindsInGroup] : rest;
+}
+
+// What the button says after a try: copied, or where to copy it from.
+const copyNote = ref("");
+async function copyLink() {
+  toAddress();
+  try {
+    await navigator.clipboard.writeText(location.href);
+    copyNote.value = "Link copied";
+  } catch {
+    copyNote.value = "Couldn't copy: the address bar has the link";
+  }
+  setTimeout(() => (copyNote.value = ""), 4000);
+}
+
+const pages = computed(() => {
+  const r = result.value;
+  return r && r.per_page ? Math.max(1, Math.ceil(r.total / r.per_page)) : 1;
+});
+// Page numbers to offer: the first, the last, and those near this one.
+const pageLinks = computed(() => {
+  const near = new Set([1, pages.value, page.value - 1, page.value, page.value + 1]);
+  const list = [...near].filter((n) => n >= 1 && n <= pages.value).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  for (const n of list) {
+    if (out.length && typeof out[out.length - 1] === "number" && n - (out[out.length - 1] as number) > 1)
+      out.push("…");
+    out.push(n);
+  }
+  return out;
+});
+function goTo(n: number) {
+  run(n);
+  document.getElementById("results")?.scrollIntoView();
 }
 
 const summary = computed(() => {
   const r = result.value;
   if (!r) return "";
-  const n = `${r.total.toLocaleString()} ${r.total === 1 ? "recipe" : "recipes"}`;
-  const where = shelf.value.length ? ` in ${shelf.value.length === 1 ? "this book" : "these books"}` : "";
-  const titled = r.q ? ` with “${r.q}” in the title` : "";
-  if (!chosen.value.length) return `${n}${where}${titled}.`;
-  return `${n}${where}${titled} use some of what you have, closest to made first.`;
+  return `${r.total.toLocaleString()} ${r.total === 1 ? "recipe" : "recipes"}`;
 });
-
-function where(r: SearchResult["recipes"][number]) {
-  return r.pages.length ? `, p. ${r.pages.join(" / ")}` : "";
-}
 
 onMounted(async () => {
   const ids = params.getAll("i").slice(0, MAX_INGREDIENTS);
-  const books = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_BOOKS);
+  const sources = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_SOURCES);
   try {
     if (!ids.length && !title.value.trim()) {
-      // Books, before anything to search by: their names are all to show.
-      for (const id of books) {
+      // Sources, before anything to search by: their names are all to show.
+      for (const id of sources) {
         const res = await fetch(`/api/sources/${id}`);
         if (res.ok) shelf.value.push({ id, name: (await res.json()).title });
       }
-      if (shelf.value.length < books.length) run();
+      if (shelf.value.length < sources.length) toAddress();
       return;
     }
-    // The search names the ingredients and books, so a link needs only IDs.
-    const page = await searchRecipes(ids, { sources: books, q: title.value });
-    chosen.value = page.ingredients;
-    shelf.value = page.sources;
-    missing.value = page.missing.length + page.missing_sources.length;
-    result.value = page;
-    if (missing.value) run();
+    // The search names the ingredients and sources, so a link needs only IDs.
+    const first = await searchRecipes(ids, {
+      sources,
+      q: title.value,
+      kinds: narrowedKinds.value,
+    });
+    chosen.value = first.ingredients;
+    shelf.value = first.sources;
+    missing.value = first.missing.length + first.missing_sources.length;
+    result.value = first;
+    if (missing.value || page.value > 1) run(page.value);
   } catch {
     failed.value = true;
   }
@@ -169,105 +232,93 @@ onMounted(async () => {
 </script>
 
 <template>
-  <article>
+  <article class="wide search-page">
     <h1>Search</h1>
-    <p class="status">
-      Tell it what you have and which books are out, and it finds the recipes you're closest to
-      making, with the book and page to find them on.
-    </p>
 
-    <div class="isbn-form">
-      <label for="search-ingredient">Ingredients you have</label>
-      <div class="row">
+    <form class="search-panel" role="search" @submit.prevent="run()">
+      <label for="search-ingredient">I have</label>
+      <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
+        <span v-for="i in chosen" :key="i.id" class="chip">
+          {{ i.name }}
+          <button type="button" :aria-label="`Remove ${i.name}`" @click.stop="dropIngredient(i.id)">
+            ×
+          </button>
+        </span>
         <input
           id="search-ingredient"
           v-model="ingredientFind.query.value"
           type="search"
           autocomplete="off"
-          placeholder="rhubarb"
+          :placeholder="`Add an ingredient (up to ${MAX_INGREDIENTS})`"
+          aria-describedby="search-ingredient-help"
           :disabled="chosen.length >= MAX_INGREDIENTS"
           @keydown.enter.prevent="
-            ingredientFind.suggestions.value[0] &&
-            addIngredient(ingredientFind.suggestions.value[0])
+            ingredientFind.suggestions.value[0] && addIngredient(ingredientFind.suggestions.value[0])
           "
         />
       </div>
-      <ul v-if="ingredientFind.suggestions.value.length" class="merge-candidates">
+      <ul v-if="ingredientFind.suggestions.value.length" class="suggestions">
         <li v-for="s in ingredientFind.suggestions.value" :key="s.id">
-          <button
-            type="button"
-            class="link"
-            @click="addIngredient(s)"
-          >
-            {{ s.name }}
-          </button>
+          <button type="button" class="link" @click="addIngredient(s)">{{ s.name }}</button>
           <span class="page-ref">
             {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
           </span>
         </li>
       </ul>
-    </div>
-    <ul v-if="chosen.length" class="chosen" aria-label="Ingredients you have">
-      <li v-for="i in chosen" :key="i.id">
-        <a :href="`/ingredients/${i.id}`">{{ i.name }}</a>
-        <button
-          type="button"
-          class="link"
-          :aria-label="`Remove ${i.name}`"
-          @click="dropIngredient(i.id)"
-        >
-          ×
-        </button>
-      </li>
-    </ul>
+      <p id="search-ingredient-help" class="help">
+        An ingredient also finds what's under it: cheese finds cheddar.
+      </p>
 
-    <div class="isbn-form">
-      <label for="search-book">Books</label>
-      <div class="row">
-        <input
-          id="search-book"
-          v-model="bookFind.query.value"
-          type="search"
-          autocomplete="off"
-          placeholder="every book, or type a title or author"
-          :disabled="shelf.length >= MAX_BOOKS"
-          @keydown.enter.prevent="
-            bookFind.suggestions.value[0] &&
-            addBook(bookFind.suggestions.value[0])
-          "
-        />
+      <div class="panel-row">
+        <div>
+          <label for="search-title">Title words</label>
+          <input
+            id="search-title"
+            v-model="title"
+            type="search"
+            autocomplete="off"
+            maxlength="200"
+            placeholder="e.g. biscuit"
+          />
+        </div>
+        <div>
+          <label for="search-source">In sources <span class="optional">(optional)</span></label>
+          <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
+            <span v-for="b in shelf" :key="b.id" class="chip">
+              {{ b.name }}
+              <button type="button" :aria-label="`Remove ${b.name}`" @click.stop="dropSource(b.id)">
+                ×
+              </button>
+            </span>
+            <input
+              id="search-source"
+              v-model="sourceFind.query.value"
+              type="search"
+              autocomplete="off"
+              placeholder="Type a title, author or site"
+              :disabled="shelf.length >= MAX_SOURCES"
+              @keydown.enter.prevent="
+                sourceFind.suggestions.value[0] && addSource(sourceFind.suggestions.value[0])
+              "
+            />
+          </div>
+          <ul v-if="sourceFind.suggestions.value.length" class="suggestions">
+            <li v-for="b in sourceFind.suggestions.value" :key="b.id">
+              <button type="button" class="link" @click="addSource(b)">{{ b.title }}</button>
+              <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <ul v-if="bookFind.suggestions.value.length" class="merge-candidates">
-        <li v-for="b in bookFind.suggestions.value" :key="b.id">
-          <button type="button" class="link" @click="addBook(b)">
-            {{ b.title }}
-          </button>
-          <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
-        </li>
-      </ul>
-    </div>
-    <ul v-if="shelf.length" class="chosen" aria-label="Books">
-      <li v-for="b in shelf" :key="b.id">
-        <a :href="`/sources/${b.id}`">{{ b.name }}</a>
-        <button type="button" class="link" :aria-label="`Remove ${b.name}`" @click="dropBook(b.id)">
-          ×
-        </button>
-      </li>
-    </ul>
 
-    <div class="isbn-form">
-      <label for="search-title">Words in the title</label>
-      <div class="row">
-        <input
-          id="search-title"
-          v-model="title"
-          type="search"
-          autocomplete="off"
-          maxlength="200"
-          placeholder="cake"
-        />
+      <div class="panel-actions">
+        <button type="submit" class="primary">Search</button>
+        <button type="button" class="secondary" @click="copyLink">
+          Copy link to this search
+        </button>
+        <span class="status" role="status">{{ copyNote }}</span>
       </div>
-    </div>
+    </form>
 
     <p v-if="missing" class="status">
       {{ missing === 1 ? "Something" : `${missing} things` }} in this link no longer
@@ -275,32 +326,85 @@ onMounted(async () => {
       without {{ missing === 1 ? "it" : "them" }}.
     </p>
 
-    <p v-if="failed" role="alert">The search didn't work. Try again.</p>
-    <template v-else-if="result && (chosen.length || result.q)">
-      <p class="status">{{ summary }}</p>
-      <ul class="recipe-list">
-        <li v-for="r in result.recipes" :key="r.id">
-          <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
-          <span class="page-ref">
-            <a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a>{{ where(r) }}
-          </span>
-          <span v-if="r.lines !== null" class="match">
-            <template v-if="!r.needs.length">You have everything it lists.</template>
-            <template v-else>
-              You have {{ r.have }} of {{ r.lines }}. Needs {{ r.needs.join(", ") }}.
+    <div class="search-body">
+      <aside class="filters" aria-label="Filters">
+        <fieldset>
+          <legend>Source kind</legend>
+          <template v-for="(g, n) in KIND_GROUPS" :key="g.label">
+            <label v-if="n < 3 || moreKinds" class="check">
+              <input
+                type="checkbox"
+                :checked="groupTicked(g.kinds)"
+                @change="toggleGroup(g.kinds, ($event.target as HTMLInputElement).checked)"
+              />
+              {{ g.label }}
+            </label>
+          </template>
+          <button
+            type="button"
+            class="link"
+            :aria-expanded="moreKinds"
+            @click="moreKinds = !moreKinds"
+          >
+            {{ moreKinds ? "Fewer kinds" : "More kinds" }}
+          </button>
+        </fieldset>
+      </aside>
+
+      <section id="results" class="results" aria-live="polite" :aria-busy="loading">
+        <p v-if="failed" role="alert">The search didn't work. Try again.</p>
+        <p v-else-if="!searching" class="status">
+          Add what you have, or words of a title, and the recipes you're closest to making come
+          first, with where to find them.
+        </p>
+        <template v-else-if="result">
+          <h2 class="results-head">
+            {{ summary }}
+            <span v-if="chosen.length" class="muted"> · most of your ingredients first</span>
+          </h2>
+          <ul class="hits">
+            <li v-for="r in result.recipes" :key="r.id" class="hit">
+              <img v-if="r.cover_url" :src="r.cover_url" alt="" class="hit-cover" loading="lazy" />
+              <span v-else class="hit-cover" aria-hidden="true"></span>
+              <div>
+                <h3><a :href="`/recipes/${r.id}`">{{ r.title }}</a></h3>
+                <p class="hit-where">
+                  <a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a
+                  ><template v-if="whereItIs(r)"> · {{ whereItIs(r) }}</template>
+                </p>
+                <template v-if="r.lines !== null">
+                  <p class="hit-have">
+                    {{ r.needs.length ? `You have ${r.have} of its ${r.lines}` : `You have all ${r.lines}` }}
+                  </p>
+                  <p v-if="r.needs.length" class="hit-needs">
+                    Still needs: {{ r.needs.join(", ") }}
+                  </p>
+                </template>
+              </div>
+            </li>
+          </ul>
+          <nav v-if="pages > 1" class="pager" aria-label="Pages of results">
+            <button v-if="page > 1" type="button" class="secondary" @click="goTo(page - 1)">
+              Previous
+            </button>
+            <template v-for="(n, k) in pageLinks" :key="k">
+              <span v-if="n === '…'" class="muted">…</span>
+              <button
+                v-else
+                type="button"
+                class="secondary"
+                :aria-current="n === page ? 'page' : undefined"
+                @click="goTo(n)"
+              >
+                {{ n }}
+              </button>
             </template>
-          </span>
-        </li>
-      </ul>
-      <button
-        v-if="result.recipes.length < result.total"
-        type="button"
-        class="primary"
-        :disabled="loading"
-        @click="run(true)"
-      >
-        Show more ({{ (result.total - result.recipes.length).toLocaleString() }} left)
-      </button>
-    </template>
+            <button v-if="page < pages" type="button" class="secondary" @click="goTo(page + 1)">
+              Next
+            </button>
+          </nav>
+        </template>
+      </section>
+    </div>
   </article>
 </template>

@@ -15,7 +15,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       feature; one PR per page. **The shell and home page (#66):** colours
       as tokens for light and dark, the full logo top left, the header's
       sections and footer, and the front page's search, "cook with what you
-      have" and recently added sources. Next, in order: search; a source's
+      have" and recently added sources. **Search (#69):** the panel, a
+      source-kind filter, result cards with where each recipe is, numbered
+      pages. Next, in order: a source's
       page (with the admin bar and breadcrumbs); a recipe's page; the
       ingredient and author pages; then adding a recipe and entering a whole
       book, which are contribution features too. #17's sign-in screens
@@ -85,9 +87,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         from the 2024 one. A product has no years or barcode (GTIN) yet;
         add them if two printings need telling apart.
       Found while building episodes:
-      - **Search and ingredient pages say only a page**: a magazine's
-        recipe shows "p. 42" without its issue, and a show's nothing about
-        its episode. The source and recipe pages say both.
+      - [x] **Search and ingredient pages say only a page**: search says
+        the issue, episode and time, or site now (#69); the ingredient page
+        gets the same when it is redesigned (the API already gives it).
       - **A video's or podcast episode's address isn't archived** the way
         a web page is; whether the Internet Archive keeps video pages
         usefully needs checking first.
@@ -205,6 +207,8 @@ OCR import of index pages, magazines and web sources, the write API.
 
 ## Done recently
 
+- [x] Site design, part 2: the search page, with a source-kind filter and
+      results that say where each recipe is (#69)
 - [x] An accessibility check in CI: every kind of page through axe-core's
       WCAG 2.1 AA rules in light and dark, and at phone width (#68)
 - [x] A light, dark or same-as-device theme choice in the footer (#67)

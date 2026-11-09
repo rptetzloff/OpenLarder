@@ -26,7 +26,7 @@ matched to it; this is the broader search.
 """
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
@@ -37,7 +37,6 @@ from openlarder.auth import Viewer
 from openlarder.db import Session
 from openlarder.ingredients import family
 from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Source
-from openlarder.routers import ingredients as listing
 from openlarder.routers.ingredients import (
     UsedBy,
     contains_pattern,
@@ -50,6 +49,9 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 MAX_INGREDIENTS = 30
 MAX_WORDS = 10
 MAX_SOURCES = 10
+# Results a page holds: the wireframe's short page, numbered (Ray,
+# 2026-11-08).
+PAGE = 20
 
 
 class Named(BaseModel):
@@ -65,6 +67,20 @@ class Hit(UsedBy):
     needs: list[str] = []
 
 
+Kind = Literal[
+    "book",
+    "website",
+    "magazine",
+    "newspaper",
+    "tv_show",
+    "podcast",
+    "video_channel",
+    "social",
+    "packaging",
+    "family",
+]
+
+
 class Found(BaseModel):
     # The sources searched within, if any were, in the order asked.
     sources: list[Named]
@@ -77,6 +93,8 @@ class Found(BaseModel):
     q: str
     recipes: list[Hit]
     total: int
+    # Recipes a page holds, so a listing can number its pages.
+    per_page: int = 0
 
 
 def _too_many(n: int, limit: int, what: str) -> None:
@@ -93,6 +111,8 @@ async def search(
     ingredient: Annotated[list[uuid.UUID] | None, Query()] = None,
     q: str = Query("", max_length=200),
     source: Annotated[list[uuid.UUID] | None, Query()] = None,
+    # Only these kinds of source: books, websites and so on.
+    kind: Annotated[list[Kind] | None, Query()] = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     asked = list(dict.fromkeys(ingredient or []))
@@ -128,16 +148,20 @@ async def search(
         q=" ".join(q.split()),
         recipes=[],
         total=0,
+        # Read at call time, so a test can shrink it.
+        per_page=PAGE,
     )
     # Every ingredient asked for is gone: nothing left to search by.
     if not known and not words:
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
     conditions.append(visibility.recipes_seen_by(viewer))
+    if kind:
+        conditions.append(Recipe.source_id.in_(select(Source.id).where(Source.kind.in_(kind))))
     if books:
         conditions.append(Recipe.source_id.in_(books))
     if not known:
-        page, found.total = await recipes_where(session, *conditions, offset=offset)
+        page, found.total = await recipes_where(session, *conditions, offset=offset, limit=PAGE)
         found.recipes = [Hit(**r.model_dump()) for r in page]
         return found
     found.recipes, found.total = await _best_match(session, known, conditions, offset)
@@ -187,7 +211,7 @@ async def _best_match(session: Session, have: list[uuid.UUID], conditions, offse
             )
             .offset(offset)
             # Read at call time, so a test can shrink it.
-            .limit(listing.PAGE)
+            .limit(PAGE)
         )
     ).all()
     listed = await with_pages(session, [r[:4] for r in rows])

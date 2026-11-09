@@ -8,7 +8,8 @@ import type { Named } from "../ingredients";
 // ingredients as i, as its own links do.
 const q = ref("");
 const have = ref<Named[]>([]);
-const MAX_INGREDIENTS = 10;
+// As many as Search takes.
+const MAX_INGREDIENTS = 30;
 function searchTitles() {
   const words = q.value.trim();
   if (words) location.href = `/search?${new URLSearchParams({ q: words })}`;
@@ -78,7 +79,7 @@ function byline(s: BookSummary) {
           <button v-if="have.length" type="button" class="primary" @click="findRecipes">
             Find recipes
           </button>
-          <p class="help">Up to 10 ingredients. Recipes using more of them rank higher.</p>
+          <p class="help">Up to 30 ingredients. Recipes using more of them rank higher.</p>
         </div>
       </div>
     </section>

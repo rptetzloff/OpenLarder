@@ -169,7 +169,7 @@ async def test_an_ingredient_asked_twice_counts_once(admin, work, adb, client) -
 
 
 async def test_results_come_in_pages(admin, work, adb, client, monkeypatch) -> None:
-    monkeypatch.setattr("openlarder.routers.ingredients.PAGE", 2)
+    monkeypatch.setattr("openlarder.routers.search.PAGE", 2)
     for n in range(5):
         await _add(admin, work, f"Cake {n}", str(n), ["Egg"])
     egg = await _id(adb, "Egg")
@@ -337,3 +337,95 @@ async def test_a_title_search_has_at_most_ten_words(client) -> None:
     assert (
         await client.get("/api/search", params={"q": " ".join("abcdefghijk")})
     ).status_code == 422
+
+
+# Where each found recipe is, and narrowing by kind of source
+
+
+async def test_a_hit_says_where_it_is(admin, work, adb, client) -> None:
+    author = await adb.scalar(
+        text(
+            "INSERT INTO authors (name, name_key)"
+            " VALUES ('Claire Ptak', 'claire ptak') RETURNING id"
+        )
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO source_credits (source_id, author_id, position, credited_as)"
+            " VALUES (:w, :a, 1, 'Claire Ptak')"
+        ),
+        {"w": work, "a": author},
+    )
+    await _add(admin, work, "Rhubarb Cake", "12", ["Rhubarb"])
+    magazine = (
+        await admin.post("/api/sources/periodicals", json={"kind": "magazine", "title": "Saveur"})
+    ).json()["id"]
+    await admin.post(
+        f"/api/sources/{magazine}/recipes",
+        json={
+            "title": "Rhubarb Fool",
+            "issue": "May 2024",
+            "issue_page": "42",
+            "ingredients": ["Rhubarb"],
+        },
+    )
+    show = (
+        await admin.post("/api/sources/shows", json={"kind": "tv_show", "title": "Salt Fat"})
+    ).json()["id"]
+    await admin.post(
+        f"/api/sources/{show}/recipes",
+        json={
+            "title": "Rhubarb Jam",
+            "episode": {"season": 1, "number": 2, "at": "12:34"},
+            "ingredients": ["Rhubarb"],
+        },
+    )
+    site = (await admin.post("/api/sources/websites", json={"address": "example.com"})).json()
+    await admin.post(
+        f"/api/sources/{site['id']}/recipes",
+        json={
+            "title": "Rhubarb Tart",
+            "web_address": "https://example.com/tart",
+            "ingredients": ["Rhubarb"],
+        },
+    )
+    found = await _search(client, await _id(adb, "Rhubarb"))
+    where = {
+        r["title"]: (
+            r["source_kind"],
+            r["authors"],
+            r["pages"],
+            r["issue"],
+            r["episode"],
+            r["at"],
+            r["site"],
+        )
+        for r in found["recipes"]
+    }
+    assert where == {
+        "Rhubarb Cake": ("book", ["Claire Ptak"], ["12"], None, None, None, None),
+        "Rhubarb Fool": ("magazine", [], ["42"], "May 2024", None, None, None),
+        "Rhubarb Jam": ("tv_show", [], [], None, "Season 1, episode 2", "12:34", None),
+        "Rhubarb Tart": ("website", [], [], None, None, None, "example.com"),
+    }
+    assert found["per_page"] > 0
+
+
+async def test_kinds_narrow_a_search(admin, work, adb, client) -> None:
+    await _add(admin, work, "Rhubarb Cake", "12", ["Rhubarb"])
+    magazine = (
+        await admin.post("/api/sources/periodicals", json={"kind": "magazine", "title": "Saveur"})
+    ).json()["id"]
+    await admin.post(
+        f"/api/sources/{magazine}/recipes",
+        json={"title": "Rhubarb Fool", "issue": "May", "ingredients": ["Rhubarb"]},
+    )
+    rhubarb = await _id(adb, "Rhubarb")
+    assert _titles(await _search(client, rhubarb, kind=["magazine"])) == ["Rhubarb Fool"]
+    assert _titles(await _search(client, rhubarb, kind=["book", "magazine"])) == [
+        "Rhubarb Cake",
+        "Rhubarb Fool",
+    ]
+    assert _titles(await _search(client, q="rhubarb", kind=["book"])) == ["Rhubarb Cake"]
+    bad = await client.get("/api/search", params={"q": "rhubarb", "kind": ["zine"]})
+    assert bad.status_code == 422
