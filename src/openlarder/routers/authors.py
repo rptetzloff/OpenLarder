@@ -19,11 +19,12 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
 
 from openlarder import author_merge, openlibrary, visibility
 from openlarder.auth import AdminUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Author, AuthorLink, Source, SourceCredit
+from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
 from openlarder.routers.ingredients import contains_pattern
 from openlarder.routers.sources import BookSummary, summaries
 
@@ -32,14 +33,27 @@ router = APIRouter(prefix="/api/authors", tags=["authors"])
 PAGE = 100
 
 
+class KnownFor(BaseModel):
+    id: uuid.UUID
+    title: str
+
+
 class AuthorSummary(BaseModel):
     id: uuid.UUID
     name: str
     sources: int
 
 
+class AuthorListed(AuthorSummary):
+    # For the Authors page: a person or an organisation, how many recipes
+    # their sources hold, and the one of them with the most.
+    kind: str
+    recipes: int
+    known_for: KnownFor | None
+
+
 class AuthorList(BaseModel):
-    authors: list[AuthorSummary]
+    authors: list[AuthorListed]
     total: int
 
 
@@ -81,16 +95,36 @@ async def list_authors(
     viewer: Viewer,
     q: str = Query("", max_length=200),
     offset: int = Query(0, ge=0),
+    # "name": A to Z; "recipes": the most recipes first.
+    sort: Literal["name", "recipes"] = "name",
+    # Only people, or only organisations (a test kitchen, a magazine's staff).
+    kind: Literal["person", "organisation"] | None = None,
 ) -> AuthorList:
     """Authors by name, with how many books credit them; with q, those with
     every word of it in their name or a name a book prints for them."""
     books = func.count(func.distinct(SourceCredit.source_id))
+    # The recipes in the sources crediting them that the viewer can see;
+    # aliased, so it doesn't take the outer query's credits for its own.
+    credit = aliased(SourceCredit)
+    recipes = (
+        # Distinct: someone credited twice on a book (author and photographer)
+        # is still credited with its recipes once.
+        select(func.count(func.distinct(Recipe.id)))
+        .join(credit, credit.source_id == Recipe.source_id)
+        .where(
+            credit.author_id == Author.id,
+            Recipe.source_id.in_(visibility.seen_source_ids(viewer)),
+        )
+        .scalar_subquery()
+    )
     query = (
-        select(Author.id, Author.name, books)
+        select(Author.id, Author.name, books, Author.kind, recipes.label("recipes"))
         .join(SourceCredit, SourceCredit.author_id == Author.id)
         .where(SourceCredit.source_id.in_(visibility.seen_source_ids(viewer)))
-        .group_by(Author.id, Author.name)
+        .group_by(Author.id, Author.name, Author.kind)
     )
+    if kind:
+        query = query.where(Author.kind == kind)
     for word in q.casefold().split()[:10]:
         like = contains_pattern(word)
         query = query.having(
@@ -100,11 +134,40 @@ async def list_authors(
             )
         )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    rows = await session.execute(
-        query.order_by(func.lower(Author.name), Author.id).offset(offset).limit(PAGE)
+    order = (
+        (recipes.desc(), func.lower(Author.name), Author.id)
+        if sort == "recipes"
+        else (func.lower(Author.name), Author.id)
     )
+    rows = (await session.execute(query.order_by(*order).offset(offset).limit(PAGE))).all()
+    # Each one's source with the most recipes, of those the viewer can see.
+    known: dict[uuid.UUID, tuple[int, KnownFor]] = {}
+    count = func.count(Recipe.id)
+    for author_id, source_id, title, n in await session.execute(
+        select(SourceCredit.author_id, Source.id, Source.title, count)
+        .join(Source, Source.id == SourceCredit.source_id)
+        .outerjoin(Recipe, Recipe.source_id == Source.id)
+        .where(
+            SourceCredit.author_id.in_([r[0] for r in rows]),
+            Source.id.in_(visibility.seen_source_ids(viewer)),
+        )
+        .group_by(SourceCredit.author_id, Source.id, Source.title)
+        .order_by(SourceCredit.author_id, count.desc(), func.lower(Source.title))
+    ):
+        known.setdefault(author_id, (n, KnownFor(id=source_id, title=title)))
     return AuthorList(
-        authors=[AuthorSummary(id=i, name=n, sources=c) for i, n, c in rows], total=total or 0
+        authors=[
+            AuthorListed(
+                id=i,
+                name=n,
+                sources=c,
+                kind=k,
+                recipes=r or 0,
+                known_for=known[i][1] if i in known else None,
+            )
+            for i, n, c, k, r in rows
+        ],
+        total=total or 0,
     )
 
 

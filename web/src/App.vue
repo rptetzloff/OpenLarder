@@ -1277,7 +1277,8 @@ button.secondary[aria-pressed="true"] {
 button.secondary[aria-pressed="true"] .count {
   color: inherit;
 }
-.ingredient-list .numeric {
+.ingredient-list .numeric,
+.author-list .numeric {
   text-align: right;
 }
 .cell-label {
@@ -1288,11 +1289,17 @@ button.secondary[aria-pressed="true"] .count {
     display: inline;
     color: var(--muted);
   }
-  .ingredient-list td.empty {
+  .ingredient-list td.empty,
+  .author-list td.empty {
     display: none;
   }
-  .ingredient-list .numeric {
+  .ingredient-list .numeric,
+  .author-list .numeric {
     text-align: left;
+  }
+  .author-list td.numeric {
+    display: inline-block;
+    margin-right: 1rem;
   }
 }
 .results-count {

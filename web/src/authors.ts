@@ -8,6 +8,14 @@ export interface AuthorSummary {
   sources: number;
 }
 
+// As the Authors page lists them: also how many recipes their sources hold,
+// and the source with the most.
+export interface AuthorListed extends AuthorSummary {
+  kind: "person" | "organisation";
+  recipes: number;
+  known_for: { id: string; title: string } | null;
+}
+
 export interface Author {
   id: string;
   name: string;
@@ -35,12 +43,17 @@ async function send(path: string, method: string, body?: unknown) {
   return out;
 }
 
+// sort "recipes": the most recipes first, rather than A to Z; kind: only
+// people, or only organisations.
 export async function listAuthors(
   q: string,
   offset = 0,
-): Promise<{ authors: AuthorSummary[]; total: number }> {
+  options: { sort?: "name" | "recipes"; kind?: "person" | "organisation" | null } = {},
+): Promise<{ authors: AuthorListed[]; total: number }> {
   const query = new URLSearchParams({ q });
   if (offset) query.set("offset", String(offset));
+  if (options.sort === "recipes") query.set("sort", "recipes");
+  if (options.kind) query.set("kind", options.kind);
   return send(`/api/authors?${query}`, "GET");
 }
 

@@ -43,7 +43,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       as panels, a search box, kind filters with counts, sorting by title,
       most recipes or newest, and covers in a grid. **Ingredients (#82):** a
       table with what each comes under and its other names, most used or A
-      to Z, and "Top level only" to browse the hierarchy. Then Authors. #17's sign-in screens
+      to Z, and "Top level only" to browse the hierarchy. **Authors (#83):** a
+      table with what each is known for (their source with the most
+      recipes) and their sources and recipes, people or organisations, A to
+      Z or most recipes. Every page is now in the redesigned style. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).
