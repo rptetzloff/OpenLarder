@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import AdminBar from "../components/AdminBar.vue";
 import { KIND_LABELS } from "../flags";
 import type { Me } from "../me";
 import {
@@ -152,17 +153,24 @@ function download() {
 </script>
 
 <template>
-  <article>
-    <p><a href="/admin">← Admin</a></p>
-    <h1>Import</h1>
+  <AdminBar v-if="user?.is_admin" current="/admin/import" />
+  <article class="wide">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/admin">Admin</a>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">Bulk import</span>
+    </nav>
+    <div class="list-head">
+      <h1>Bulk import</h1>
+      <p class="muted">
+        Books and recipes from a book list and a recipe list. Nothing is stored until you've seen
+        what's in them. <a href="/admin/imports">Import history</a>
+      </p>
+    </div>
     <p v-if="!user?.is_admin" class="status">Only an admin can import.</p>
 
     <template v-else-if="stage === 'pick'">
-      <p>
-        Choose the book list and the recipe list. Nothing is stored until you've seen what's in
-        them.
-      </p>
-      <form class="recipe-form" @submit.prevent="read">
+      <form class="recipe-form tool-panel import-form" @submit.prevent="read">
         <label for="books-file">Book list (CSV)</label>
         <input id="books-file" type="file" accept=".csv,text/csv" required @change="booksFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
         <label for="recipes-file">Recipe list (CSV)</label>
@@ -172,7 +180,7 @@ function download() {
       </form>
     </template>
 
-    <template v-else-if="stage === 'review' && parsed">
+    <section v-else-if="stage === 'review' && parsed" class="tool-panel import-form" aria-label="What's in the files">
       <ul>
         <li>{{ parsed.books.length }} books: {{ withIsbn }} with an ISBN, looked up on Open Library; {{ parsed.books.length - withIsbn }} without, added from the list.</li>
         <li>{{ recipeTotal.toLocaleString() }} recipes.</li>
@@ -190,9 +198,9 @@ function download() {
         is flagged on its recipe. Running the import again skips what it already added.
       </p>
       <button type="button" class="primary" @click="run">Import</button>
-    </template>
+    </section>
 
-    <template v-else-if="parsed">
+    <section v-else-if="parsed" class="tool-panel import-form" aria-label="Progress">
       <p role="status">
         Books: {{ progress.books }} of {{ parsed.books.length }} ·
         Recipes: {{ progress.recipes.toLocaleString() }} of {{ recipeTotal.toLocaleString() }}
@@ -210,6 +218,6 @@ function download() {
         <p>This run, and its report, are kept in the <a href="/admin/imports">import history</a>.</p>
       </template>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-    </template>
+    </section>
   </article>
 </template>

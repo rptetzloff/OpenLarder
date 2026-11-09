@@ -611,6 +611,10 @@ button.secondary[aria-current="page"] {
 .admin-bar a {
   color: var(--fg);
 }
+.admin-bar a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration: none;
+}
 .crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -1813,9 +1817,140 @@ button.primary:disabled {
   margin-top: 0.5rem;
   font-size: 0.875rem;
 }
-button.secondary.small {
+button.secondary.small,
+button.primary.small {
   padding: 0.25rem 0.625rem;
   font-size: 0.875rem;
+}
+
+/* The admin pages: cards to each, filters, tables and panels. */
+.list-filters {
+  margin: 1.25rem 0 0.25rem;
+}
+.list-filters .kind-filter {
+  margin-bottom: 0.75rem;
+}
+.link-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.link-cards li {
+  margin: 0;
+}
+.link-cards a {
+  display: block;
+  height: 100%;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: var(--fg);
+  text-decoration: none;
+}
+.link-cards a:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.link-cards h2 {
+  margin: 0 0 0.25rem;
+  color: var(--link);
+  font-size: 1.0625rem;
+  text-decoration: underline;
+}
+.link-cards p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.link-cards .count {
+  margin-bottom: 0.375rem;
+  color: var(--fg);
+  font-weight: 600;
+}
+.section-title {
+  margin: 2.5rem 0 1rem;
+  font-size: 1.25rem;
+}
+.tool-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+}
+.tool-panel {
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.tool-panel h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+}
+.tool-panel > p.muted {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+}
+.import-form {
+  max-width: 36rem;
+  margin-top: 1.5rem;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.flag-table .flag-actions {
+  min-width: 12rem;
+}
+.flag-table .flag-actions > button + button {
+  margin-left: 0.5rem;
+}
+.flag-table .dismiss {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.flag-table .error,
+.import-table .error {
+  margin: 0.25rem 0 0;
+  color: var(--error);
+}
+.import-table .numeric {
+  text-align: right;
+}
+@media (max-width: 40rem) {
+  .import-table .numeric {
+    text-align: left;
+  }
+  .flag-table .flag-actions {
+    padding-top: 0.5rem;
+  }
+}
+.suggestion-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.suggestion {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.suggestion h2 {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+}
+.suggestion p {
+  margin: 0.25rem 0;
 }
 .line-add {
   display: flex;
@@ -2136,13 +2271,6 @@ progress {
   border-radius: 4px;
   color: var(--fg);
 }
-.flag-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-.flag-filters select,
 .dismiss input {
   font: inherit;
   padding: 0.25rem 0.5rem;
