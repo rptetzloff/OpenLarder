@@ -2,8 +2,8 @@
 # image. Separate jobs, because a green test job says nothing about lint, and
 # a sibling repo shipped red lint behind a green suite for exactly that reason.
 #
-# Postgres 17, what the compose file runs. Production's version is not chosen
-# yet; when it is, this follows it rather than the laptop.
+# Postgres 17 with pgvector, what the compose file runs and production must
+# too (migration 0029 needs the extension).
 
 name: ci
 
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        image: pgvector/pgvector:pg17-trixie
         env:
           POSTGRES_USER: openlarder
           POSTGRES_PASSWORD: openlarder
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        image: pgvector/pgvector:pg17-trixie
         env:
           POSTGRES_USER: openlarder
           POSTGRES_PASSWORD: openlarder

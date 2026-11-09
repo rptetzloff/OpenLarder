@@ -6,7 +6,12 @@
 
 services:
   db:
-    image: postgres:17
+    # Postgres 17 with pgvector, for the ingredient embeddings (0029). The
+    # same image as CI and production. Trixie, not the plain pg17 tag: that
+    # one is Debian 12, whose older glibc sorts text differently from the
+    # postgres:17 image's, so a database made by one is unsafe under the
+    # other (Postgres warns of a collation version mismatch).
+    image: pgvector/pgvector:pg17-trixie
     environment:
       POSTGRES_USER: openlarder
       POSTGRES_PASSWORD: openlarder

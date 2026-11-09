@@ -10,11 +10,11 @@ import uuid
 
 import httpx2
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from openlarder import visibility
 from openlarder.main import app
-from openlarder.models import Source, User
+from openlarder.models import Ingredient, Source, User
 
 SECRETS = ("Secret Box", "Secret Stew", "Zanzibar Moonsalt", "Nana Secretta", "Secret Family")
 
@@ -300,6 +300,26 @@ async def test_the_author_list_counts_only_what_you_see(secret, people) -> None:
     ]
     mine = (await secret["ann"].get("/api/authors", params={"q": "pat public"})).json()
     assert [(a["sources"], a["recipes"]) for a in mine["authors"]] == [(2, 1)]
+
+
+async def test_the_views_for_n8n_leave_out_the_private_collection(secret, adb) -> None:
+    """What local models read (migration 0029): what someone signed out sees."""
+    public = set(await adb.scalars(text("SELECT id FROM public_ingredients")))
+    seen = set(await adb.scalars(select(Ingredient.id).where(visibility.ingredients_seen_by(None))))
+    assert public == seen
+    # Nothing uses Salt; only the private stew uses the moonsalt and butter.
+    assert secret["above"] in public and secret["salt"] not in public
+    # Smoked Flakes sits under the private salt: it reads as top level.
+    assert (
+        await adb.scalar(
+            text("SELECT parent_id FROM public_ingredients WHERE id = :i"), {"i": secret["below"]}
+        )
+        is None
+    )
+    lines = list(await adb.scalars(text("SELECT original_text FROM public_ingredient_lines")))
+    assert "Zanzibar Moonsalt" not in lines
+    flags = list(await adb.scalars(text("SELECT recipe_id FROM public_open_flags")))
+    assert uuid.UUID(secret["stew"]) not in flags
 
 
 async def test_counts_leave_out_what_you_cant_see(secret, people, adb) -> None:
