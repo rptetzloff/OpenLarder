@@ -128,6 +128,8 @@ export interface SearchResult {
   // The sources searched within, if any were.
   sources: Named[];
   ingredients: Named[];
+  // Those you don't have or want: recipes needing one are left out.
+  without: Named[];
   // IDs in the search that name no ingredient now, as after a merge.
   missing: string[];
   missing_sources: string[];
@@ -156,12 +158,20 @@ export async function searchRecipes(
     sources = [],
     q = "",
     kinds = [],
-  }: { offset?: number; sources?: string[]; q?: string; kinds?: string[] } = {},
+    without = [],
+  }: {
+    offset?: number;
+    sources?: string[];
+    q?: string;
+    kinds?: string[];
+    without?: string[];
+  } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
   if (q.trim()) query.set("q", q.trim());
   for (const source of sources) query.append("source", source);
   for (const kind of kinds) query.append("kind", kind);
+  for (const id of without) query.append("without", id);
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

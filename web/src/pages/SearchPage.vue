@@ -33,6 +33,9 @@ const ALL_KINDS = KIND_GROUPS.flatMap((g) => g.kinds);
 
 const params = new URLSearchParams(location.search);
 const chosen = ref<Named[]>([]);
+// What you don't have or want (Ray, 2026-11-08): recipes needing one are left
+// out; a line offering something else ("butter or oil") doesn't need it.
+const unwanted = ref<Named[]>([]);
 const shelf = ref<Named[]>([]);
 const title = ref(params.get("q") ?? "");
 // Every kind until some are unticked; the address lists them only then.
@@ -53,7 +56,8 @@ const searching = computed(() => !!chosen.value.length || !!title.value.trim());
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "book", "source", "q", "kind", "page"]) url.searchParams.delete(key);
+  for (const key of ["i", "x", "book", "source", "q", "kind", "page"]) url.searchParams.delete(key);
+  for (const i of unwanted.value) url.searchParams.append("x", i.id);
   for (const b of shelf.value) url.searchParams.append("source", b.id);
   for (const i of chosen.value) url.searchParams.append("i", i.id);
   if (title.value.trim()) url.searchParams.set("q", title.value.trim());
@@ -81,6 +85,7 @@ async function run(toPage = 1) {
         sources: shelf.value.map((b) => b.id),
         q: title.value,
         kinds: narrowedKinds.value,
+        without: unwanted.value.map((i) => i.id),
       },
     );
     if (mine !== latest) return;
@@ -120,9 +125,26 @@ function finder<T extends Named>(find: (q: string) => Promise<T[]>, taken: () =>
   return { query, suggestions };
 }
 
+const unwantedFind = finder(
+  async (q) => (await listIngredients(q)).ingredients,
+  () => [...unwanted.value, ...chosen.value],
+);
+function addUnwanted(item: Named) {
+  if (unwanted.value.length < MAX_INGREDIENTS) unwanted.value.push({ id: item.id, name: item.name });
+  unwantedFind.query.value = "";
+  unwantedFind.suggestions.value = [];
+  document.getElementById("search-unwanted")?.focus();
+  run();
+}
+function dropUnwanted(id: string) {
+  unwanted.value = unwanted.value.filter((i) => i.id !== id);
+  document.getElementById("search-unwanted")?.focus();
+  run();
+}
+
 const ingredientFind = finder(
   async (q) => (await listIngredients(q)).ingredients,
-  () => chosen.value,
+  () => [...chosen.value, ...unwanted.value],
 );
 const sourceFind = finder(
   async (q) => (await findBooks(q)).map((b) => ({ ...b, name: b.title })),
@@ -216,7 +238,12 @@ onMounted(async () => {
         const res = await fetch(`/api/sources/${id}`);
         if (res.ok) shelf.value.push({ id, name: (await res.json()).title });
       }
-      if (shelf.value.length < sources.length) toAddress();
+      const leftOut = params.getAll("x").slice(0, MAX_INGREDIENTS);
+      for (const id of leftOut) {
+        const res = await fetch(`/api/ingredients/${id}`);
+        if (res.ok) unwanted.value.push({ id, name: (await res.json()).name });
+      }
+      if (shelf.value.length < sources.length || unwanted.value.length < leftOut.length) toAddress();
       return;
     }
     // The search names the ingredients and sources, so a link needs only IDs.
@@ -224,8 +251,10 @@ onMounted(async () => {
       sources,
       q: title.value,
       kinds: narrowedKinds.value,
+      without: params.getAll("x").slice(0, MAX_INGREDIENTS),
     });
     chosen.value = first.ingredients;
+    unwanted.value = first.without;
     shelf.value = first.sources;
     missing.value = first.missing.length + first.missing_sources.length;
     result.value = first;
@@ -272,6 +301,40 @@ onMounted(async () => {
       </ul>
       <p id="search-ingredient-help" class="help">
         An ingredient also finds what's under it: cheese finds cheddar.
+      </p>
+
+      <label for="search-unwanted" class="panel-gap">I don't have or don't want</label>
+      <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
+        <span v-for="i in unwanted" :key="i.id" class="chip chip-unwanted">
+          {{ i.name }}
+          <button type="button" :aria-label="`Remove ${i.name}`" @click.stop="dropUnwanted(i.id)">
+            ×
+          </button>
+        </span>
+        <input
+          id="search-unwanted"
+          v-model="unwantedFind.query.value"
+          type="search"
+          autocomplete="off"
+          placeholder="Add an ingredient to leave out"
+          aria-describedby="search-unwanted-help"
+          :disabled="unwanted.length >= MAX_INGREDIENTS"
+          @keydown.enter.prevent="
+            unwantedFind.suggestions.value[0] && addUnwanted(unwantedFind.suggestions.value[0])
+          "
+        />
+      </div>
+      <ul v-if="unwantedFind.suggestions.value.length" class="suggestions">
+        <li v-for="s in unwantedFind.suggestions.value" :key="s.id">
+          <button type="button" class="link" @click="addUnwanted(s)">{{ s.name }}</button>
+          <span class="page-ref">
+            {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
+          </span>
+        </li>
+      </ul>
+      <p id="search-unwanted-help" class="help">
+        Recipes that need one are left out. One that offers another choice, like “butter or oil”,
+        stays.
       </p>
 
       <div class="panel-row">

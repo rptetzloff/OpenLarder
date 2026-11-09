@@ -471,3 +471,32 @@ async def test_a_hit_says_which_of_yours_it_uses(admin, work, adb, client) -> No
         "Onion Powder": ["Onion"],
         "Cheese Board": ["Cheese"],
     }
+
+
+# Leaving out what you don't have or want
+
+
+async def test_a_recipe_needing_an_unwanted_ingredient_is_left_out(admin, work, adb, client):
+    await _add(admin, work, "Butter Cake", "1", ["Flour", "Butter"])
+    await _add(admin, work, "Oil Cake", "2", ["Flour", "Butter or Coconut Oil"])
+    await _add(admin, work, "Plain Cake", "3", ["Flour"])
+    await _add(admin, work, "Cheese Cake", "4", ["Flour", "Aged Cheddar"])
+    flour, butter = await _id(adb, "Flour"), await _id(adb, "Butter")
+    await _add(admin, work, "Cheese Plate", "5", ["Cheese"])
+    cheese, cheddar = await _id(adb, "Cheese"), await _id(adb, "Aged Cheddar")
+    await adb.execute(
+        text("UPDATE ingredients SET parent_id = :p WHERE id = :i"), {"p": cheese, "i": cheddar}
+    )
+    found = await _search(client, flour, without=[str(butter), str(cheese)])
+    # Butter Cake needs butter; Oil Cake can use the oil; cheddar is cheese.
+    assert sorted(_titles(found)) == ["Oil Cake", "Plain Cake"]
+    assert [w["name"] for w in found["without"]] == ["Butter", "Cheese"]
+    by_title = await _search(client, q="cake", without=[str(butter)])
+    assert sorted(_titles(by_title)) == ["Cheese Cake", "Oil Cake", "Plain Cake"]
+
+
+async def test_an_unwanted_ingredient_gone_is_reported(admin, work, adb, client) -> None:
+    await _add(admin, work, "Cake", "1", ["Flour"])
+    gone = uuid.uuid4()
+    found = await _search(client, await _id(adb, "Flour"), without=[str(gone)])
+    assert (found["missing"], _titles(found)) == ([str(gone)], ["Cake"])
