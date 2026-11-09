@@ -128,13 +128,34 @@ export interface LineReview {
   suggestion: string | null;
   // The rules would leave the whole line out.
   remove: boolean;
+  // How the line reads, once the rules have nothing to say about it: its
+  // options in the source's order.
+  options: LineOption[];
 }
 
-export async function checkLines(lines: string[]): Promise<LineReview[]> {
+export interface LineOption {
+  name: string;
+  // A page it cites, and the recipe in the source that means, if any.
+  page: string | null;
+  recipe: { id: string; name: string } | null;
+  recipe_pages: string[];
+  // Otherwise the ingredient it will be matched to, and whether by another
+  // of its names; or, with none, ingredients named like it.
+  ingredient: { id: string; name: string } | null;
+  alias: boolean;
+  similar: { id: string; name: string }[];
+}
+
+// Each line's review. With the source, page references are looked up in
+// it; with the recipe being changed, it isn't taken to cite itself.
+export async function checkLines(
+  lines: string[],
+  where: { sourceId?: string; recipeId?: string } = {},
+): Promise<LineReview[]> {
   const res = await fetch("/api/ingredient-lines/check", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lines }),
+    body: JSON.stringify({ lines, source_id: where.sourceId, recipe_id: where.recipeId }),
   });
   if (!res.ok) throw new Error("The lines couldn't be checked.");
   return (await res.json()).lines;

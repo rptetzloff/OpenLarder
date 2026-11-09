@@ -17,7 +17,7 @@ import re
 import uuid
 from collections import Counter, defaultdict
 
-from sqlalchemy import and_, delete, exists, or_, select, update
+from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -114,6 +114,55 @@ async def _ids(session: AsyncSession, keys: set[str]) -> dict[str, uuid.UUID]:
             for key, i in await session.execute(query.where(column.in_(chunk))):
                 found[key] = i
     return found
+
+
+async def known(
+    session: AsyncSession, keys: set[str], seen: ColumnElement[bool]
+) -> dict[str, tuple[uuid.UUID, str, bool]]:
+    """What _ids finds, among the ingredients seen, with each one's name and
+    whether the key is another name for it, for the form to say what a line
+    will be matched to."""
+    found: dict[str, tuple[uuid.UUID, str, bool]] = {}
+    for chunk in _chunks(sorted(keys), 1000):
+        for query, alias in (
+            (select(Ingredient.match_key, Ingredient.id, Ingredient.name), False),
+            (
+                select(IngredientAlias.match_key, Ingredient.id, Ingredient.name)
+                .join(Ingredient, Ingredient.id == IngredientAlias.ingredient_id)
+                .where(IngredientAlias.region.is_(None)),
+                True,
+            ),
+        ):
+            column = query.selected_columns[0]
+            for key, i, name in await session.execute(query.where(column.in_(chunk), seen)):
+                found[key] = (i, name, alias)
+    return found
+
+
+async def like(
+    session: AsyncSession, name: str, seen: ColumnElement[bool], limit: int = 3
+) -> list[tuple[uuid.UUID, str]]:
+    """Ingredients named like a name nothing matches, by it or another name,
+    closest first: "sweet rice flower" finds "Glutinous Rice Flour" by its
+    alias "Sweet Rice Flour"."""
+    closeness = func.greatest(
+        func.similarity(Ingredient.name, name),
+        func.coalesce(
+            select(func.max(func.similarity(IngredientAlias.name, name)))
+            .where(IngredientAlias.ingredient_id == Ingredient.id)
+            .scalar_subquery(),
+            0,
+        ),
+    )
+    # The % operator is the trigram indexes' way in.
+    by_alias = select(IngredientAlias.ingredient_id).where(IngredientAlias.name.op("%")(name))
+    rows = await session.execute(
+        select(Ingredient.id, Ingredient.name)
+        .where(or_(Ingredient.name.op("%")(name), Ingredient.id.in_(by_alias)), seen)
+        .order_by(closeness.desc(), Ingredient.name)
+        .limit(limit)
+    )
+    return [(i, n) for i, n in rows]
 
 
 # Fixing the list. An ingredient a line was matched to wrongly is fixed on

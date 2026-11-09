@@ -1,10 +1,12 @@
 """The entry rules on one line: what's wrong, and the bare ingredient."""
 
 import pytest
+from sqlalchemy import text
 
 from fake_broker import _sign_in
 from openlarder import detector
 from openlarder.detector import AMOUNT, LEFT_OUT, OPTIONAL, PREP, TWICE, review, review_all
+from openlarder.ingredients import match_key
 
 
 @pytest.mark.parametrize(
@@ -147,16 +149,111 @@ async def test_the_form_can_check_its_lines(client, broker) -> None:
     response = await client.post(
         "/api/ingredient-lines/check", json={"lines": ["2 eggs", "Rhubarb", "Salt", "rhubarb"]}
     )
-    assert response.json() == {
-        "lines": [
-            {"problems": [AMOUNT], "suggestion": "eggs", "remove": False},
-            {"problems": [], "suggestion": None, "remove": False},
-            {"problems": [LEFT_OUT], "suggestion": None, "remove": True},
-            {"problems": [TWICE], "suggestion": None, "remove": True},
-        ]
-    }
+    reviews = response.json()["lines"]
+    assert [{k: r[k] for k in ("problems", "suggestion", "remove")} for r in reviews] == [
+        {"problems": [AMOUNT], "suggestion": "eggs", "remove": False},
+        {"problems": [], "suggestion": None, "remove": False},
+        {"problems": [LEFT_OUT], "suggestion": None, "remove": True},
+        {"problems": [TWICE], "suggestion": None, "remove": True},
+    ]
+    # Only a line the rules are happy with is read into its options.
+    assert [[o["name"] for o in r["options"]] for r in reviews] == [[], ["Rhubarb"], [], []]
 
 
 async def test_checking_needs_someone_signed_in(client) -> None:
     response = await client.post("/api/ingredient-lines/check", json={"lines": ["2 eggs"]})
     assert response.status_code == 401
+
+
+@pytest.fixture
+async def admin(client, broker, adb):
+    await _sign_in(client, broker)
+    await adb.execute(text("UPDATE users SET is_admin = true"))
+    return client
+
+
+async def _ingredient(adb, name, *aliases):
+    found = await adb.scalar(
+        text("INSERT INTO ingredients (name, match_key) VALUES (:n, :k) RETURNING id"),
+        {"n": name, "k": match_key(name)},
+    )
+    for alias in aliases:
+        await adb.execute(
+            text(
+                "INSERT INTO ingredient_aliases (ingredient_id, name, match_key)"
+                " VALUES (:i, :n, :k)"
+            ),
+            {"i": found, "n": alias, "k": match_key(alias)},
+        )
+    return str(found)
+
+
+def _read(response):
+    assert response.status_code == 200, response.text
+    return [r["options"] for r in response.json()["lines"]]
+
+
+async def test_the_check_says_what_each_line_will_be_matched_to(admin, adb) -> None:
+    onion = await _ingredient(adb, "Green Onion", "Scallions")
+    rice = await _ingredient(adb, "Glutinous Rice Flour", "Sweet Rice Flour")
+    lines = ["green onions", "scallion", "sweet rice flower", "frog's legs"]
+    read = _read(await admin.post("/api/ingredient-lines/check", json={"lines": lines}))
+    assert [(o[0]["ingredient"], o[0]["alias"]) for o in read] == [
+        ({"id": onion, "name": "Green Onion"}, False),
+        ({"id": onion, "name": "Green Onion"}, True),
+        (None, False),
+        (None, False),
+    ]
+    # Nothing has that name, but one is called something like it.
+    assert read[2][0]["similar"] == [{"id": rice, "name": "Glutinous Rice Flour"}]
+    assert read[3][0]["similar"] == []
+
+
+async def test_each_option_is_read(admin, adb) -> None:
+    oil = await _ingredient(adb, "Grapeseed Oil")
+    read = _read(
+        await admin.post(
+            "/api/ingredient-lines/check", json={"lines": ["grapeseed oil or olive oil"]}
+        )
+    )
+    assert [(o["name"], o["ingredient"] and o["ingredient"]["id"]) for o in read[0]] == [
+        ("grapeseed oil", oil),
+        ("olive oil", None),
+    ]
+
+
+async def test_a_page_reference_names_the_recipe_in_the_source(admin, adb) -> None:
+    book = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Gluten-Free') RETURNING id"))
+    edition = await adb.scalar(
+        text("INSERT INTO editions (source_id) VALUES (:s) RETURNING id"), {"s": book}
+    )
+    added = await admin.post(
+        f"/api/sources/{book}/recipes",
+        json={
+            "title": "Biscuit Blend",
+            "editions": [{"edition_id": str(edition), "page": "14"}],
+            "ingredients": ["rice flour"],
+        },
+    )
+    blend = added.json()["id"]
+    lines = ["Biscuit Blend (p. 14)", "Mystery Mix (p. 99)"]
+    body = {"lines": lines, "source_id": str(book)}
+    read = _read(await admin.post("/api/ingredient-lines/check", json=body))
+    assert read[0][0]["recipe"] == {"id": blend, "name": "Biscuit Blend"}
+    assert read[0][0]["recipe_pages"] == ["14"]
+    assert read[1][0]["recipe"] is None
+    # A component is never an ingredient.
+    assert read[0][0]["ingredient"] is None and read[0][0]["similar"] == []
+    # Changing the recipe itself, it doesn't cite itself.
+    body["recipe_id"] = blend
+    read = _read(await admin.post("/api/ingredient-lines/check", json=body))
+    assert read[0][0]["recipe"] is None
+
+
+async def test_the_source_must_be_one_you_may_add_to(client, broker, adb) -> None:
+    await _sign_in(client, broker)
+    book = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Not Yours') RETURNING id"))
+    response = await client.post(
+        "/api/ingredient-lines/check", json={"lines": ["x"], "source_id": str(book)}
+    )
+    assert response.status_code == 403

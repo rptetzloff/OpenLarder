@@ -259,6 +259,25 @@ async def test_a_shared_ingredient_counts_only_what_you_see(secret, people, adb)
     assert [r["title"] for r in found["recipes"]] == ["Shortbread"]
 
 
+async def test_checking_a_line_finds_only_what_you_see(secret, people) -> None:
+    """The add-a-recipe form's check is a POST, so the sweep doesn't ask it."""
+    lines = ["Zanzibar Moonsalt", "Zanzibar Moonsal"]
+
+    async def read(who, **more):
+        return await who.post("/api/ingredient-lines/check", json={"lines": lines, **more})
+
+    def found(response):
+        assert response.status_code == 200, response.text
+        options = [r["options"][0] for r in response.json()["lines"]]
+        return [(o["ingredient"], o["similar"]) for o in options]
+
+    salt = {"id": str(secret["salt"]), "name": "Zanzibar Moonsalt"}
+    assert found(await read(await people("bob", admin=True))) == [(None, []), (None, [])]
+    assert found(await read(secret["ann"])) == [(salt, []), (None, [salt])]
+    # Nor does anyone else learn the box is there.
+    assert (await read(await people("cat"), source_id=secret["box"])).status_code == 404
+
+
 async def test_counts_leave_out_what_you_cant_see(secret, people, adb) -> None:
     """Counts carry no names, so the sweep can't see them: the flags an
     admin is told of, and the recipes under an ingredient."""

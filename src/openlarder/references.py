@@ -32,7 +32,11 @@ from openlarder.models import (
 REFERENCE_KINDS = (FlagKind.REFERENCE_PAGE.value, FlagKind.UNKNOWN_REFERENCE.value)
 
 
-async def relink(session: AsyncSession, source_id: uuid.UUID) -> None:
+async def book_recipes(
+    session: AsyncSession, source_id: uuid.UUID
+) -> tuple[list[lines.BookRecipe], dict[str, list[lines.BookRecipe]]]:
+    """The source's recipes with their pages, and keyed by title, for
+    lines.resolve."""
     titles = {
         recipe_id: title
         for recipe_id, title in await session.execute(
@@ -50,6 +54,11 @@ async def relink(session: AsyncSession, source_id: uuid.UUID) -> None:
     by_title: dict[str, list[lines.BookRecipe]] = defaultdict(list)
     for recipe in book:
         by_title[recipe.title.casefold()].append(recipe)
+    return book, by_title
+
+
+async def relink(session: AsyncSession, source_id: uuid.UUID) -> None:
+    book, by_title = await book_recipes(session, source_id)
 
     existing: dict[uuid.UUID, list[IngredientOption]] = defaultdict(list)
     for option in await session.scalars(

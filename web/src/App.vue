@@ -155,9 +155,9 @@ onMounted(async () => {
     <AdminImportsPage v-else-if="onImports" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
-    <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" />
+    <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
     <BookEditPage v-else-if="editBookId" :id="editBookId" />
-    <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" />
+    <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" :user="user" />
     <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
     <template v-else>
       <p v-if="signInFailed" class="sign-in-failed" role="alert">
@@ -206,6 +206,7 @@ onMounted(async () => {
   --border: #8a877f;
   --line: #e3e2de;
   --chip: #e8eef7;
+  --ok-bg: #e3f1e6;
   --admin-bg: #fdf3d3;
   --admin-line: #ecd58a;
   --error: #b3261e;
@@ -226,6 +227,7 @@ onMounted(async () => {
   --border: #77746c;
   --line: #34332f;
   --chip: #1f2c40;
+  --ok-bg: #1d3324;
   --admin-bg: #3a3016;
   --admin-line: #5c4c1f;
   --error: #f2a8a2;
@@ -1513,16 +1515,231 @@ button.primary:disabled {
 .recipe-form .error {
   color: var(--error);
 }
-.line-hints {
+/* Adding a recipe: four steps, then a box per ingredient line with its
+   check beside it (Ray's wireframe). */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+.steps li {
   margin: 0;
+}
+.step {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+.step[aria-current="step"] {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+.step:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+.add-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 2rem;
+  align-items: start;
+}
+.add-layout.solo {
+  grid-template-columns: minmax(0, 48rem);
+}
+@media (max-width: 52rem) {
+  .add-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.add-recipe h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+}
+.add-recipe h2:focus {
+  outline: none;
+}
+.add-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem 1.25rem;
+  align-items: start;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.add-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+}
+.add-summary dt {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.add-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 40rem) {
+  .add-summary,
+  .add-summary dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .add-summary button {
+    justify-self: start;
+  }
+}
+.add-recipe .help {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.line-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+.line-row {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.line-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem 0.75rem;
+  align-items: start;
+}
+@media (max-width: 40rem) {
+  .line-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.line-input {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.line-input input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.remove-line {
+  padding: 0 0.375rem;
+  font-size: 1.375rem;
+  line-height: 1;
+  text-decoration: none;
+}
+.line-tag {
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.875rem;
+}
+.tone-ok {
+  background: var(--ok-bg);
+}
+.tone-info {
+  background: var(--chip);
+}
+.tone-warn {
+  background: var(--admin-bg);
+}
+.line-options {
+  margin: 0.5rem 0 0;
   padding-left: 1.25rem;
   font-size: 0.875rem;
 }
-.line-hints li {
-  margin-bottom: 0.375rem;
+.line-options li {
+  margin-bottom: 0.125rem;
 }
-.line-hints button {
-  margin-left: 0.375rem;
+.line-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+button.secondary.small {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.875rem;
+}
+.line-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin: 0 0 1.5rem;
+}
+.review-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+.review-lines {
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+}
+.review-lines li {
+  margin-bottom: 0.125rem;
+}
+.add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--surface);
+}
+.add-actions .help,
+.add-actions .error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.add-actions .error {
+  color: var(--error);
+}
+.aside-card {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.aside-card h2 {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+}
+.aside-card p {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.aside-card a:not(.button-primary) {
+  color: var(--link);
 }
 .credit-row {
   display: flex;

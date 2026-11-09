@@ -26,9 +26,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       swaps, and flags and actions beside. **The ingredient and author pages
       (#77):** admin bars, breadcrumbs, the ingredient's cards and its
       recipes counting what's under it with each line as written, the
-      author's sources as covers and who they're credited with. Next, in
-      order: adding a recipe and entering a whole
-      book, which are contribution features too. #17's sign-in screens
+      author's sources as covers and who they're credited with. **Adding a
+      recipe (#78):** four steps (source, recipe and where, ingredients,
+      review), a box per ingredient line with its check beside it: the
+      entry rules with a fix or "keep it", what it will be matched to (by
+      another name too), a recipe in the same source it cites, its options,
+      and for no match, ingredients named like it; admins see bulk import
+      beside it. Left out until they exist: the contributor-agreement tick,
+      "Submit for review", your contributions, and an entry-rules page to
+      link. Next: entering a whole book, a contribution feature too. #17's sign-in screens
       should match. Fonts are the system's; the wireframes look like Inter,
       which could be served from OpenLarder itself (not Google Fonts, which
       would tell Google who visits).
