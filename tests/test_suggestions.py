@@ -141,3 +141,131 @@ async def test_the_role_writes_embeddings_and_adds_suggestions(n8n, adb) -> None
         with pytest.raises(DBAPIError, match="permission denied"):
             await n8n(sql)
     assert suggestion is not None
+
+
+# The admin queue (routers/suggestions.py).
+
+
+async def _suggest(adb, kind, a, b, *, decision="same", keep="a", similarity="0.95"):
+    """A suggestion as Workflow 2 writes it."""
+    proposal = {
+        "a_id": str(a),
+        "b_id": str(b),
+        "a_name": "model's a",
+        "b_name": "model's b",
+        "decision": decision,
+        "keep_name": keep,
+        "similarity": similarity,
+    }
+    return await adb.scalar(
+        text(
+            "INSERT INTO suggestions (kind, target, proposal, reason, confidence, model,"
+            " prompt_version) VALUES (:k, CAST(:t AS jsonb), CAST(:p AS jsonb), 'because', 1,"
+            " 'gemma4:12b', 'merge-v1') RETURNING id"
+        ),
+        {
+            "k": kind,
+            "t": json.dumps(sorted([str(a), str(b)])),
+            "p": json.dumps(proposal),
+        },
+    )
+
+
+async def _names(adb):
+    rows = await adb.execute(
+        text(
+            "SELECT c.name, p.name FROM ingredients c"
+            " LEFT JOIN ingredients p ON p.id = c.parent_id ORDER BY 1"
+        )
+    )
+    return [tuple(r) for r in rows]
+
+
+async def test_the_queue_is_for_admins_and_closest_first(people, adb) -> None:
+    oats, quick, flax, golden = [
+        await _ingredient(adb, n)
+        for n in ("Quick-Cooking Oats", "Quick-Cook Oats", "Flax Meal", "Golden Flax Meal")
+    ]
+    await _suggest(adb, "parent", golden, flax, decision="a_under_b", similarity="0.81")
+    await _suggest(adb, "merge", oats, quick, similarity="0.9875")
+    ann = await people("ann")
+    assert (await ann.get("/api/suggestions")).status_code == 403
+    admin = await people("ada", admin=True)
+    page = (await admin.get("/api/suggestions")).json()
+    assert page["open_by_kind"] == {"merge": 1, "parent": 1}
+    first, second = page["suggestions"]
+    # The names are the ingredients' own, not what the model was shown.
+    assert (first["a"]["name"], first["b"]["name"], first["similarity"]) == (
+        "Quick-Cooking Oats",
+        "Quick-Cook Oats",
+        0.9875,
+    )
+    assert second["decision"] == "a_under_b" and second["actionable"]
+    only = (await admin.get("/api/suggestions", params={"kind": "parent"})).json()
+    assert [s["kind"] for s in only["suggestions"]] == ["parent"]
+
+
+@pytest.mark.parametrize(
+    ("keep", "kept"), [(None, "Thai Red Curry Paste"), ("b", "Red Thai Curry Paste")]
+)
+async def test_accepting_a_merge_keeps_the_chosen_name(people, adb, keep, kept) -> None:
+    a = await _ingredient(adb, "Thai Red Curry Paste")
+    b = await _ingredient(adb, "Red Thai Curry Paste")
+    suggestion = await _suggest(adb, "merge", a, b, keep="a")
+    admin = await people("ada", admin=True)
+    body = {"keep": keep} if keep else {}
+    done = await admin.post(f"/api/suggestions/{suggestion}/accept", json=body)
+    assert done.status_code == 200, done.text
+    assert done.json()["status"] == "accepted"
+    assert await _names(adb) == [(kept, None)]
+    # The dropped name still finds it.
+    dropped = ({"Thai Red Curry Paste", "Red Thai Curry Paste"} - {kept}).pop()
+    assert await adb.scalar(
+        text("SELECT count(*) FROM ingredient_aliases WHERE name = :n"), {"n": dropped}
+    )
+    again = await admin.post(f"/api/suggestions/{suggestion}/accept", json={})
+    assert again.status_code == 409
+
+
+async def test_accepting_a_parent_puts_one_under_the_other(people, adb) -> None:
+    flax = await _ingredient(adb, "Flax Meal")
+    golden = await _ingredient(adb, "Golden Flax Meal")
+    suggestion = await _suggest(adb, "parent", flax, golden, decision="b_under_a")
+    admin = await people("ada", admin=True)
+    done = await admin.post(f"/api/suggestions/{suggestion}/accept", json={})
+    assert done.status_code == 200, done.text
+    assert await _names(adb) == [("Flax Meal", None), ("Golden Flax Meal", "Flax Meal")]
+
+
+async def test_a_parent_that_would_loop_is_refused(people, adb) -> None:
+    cheese = await _ingredient(adb, "Cheese")
+    cheddar = await _ingredient(adb, "Cheddar")
+    await adb.execute(
+        text("UPDATE ingredients SET parent_id = :p WHERE id = :i"), {"p": cheese, "i": cheddar}
+    )
+    suggestion = await _suggest(adb, "parent", cheese, cheddar, decision="a_under_b")
+    admin = await people("ada", admin=True)
+    refused = await admin.post(f"/api/suggestions/{suggestion}/accept", json={})
+    assert refused.status_code == 422
+    assert (
+        await adb.scalar(text("SELECT status FROM suggestions WHERE id = :i"), {"i": suggestion})
+        == "open"
+    )
+
+
+async def test_one_naming_a_gone_ingredient_can_only_be_dismissed(people, adb) -> None:
+    a = await _ingredient(adb, "Salted Dried Shrimp")
+    b = await _ingredient(adb, "Dried Salted Shrimp")
+    suggestion = await _suggest(adb, "merge", a, b)
+    await adb.execute(text("DELETE FROM ingredients WHERE id = :i"), {"i": b})
+    admin = await people("ada", admin=True)
+    listed = (await admin.get("/api/suggestions")).json()["suggestions"][0]
+    assert not listed["actionable"]
+    # The model's name stands in for the one that's gone.
+    assert (listed["b"]["name"], listed["b"]["exists"]) == ("model's b", False)
+    assert (await admin.post(f"/api/suggestions/{suggestion}/accept", json={})).status_code == 409
+    dismissed = await admin.post(f"/api/suggestions/{suggestion}/dismiss")
+    assert dismissed.json()["status"] == "dismissed"
+    assert (await admin.get("/api/suggestions")).json()["total"] == 0
+    decided = (await admin.get("/api/suggestions", params={"state": "decided"})).json()
+    assert [s["status"] for s in decided["suggestions"]] == ["dismissed"]

@@ -24,6 +24,7 @@ import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
 import RecipePage from "./pages/RecipePage.vue";
 import SearchPage from "./pages/SearchPage.vue";
+import SuggestionsPage from "./pages/SuggestionsPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
 
@@ -48,6 +49,7 @@ const onAdmin = path === "/admin";
 const onGroups = path === "/groups";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
+const onSuggestions = path === "/admin/suggestions";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
@@ -155,6 +157,7 @@ onMounted(async () => {
     <InvitePage v-else-if="inviteCode" :code="inviteCode" :user="user" />
     <AdminImportPage v-else-if="onImport" :user="user" />
     <AdminImportsPage v-else-if="onImports" :user="user" />
+    <SuggestionsPage v-else-if="onSuggestions" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
@@ -2111,6 +2114,21 @@ progress {
 }
 .flag p {
   margin: 0.25rem 0;
+}
+/* A suggested merge: which name to keep, one choice a line. */
+.keep-name {
+  border: 0;
+  padding: 0;
+  margin: 0.25rem 0;
+}
+.keep-name legend {
+  padding: 0;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+.keep-name label {
+  display: block;
+  padding: 0.2rem 0;
 }
 .flag-filters {
   display: flex;
