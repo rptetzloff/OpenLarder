@@ -3,8 +3,9 @@ and fixing an author (admins).
 
 Reading is public, like the rest of the catalog. A page shows the author's
 books, linking to each, and the people credited with them on those books;
-their links; and Open Library, where the record came from. Wikidata facts,
-bios and photos come later (SCOPING, "Author pages"; TODO.md).
+their links; Open Library, where the record came from; and facts from
+Wikidata (author_facts.py): born and died, country, website. Bios and photos
+come later (SCOPING, "Author pages"; TODO.md).
 
 An admin can fix the author's own name and kind here, Open Library authors
 included: Open Library's names come as it files them ("Moore, Russell
@@ -13,15 +14,16 @@ itself is fixed. Editing a book changes only how that book prints the name.
 """
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+import httpx2
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
-from openlarder import author_merge, openlibrary, visibility
+from openlarder import author_facts, author_merge, openlibrary, visibility, wikidata
 from openlarder.auth import AdminUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
@@ -31,6 +33,14 @@ from openlarder.routers.sources import BookSummary, summaries
 router = APIRouter(prefix="/api/authors", tags=["authors"])
 
 PAGE = 100
+
+
+def wikidata_transport() -> httpx2.AsyncBaseTransport | None:
+    """None means the real Wikidata; tests replace this with a fake."""
+    return None
+
+
+WikidataTransport = Annotated[httpx2.AsyncBaseTransport | None, Depends(wikidata_transport)]
 
 
 class KnownFor(BaseModel):
@@ -81,6 +91,12 @@ class AuthorOut(BaseModel):
     name: str
     kind: Literal["person", "organisation"]
     open_library_url: str | None
+    # From Wikidata, when the author is on it.
+    wikidata_url: str | None
+    born_year: int | None
+    died_year: int | None
+    country: str | None
+    website: str | None
     links: list[LinkOut]
     sources: list[AuthorBook]
     coauthors: list[CoAuthor]
@@ -229,6 +245,11 @@ async def get_author(author_id: uuid.UUID, session: Session, viewer: Viewer) -> 
             if author.open_library_author_id
             else None
         ),
+        wikidata_url=wikidata.item_url(author.wikidata_id) if author.wikidata_id else None,
+        born_year=author.born_year,
+        died_year=author.died_year,
+        country=author.country,
+        website=author.website,
         links=[LinkOut(id=x.id, url=x.url, label=x.label) for x in links],
         sources=books,
         coauthors=[CoAuthor(id=i, name=n, sources=c) for i, n, c in coauthors],
@@ -354,3 +375,112 @@ async def merge_author(
         )
     )
     return AuthorSummary(id=kept.id, name=kept.name, sources=sources or 0)
+
+
+# Facts from Wikidata
+
+
+class ClashOut(BaseModel):
+    author: AuthorSummary
+    other: AuthorSummary
+
+
+class WikidataRun(BaseModel):
+    checked: int
+    found: int
+    # Authors whose item another author has: probably one person twice.
+    clashes: list[ClashOut]
+    # Still to ask about after this batch.
+    remaining: int
+
+
+def _unavailable(exc: wikidata.Unavailable) -> HTTPException:
+    return HTTPException(
+        status.HTTP_502_BAD_GATEWAY, f"Wikidata didn't answer. Try again later. ({exc})"
+    )
+
+
+@router.post("/wikidata", response_model=WikidataRun, dependencies=[SameOrigin])
+async def check_wikidata(
+    admin: AdminUser, session: Session, transport: WikidataTransport
+) -> WikidataRun:
+    """Ask Wikidata about the next batch of authors not asked lately; the
+    admin page calls this until none remain."""
+    batch = list(
+        await session.scalars(
+            author_facts.due()
+            .order_by(Author.wikidata_checked_at.nulls_first(), Author.id)
+            .limit(author_facts.BATCH)
+            .with_for_update(skip_locked=True)
+        )
+    )
+    try:
+        done = await author_facts.check(session, batch, transport)
+    except wikidata.Unavailable as exc:
+        raise _unavailable(exc) from None
+    await session.commit()
+    remaining = await session.scalar(
+        select(func.count()).select_from(author_facts.due().subquery())
+    )
+    return WikidataRun(
+        checked=done.checked,
+        found=done.found,
+        clashes=[
+            ClashOut(
+                author=AuthorSummary(id=c.author_id, name=c.name, sources=0),
+                other=AuthorSummary(id=c.other_id, name=c.other_name, sources=0),
+            )
+            for c in done.clashes
+        ],
+        remaining=remaining or 0,
+    )
+
+
+class WikidataIn(BaseModel):
+    # A Wikidata ID or a link to the item; null takes it off.
+    reference: str | None = Field(default=None, max_length=300)
+
+
+@router.put("/{author_id}/wikidata", response_model=AuthorOut, dependencies=[SameOrigin])
+async def set_wikidata(
+    author_id: uuid.UUID,
+    body: WikidataIn,
+    admin: AdminUser,
+    session: Session,
+    transport: WikidataTransport,
+) -> AuthorOut:
+    """Say which Wikidata item the author is, and fetch its facts; or take
+    it off, with its facts."""
+    author = await _author_or_404(session, author_id)
+    if not (body.reference or "").strip():
+        author.wikidata_id = None
+        author.born_year = author.died_year = author.country = author.website = None
+        author.wikidata_checked_at = None
+    else:
+        try:
+            item = wikidata.parse_reference(body.reference or "")
+        except wikidata.BadReference as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+        other = await session.scalar(
+            select(Author).where(Author.wikidata_id == item, Author.id != author_id)
+        )
+        if other is not None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                {
+                    "message": f"{other.name} is that Wikidata item already. Merge them instead.",
+                    "author": {"id": str(other.id), "name": other.name},
+                },
+            )
+        author.wikidata_id = item
+        try:
+            done = await author_facts.check(session, [author], transport)
+        except wikidata.Unavailable as exc:
+            raise _unavailable(exc) from None
+        if not done.found:
+            await session.rollback()
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, f"Wikidata has no item {item}."
+            )
+    await session.commit()
+    return await get_author(author_id, session, admin)

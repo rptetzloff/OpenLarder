@@ -1,0 +1,26 @@
+{
+ "head": {
+  "vars": [
+   "item",
+   "ol",
+   "born",
+   "died",
+   "countryLabel",
+   "website"
+  ]
+ },
+ "results": {
+  "bindings": [
+   {
+    "item": {
+     "type": "uri",
+     "value": "http://www.wikidata.org/entity/Q20926529"
+    },
+    "website": {
+     "type": "uri",
+     "value": "https://www.americastestkitchen.com/"
+    }
+   }
+  ]
+ }
+}

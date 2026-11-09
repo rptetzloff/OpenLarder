@@ -1,0 +1,178 @@
+"""Facts about authors from Wikidata: born and died, country, website.
+
+Wikidata is CC0, so its facts can sit in the ODbL catalog; Wikipedia's prose
+can't (SCOPING.md, Authors). One query to Wikidata's query service answers
+for a batch of authors, found by their Open Library ID (Wikidata's P648) or
+by a Wikidata ID an admin gave, and asks only for the four facts: an item's
+whole record runs to megabytes.
+"""
+
+import asyncio
+import re
+import time
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any
+
+import httpx2
+
+from openlarder.openlibrary import USER_AGENT
+
+ENDPOINT = "https://query.wikidata.org/sparql"
+TIMEOUT = 60.0
+# Batches are asked for one after another, a second apart at least: the
+# query service asks callers to keep to one query at a time. Tests set it
+# to 0.
+MIN_INTERVAL = 1.0
+_pace = asyncio.Lock()
+_last = 0.0
+
+_OL = re.compile(r"^OL[1-9][0-9]*A$")
+_Q = re.compile(r"^Q[1-9][0-9]*$")
+# A year at the start of an xsd:dateTime, BC ones negative.
+_YEAR = re.compile(r"^(-?[0-9]{1,4})-")
+
+
+class Unavailable(RuntimeError):
+    pass
+
+
+class BadReference(ValueError):
+    pass
+
+
+@dataclass
+class Facts:
+    wikidata_id: str
+    open_library_ids: set[str] = field(default_factory=set)
+    born_year: int | None = None
+    died_year: int | None = None
+    country: str | None = None
+    website: str | None = None
+
+
+def item_url(wikidata_id: str) -> str:
+    return f"https://www.wikidata.org/wiki/{wikidata_id}"
+
+
+def parse_reference(raw: str) -> str:
+    """A Wikidata ID ("Q214477") from itself or a link to its page."""
+    found = re.search(r"(?<![A-Za-z0-9])Q[1-9][0-9]*(?![0-9])", raw.strip())
+    if not found:
+        raise BadReference("Give a Wikidata ID, like Q214477, or a link to the item.")
+    return found.group(0)
+
+
+def _query(selector: str) -> str:
+    # P569 born, P571 founded (an organisation); P570 died; P27 citizenship,
+    # P17 an organisation's country; P856 official website.
+    return f"""SELECT ?item ?ol ?born ?died ?countryLabel ?website WHERE {{
+  {selector}
+  OPTIONAL {{ ?item wdt:P569|wdt:P571 ?born }}
+  OPTIONAL {{ ?item wdt:P570 ?died }}
+  OPTIONAL {{ ?item wdt:P27|wdt:P17 ?country }}
+  OPTIONAL {{ ?item wdt:P856 ?website }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}}"""
+
+
+def _value(row: dict[str, Any], name: str) -> str | None:
+    cell = row.get(name)
+    # An unknown value comes as a blank node, not a literal.
+    return cell["value"] if cell and cell.get("type") in ("literal", "uri") else None
+
+
+def _year(value: str | None) -> int | None:
+    found = _YEAR.match(value or "")
+    return int(found.group(1)) if found else None
+
+
+def _read(rows: list[dict[str, Any]]) -> dict[str, Facts]:
+    """Rows to facts by Wikidata ID: a row per combination of values, so an
+    item with two countries and two websites comes as four."""
+    found: dict[str, Facts] = {}
+    countries: dict[str, list[str]] = {}
+    sites: dict[str, list[str]] = {}
+    for row in rows:
+        item = (_value(row, "item") or "").rsplit("/", 1)[-1]
+        if not _Q.match(item):
+            continue
+        facts = found.setdefault(item, Facts(item))
+        if ol := _value(row, "ol"):
+            facts.open_library_ids.add(ol)
+        born, died = _year(_value(row, "born")), _year(_value(row, "died"))
+        # The earliest, when sources disagree.
+        if born is not None and (facts.born_year is None or born < facts.born_year):
+            facts.born_year = born
+        if died is not None and (facts.died_year is None or died < facts.died_year):
+            facts.died_year = died
+        country = _value(row, "countryLabel")
+        # An item with no English label is labelled with its own ID.
+        if country and not _Q.match(country) and country not in countries.setdefault(item, []):
+            countries[item].append(country)
+        site = _value(row, "website")
+        if (
+            site
+            and site.startswith(("https://", "http://"))
+            and site not in sites.setdefault(item, [])
+        ):
+            sites[item].append(site)
+    for item, facts in found.items():
+        facts.country = " and ".join(sorted(countries.get(item, []))[:2]) or None
+        # https first, then the shortest: usually the site's front page.
+        ranked = sorted(sites.get(item, []), key=lambda s: (not s.startswith("https"), len(s)))
+        facts.website = ranked[0] if ranked else None
+    return found
+
+
+async def _wait_turn() -> None:
+    global _last
+    async with _pace:
+        delay = _last + MIN_INTERVAL - time.monotonic()
+        if delay > 0:
+            await asyncio.sleep(delay)
+        _last = time.monotonic()
+
+
+async def _ask(client: httpx2.AsyncClient, query: str) -> list[dict[str, Any]]:
+    await _wait_turn()
+    try:
+        response = await client.post(
+            ENDPOINT,
+            data={"query": query},
+            headers={"Accept": "application/sparql-results+json"},
+        )
+    except httpx2.HTTPError as exc:
+        raise Unavailable(f"Wikidata could not be reached: {exc!r}") from exc
+    if response.status_code >= 400:
+        raise Unavailable(f"Wikidata answered {response.status_code}")
+    return response.json()["results"]["bindings"]
+
+
+async def lookup(
+    open_library_ids: Sequence[str] = (),
+    wikidata_ids: Sequence[str] = (),
+    transport: httpx2.AsyncBaseTransport | None = None,
+) -> dict[str, Facts]:
+    """Facts for the items with these Open Library author IDs, or these
+    Wikidata IDs, by Wikidata ID. Malformed IDs are left out rather than
+    put in the query."""
+    ols = sorted({i for i in open_library_ids if _OL.match(i)})
+    qs = sorted({i for i in wikidata_ids if _Q.match(i)})
+    rows: list[dict[str, Any]] = []
+    async with httpx2.AsyncClient(
+        transport=transport, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
+    ) as client:
+        if ols:
+            values = " ".join(f'"{i}"' for i in ols)
+            rows += await _ask(client, _query(f"VALUES ?ol {{ {values} }} ?item wdt:P648 ?ol ."))
+        if qs:
+            values = " ".join(f"wd:{i}" for i in qs)
+            # schema:version, which every item has: without it, VALUES
+            # answers for an ID with no item behind it too.
+            selector = (
+                f"VALUES ?item {{ {values} }} ?item schema:version [] ."
+                " OPTIONAL { ?item wdt:P648 ?ol }"
+            )
+            rows += await _ask(client, _query(selector))
+    return _read(rows)

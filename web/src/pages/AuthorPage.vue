@@ -5,10 +5,12 @@ import {
   type Author,
   type AuthorSummary,
   fetchAuthor,
+  lifespan,
   listAuthors,
   mergeAuthor,
   removeLink,
   saveAuthor,
+  setWikidata,
 } from "../authors";
 import { KIND_NAMES } from "../books";
 import type { Me } from "../me";
@@ -34,6 +36,7 @@ async function load() {
       author.value = found;
       name.value = found.name;
       kind.value = found.kind;
+      wikidataRef.value = found.wikidata_url?.split("/").pop() ?? "";
       document.title = `${found.name} · OpenLarder`;
     }
   } catch {
@@ -58,6 +61,26 @@ const save = () =>
     await saveAuthor(props.id, name.value, kind.value);
     await load();
   });
+
+// Which Wikidata item the author is, for admins; its facts come with it.
+const wikidataRef = ref("");
+const saveWikidata = (reference: string | null) =>
+  act(async () => {
+    author.value = await setWikidata(props.id, reference);
+    wikidataRef.value = author.value.wikidata_url?.split("/").pop() ?? "";
+  });
+
+// The facts line: years, country, and the website unless it's a link
+// already.
+const facts = computed(() => {
+  const a = author.value;
+  if (!a) return [];
+  return [lifespan(a), a.country ?? ""].filter(Boolean);
+});
+const website = computed(() => {
+  const a = author.value;
+  return a?.website && !a.links.some((l) => l.url === a.website) ? a.website : null;
+});
 
 const add = () =>
   act(async () => {
@@ -133,6 +156,7 @@ onMounted(load);
             <strong>Admin</strong>
             <a href="#author-name">Edit name and kind</a>
             <a href="#link-url">Edit links</a>
+            <a href="#wikidata-item">Wikidata</a>
             <template v-if="author.same_name.length">
               <span>
                 Possible duplicate:
@@ -154,7 +178,14 @@ onMounted(load);
       <div class="author-head">
         <p class="kind">{{ author.kind === "organisation" ? "Organisation" : "Person" }}</p>
         <h1>{{ author.name }}</h1>
-        <ul v-if="author.links.length || author.open_library_url" class="author-links">
+        <p v-if="facts.length" class="author-facts">{{ facts.join(" · ") }}</p>
+        <ul
+          v-if="author.links.length || author.open_library_url || author.wikidata_url"
+          class="author-links"
+        >
+          <li v-if="website">
+            <a :href="website" rel="nofollow noopener">Website</a>
+          </li>
           <li v-for="link in author.links" :key="link.id">
             <a :href="link.url" rel="nofollow noopener">{{ link.label ?? link.url }}</a>
             <button
@@ -170,6 +201,9 @@ onMounted(load);
           </li>
           <li v-if="author.open_library_url">
             <a :href="author.open_library_url">Open Library</a>
+          </li>
+          <li v-if="author.wikidata_url">
+            <a :href="author.wikidata_url">Wikidata</a>
           </li>
         </ul>
       </div>
@@ -246,6 +280,35 @@ onMounted(load);
           <label for="link-label">Label (optional)</label>
           <input id="link-label" v-model="linkLabel" maxlength="100" placeholder="Website" />
           <button type="submit" class="primary" :disabled="busy">Add the link</button>
+        </form>
+        <form class="recipe-form author-wikidata" @submit.prevent="saveWikidata(wikidataRef)">
+          <label for="wikidata-item">Wikidata item</label>
+          <input
+            id="wikidata-item"
+            v-model="wikidataRef"
+            autocomplete="off"
+            maxlength="300"
+            placeholder="Q214477, or a link to the item"
+            aria-describedby="wikidata-help"
+          />
+          <p id="wikidata-help" class="help">
+            Born and died, country and website come from it. An author with an Open Library
+            record is usually found by that, from the Admin page.
+          </p>
+          <div class="row-actions">
+            <button type="submit" class="primary" :disabled="busy || !wikidataRef.trim()">
+              Use this item
+            </button>
+            <button
+              v-if="author.wikidata_url"
+              type="button"
+              class="secondary small"
+              :disabled="busy"
+              @click="saveWikidata(null)"
+            >
+              Take it off
+            </button>
+          </div>
         </form>
         <div class="isbn-form author-merge">
           <label for="merge-author">Merge this author into another</label>

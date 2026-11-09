@@ -1096,6 +1096,23 @@ a.button-primary:hover {
 .show-more {
   margin-top: 0.75rem;
 }
+.author-facts {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+.author-wikidata .help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.clash-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+}
+.clash-list a {
+  color: var(--link);
+}
 .author-head .kind {
   margin: 0;
   color: var(--muted);
