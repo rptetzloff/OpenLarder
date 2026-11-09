@@ -25,6 +25,7 @@ from openlarder.models import (
     IngredientOption,
     Issue,
     Recipe,
+    RecipeIngredient,
     RecipeLocation,
     Source,
     SourceCredit,
@@ -65,6 +66,8 @@ class UsedBy(BaseModel):
     episode: str | None = None
     at: str | None = None
     site: str | None = None
+    # On an ingredient's page: the line naming it, as the source writes it.
+    line: str | None = None
 
 
 class AliasOut(BaseModel):
@@ -86,7 +89,11 @@ class IngredientOut(BaseModel):
     parent: Related | None
     children: list[Related]
     recipes: list[UsedBy]
+    # Recipes using exactly this ingredient.
     total: int
+    # How many the list holds in all: those using it, or with under, those
+    # using it or anything under it.
+    listed_total: int = 0
     # Recipes using it or anything under it, as search counts them.
     family_total: int
     # What can stand in for it.
@@ -240,7 +247,13 @@ async def list_ingredients(
 
 @router.get("/{ingredient_id}", response_model=IngredientOut)
 async def get_ingredient(
-    ingredient_id: uuid.UUID, session: Session, viewer: Viewer, offset: int = Query(0, ge=0)
+    ingredient_id: uuid.UUID,
+    session: Session,
+    viewer: Viewer,
+    offset: int = Query(0, ge=0),
+    # List the recipes using anything under it too (Ray's wireframe:
+    # "counting what's under it", with "Only this exact ingredient").
+    under: bool = False,
 ) -> IngredientOut:
     ingredient = await session.scalar(
         select(Ingredient).where(
@@ -249,16 +262,35 @@ async def get_ingredient(
     )
     if ingredient is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingredient.")
-    recipes, total = await recipes_where(
+    exactly = IngredientOption.ingredient_id == ingredient_id
+    named = (
+        IngredientOption.ingredient_id.in_(ingredients.family(ingredient_id)) if under else exactly
+    )
+    recipes, listed_total = await recipes_where(
         session,
-        Recipe.id.in_(
-            select(IngredientOption.recipe_id).where(
-                IngredientOption.ingredient_id == ingredient_id
-            )
-        ),
+        Recipe.id.in_(select(IngredientOption.recipe_id).where(named)),
         visibility.recipes_seen_by(viewer),
         offset=offset,
     )
+    total = listed_total
+    if under:
+        total = await session.scalar(
+            select(func.count(func.distinct(IngredientOption.recipe_id))).where(
+                exactly, visibility.options_seen_by(viewer)
+            )
+        )
+    # Each listed recipe's line naming it, the first if several do.
+    written: dict[uuid.UUID, str] = {}
+    if recipes:
+        for recipe_id, text in await session.execute(
+            select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
+            .join(IngredientOption, IngredientOption.recipe_ingredient_id == RecipeIngredient.id)
+            .where(RecipeIngredient.recipe_id.in_([r.id for r in recipes]), named)
+            .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
+        ):
+            written.setdefault(recipe_id, text)
+    for r in recipes:
+        r.line = written.get(r.id)
     aliases = await session.execute(
         select(IngredientAlias.id, IngredientAlias.name)
         .where(IngredientAlias.ingredient_id == ingredient_id)
@@ -290,7 +322,8 @@ async def get_ingredient(
         parent=Related(id=parent.id, name=parent.name) if parent else None,
         children=children,
         recipes=recipes,
-        total=total,
+        total=total or 0,
+        listed_total=listed_total,
         family_total=family_total or 0,
         swaps=[
             swap_out(s)

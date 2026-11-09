@@ -122,66 +122,92 @@ onMounted(load);
 </script>
 
 <template>
-  <article>
-    <p><a href="/authors">← All authors</a></p>
+  <article class="wide author-page">
     <p v-if="missing">There's no author here. The link may be wrong.</p>
     <p v-else-if="failed" role="alert">This author couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!author" class="status">Loading…</p>
     <template v-else>
-      <h1>{{ author.name }}</h1>
-      <ul v-if="author.links.length || author.open_library_url" class="author-links">
-        <li v-for="link in author.links" :key="link.id">
-          <a :href="link.url" rel="nofollow noopener">{{ link.label ?? link.url }}</a>
-          <button
-            v-if="user?.is_admin"
-            type="button"
-            class="link remove-alias"
-            :disabled="busy"
-            :aria-label="`Remove the link to ${link.label ?? link.url}`"
-            @click="remove(link)"
-          >
-            ×
-          </button>
-        </li>
-        <li v-if="author.open_library_url">
-          <a :href="author.open_library_url">On Open Library</a>
-        </li>
-      </ul>
+      <Teleport v-if="user?.is_admin" to="#admin-bar" defer>
+        <div class="admin-bar">
+          <div class="bar">
+            <strong>Admin</strong>
+            <a href="#author-name">Edit name and kind</a>
+            <a href="#link-url">Edit links</a>
+            <template v-if="author.same_name.length">
+              <span>
+                Possible duplicate:
+                <a :href="`/authors/${author.same_name[0].id}`">{{ author.same_name[0].name }}</a>
+                ·
+                <a href="#same-name">Merge</a>
+              </span>
+            </template>
+          </div>
+        </div>
+      </Teleport>
 
-      <h2>{{ sourcesHeading }}</h2>
-      <ul class="book-list">
-        <li v-for="b in author.sources" :key="b.id">
-          <a :href="`/sources/${b.id}`" class="book-card">
-            <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" />
-            <span v-else class="no-cover" aria-hidden="true"></span>
-            <span>
-              <strong>{{ b.title }}</strong>
-              <span v-if="b.host" class="byline">{{ b.host }}</span>
-              <span v-if="roles(b.roles)" class="byline">{{ roles(b.roles) }}</span>
-              <span v-if="b.credited_as !== author.name" class="byline"
-                >as {{ b.credited_as }}</span
-              >
-            </span>
-          </a>
-        </li>
-      </ul>
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="/authors">Authors</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{{ author.name }}</span>
+      </nav>
 
-      <template v-if="author.coauthors.length">
-        <h2>Worked with</h2>
-        <ul class="recipe-list">
-          <li v-for="c in author.coauthors" :key="c.id">
-            <a :href="`/authors/${c.id}`">{{ c.name }}</a>
-            <span class="page-ref">
-              {{ c.sources }} together
-            </span>
+      <div class="author-head">
+        <p class="kind">{{ author.kind === "organisation" ? "Organisation" : "Person" }}</p>
+        <h1>{{ author.name }}</h1>
+        <ul v-if="author.links.length || author.open_library_url" class="author-links">
+          <li v-for="link in author.links" :key="link.id">
+            <a :href="link.url" rel="nofollow noopener">{{ link.label ?? link.url }}</a>
+            <button
+              v-if="user?.is_admin"
+              type="button"
+              class="link remove-alias"
+              :disabled="busy"
+              :aria-label="`Remove the link to ${link.label ?? link.url}`"
+              @click="remove(link)"
+            >
+              ×
+            </button>
+          </li>
+          <li v-if="author.open_library_url">
+            <a :href="author.open_library_url">Open Library</a>
           </li>
         </ul>
-      </template>
+      </div>
 
-      <section v-if="user?.is_admin" class="fix-ingredient">
+      <section class="source-section">
+        <h2>{{ sourcesHeading }}</h2>
+        <ul class="cover-grid">
+          <li v-for="b in author.sources" :key="b.id">
+            <a :href="`/sources/${b.id}`" class="cover-card">
+              <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" />
+              <span v-else class="cover-blank" aria-hidden="true"></span>
+              <strong>{{ b.title }}</strong>
+              <span class="byline">
+                {{ b.recipes.toLocaleString() }} {{ b.recipes === 1 ? "recipe" : "recipes"
+                }}{{ roles(b.roles) ? ` · ${roles(b.roles)}` : "" }}
+              </span>
+              <span v-if="b.credited_as !== author.name" class="byline"
+                >printed as “{{ b.credited_as }}”</span
+              >
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <section v-if="author.coauthors.length" class="source-section">
+        <h2>Credited with</h2>
+        <ul class="ingredient-chips">
+          <li v-for="c in author.coauthors" :key="c.id">
+            <a :href="`/authors/${c.id}`">{{ c.name }}</a>
+            <span class="count"> · {{ c.sources }} {{ c.sources === 1 ? "source" : "sources" }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <section v-if="user?.is_admin" class="fix-ingredient source-section">
         <h2>Fix this author</h2>
         <template v-if="author.same_name.length">
-          <h3>Possibly the same person</h3>
+          <h3 id="same-name">Possibly the same person</h3>
           <ul class="recipe-list">
             <li v-for="a in author.same_name" :key="a.id">
               <a :href="`/authors/${a.id}`">{{ a.name }}</a>

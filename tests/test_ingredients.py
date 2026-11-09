@@ -536,3 +536,22 @@ async def test_only_admins_set_a_parent(admin, work, adb) -> None:
     await adb.execute(text("UPDATE users SET is_admin = false"))
     response = await _parent(admin, await _id(adb, "Fresh Ginger"), await _id(adb, "Ginger"))
     assert response.status_code == 403
+
+
+async def test_an_ingredients_page_lists_whats_under_it_on_request(admin, work, adb, client):
+    """Ray's wireframe: counting what's under it, or only this exact one; each
+    recipe with the line naming it as written."""
+    await _add(admin, work, "Ginger Cake", "1", ["Flour", "Ginger"])
+    await _add(admin, work, "Stir-Fry", "2", ["Fresh Ginger, peeled", "Garlic"])
+    ginger, fresh = await _id(adb, "Ginger"), await _id(adb, "Fresh Ginger, peeled")
+    await _parent(admin, fresh, ginger)
+    exact = (await client.get(f"/api/ingredients/{ginger}")).json()
+    assert [(r["title"], r["line"]) for r in exact["recipes"]] == [("Ginger Cake", "Ginger")]
+    assert (exact["total"], exact["listed_total"], exact["family_total"]) == (1, 1, 2)
+    under = (await client.get(f"/api/ingredients/{ginger}", params={"under": "true"})).json()
+    assert [(r["title"], r["line"]) for r in under["recipes"]] == [
+        ("Ginger Cake", "Ginger"),
+        ("Stir-Fry", "Fresh Ginger, peeled"),
+    ]
+    # The exact count stays exact: it is what decides whether it can be deleted.
+    assert (under["total"], under["listed_total"]) == (1, 2)

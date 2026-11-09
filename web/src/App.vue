@@ -819,10 +819,16 @@ button.secondary[aria-current="page"] {
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--line);
   }
-  .recipe-table td {
+  .recipe-table,
+  .recipe-table tbody {
+    display: block;
+  }
+  .recipe-table td,
+  .recipe-table td:first-child {
     display: block;
     padding: 0.125rem 0;
     border: none;
+    white-space: normal;
   }
 }
 .badge {
@@ -1016,6 +1022,85 @@ button.secondary[aria-current="page"] {
   margin: 0;
   padding-top: 0.75rem;
   border-top: 1px solid var(--line);
+}
+
+/* An ingredient's page and an author's. */
+.ingredient-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem 1.5rem;
+}
+.ingredient-head h1,
+.author-head h1 {
+  margin: 0 0 0.25rem;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.2;
+}
+.ingredient-head .status {
+  margin: 0;
+}
+a.button-primary {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+a.button-primary:hover {
+  background: var(--accent-hover);
+}
+.ingredient-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.ingredient-cards > div {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.ingredient-cards h2 {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.ingredient-cards p {
+  margin: 0;
+}
+.ingredient-cards a,
+.author-head a,
+.cover-card + .byline a {
+  color: var(--link);
+}
+.recipe-table a.strong {
+  font-weight: 600;
+}
+.show-more {
+  margin-top: 0.75rem;
+}
+.author-head .kind {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.author-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.author-links li {
+  margin: 0;
 }
 
 /* The front page. */
