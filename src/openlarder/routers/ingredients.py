@@ -8,10 +8,12 @@ Renaming, merging and deleting are for admins.
 
 import uuid
 from collections.abc import Sequence
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Row, exists, func, select
+from sqlalchemy.orm import aliased
 
 from openlarder import ingredients, openlibrary, substitutions, visibility, web
 from openlarder import recipes as recipe_entries
@@ -39,10 +41,19 @@ router = APIRouter(prefix="/api/ingredients", tags=["ingredients"])
 PAGE = 100
 
 
+class IngredientParent(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class IngredientSummary(BaseModel):
     id: uuid.UUID
     name: str
     recipes: int
+    # What it comes under, if the viewer can see that, and its other names
+    # ("Spring Onion (UK)"), for the Ingredients page.
+    parent: IngredientParent | None = None
+    aliases: list[str] = []
 
 
 class IngredientList(BaseModel):
@@ -206,9 +217,27 @@ async def with_pages(
 
 @router.get("", response_model=IngredientList)
 async def list_ingredients(
-    session: Session, viewer: Viewer, q: str = "", offset: int = Query(0, ge=0)
+    session: Session,
+    viewer: Viewer,
+    q: str = "",
+    offset: int = Query(0, ge=0),
+    # "uses": the most used first; "name": A to Z.
+    sort: Literal["uses", "name"] = "uses",
+    # Only those that come under nothing, to browse from the top.
+    top: bool = False,
 ) -> IngredientList:
     named: list[ColumnElement[bool]] = [visibility.ingredients_seen_by(viewer)]
+    if top:
+        # A parent the viewer can't see counts as none.
+        # Not correlated: it asks of every ingredient, not the outer one.
+        visible = (
+            select(Ingredient.id).where(visibility.ingredients_seen_by(viewer)).correlate(None)
+        )
+        parent = aliased(Ingredient)
+        named.append(
+            Ingredient.parent_id.is_(None)
+            | ~exists().where(parent.id == Ingredient.parent_id, parent.id.in_(visible))
+        )
     if q.strip():
         like = contains_pattern(" ".join(q.split()))
         named.append(
@@ -229,18 +258,40 @@ async def list_ingredients(
         uses = uses.where(IngredientOption.ingredient_id.in_(select(Ingredient.id).where(*named)))
     uses = uses.group_by(IngredientOption.ingredient_id).subquery()
     query = (
-        select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0))
+        select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0), Ingredient.parent_id)
         .outerjoin(uses, uses.c.ingredient_id == Ingredient.id)
         .where(*named)
     )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    rows = await session.execute(
-        query.order_by(func.coalesce(uses.c.n, 0).desc(), func.lower(Ingredient.name))
-        .offset(offset)
-        .limit(PAGE)
+    order = (
+        (func.lower(Ingredient.name), Ingredient.id)
+        if sort == "name"
+        else (func.coalesce(uses.c.n, 0).desc(), func.lower(Ingredient.name))
     )
+    rows = (await session.execute(query.order_by(*order).offset(offset).limit(PAGE))).all()
+    parents = {
+        i: IngredientParent(id=i, name=n)
+        for i, n in await session.execute(
+            select(Ingredient.id, Ingredient.name).where(
+                Ingredient.id.in_({p for *_, p in rows if p}),
+                visibility.ingredients_seen_by(viewer),
+            )
+        )
+    }
+    aliases: dict[uuid.UUID, list[str]] = {}
+    for i, name, region in await session.execute(
+        select(IngredientAlias.ingredient_id, IngredientAlias.name, IngredientAlias.region)
+        .where(IngredientAlias.ingredient_id.in_([r[0] for r in rows]))
+        .order_by(IngredientAlias.ingredient_id, func.lower(IngredientAlias.name))
+    ):
+        aliases.setdefault(i, []).append(f"{name} ({region})" if region else name)
     return IngredientList(
-        ingredients=[IngredientSummary(id=i, name=n, recipes=c) for i, n, c in rows],
+        ingredients=[
+            IngredientSummary(
+                id=i, name=n, recipes=c, parent=parents.get(p), aliases=aliases.get(i, [])
+            )
+            for i, n, c, p in rows
+        ],
         total=total or 0,
     )
 

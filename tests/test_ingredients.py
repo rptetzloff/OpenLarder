@@ -199,6 +199,23 @@ async def test_the_list_narrows_by_name(admin, work, client) -> None:
     assert names(await client.get("/api/ingredients", params={"q": "_"})) == []
 
 
+async def test_the_list_says_what_each_comes_under_and_its_other_names(
+    admin, work, adb, client
+) -> None:
+    await _add(admin, work, "Tea", "1", ["Ginger", "Fresh Ginger", "Apple"])
+    ginger, fresh = await _id(adb, "Ginger"), await _id(adb, "Fresh Ginger")
+    assert (await _parent(admin, fresh, ginger)).status_code == 200
+    await _regional(adb, fresh, "Root Ginger", "UK")
+    await _regional(adb, fresh, "Green Ginger", None)
+    listed = {i["name"]: i for i in (await client.get("/api/ingredients")).json()["ingredients"]}
+    assert listed["Fresh Ginger"]["parent"] == {"id": str(ginger), "name": "Ginger"}
+    assert listed["Fresh Ginger"]["aliases"] == ["Green Ginger", "Root Ginger (UK)"]
+    assert listed["Ginger"]["parent"] is None and listed["Ginger"]["aliases"] == []
+    top = (await client.get("/api/ingredients", params={"top": "true", "sort": "name"})).json()
+    assert [i["name"] for i in top["ingredients"]] == ["Apple", "Ginger"]
+    assert top["total"] == 2
+
+
 async def test_an_ingredient_lists_its_recipes_with_book_and_page(admin, work, client) -> None:
     cake = await _add(admin, work, "Rhubarb Cake", "112", ["Rhubarb", "Sugar"])
     await _add(admin, work, "Apple Pie", "90", ["Sugar"])
