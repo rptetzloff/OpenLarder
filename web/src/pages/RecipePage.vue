@@ -390,7 +390,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           </p>
         </aside>
       </div>
-      <HistoryPanel kind="recipes" :id="id" />
+      <HistoryPanel kind="recipes" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>
 </template>

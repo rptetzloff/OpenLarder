@@ -53,7 +53,13 @@ watch(allowed, (yes) => yes && !changes.value && load(), { immediate: true });
       </form>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!changes" class="status">Loading…</p>
-      <ChangeList v-else-if="changes.length" :changes="changes" link-sources />
+      <ChangeList
+        v-else-if="changes.length"
+        :changes="changes"
+        link-sources
+        can-revert
+        @reverted="load"
+      />
       <p v-else class="status">No changes recorded{{ by ? " by that name" : "" }} yet.</p>
     </template>
   </article>

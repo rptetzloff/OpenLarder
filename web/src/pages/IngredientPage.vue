@@ -383,7 +383,7 @@ onMounted(() => load());
           </button>
         </p>
       </section>
-      <HistoryPanel kind="ingredients" :id="id" />
+      <HistoryPanel kind="ingredients" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>
 </template>

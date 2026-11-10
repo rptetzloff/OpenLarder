@@ -17,8 +17,8 @@ from pydantic import BaseModel
 from sqlalchemy import and_, false, or_, select, true
 from sqlalchemy.orm import aliased
 
-from openlarder import visibility
-from openlarder.auth import ModeratorUser, Viewer
+from openlarder import revert, visibility
+from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import Author, Ingredient, Recipe, Revision, Source, Tag, User
 
@@ -369,3 +369,28 @@ async def recent_changes(
     if by:
         query = query.join(User, User.id == Revision.user_id).where(User.display_name == by)
     return await _changes(session, moderator, query)
+
+
+class Reverted(BaseModel):
+    # Rows put back, changed back or taken away.
+    undone: int
+
+
+@router.post("/api/changes/{change_id}/revert", response_model=Reverted, dependencies=[SameOrigin])
+async def revert_change(
+    change_id: uuid.UUID, moderator: ModeratorUser, session: Session
+) -> Reverted:
+    """Undo one change, as a new change (revert.py). Not one that touched
+    anything the moderator can't see: a family collection's is its own."""
+    hidden = await session.scalar(
+        select(Revision.id).where(Revision.change_id == change_id, _hidden(moderator)).limit(1)
+    )
+    if hidden is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such change.")
+    try:
+        undone = await revert.revert(session, change_id)
+    except revert.CantRevert as exc:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    await session.commit()
+    return Reverted(undone=undone)

@@ -332,7 +332,7 @@ onMounted(load);
           </ul>
         </div>
       </section>
-      <HistoryPanel kind="authors" :id="id" />
+      <HistoryPanel kind="authors" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>
 </template>

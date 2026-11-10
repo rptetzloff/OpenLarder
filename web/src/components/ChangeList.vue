@@ -1,8 +1,27 @@
 <script setup lang="ts">
-import { type Change, cameThrough, label, madeBy, shown } from "../history";
+import { ref } from "vue";
+import { type Change, cameThrough, label, madeBy, revertChange, shown } from "../history";
 
-// Changes, newest first, each with what it added, changed or removed.
-defineProps<{ changes: Change[]; linkSources?: boolean }>();
+// Changes, newest first, each with what it added, changed or removed; for
+// moderators, a button to undo one, after which the list is reloaded.
+defineProps<{ changes: Change[]; linkSources?: boolean; canRevert?: boolean }>();
+const emit = defineEmits<{ reverted: [] }>();
+const errors = ref<Record<string, string>>({});
+const busy = ref(false);
+
+async function undo(c: Change) {
+  if (!confirm("Undo this change? It's put back as it was before, as a new change in the history.")) return;
+  busy.value = true;
+  errors.value = {};
+  try {
+    await revertChange(c.id);
+    emit("reverted");
+  } catch (e) {
+    errors.value = { [c.id]: e instanceof Error ? e.message : String(e) };
+  } finally {
+    busy.value = false;
+  }
+}
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 </script>
@@ -19,7 +38,17 @@ const when = (iso: string) =>
             · <a :href="`/sources/${c.source_id}`">the source</a>
           </template>
         </span>
+        <button
+          v-if="canRevert && !c.withheld"
+          type="button"
+          class="link change-undo"
+          :disabled="busy"
+          @click="undo(c)"
+        >
+          Undo
+        </button>
       </p>
+      <p v-if="errors[c.id]" class="error" role="alert">{{ errors[c.id] }}</p>
       <ul class="change-entries">
         <li v-for="(e, i) in c.entries" :key="i">
           <span class="change-action" :class="e.action">{{ e.action }}</span>{{ " " }}

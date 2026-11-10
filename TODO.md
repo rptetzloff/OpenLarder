@@ -157,7 +157,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] A lawyer's read of the agreement's wording, with the terms.
       - [ ] Contributors' edits to published records (a title, a page), as
         proposed changes for review.
-      - [ ] One-click revert of a change.
+      - [x] One-click revert (#109): a moderator's Undo on any change in a
+        record's history or Recent changes puts back what it removed, sets
+        back what it changed and takes away what it added, as a new change
+        through "revert:<change>", so it can be undone in turn. Refused when
+        a later change touched the same records (undo that first), or for a
+        removal recorded before migration 0042 kept whole rows.
       - [ ] Then trust levels and a report button. The ingredient matching
         flow's suggestions and "new ingredient" step wait on this too.
       - [ ] Edit history keeps everything forever: check its size once the
