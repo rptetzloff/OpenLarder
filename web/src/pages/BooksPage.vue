@@ -231,7 +231,7 @@ async function add() {
     <div v-if="user" class="add-panels">
       <!-- Contributors add books, which wait for review; the agreement first. -->
       <AgreementPanel v-if="user.may_claim && !user.agreed" :agreed="false" @accepted="reload" />
-      <p v-if="user.may_claim && !user.may_edit && user.agreed" class="muted add-note">
+      <p v-if="user.may_claim && !user.may_edit && !user.trusted && user.agreed" class="muted add-note">
         Books you add wait for a moderator's review before anyone else sees them.
       </p>
       <details v-if="user.may_claim && user.agreed" class="add-panel">

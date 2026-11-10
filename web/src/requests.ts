@@ -41,6 +41,8 @@ export interface Person {
   created_at: string;
   // Whether you may change their role.
   changeable: boolean;
+  // A contributor's trust (trust.py).
+  trust: "earned" | "granted" | "withheld" | null;
 }
 
 async function send<T>(url: string, method: string, body?: unknown): Promise<T> {
@@ -77,6 +79,9 @@ export const decline = (id: string, reason: string) =>
 
 export const findPeople = (q: string, role: Role | "") =>
   send<Person[]>(`/api/admin/people?q=${encodeURIComponent(q)}${role ? `&role=${role}` : ""}`, "GET");
+
+export const setTrust = (id: string, trust: "granted" | "withheld" | null) =>
+  send<Person>(`/api/admin/people/${id}/trust`, "PUT", { trust });
 
 export const setRole = (id: string, role: Role) =>
   send<Person>(`/api/admin/people/${id}/role`, "PUT", { role });

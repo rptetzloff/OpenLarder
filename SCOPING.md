@@ -285,14 +285,14 @@ The flag pages are built: Admin → Flagged recipes lists every open flag, filte
 
 **Catalog data is experimental until launch.** What is in the database now, the household index included, is there to work things out against. Before launch a script in the repository empties the catalog tables and the index is imported again through whatever the importer has become; the schema and the accounts stay. *Ray, 2026-11-07: "we'll start over, so this is just all experimental".*
 
-**Trust levels**
+**Trust levels** (*Ray, 2026-11-10*; built, #119)
 
-| Level | How earned | Edits |
+| Level | How | What they add |
 | --- | --- | --- |
-| New | Signup | Every submission goes to the review queue |
-| Contributor | N approved submissions | Edits publish directly; new ingredients still reviewed |
-| Trusted | Sustained quality, granted by moderators | Can review others' submissions and merge ingredients |
-| Moderator | Appointed | Everything, including bans and reverts |
+| User | Signing in | Family collections, requests, flags on their own recipes |
+| Contributor | A moderator names them | Books and recipes, waiting for review; proposed changes to published records |
+| Trusted contributor | 250 approved recipes across 5 books (settings), or a moderator grants it | Additions publish at once; changes to published records still proposed |
+| Moderator and up | Appointed (roles.py) | Everything in the catalog directly, reviews, merges, undo |
 
 **Safeguards**
 

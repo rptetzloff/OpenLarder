@@ -75,6 +75,8 @@ not all, the app refuses to start.
 | `OPENLARDER_DUMPS_SECRET_KEY` | Its secret. Never committed |
 | `OPENLARDER_DUMPS_PUBLIC_URL` | Where the bucket is read from: its custom domain (`https://data.openlarder.com`) or its `r2.dev` address |
 | `OPENLARDER_DUMPS_REGION` | `auto` unless set, which R2 wants; another store's region otherwise |
+| `OPENLARDER_TRUST_RECIPES` | Approved recipes that make a contributor trusted, `250` unless set (with the next, both needed) |
+| `OPENLARDER_TRUST_BOOKS` | Different books those approved recipes are in, `5` unless set |
 | `OPENLARDER_DUMPS_KEEP_DAYS` | How long a dump is kept, `365` unless set (at least 7). Older ones are deleted from the bucket and `/data`; the newest always stays |
 
 The bucket needs public reading (R2: a custom domain or the r2.dev address

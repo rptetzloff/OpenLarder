@@ -45,7 +45,8 @@ onMounted(async () => {
     <p>
       Contributors, whom a moderator names, add books and their recipes. What they add waits for a
       moderator's review, seen only by them and the moderators until it's approved, and may be
-      sent back with what to fix. Everyone who adds to the catalog first accepts the contributor
+      sent back with what to fix, until they become trusted contributors, whose additions publish
+      at once and can still be changed or undone. Everyone who adds to the catalog first accepts the contributor
       agreement below, and accepts it again if it changes. These rules apply too.
     </p>
     <ul>

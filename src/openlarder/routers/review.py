@@ -15,10 +15,11 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 
-from openlarder import agreement
+from openlarder import agreement, trust
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import BookRequest, Edition, Proposal, Recipe, Source, User
+from openlarder.routers.auth import Config
 
 router = APIRouter(tags=["review"])
 WAITING = ("pending", "returned")
@@ -163,12 +164,20 @@ async def decide_source(
 
 @router.post("/api/review/recipes/{recipe_id}", response_model=Item, dependencies=[SameOrigin])
 async def decide_recipe(
-    recipe_id: uuid.UUID, body: Decision, moderator: ModeratorUser, session: Session
+    recipe_id: uuid.UUID,
+    body: Decision,
+    moderator: ModeratorUser,
+    session: Session,
+    settings: Config,
 ) -> Item:
     recipe = await session.get(Recipe, recipe_id, with_for_update=True)
     if recipe is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     _decide(recipe, body, moderator)
+    if body.action == "approve":
+        await session.flush()
+        # Enough approved now to be trusted (trust.py)?
+        await trust.consider(session, recipe.created_by, settings)
     await session.commit()
     await session.refresh(recipe)
     return _item(recipe, await _names(session, [recipe.created_by]))
@@ -184,10 +193,19 @@ class Approved(BaseModel):
     response_model=Approved,
     dependencies=[SameOrigin],
 )
-async def approve_all(source_id: uuid.UUID, moderator: ModeratorUser, session: Session) -> Approved:
+async def approve_all(
+    source_id: uuid.UUID, moderator: ModeratorUser, session: Session, settings: Config
+) -> Approved:
     """The source, if it's waiting, and every recipe of it that's waiting;
     those sent back stay with their contributor."""
     source = await _source(session, source_id)
+    makers = set(
+        await session.scalars(
+            select(Recipe.created_by).where(
+                Recipe.source_id == source_id, Recipe.review == "pending"
+            )
+        )
+    )
     published_source = source.review == "pending"
     if published_source:
         _decide(source, Decision(action="approve"), moderator)
@@ -201,6 +219,8 @@ async def approve_all(source_id: uuid.UUID, moderator: ModeratorUser, session: S
     await session.flush()
     if published_source:
         await _close_requests(session, source)
+    for maker in makers:
+        await trust.consider(session, maker, settings)
     await session.commit()
     return Approved(source=published_source, recipes=result.rowcount)
 
@@ -242,3 +262,19 @@ async def accept(body: Accept, user: CurrentUser, session: Session) -> None:
         )
     user.agreed_at, user.agreed_version = func.now(), agreement.VERSION
     await session.commit()
+
+
+class TrustOut(BaseModel):
+    trusted: bool
+    # earned, granted, withheld, or none yet.
+    trust: str | None
+    recipes: int
+    books: int
+    needs_recipes: int
+    needs_books: int
+
+
+@router.get("/api/account/trust", response_model=TrustOut)
+async def my_trust(user: CurrentUser, session: Session, settings: Config) -> TrustOut:
+    """How near you are to adding without waiting for review (trust.py)."""
+    return TrustOut(**(await trust.progress(session, user, settings)).__dict__)

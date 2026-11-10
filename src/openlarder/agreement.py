@@ -6,7 +6,7 @@ and contributors agree to it before their first contribution.
 The wording is the site's, not a lawyer's yet: the lawyer review planned
 for the terms and the content rules covers it too (SCOPING.md, Before
 launch). Changing what it says means a new VERSION, which asks everyone
-again.
+again: 2026-11-10.2 said that trusted contributors' additions don't wait.
 """
 
 from typing import Annotated
@@ -16,7 +16,7 @@ from fastapi import Depends, HTTPException, status
 from openlarder.auth import CurrentUser
 from openlarder.models import User
 
-VERSION = "2026-11-10"
+VERSION = "2026-11-10.2"
 
 POINTS = [
     "What you add to OpenLarder's catalog (sources, recipes' titles and where they are, "
@@ -29,8 +29,9 @@ POINTS = [
     "its index or data.",
     "Your display name is shown beside what you add and change, in the edit history, for "
     "anyone to read.",
-    "A moderator reviews what you add before it's public, and may change it, send it back "
-    "to you with a reason, or remove it.",
+    "What you add waits for a moderator's review before it's public, until you're a trusted "
+    "contributor; moderators may change anything you add, send it back to you with a "
+    "reason, or remove it.",
 ]
 
 

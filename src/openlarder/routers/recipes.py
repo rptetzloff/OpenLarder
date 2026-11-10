@@ -639,7 +639,7 @@ async def add_recipe(
     # Whoever added it deals with its flags (routers/flags.py).
     recipe.created_by = user.id
     # A contributor's waits for a moderator (migration 0041).
-    if source.kind != "family" and not user.may_edit:
+    if source.kind != "family" and not user.publishes_directly:
         recipe.review = "pending"
     await references.relink(session, source_id)
     await session.commit()
