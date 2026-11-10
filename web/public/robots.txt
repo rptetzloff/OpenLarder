@@ -1,0 +1,5 @@
+# OpenLarder's pages are for search engines to index. /api is fetched to
+# build them, so it isn't blocked here; its answers say noindex instead.
+# Buy links (/go/) are redirects to shops, counted when followed.
+User-agent: *
+Disallow: /go/
