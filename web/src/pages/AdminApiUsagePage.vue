@@ -13,6 +13,12 @@ const page = ref<UsagePage | null>(null);
 const error = ref("");
 const allowed = computed(() => !!props.user?.may_run);
 const n = (v: number) => v.toLocaleString();
+// Search engines' crawlers, verified by their addresses (crawlers.py).
+const CRAWLERS: Record<string, string> = {
+  googlebot: "Googlebot",
+  bingbot: "Bingbot",
+  applebot: "Applebot",
+};
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -52,7 +58,8 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
       <p class="muted">
         Programs reading the public API, busiest first; the site's own pages aren't counted. A
         caller without a key is a name made from its address, the same each day, and its network:
-        the address itself isn't kept. Kept 30 days.
+        the address itself isn't kept. Search engines' crawlers, checked by their addresses, are
+        shown by name and never limited. Kept 30 days.
       </p>
     </div>
     <p v-if="!user?.may_run" class="status">This is for administrators.</p>
@@ -95,6 +102,10 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
                   <strong>{{ c.key_name }}</strong>
                   <code v-if="c.key_prefix"> {{ c.key_prefix }}…</code>
                   <div v-if="c.owner" class="muted">{{ c.owner }}'s key</div>
+                </template>
+                <template v-else-if="c.caller.startsWith('bot:')">
+                  <strong>{{ CRAWLERS[c.caller.slice(4)] ?? c.caller.slice(4) }}</strong>
+                  <div class="muted">A search engine's crawler, verified; never limited</div>
                 </template>
                 <template v-else>
                   <strong>Address {{ c.caller.slice(3) }}</strong>

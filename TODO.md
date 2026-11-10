@@ -179,6 +179,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       there in any environment. Set `production` on the live site when it
       exists.
 
+- [x] **Search engines' crawlers and the API** (#111). *Ray, 2026-11-10,
+      seeing Google's 66.249.x.x on API usage.* Google renders pages with
+      the API's data, without the header that marks a page's own requests,
+      so it was counted, and would have been limited into indexing empty
+      pages. Googlebot, Bingbot and Applebot are now verified by the
+      ranges their engines publish (fetched daily; reverse DNS as the
+      fallback, which Docker's DNS doesn't answer), never limited, and
+      shown by name on API usage. API answers and buy-link redirects say
+      `X-Robots-Tag: noindex` (robots.txt can't block /api, or Google
+      can't render the pages); robots.txt keeps crawlers off /go/. The
+      daily cap now survives a deploy.
+
 ## Planned features
 
 - [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*

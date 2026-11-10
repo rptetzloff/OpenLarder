@@ -16,9 +16,10 @@ address bar ("none"). A program can copy that header, which is fine: the
 limit is a courtesy for an open catalog, not a lock. Writes need a signed-in
 account whatever the key.
 
-The limits' counts are kept in memory, one process serving; a deploy starts
-them afresh. usage.py keeps a daily record per caller for admins, an address
-only as a pseudonym and its network.
+The limits' counts are kept in memory, one process serving; a deploy picks
+the day's back up from the usage record (resume). Search engines' crawlers,
+verified, aren't limited (crawlers.py). usage.py keeps a daily record per
+caller for admins, an address only as a pseudonym and its network.
 """
 
 import math
@@ -28,7 +29,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException, Request, Response, status
 from sqlalchemy import select
 
-from openlarder import usage
+from openlarder import crawlers, usage
 from openlarder.auth import hash_token
 from openlarder.config import Settings, get_settings
 from openlarder.db import Session
@@ -51,6 +52,18 @@ def reset() -> None:
     """Forget every count (tests)."""
     _buckets.clear()
     _days.clear()
+
+
+async def resume(session) -> None:
+    """Today's counts from the usage record, so a deploy doesn't reset the
+    daily cap (the record is at most a minute behind)."""
+    from openlarder.models import ApiUsage
+
+    today = datetime.now(UTC).date()
+    for caller, requests in await session.execute(
+        select(ApiUsage.caller, ApiUsage.requests).where(ApiUsage.day == today)
+    ):
+        _days[caller] = (today.isoformat(), requests)
 
 
 def _sweep(now: float, today: str) -> None:
@@ -140,6 +153,13 @@ async def rate_limit(request: Request, response: Response, session: Session) -> 
     given = _given_key(request)
     if given is None and request.headers.get("sec-fetch-site") in ("same-origin", "none"):
         return
+    if given is None:
+        address = _address(request)
+        # A search engine's crawler rendering the pages: never limited, and
+        # shown on API usage by name (crawlers.py).
+        if crawler := await crawlers.verified(request.headers.get("user-agent", ""), address):
+            usage.record(f"bot:{crawler}", None, address, search=is_search(request), refused=False)
+            return
     if given is not None:
         key = (
             await session.scalar(select(ApiKey).where(ApiKey.token_hash == hash_token(given)))

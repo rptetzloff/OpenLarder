@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from openlarder import __version__, history, usage
+from openlarder import __version__, crawlers, history, ratelimit, usage
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine, session_factory
@@ -63,6 +63,17 @@ mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # The day's rate-limit counts, so a deploy doesn't reset the daily cap.
+    try:
+        async with session_factory()() as session:
+            await ratelimit.resume(session)
+    except Exception:
+        logging.getLogger(__name__).exception("Picking up today's API counts failed")
+    # Search engines' crawler addresses, which the rate limit leaves alone.
+    try:
+        await asyncio.wait_for(crawlers.refresh(), 20)
+    except Exception:
+        logging.getLogger(__name__).exception("Fetching crawlers' address ranges failed")
     # API usage is written a minute at a time, and once more at shutdown.
     writer = asyncio.create_task(usage.keep_writing(session_factory()))
     yield
@@ -112,6 +123,31 @@ app = FastAPI(
 settings = get_settings()
 # Each request's writes are one change in the edit history (history.py).
 app.add_middleware(history.Middleware)
+
+
+class NoIndexApi:
+    """API answers and buy-link redirects aren't pages: a search engine may
+    fetch them (Google renders pages with the API's data, so robots.txt
+    mustn't block /api), but shouldn't list them. *Ray, 2026-11-10.*"""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/", "/go/")):
+            await self.app(scope, receive, send)
+            return
+
+        async def tagged(message) -> None:
+            if message["type"] == "http.response.start":
+                message.setdefault("headers", [])
+                message["headers"] = [*message["headers"], (b"x-robots-tag", b"noindex")]
+            await send(message)
+
+        await self.app(scope, receive, tagged)
+
+
+app.add_middleware(NoIndexApi)
 app.add_middleware(
     SessionMiddleware,
     # Without sign-in configured nothing is ever written to this cookie, so a
