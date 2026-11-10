@@ -152,16 +152,16 @@ async def can_see(session: AsyncSession, viewer: User | None, source: Source) ->
 
 def may_manage(user: User, source: Source) -> bool:
     """Rename, delete, make public or share a family collection: its owner,
-    and an admin once it's public."""
+    and a moderator once it's public."""
     return source.kind == "family" and (
-        source.owner_id == user.id or (user.is_admin and not source.private)
+        source.owner_id == user.id or (user.may_edit and not source.private)
     )
 
 
 async def may_edit(session: AsyncSession, user: User, source: Source) -> bool:
     """Add and change a source's recipes. A family collection's: whoever may
     manage it, and the editors and admins of a group it's shared with;
-    everything else's: an admin."""
+    everything else's: a moderator or above."""
     if source.kind == "family":
         return may_manage(user, source) or await _shared(session, user, source, EDITING_ROLES)
-    return user.is_admin
+    return user.may_edit

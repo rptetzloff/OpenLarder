@@ -17,7 +17,7 @@ from sqlalchemy.orm import aliased
 
 from openlarder import ingredients, openlibrary, substitutions, visibility, web
 from openlarder import recipes as recipe_entries
-from openlarder.auth import AdminUser, SameOrigin, Viewer
+from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
@@ -422,7 +422,7 @@ def _taken(exc: ingredients.Taken) -> HTTPException:
 
 @router.patch("/{ingredient_id}", response_model=Named, dependencies=[SameOrigin])
 async def rename_ingredient(
-    ingredient_id: uuid.UUID, body: Rename, admin: AdminUser, session: Session
+    ingredient_id: uuid.UUID, body: Rename, admin: ModeratorUser, session: Session
 ) -> Named:
     ingredient = await _ingredient_or_404(session, ingredient_id)
     try:
@@ -437,7 +437,7 @@ async def rename_ingredient(
 
 @router.post("/{ingredient_id}/merge", response_model=Named, dependencies=[SameOrigin])
 async def merge_ingredient(
-    ingredient_id: uuid.UUID, body: MergeInto, admin: AdminUser, session: Session
+    ingredient_id: uuid.UUID, body: MergeInto, admin: ModeratorUser, session: Session
 ) -> Named:
     """Merge this ingredient into another; answers with the one that's left."""
     source = await _ingredient_or_404(session, ingredient_id)
@@ -454,7 +454,7 @@ async def merge_ingredient(
     "/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[SameOrigin]
 )
 async def delete_ingredient(
-    ingredient_id: uuid.UUID, admin: AdminUser, session: Session
+    ingredient_id: uuid.UUID, admin: ModeratorUser, session: Session
 ) -> Response:
     ingredient = await _ingredient_or_404(session, ingredient_id)
     try:
@@ -474,7 +474,7 @@ async def delete_ingredient(
     dependencies=[SameOrigin],
 )
 async def delete_alias(
-    ingredient_id: uuid.UUID, alias_id: uuid.UUID, admin: AdminUser, session: Session
+    ingredient_id: uuid.UUID, alias_id: uuid.UUID, admin: ModeratorUser, session: Session
 ) -> Response:
     """Stop matching lines by this name. Lines already matched keep their
     ingredient; new ones written this way become an ingredient of their own."""
@@ -493,7 +493,7 @@ class ParentIn(BaseModel):
 
 @router.put("/{ingredient_id}/parent", response_model=Named, dependencies=[SameOrigin])
 async def set_parent(
-    ingredient_id: uuid.UUID, body: ParentIn, admin: AdminUser, session: Session
+    ingredient_id: uuid.UUID, body: ParentIn, admin: ModeratorUser, session: Session
 ) -> Named:
     """Put this ingredient under another, or under nothing; answers with
     the ingredient."""

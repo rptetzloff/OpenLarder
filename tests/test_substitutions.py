@@ -24,7 +24,7 @@ async def work(adb):
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -204,7 +204,7 @@ async def test_only_admins_change_swaps_and_diets(admin, work, adb) -> None:
     await _add(admin, work, "Cake", "1", ["Butter", "Ghee"])
     sides = ({"ingredient_id": await _id(adb, "Butter")}, {"ingredient_id": await _id(adb, "Ghee")})
     swap = (await _swap(admin, *sides)).json()
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await _swap(admin, *sides, source_edition_id=str(E))).status_code == 403
     assert (await admin.delete(f"/api/substitutions/{swap['id']}")).status_code == 403
     assert (await admin.post("/api/diets", json={"name": "Keto"})).status_code == 403

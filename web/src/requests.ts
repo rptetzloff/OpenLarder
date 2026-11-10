@@ -1,5 +1,7 @@
+import type { Role } from "./me";
+
 // Requests for a book to be indexed (routers/book_requests.py): asking,
-// voting, claiming; and, for admins, who may claim.
+// voting, claiming; and, for moderators up, people's roles (roles.py).
 
 export type State = "open" | "claimed" | "done" | "declined";
 
@@ -34,9 +36,11 @@ export interface Asked {
 export interface Person {
   id: string;
   name: string | null;
-  is_enterer: boolean;
-  is_admin: boolean;
+  role: Role;
   claims: number;
+  created_at: string;
+  // Whether you may change their role.
+  changeable: boolean;
 }
 
 async function send<T>(url: string, method: string, body?: unknown): Promise<T> {
@@ -71,8 +75,8 @@ export const markDone = (id: string) => send<BookRequest>(`/api/requests/${id}/d
 export const decline = (id: string, reason: string) =>
   send<BookRequest>(`/api/requests/${id}/decline`, "POST", { reason });
 
-export const findPeople = (q: string) =>
-  send<Person[]>(`/api/admin/people?q=${encodeURIComponent(q)}`, "GET");
+export const findPeople = (q: string, role: Role | "") =>
+  send<Person[]>(`/api/admin/people?q=${encodeURIComponent(q)}${role ? `&role=${role}` : ""}`, "GET");
 
-export const setEnterer = (id: string, is_enterer: boolean) =>
-  send<Person>(`/api/admin/people/${id}/enterer`, "PUT", { is_enterer });
+export const setRole = (id: string, role: Role) =>
+  send<Person>(`/api/admin/people/${id}/role`, "PUT", { role });

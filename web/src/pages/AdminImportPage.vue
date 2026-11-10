@@ -154,7 +154,7 @@ function download() {
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" current="/admin/import" />
+  <AdminBar v-if="user?.may_edit" :user="user" current="/admin/import" />
   <article class="wide">
     <nav class="crumbs" aria-label="Breadcrumb">
       <a href="/admin">Admin</a>
@@ -168,7 +168,7 @@ function download() {
         what's in them. <a href="/admin/imports">Import history</a>
       </p>
     </div>
-    <p v-if="!user?.is_admin" class="status">Only an admin can import.</p>
+    <p v-if="!user?.may_run" class="status">Only an administrator can import.</p>
 
     <template v-else-if="stage === 'pick'">
       <form class="recipe-form tool-panel import-form" @submit.prevent="read">

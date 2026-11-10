@@ -3,9 +3,9 @@
 -- a group. Their session tokens are fixed and known, so this is for a
 -- throwaway database only: CI's, or a local one.
 WITH people AS (
-  INSERT INTO users (issuer, subject, display_name, is_admin)
-  VALUES ('a11y-check', 'admin', 'Ada Admin', true),
-         ('a11y-check', 'cook', 'Cy Cook', false)
+  INSERT INTO users (issuer, subject, display_name, role)
+  VALUES ('a11y-check', 'admin', 'Ada Admin', 'owner'),
+         ('a11y-check', 'cook', 'Cy Cook', 'user')
   ON CONFLICT (issuer, subject) DO UPDATE SET display_name = EXCLUDED.display_name
   RETURNING id, subject
 )

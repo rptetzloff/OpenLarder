@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from joserfc.errors import JoseError
 from pydantic import BaseModel
 
+from openlarder import roles
 from openlarder.auth import (
     CALLBACK_PATH,
     SESSION_COOKIE,
@@ -49,9 +50,14 @@ class Me(BaseModel):
     suggested_name: str | None
     # Where to manage sign-in methods and passkeys: Authgear's own page.
     account_url: str | None
-    # May add to the catalog directly, until review exists.
-    is_admin: bool
-    is_enterer: bool = False
+    # Their role (roles.py), and what it lets them do, so the SPA needn't
+    # know the ladder: edit the catalog (moderator), run the site (admin),
+    # claim requests (contributor), and the roles they may give.
+    role: str
+    may_edit: bool
+    may_run: bool
+    may_claim: bool
+    grants: list[str]
     # Their buy-link shops: {"order": [...], "hidden": [...]}, or None.
     shops: dict | None = None
 
@@ -63,8 +69,11 @@ def me_for(user: User, settings: Settings) -> Me:
         display_name=user.display_name,
         suggested_name=user.suggested_name if user.display_name is None else None,
         account_url=issuer.rstrip("/") + "/settings" if issuer else None,
-        is_admin=user.is_admin,
-        is_enterer=user.is_enterer,
+        role=user.role,
+        may_edit=user.may_edit,
+        may_run=user.at_least("admin"),
+        may_claim=user.may_claim,
+        grants=roles.grantable(user.role),
         shops=user.shop_preferences,
     )
 

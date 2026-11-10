@@ -212,12 +212,14 @@ async def test_only_a_family_collection_is_deleted_this_way(people, adb) -> None
 # Everyone else's
 
 
-@pytest.mark.parametrize("who", ["nobody", "bob", "admin"])
+@pytest.mark.parametrize("who", ["nobody", "bob", "moderator", "admin", "owner"])
 async def test_nobody_else_sees_or_changes_it(secret, people, client, who) -> None:
     other = {
         "nobody": lambda: client,
         "bob": lambda: people("bob"),
+        "moderator": lambda: people("mo", role="moderator"),
         "admin": lambda: people("ada", admin=True),
+        "owner": lambda: people("own", role="owner"),
     }[who]()
     other = await other if not isinstance(other, httpx2.AsyncClient) else other
     box, stew = secret["box"], secret["stew"]
@@ -229,9 +231,9 @@ async def test_nobody_else_sees_or_changes_it(secret, people, client, who) -> No
     assert (await other.post(f"/api/sources/{box}/recipes", json=body)).status_code == 404
     assert (await other.put(f"/api/recipes/{stew}", json=body)).status_code == 404
     assert (await other.delete(f"/api/recipes/{stew}")).status_code == 404
-    # The book editor is an admin's: 403 for Bob, and 404 for an admin.
+    # The book editor is a moderator's: 403 for Bob, and 404 for a moderator up.
     editing = await other.put(f"/api/sources/{box}", json={"title": "X"})
-    assert editing.status_code == (404 if who == "admin" else 403)
+    assert editing.status_code == (403 if who == "bob" else 404)
     assert (await other.patch(f"/api/sources/{box}/family", json={"title": "X"})).status_code == 404
     assert (await other.delete(f"/api/sources/{box}")).status_code == 404
     assert (await other.get(f"/api/recipes/{stew}/flags")).status_code == 404
@@ -365,15 +367,16 @@ async def test_a_public_collection_is_still_only_its_owners_to_change(people, ad
     assert (await bob.post(f"/api/sources/{book}/recipes", json=body)).status_code == 403
 
 
-def test_an_admin_may_not_change_a_private_collection() -> None:
+@pytest.mark.parametrize("role", ["moderator", "admin", "owner"])
+def test_no_role_may_change_a_private_collection(role) -> None:
     """Can't happen through the routes, which hide it from them first; the
-    rule says so anyway."""
-    ann, ada = User(id=uuid.uuid4()), User(id=uuid.uuid4(), is_admin=True)
+    rule says so anyway, for every role up to the owner."""
+    ann, ada = User(id=uuid.uuid4(), role="user"), User(id=uuid.uuid4(), role=role)
     box = Source(kind="family", owner_id=ann.id, private=True)
     assert (visibility.may_manage(ann, box), visibility.may_manage(ada, box)) == (True, False)
     box.private = False
     assert visibility.may_manage(ada, box)
-    # Only a family collection is managed this way; a book is edited by admins.
+    # Only a family collection is managed this way; a book is edited by moderators.
     assert not visibility.may_manage(ada, Source(kind="book"))
 
 

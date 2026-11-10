@@ -228,19 +228,26 @@ def wikidata(configure, monkeypatch) -> FakeWikidata:
 
 @pytest.fixture
 async def people(client, adb):
-    """Clients signed in as different people: people("ann", admin=True)."""
+    """Clients signed in as different people: people("ann", admin=True), or
+    people("mo", role="moderator")."""
     async with AsyncExitStack() as stack:
 
-        async def person(name: str, admin: bool = False) -> httpx2.AsyncClient:
+        async def person(
+            name: str, admin: bool = False, role: str | None = None
+        ) -> httpx2.AsyncClient:
             token = f"token-{name}-{uuid.uuid4().hex}"
             await adb.execute(
                 text(
-                    "WITH u AS (INSERT INTO users (issuer, subject, display_name, is_admin)"
+                    "WITH u AS (INSERT INTO users (issuer, subject, display_name, role)"
                     " VALUES ('test', :n, :n, :a) RETURNING id)"
                     " INSERT INTO user_sessions (user_id, token_hash, expires_at)"
                     " SELECT id, :h, now() + interval '1 day' FROM u"
                 ),
-                {"n": name, "a": admin, "h": hashlib.sha256(token.encode()).digest()},
+                {
+                    "n": name,
+                    "a": role or ("admin" if admin else "user"),
+                    "h": hashlib.sha256(token.encode()).digest(),
+                },
             )
             c = await stack.enter_async_context(
                 httpx2.AsyncClient(

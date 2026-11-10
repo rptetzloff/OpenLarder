@@ -21,7 +21,9 @@ async function loadCounts() {
   const [flags, suggestions, runs] = await Promise.allSettled([
     fetchFlags({ scope: "all", state: "open" }),
     fetchSuggestions({ state: "open" }),
-    fetch("/api/import/runs").then((r) => (r.ok ? r.json() : Promise.reject())),
+    props.user?.may_run
+      ? fetch("/api/import/runs").then((r) => (r.ok ? r.json() : Promise.reject()))
+      : Promise.reject(),
   ]);
   if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
   if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
@@ -29,7 +31,7 @@ async function loadCounts() {
 }
 // Who's signed in arrives after the page mounts.
 watch(
-  () => props.user?.is_admin,
+  () => props.user?.may_edit,
   (yes) => {
     if (yes) loadCounts();
   },
@@ -119,13 +121,13 @@ async function archiveAll() {
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" current="/admin" />
+  <AdminBar v-if="user?.may_edit" :user="user" current="/admin" />
   <article class="wide admin-page">
     <div class="list-head">
       <h1>Admin</h1>
       <p class="muted">Keeping the catalog in order: what's been flagged or suggested, and imports.</p>
     </div>
-    <p v-if="!user?.is_admin" class="status">This is for admins.</p>
+    <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
       <ul class="link-cards">
         <li>
@@ -142,31 +144,31 @@ async function archiveAll() {
             <p>Ingredients a local model thinks are the same, or belong under another.</p>
           </a>
         </li>
-        <li>
+        <li v-if="user.may_run">
           <a href="/admin/import">
             <h2>Bulk import</h2>
             <p>Add books and recipes from a book list and a recipe list.</p>
           </a>
         </li>
-        <li>
+        <li v-if="user.may_run">
           <a href="/admin/api">
             <h2>API usage</h2>
             <p>Programs reading the API, busiest first, to spot abuse; keys can be revoked there.</p>
           </a>
         </li>
-        <li>
+        <li v-if="user.may_run">
           <a href="/admin/clicks">
             <h2>Buy-link clicks</h2>
             <p>Clicks on the shops' links, by shop, book, page and day.</p>
           </a>
         </li>
         <li>
-          <a href="/admin/enterers">
-            <h2>Enterers</h2>
-            <p>Who may claim book requests to queue them up.</p>
+          <a href="/admin/people">
+            <h2>People and roles</h2>
+            <p>Contributors, moderators and administrators, and who can make whom one.</p>
           </a>
         </li>
-        <li>
+        <li v-if="user.may_run">
           <a href="/admin/imports">
             <h2>Import history</h2>
             <p class="count">{{ n(imports, "import", "imports") }}</p>

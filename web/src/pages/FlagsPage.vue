@@ -16,7 +16,7 @@ const page = ref<FlagPage | null>(null);
 const flags = ref<Flag[]>([]);
 const failed = ref(false);
 const loading = ref(false);
-const allowed = computed(() => (props.scope === "all" ? !!props.user?.is_admin : !!props.user));
+const allowed = computed(() => (props.scope === "all" ? !!props.user?.may_edit : !!props.user));
 const openTotal = computed(() =>
   Object.values(page.value?.open_by_kind ?? {}).reduce((a, b) => a + b, 0),
 );
@@ -60,7 +60,7 @@ watch(allowed, (yes) => {
 </script>
 
 <template>
-  <AdminBar v-if="scope === 'all' && user?.is_admin" current="/admin/flags" />
+  <AdminBar v-if="scope === 'all' && user?.may_edit" :user="user" current="/admin/flags" />
   <article class="wide">
     <nav class="crumbs" aria-label="Breadcrumb">
       <a v-if="scope === 'all'" href="/admin">Admin</a>
@@ -76,7 +76,7 @@ watch(allowed, (yes) => {
       </p>
     </div>
     <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see flags.</p>
-    <p v-else-if="!allowed" class="status">This is for admins.</p>
+    <p v-else-if="!allowed" class="status">This is for moderators.</p>
     <template v-else>
       <div class="list-filters">
         <div class="kind-filter" role="group" aria-label="Show">

@@ -182,7 +182,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         what="recipe"
         :selected="recipe.tags.filter((t) => !t.from_source).map((t) => t.id)"
         :inherited="recipe.tags.filter((t) => t.from_source).map((t) => t.id)"
-        :can-add="!!user?.is_admin"
+        :can-add="!!user?.may_edit"
         :save="saveTags"
       />
 
@@ -319,11 +319,11 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </ul>
           </section>
 
-          <section v-if="recipe.swaps.length || user?.is_admin" class="recipe-section">
+          <section v-if="recipe.swaps.length || user?.may_edit" class="recipe-section">
             <div class="table-head">
               <h2>Swaps</h2>
               <button
-                v-if="user?.is_admin && !addingSwap"
+                v-if="user?.may_edit && !addingSwap"
                 type="button"
                 class="link"
                 @click="addingSwap = true"
@@ -334,12 +334,12 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <SwapList
               v-if="recipe.swaps.length"
               :swaps="recipe.swaps"
-              :can-edit="!!user?.is_admin"
+              :can-edit="!!user?.may_edit"
               @removed="(id) => (recipe!.swaps = recipe!.swaps.filter((s) => s.id !== id))"
             />
             <p v-else class="status">None recorded yet.</p>
             <SwapForm
-              v-if="user?.is_admin && addingSwap"
+              v-if="user?.may_edit && addingSwap"
               :choices="swapChoices"
               :book-id="recipe.source.id"
               :edition-id="firstPage?.edition_id"
@@ -365,7 +365,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <div v-if="recipe.editable" class="recipe-actions">
             <a :href="`/recipes/${recipe.id}/edit`" class="button-outline">Edit</a>
             <button type="button" class="secondary" @click="remove">Remove</button>
-            <template v-if="recipe.web_page && user?.is_admin">
+            <template v-if="recipe.web_page && user?.may_edit">
               <button
                 v-if="!recipe.web_page.archive_url"
                 type="button"

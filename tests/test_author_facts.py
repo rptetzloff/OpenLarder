@@ -11,7 +11,7 @@ from openlarder import wikidata as wikidata_client
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -140,7 +140,7 @@ async def test_a_bad_reference_is_refused_or_clears(admin, adb, wikidata, refere
 
 async def test_only_admins_ask_wikidata(admin, adb, wikidata) -> None:
     someone = await _author(adb, "Someone", ol="OL218264A")
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await admin.post("/api/authors/wikidata")).status_code == 403
     assert (
         await admin.put(f"/api/authors/{someone}/wikidata", json={"reference": "Q214477"})

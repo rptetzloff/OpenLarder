@@ -1,18 +1,24 @@
 <script setup lang="ts">
 // The yellow band under the header on admin pages and Sources: every admin
-// page, with the one you're on marked. Only rendered for an admin.
-defineProps<{ current?: string }>();
+// page they may use, with the one you're on marked. Only rendered for a
+// moderator or above; the administrators' pages only for them.
+import { computed } from "vue";
+import type { Me } from "../me";
 
+const props = defineProps<{ current?: string; user: Me }>();
+
+// [href, label, administrators only]
 const LINKS = [
-  ["/admin", "Overview"],
-  ["/admin/import", "Bulk import"],
-  ["/admin/imports", "Import history"],
-  ["/admin/flags", "Flagged recipes"],
-  ["/admin/suggestions", "Suggestions"],
-  ["/admin/api", "API usage"],
-  ["/admin/clicks", "Buy-link clicks"],
-  ["/admin/enterers", "Enterers"],
+  ["/admin", "Overview", false],
+  ["/admin/import", "Bulk import", true],
+  ["/admin/imports", "Import history", true],
+  ["/admin/flags", "Flagged recipes", false],
+  ["/admin/suggestions", "Suggestions", false],
+  ["/admin/people", "People", false],
+  ["/admin/api", "API usage", true],
+  ["/admin/clicks", "Buy-link clicks", true],
 ] as const;
+const links = computed(() => LINKS.filter(([, , run]) => !run || props.user.may_run));
 </script>
 
 <template>
@@ -21,7 +27,7 @@ const LINKS = [
       <div class="bar">
         <strong>Admin</strong>
         <a
-          v-for="[href, label] in LINKS"
+          v-for="[href, label] in links"
           :key="href"
           :href="href"
           :aria-current="href === current ? 'page' : undefined"

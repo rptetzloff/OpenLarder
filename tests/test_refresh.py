@@ -42,7 +42,7 @@ def test_open_library_names_are_cleaned(raw, name, kind) -> None:
 @pytest.fixture
 async def admin(client, broker, adb, openlib):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     # The edition by its own key, as a check asks for it.
     openlib.records[EDITION] = copy.deepcopy(openlib.records[f"/isbn/{PINK_CAKE}.json"])
     return client
@@ -223,7 +223,7 @@ async def test_open_library_failing_changes_nothing(admin, openlib, adb, fail, s
 
 async def test_only_admins_check(admin, adb) -> None:
     book = await _pink_cake(admin)
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await _check(admin, book)).status_code == 403
     take = await admin.post(f"/api/sources/{book}/open-library/take", json={"keys": []})
     assert take.status_code == 403

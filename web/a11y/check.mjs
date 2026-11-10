@@ -188,7 +188,7 @@ function pages(s) {
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],
     ["/admin/clicks", "admin"],
-    ["/admin/enterers", "admin"],
+    ["/admin/people", "admin"],
     ["/requests", null],
     ["/requests", "cook"],
     ["/admin/suggestions", "cook"],

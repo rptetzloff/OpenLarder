@@ -19,7 +19,7 @@ from openlarder import isbn, openlibrary
 @pytest.fixture
 async def admin(client, broker, adb, openlib):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 

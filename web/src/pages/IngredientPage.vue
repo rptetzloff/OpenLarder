@@ -151,7 +151,7 @@ onMounted(() => load());
     <p v-else-if="failed" role="alert">This ingredient couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!ingredient" class="status">Loading…</p>
     <template v-else>
-      <Teleport v-if="user?.is_admin" to="#admin-bar" defer>
+      <Teleport v-if="user?.may_edit" to="#admin-bar" defer>
         <div class="admin-bar">
           <div class="bar">
             <strong>Admin</strong>
@@ -211,7 +211,7 @@ onMounted(() => load());
               <template v-if="i > 0"> · </template>
               <span>{{ a.name }}</span>
               <button
-                v-if="user?.is_admin"
+                v-if="user?.may_edit"
                 type="button"
                 class="link remove-alias"
                 :aria-label="`Stop matching ${a.name}`"
@@ -264,11 +264,11 @@ onMounted(() => load());
         </button>
       </section>
 
-      <section v-if="ingredient.swaps.length || user?.is_admin" class="source-section">
+      <section v-if="ingredient.swaps.length || user?.may_edit" class="source-section">
         <div class="table-head">
           <h2>Swaps</h2>
           <button
-            v-if="user?.is_admin && !addingSwap"
+            v-if="user?.may_edit && !addingSwap"
             type="button"
             class="link"
             @click="addingSwap = true"
@@ -279,18 +279,18 @@ onMounted(() => load());
         <SwapList
           v-if="ingredient.swaps.length"
           :swaps="ingredient.swaps"
-          :can-edit="!!user?.is_admin"
+          :can-edit="!!user?.may_edit"
           @removed="(id) => (ingredient!.swaps = ingredient!.swaps.filter((s) => s.id !== id))"
         />
         <p v-else class="status">None recorded yet.</p>
         <SwapForm
-          v-if="user?.is_admin && addingSwap"
+          v-if="user?.may_edit && addingSwap"
           :choices="[{ kind: 'ingredient', id: ingredient.id, name: ingredient.name }]"
           @added="(s) => ingredient!.swaps.push(s)"
         />
       </section>
 
-      <section v-if="user?.is_admin" class="fix-ingredient source-section">
+      <section v-if="user?.may_edit" class="fix-ingredient source-section">
         <h2>Fix this ingredient</h2>
         <p class="status">
           A recipe matched to the wrong ingredient is fixed on the recipe, by correcting its line.
