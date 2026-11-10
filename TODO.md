@@ -353,7 +353,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         (`larder=true`) counts what you have and low, each as itself and
         everything above it. Private: not history, dumps or the API's
         public reads. An ingredient merge keeps larder items.
-      - [ ] Sharing lists with household groups, view or edit by group role.
+      - [x] Sharing with household groups (#118): an owner picks which of
+        their groups see each list; view members see it, edit and admin
+        members change what's on it; renaming, removing and sharing stay the
+        owner's. Search with your larder counts the lists shared with you.
       - [ ] A book shelf ("books I own") alongside, Phase 2.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged

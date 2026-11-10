@@ -156,6 +156,10 @@ async function seed() {
   await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: "Aged cheddar" });
   await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: "Grandma's mystery jar" });
   const butter = await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: "Butter" });
+  // Cy shares his pantry with his family group, which Ada joins to view.
+  await api(`/api/larder/lists/${pantry.id}/groups`, "cook", { groups: [group.id] }, "PUT");
+  const seat = await api(`/api/groups/${group.id}/invites`, "cook", { role: "view" });
+  await api(`/api/invites/${seat.token}/accept`, "admin", {});
   await api(`/api/larder/items/${butter.id}`, "cook", { state: "out" }, "PATCH");
   // Requests: one asked for twice, one claimed, one declined.
   await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
@@ -233,6 +237,7 @@ function pages(s) {
     ["/admin/suggestions", "cook"],
     ["/data", null],
     ["/larder", "cook"],
+    ["/larder", "admin"],
     ["/search?larder=1", "cook"],
     ["/larder", null],
     ["/privacy", null],

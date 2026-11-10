@@ -55,6 +55,7 @@ from openlarder.routers.ingredients import (
     recipes_where,
     with_pages,
 )
+from openlarder.routers.larder import seen_list_ids
 from openlarder.tagging import MAX_TAGS
 
 router = APIRouter(prefix="/api/search", tags=["search"])
@@ -234,15 +235,15 @@ async def search(
 
 
 async def larder_ingredients(session: Session, viewer) -> list[uuid.UUID]:
-    """The ingredients the viewer's larder has (have or running low), of those
-    they may see."""
+    """The ingredients the viewer's larder has (have or running low): their
+    lists and those shared with them, of the ingredients they may see."""
     return list(
         await session.scalars(
             select(func.distinct(LarderItem.ingredient_id))
             .join(LarderList, LarderList.id == LarderItem.list_id)
             .join(Ingredient, Ingredient.id == LarderItem.ingredient_id)
             .where(
-                LarderList.owner_id == viewer.id,
+                LarderList.id.in_(seen_list_ids(viewer)),
                 LarderItem.state.in_(("have", "low")),
                 visibility.ingredients_seen_by(viewer),
             )

@@ -13,16 +13,30 @@ export interface Item {
   updated_at: string;
 }
 
+export interface GroupRef {
+  id: string;
+  name: string;
+}
+
 export interface List {
   id: string;
   name: string;
   position: number;
   items: Item[];
+  // Yours, or shared with you by its owner.
+  mine: boolean;
+  owner_name: string | null;
+  // Whether you may change what's on it.
+  editable: boolean;
+  // The groups it's shared with: all for its owner, yours otherwise.
+  shared_with: GroupRef[];
 }
 
 export interface Larder {
   lists: List[];
   counted: number;
+  // Your groups, to share a list with.
+  groups: GroupRef[];
 }
 
 async function send<T>(url: string, method = "GET", body?: unknown): Promise<T> {
@@ -50,6 +64,8 @@ export const changeItem = (
   change: { name?: string; state?: State; list_id?: string; ingredient_id?: string },
 ) => send<Item>(`/api/larder/items/${id}`, "PATCH", change);
 export const removeItem = (id: string) => send<void>(`/api/larder/items/${id}`, "DELETE");
+export const shareList = (id: string, groups: string[]) =>
+  send<List>(`/api/larder/lists/${id}/groups`, "PUT", { groups });
 
 export const STATES: { state: State; label: string }[] = [
   { state: "have", label: "Have" },

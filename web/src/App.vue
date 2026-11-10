@@ -2256,6 +2256,27 @@ button.primary.small {
   background: var(--bg);
   color: var(--fg);
 }
+.larder-shared {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+}
+.larder-share {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+.larder-share legend {
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+.larder-share .check {
+  display: block;
+}
+.larder-state {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+}
 .larder-summary .button-outline {
   margin-left: 0.5rem;
 }
