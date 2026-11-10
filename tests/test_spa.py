@@ -66,8 +66,8 @@ def test_configured_meta_tags_go_in_every_pages_head(tmp_path) -> None:
         response = spa_response(tmp_path, path, tags)
         page = response.body.decode()
         assert (
-            '<meta name="impact-site-verification" content="56d1-abc" value="56d1-abc" />'
-            '<meta name="google-site-verification" content="a&quot;b" value="a&quot;b" />'
+            '<meta name="impact-site-verification" value="56d1-abc" content="56d1-abc" />'
+            '<meta name="google-site-verification" value="a&quot;b" content="a&quot;b" />'
             "</head>"
         ) in page
         assert response.headers["cache-control"] == "no-cache"
