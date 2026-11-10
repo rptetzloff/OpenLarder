@@ -99,7 +99,10 @@ document.title = "Privacy policy · OpenLarder";
       <li>
         the identifier Authgear gives your account, which is how OpenLarder recognises you;
       </li>
-      <li>your account's role: contributor, moderator or administrator, if it has one;</li>
+      <li>
+        your account's role: contributor, moderator or administrator, if it has one, and, for a
+        contributor, whether they're trusted and who decided it;
+      </li>
       <li>when you accepted the contributor agreement, and which version of it, if you have;</li>
       <li>
         your larder, if you keep one: your lists' names, and each thing's name, the ingredient

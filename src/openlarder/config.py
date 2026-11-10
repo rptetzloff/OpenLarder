@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     # How long a dump is kept before it's deleted from the bucket and the
     # list. *Ray, 2026-11-10: 12 months; R2's free space is limited.*
     dumps_keep_days: int = Field(default=365, ge=7)
+    # What makes a contributor trusted (trust.py): approved recipes, across
+    # this many different books, both. *Ray, 2026-11-10: "the greater of 250
+    # recipes or 5 books".*
+    trust_recipes: int = Field(default=250, ge=1)
+    trust_books: int = Field(default=5, ge=1)
     # Page-view counts with Umami (analytics.py): its tracker script's
     # address (https://stats.example.com/script.js) and the site's id there.
     # Both or none; none, and nothing is counted.

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import { type Me, type Role, ROLE_LABELS } from "../me";
-import { type Person, findPeople, setRole } from "../requests";
+import { type Person, findPeople, setRole, setTrust } from "../requests";
 
 // People and their roles (roles.py). *Ray, 2026-11-10:* a moderator makes
 // contributors, an administrator makes moderators, the owner makes
@@ -51,6 +51,24 @@ async function change(p: Person, role: Role) {
   }
 }
 
+const TRUST: Record<string, string> = {
+  earned: "Trusted (earned)",
+  granted: "Trusted",
+  withheld: "Not trusted",
+};
+async function trustIt(p: Person, trust: "granted" | "withheld" | null) {
+  busy.value = true;
+  error.value = "";
+  try {
+    const now = await setTrust(p.id, trust);
+    people.value = (people.value ?? []).map((x) => (x.id === p.id ? now : x));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 watch(only, () => {
   q.value = "";
   load();
@@ -69,7 +87,9 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
     <div class="list-head">
       <h1>People and roles</h1>
       <p class="muted">
-        Contributors claim <a href="/requests">requests</a> to queue them up. Moderators edit the
+        Contributors claim <a href="/requests">requests</a> to queue them up, and their additions
+        wait for review until they're trusted: earned by enough approved recipes, or given here.
+        Withholding it sticks; clearing it lets it be earned again. Moderators edit the
         catalog and work the flags and suggestions. Administrators also run imports and watch the
         API and buy links. You can give or take away only the roles below your own, and the owner
         is set outside the site.
@@ -107,6 +127,7 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
           <tr>
             <th scope="col">Name</th>
             <th scope="col">Role</th>
+            <th scope="col">Trust</th>
             <th scope="col" class="numeric">Claims</th>
             <th scope="col">Joined</th>
           </tr>
@@ -128,6 +149,42 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
                 </select>
               </template>
               <template v-else>{{ ROLE_LABELS[p.role] }}</template>
+            </td>
+            <td>
+              <span class="cell-label">Trust </span>
+              <template v-if="p.role === 'contributor'">
+                {{ p.trust ? TRUST[p.trust] : "Waits for review" }}
+                <span v-if="p.id !== user.id" class="trust-actions">
+                  <button
+                    v-if="p.trust !== 'granted' && p.trust !== 'earned'"
+                    type="button"
+                    class="link"
+                    :disabled="busy"
+                    @click="trustIt(p, 'granted')"
+                  >
+                    Trust
+                  </button>
+                  <button
+                    v-if="p.trust !== 'withheld'"
+                    type="button"
+                    class="link"
+                    :disabled="busy"
+                    @click="trustIt(p, 'withheld')"
+                  >
+                    Withhold
+                  </button>
+                  <button
+                    v-if="p.trust"
+                    type="button"
+                    class="link"
+                    :disabled="busy"
+                    @click="trustIt(p, null)"
+                  >
+                    Clear
+                  </button>
+                </span>
+              </template>
+              <template v-else>—</template>
             </td>
             <td class="numeric"><span class="cell-label">Claims </span>{{ p.claims }}</td>
             <td><span class="cell-label">Joined </span>{{ day(p.created_at) }}</td>

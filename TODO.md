@@ -177,7 +177,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         through "revert:<change>", so it can be undone in turn. Refused when
         a later change touched the same records (undo that first), or for a
         removal recorded before migration 0042 kept whole rows.
-      - [ ] Then trust levels and a report button. The ingredient matching
+      - [x] Trust levels (#119). *Ray, 2026-11-10: "the greater of 250
+        recipes or 5 books".* A contributor with at least 250 approved
+        recipes across at least 5 books is trusted when the approval that
+        gets them there is made; what they add then publishes at once (still
+        in the history, still undoable; changes to published records still
+        go as proposals). Moderators grant or withhold it on People;
+        withheld sticks, cleared lets it be earned again. Settings
+        `OPENLARDER_TRUST_RECIPES` and `OPENLARDER_TRUST_BOOKS`. The
+        contributor agreement says so (version 2026-11-10.2, asked again).
+      - [ ] A report button on every public record, for anyone (*Ray,
+        2026-11-10*), into a moderators' queue. The ingredient matching
         flow's suggestions and "new ingredient" step wait on this too.
       - [ ] Edit history keeps everything forever: check its size once the
         household index is imported again (~400,000 rows for 19,000 recipes).

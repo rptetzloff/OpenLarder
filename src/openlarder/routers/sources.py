@@ -609,7 +609,7 @@ async def _mark_new(session, user: User, source_id: uuid.UUID) -> None:
     """Who added a new book; a contributor's waits for a moderator."""
     source = await session.get_one(Source, source_id)
     source.created_by = user.id
-    if not user.may_edit:
+    if not user.publishes_directly:
         source.review = "pending"
 
 

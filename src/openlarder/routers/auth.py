@@ -61,6 +61,8 @@ class Me(BaseModel):
     # Whether they've accepted the contributor agreement as it reads now,
     # which adding to the catalog needs (agreement.py).
     agreed: bool = False
+    # A contributor whose additions publish without review (trust.py).
+    trusted: bool = False
     # Their buy-link shops: {"order": [...], "hidden": [...]}, or None.
     shops: dict | None = None
 
@@ -78,6 +80,7 @@ def me_for(user: User, settings: Settings) -> Me:
         may_claim=user.may_claim,
         grants=roles.grantable(user.role),
         agreed=agreement.has_agreed(user),
+        trusted=user.trusted,
         shops=user.shop_preferences,
     )
 

@@ -2193,6 +2193,9 @@ button.primary.small {
     justify-content: flex-start;
   }
 }
+.trust-actions .link {
+  margin-left: 0.5rem;
+}
 .people-table select {
   font: inherit;
   padding: 0.25rem 0.5rem;

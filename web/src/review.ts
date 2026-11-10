@@ -46,6 +46,17 @@ export const approveAll = (sourceId: string) =>
 
 export const myContributions = () => send<Group[]>("/api/account/contributions");
 
+// How near you are to trusted (trust.py).
+export interface Trust {
+  trusted: boolean;
+  trust: "earned" | "granted" | "withheld" | null;
+  recipes: number;
+  books: number;
+  needs_recipes: number;
+  needs_books: number;
+}
+export const myTrust = () => send<Trust>("/api/account/trust");
+
 // Proposed changes to published recipes and sources (routers/proposals.py).
 export interface Difference {
   label: string;

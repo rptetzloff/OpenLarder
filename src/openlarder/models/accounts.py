@@ -57,6 +57,7 @@ class User(Timestamps, Base):
             "role IN ('user', 'contributor', 'moderator', 'admin', 'owner')", name="role_known"
         ),
         CheckConstraint("(agreed_at IS NULL) = (agreed_version IS NULL)", name="agreement_whole"),
+        CheckConstraint("trust IN ('earned', 'granted', 'withheld')", name="trust_known"),
         # Unique ignoring case, so "Sarah" and "sarah" are one name. The rest
         # of the rules (allowed characters, reserved names) live in names.py.
         Index("uq_users_display_name_lower", func.lower(text("display_name")), unique=True),
@@ -81,6 +82,14 @@ class User(Timestamps, Base):
     # (agreement.py); none until then. Needed to add to the catalog.
     agreed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     agreed_version: Mapped[str | None] = mapped_column(Text)
+    # A contributor whose additions publish without review (trust.py):
+    # earned by approvals, granted by a moderator, or withheld by one (which
+    # sticks). None until then. Migration 0048.
+    trust: Mapped[str | None] = mapped_column(Text)
+    trust_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    trust_set_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
 
     def at_least(self, role: "roles.Role") -> bool:
         return roles.at_least(self.role, role)
@@ -89,6 +98,16 @@ class User(Timestamps, Base):
     def may_edit(self) -> bool:
         """Edits the catalog directly: a moderator or above."""
         return self.at_least("moderator")
+
+    @property
+    def trusted(self) -> bool:
+        return self.trust in ("earned", "granted")
+
+    @property
+    def publishes_directly(self) -> bool:
+        """What they add is published at once: a moderator or above, or a
+        trusted contributor; everyone else's waits for review."""
+        return self.may_edit or (self.may_claim and self.trusted)
 
     @property
     def may_claim(self) -> bool:

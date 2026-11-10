@@ -398,7 +398,7 @@ async function save(another = false) {
       @accepted="accepted = true"
     />
     <template v-else-if="book">
-      <p v-if="!inFamily && user && !user.may_edit" class="muted">
+      <p v-if="!inFamily && user && !user.may_edit && !user.trusted && !propose" class="muted">
         What you add waits for a moderator's review before anyone else sees it.
       </p>
       <ol class="steps" aria-label="Steps">
@@ -790,7 +790,7 @@ async function save(another = false) {
                     ? "A moderator looks at it beside the recipe as it is, and applies it or says why not."
                     : book.private
                       ? "Only you, and the groups you share it with, see it."
-                      : !inFamily && !user?.may_edit
+                      : !inFamily && !user?.may_edit && !user?.trusted
                         ? "It waits for a moderator's review, then publishes as open data under the ODbL."
                         : "It publishes as soon as it's saved, as open data under the ODbL."
                 }}

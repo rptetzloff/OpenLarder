@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { type Group, REVIEW_LABELS, myContributions } from "../review";
+import { type Group, REVIEW_LABELS, type Trust, myContributions, myTrust } from "../review";
 
 // What you've added that's waiting for a moderator, or that they sent back
 // with a reason to fix.
 const groups = ref<Group[] | null>(null);
+const trust = ref<Trust | null>(null);
 const error = ref("");
 
 onMounted(async () => {
+  myTrust()
+    .then((t) => (trust.value = t))
+    .catch(() => {});
   try {
     groups.value = await myContributions();
   } catch (e) {
@@ -19,10 +23,22 @@ onMounted(async () => {
 <template>
   <section class="tool-panel" aria-labelledby="contributions-title">
     <h2 id="contributions-title">Waiting for review</h2>
-    <p class="muted">
-      What you add is seen only by you and the moderators until one approves it. If one is sent
-      back, fix it and it waits again.
+    <p v-if="trust?.trusted" class="status">
+      You're a trusted contributor: what you add publishes at once, and moderators can still change
+      or undo it.
     </p>
+    <template v-else>
+      <p class="muted">
+        What you add is seen only by you and the moderators until one approves it. If one is sent
+        back, fix it and it waits again.
+      </p>
+      <p v-if="trust && trust.trust !== 'withheld'" class="muted">
+        Once {{ trust.needs_recipes.toLocaleString() }} of your recipes are approved, across
+        {{ trust.needs_books }} books, what you add publishes without waiting: so far
+        {{ trust.recipes.toLocaleString() }} recipes in {{ trust.books }}
+        {{ trust.books === 1 ? "book" : "books" }}.
+      </p>
+    </template>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-else-if="!groups" class="status">Loading…</p>
     <ul v-else-if="groups.length" class="review-items">
