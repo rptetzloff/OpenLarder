@@ -25,14 +25,12 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     LargeBinary,
     Text,
-    false,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -40,6 +38,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.schema import UniqueConstraint
 from sqlalchemy.sql import text
 
+from openlarder import roles
 from openlarder.models.base import Base, Timestamps, uuid_pk
 
 
@@ -54,6 +53,9 @@ class User(Timestamps, Base):
             name="display_name_shape",
         ),
         CheckConstraint("suggested_name <> ''", name="suggested_name_not_empty"),
+        CheckConstraint(
+            "role IN ('user', 'contributor', 'moderator', 'admin', 'owner')", name="role_known"
+        ),
         # Unique ignoring case, so "Sarah" and "sarah" are one name. The rest
         # of the rules (allowed characters, reserved names) live in names.py.
         Index("uq_users_display_name_lower", func.lower(text("display_name")), unique=True),
@@ -67,15 +69,26 @@ class User(Timestamps, Base):
     # The sign-in provider's name, kept only to pre-fill that choice:
     # refreshed at each sign-in until a name is chosen, then cleared.
     suggested_name: Mapped[str | None] = mapped_column(Text)
-    # May add to the catalog directly, until review exists (migration 0010).
-    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
-    # May claim book requests and queue them up; a role admins grant
-    # (routers/book_requests.py). *Ray, 2026-11-09.*
-    is_enterer: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    # What they may do: user, contributor, moderator, admin or owner
+    # (roles.py). *Ray, 2026-11-10.*
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
     # Buy-link shops in the order the person wants them, and those they've
     # hidden: {"order": [...], "hidden": [...]} (buying.RETAILERS' keys).
     # None until they choose. *Ray, 2026-11-09.*
     shop_preferences: Mapped[dict | None] = mapped_column(JSONB)
+
+    def at_least(self, role: "roles.Role") -> bool:
+        return roles.at_least(self.role, role)
+
+    @property
+    def may_edit(self) -> bool:
+        """Edits the catalog directly: a moderator or above."""
+        return self.at_least("moderator")
+
+    @property
+    def may_claim(self) -> bool:
+        """Claims book requests: a contributor or above."""
+        return self.at_least("contributor")
 
 
 class UserSession(Base):

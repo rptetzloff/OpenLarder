@@ -15,7 +15,7 @@ const page = ref<SuggestionPage | null>(null);
 const items = ref<Suggestion[]>([]);
 const failed = ref(false);
 const loading = ref(false);
-const allowed = computed(() => !!props.user?.is_admin);
+const allowed = computed(() => !!props.user?.may_edit);
 const openTotal = computed(() =>
   Object.values(page.value?.open_by_kind ?? {}).reduce((a, b) => a + b, 0),
 );
@@ -58,7 +58,7 @@ watch(allowed, (yes) => {
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" current="/admin/suggestions" />
+  <AdminBar v-if="user?.may_edit" :user="user" current="/admin/suggestions" />
   <article class="wide">
     <nav class="crumbs" aria-label="Breadcrumb">
       <a href="/admin">Admin</a>
@@ -76,7 +76,7 @@ watch(allowed, (yes) => {
       </p>
     </div>
     <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see suggestions.</p>
-    <p v-else-if="!allowed" class="status">This is for admins.</p>
+    <p v-else-if="!allowed" class="status">This is for moderators.</p>
     <template v-else>
       <div class="list-filters">
         <div class="kind-filter" role="group" aria-label="Show">

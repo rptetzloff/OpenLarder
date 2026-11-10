@@ -194,7 +194,7 @@ async function add() {
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" />
+  <AdminBar v-if="user?.may_edit" :user="user" />
   <article class="wide sources-page">
     <div class="list-head">
       <div>
@@ -207,7 +207,7 @@ async function add() {
     </div>
 
     <div v-if="user" class="add-panels">
-      <details v-if="user.is_admin" class="add-panel">
+      <details v-if="user.may_edit" class="add-panel">
         <summary>Add a book by ISBN</summary>
         <form class="isbn-form" @submit.prevent="add">
           <label for="isbn">ISBN</label>
@@ -229,7 +229,7 @@ async function add() {
           <p v-if="error" id="isbn-error" class="error" role="alert">{{ error }}</p>
         </form>
       </details>
-      <details v-if="user.is_admin" class="add-panel">
+      <details v-if="user.may_edit" class="add-panel">
         <summary>Add another kind of source</summary>
         <form class="recipe-form site-form" @submit.prevent="addSite">
           <label for="site-kind">What it is</label>
@@ -306,7 +306,7 @@ async function add() {
               which anyone may copy under the ODbL.
             </p>
           </div>
-          <label v-if="user.is_admin" class="check"
+          <label v-if="user.may_edit" class="check"
             ><input v-model="familyPublic" type="checkbox" /> Public, for everyone</label
           >
           <label class="check"

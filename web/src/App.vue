@@ -8,7 +8,7 @@ import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import AdminApiUsagePage from "./pages/AdminApiUsagePage.vue";
 import AdminClicksPage from "./pages/AdminClicksPage.vue";
-import AdminEnterersPage from "./pages/AdminEnterersPage.vue";
+import AdminPeoplePage from "./pages/AdminPeoplePage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
@@ -57,7 +57,7 @@ const onImports = path === "/admin/imports";
 const onSuggestions = path === "/admin/suggestions";
 const onApiUsage = path === "/admin/api";
 const onClicks = path === "/admin/clicks";
-const onEnterers = path === "/admin/enterers";
+const onPeople = path === "/admin/people";
 const onRequests = path === "/requests";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
@@ -128,7 +128,7 @@ onMounted(async () => {
       </nav>
       <div class="account">
         <template v-if="user">
-          <a v-if="user.is_admin" href="/admin">Admin</a>
+          <a v-if="user.may_edit" href="/admin">Admin</a>
           <a href="/groups">Groups</a>
           <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
           <!-- A form, not fetch: signing out ends at the broker, which ends the
@@ -171,7 +171,7 @@ onMounted(async () => {
     <SuggestionsPage v-else-if="onSuggestions" :user="user" />
     <AdminApiUsagePage v-else-if="onApiUsage" :user="user" />
     <AdminClicksPage v-else-if="onClicks" :user="user" />
-    <AdminEnterersPage v-else-if="onEnterers" :user="user" />
+    <AdminPeoplePage v-else-if="onPeople" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
@@ -2145,8 +2145,17 @@ button.primary.small {
     justify-content: flex-start;
   }
 }
+.people-table select {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
 /* Admin monitoring: API usage and buy-link clicks. */
 .usage-table .numeric,
+.people-table .numeric,
 .clicks-panels .numeric {
   text-align: right;
 }
@@ -2184,6 +2193,7 @@ button.primary.small {
 }
 @media (max-width: 40rem) {
   .usage-table .numeric,
+  .people-table .numeric,
   .clicks-panels .numeric {
     text-align: left;
   }

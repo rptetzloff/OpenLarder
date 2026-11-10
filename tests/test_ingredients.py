@@ -71,7 +71,7 @@ async def work(adb):
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -487,7 +487,7 @@ async def test_deleting_an_alias_stops_it_matching(admin, work, adb, client) -> 
 )
 async def test_only_admins_fix_ingredients(admin, work, adb, method, path, body) -> None:
     await _add(admin, work, "Salsa", "1", ["Lime"])
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     lime = await _id(adb, "Lime")
     response = await admin.request(method, f"/api/ingredients/{lime}{path}", json=body)
     assert response.status_code == 403
@@ -550,7 +550,7 @@ async def test_an_unknown_parent_is_a_404(admin, work, adb) -> None:
 
 async def test_only_admins_set_a_parent(admin, work, adb) -> None:
     await _add(admin, work, "Tea", "1", ["Ginger", "Fresh Ginger"])
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     response = await _parent(admin, await _id(adb, "Fresh Ginger"), await _id(adb, "Ginger"))
     assert response.status_code == 403
 

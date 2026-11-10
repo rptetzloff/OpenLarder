@@ -382,7 +382,7 @@ async function save(another = false) {
         </li>
       </ol>
 
-      <div class="add-layout" :class="{ solo: !user?.is_admin }">
+      <div class="add-layout" :class="{ solo: !user?.may_edit }">
         <div>
           <div v-if="step > 2" class="add-summary">
             <dl>
@@ -741,7 +741,7 @@ async function save(another = false) {
           </section>
         </div>
 
-        <aside v-if="user?.is_admin" class="add-aside" aria-label="Other ways to add">
+        <aside v-if="user?.may_edit" class="add-aside" aria-label="Other ways to add">
           <div v-if="book.kind === 'book' && !recipeId" class="aside-card">
             <h2>Enter a whole book</h2>
             <p>One row per recipe: page, title, ingredients. Each row saves as you go.</p>

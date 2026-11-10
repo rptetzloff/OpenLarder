@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder.auth import AdminUser, CurrentUser, SameOrigin
+from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import RecipeTag, Source, SourceTag, Tag, TagKind
 from openlarder.routers.recipes import _editable_source, _recipe_or_404
@@ -48,7 +48,7 @@ class NewTag(BaseModel):
     status_code=status.HTTP_201_CREATED,
     dependencies=[SameOrigin],
 )
-async def add_tag(body: NewTag, admin: AdminUser, session: Session) -> TagOut:
+async def add_tag(body: NewTag, admin: ModeratorUser, session: Session) -> TagOut:
     name = " ".join(body.name.split())
     if not name:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give the tag a name.")

@@ -22,7 +22,7 @@ async def work(adb):
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -60,7 +60,7 @@ async def test_only_an_admin_adds_a_tag_and_once(admin, adb) -> None:
     assert again.status_code == 409
     blank = await admin.post("/api/tags", json={"kind": "cuisine", "name": " "})
     assert blank.status_code == 422
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     refused = await admin.post("/api/tags", json={"kind": "cuisine", "name": "Uzbek"})
     assert refused.status_code == 403
 
@@ -113,7 +113,7 @@ async def test_a_sources_tags_are_its_recipes_too(admin, client, work) -> None:
 async def test_only_whoever_may_change_it_tags_it(admin, client, broker, work, adb) -> None:
     cake = await _add(admin, work, "Rhubarb Cake")
     dessert = await _tag(client, "course", "Dessert")
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     for path in (f"/api/recipes/{cake}/tags", f"/api/sources/{work}/tags"):
         assert (await admin.put(path, json={"tags": [dessert]})).status_code == 403
 

@@ -150,7 +150,7 @@ onMounted(load);
     <p v-else-if="failed" role="alert">This author couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!author" class="status">Loading…</p>
     <template v-else>
-      <Teleport v-if="user?.is_admin" to="#admin-bar" defer>
+      <Teleport v-if="user?.may_edit" to="#admin-bar" defer>
         <div class="admin-bar">
           <div class="bar">
             <strong>Admin</strong>
@@ -189,7 +189,7 @@ onMounted(load);
           <li v-for="link in author.links" :key="link.id">
             <a :href="link.url" rel="nofollow noopener">{{ link.label ?? link.url }}</a>
             <button
-              v-if="user?.is_admin"
+              v-if="user?.may_edit"
               type="button"
               class="link remove-alias"
               :disabled="busy"
@@ -238,7 +238,7 @@ onMounted(load);
         </ul>
       </section>
 
-      <section v-if="user?.is_admin" class="fix-ingredient source-section">
+      <section v-if="user?.may_edit" class="fix-ingredient source-section">
         <h2>Fix this author</h2>
         <template v-if="author.same_name.length">
           <h3 id="same-name">Possibly the same person</h3>

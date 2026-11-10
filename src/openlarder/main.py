@@ -36,6 +36,7 @@ from openlarder.routers import (
     imports,
     ingredients,
     monitoring,
+    people,
     recipes,
     search,
     sources,
@@ -131,6 +132,7 @@ app.include_router(go.router)
 app.include_router(groups.router)
 app.include_router(ingredients.router)
 app.include_router(monitoring.router)
+app.include_router(people.router)
 app.include_router(search.router)
 app.include_router(substitutions.router)
 app.include_router(suggestions.router)

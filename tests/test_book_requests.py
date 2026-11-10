@@ -7,9 +7,9 @@ from fake_openlibrary import PINK_CAKE
 from openlarder.routers import book_requests
 
 
-async def _make_enterer(adb, name: str) -> None:
+async def _make_contributor(adb, name: str) -> None:
     await adb.execute(
-        text("UPDATE users SET is_enterer = true WHERE display_name = :n"), {"n": name}
+        text("UPDATE users SET role = 'contributor' WHERE display_name = :n"), {"n": name}
     )
 
 
@@ -120,13 +120,13 @@ async def test_a_signed_out_vote_keeps_no_address(client, adb) -> None:
     assert voters.startswith("ip:") and "127.0.0.1" not in voters
 
 
-async def test_only_enterers_claim_and_a_claim_lapses(people, adb) -> None:
+async def test_only_contributors_claim_and_a_claim_lapses(people, adb) -> None:
     ann, bo, cy = await people("ann"), await people("bo"), await people("cy")
     rid = (await ann.post("/api/requests", json={"title": "Jerusalem"})).json()["request"]["id"]
     r = await ann.post(f"/api/requests/{rid}/claim")
-    assert r.status_code == 403 and "admin" in r.json()["detail"]
-    await _make_enterer(adb, "bo")
-    await _make_enterer(adb, "cy")
+    assert r.status_code == 403 and "moderator" in r.json()["detail"]
+    await _make_contributor(adb, "bo")
+    await _make_contributor(adb, "cy")
     claimed = (await bo.post(f"/api/requests/{rid}/claim")).json()
     assert claimed["status"] == "claimed" and claimed["claimed_by"]["name"] == "bo"
     assert (await cy.post(f"/api/requests/{rid}/claim")).status_code == 409
@@ -144,7 +144,7 @@ async def test_only_enterers_claim_and_a_claim_lapses(people, adb) -> None:
 
 async def test_mine_is_what_i_asked_for_or_claimed(client, people, adb) -> None:
     ann, bo = await people("ann"), await people("bo")
-    await _make_enterer(adb, "bo")
+    await _make_contributor(adb, "bo")
     a = (await ann.post("/api/requests", json={"title": "Jerusalem"})).json()["request"]
     b = (await bo.post("/api/requests", json={"title": "Plenty"})).json()["request"]
     await bo.post(f"/api/requests/{a['id']}/claim")
@@ -178,19 +178,6 @@ async def test_done_and_declined_close_a_request(people, adb) -> None:
     assert again["outcome"] == "created"
     counts = (await ann.get("/api/requests")).json()["counts"]
     assert counts == {"open": 1, "done": 1, "declined": 1}
-
-
-async def test_admins_grant_the_enterer_role(people) -> None:
-    ann, ada = await people("ann"), await people("ada", admin=True)
-    assert (await ann.get("/api/admin/people")).status_code == 403
-    found = (await ada.get("/api/admin/people?q=AN")).json()
-    [person] = [p for p in found if p["name"] == "ann"]
-    assert not person["is_enterer"]
-    r = await ada.put(f"/api/admin/people/{person['id']}/enterer", json={"is_enterer": True})
-    assert r.json()["is_enterer"]
-    assert (await ann.get("/api/auth/me")).json()["is_enterer"]
-    listed = {p["name"] for p in (await ada.get("/api/admin/people")).json()}
-    assert listed == {"ann", "ada"}
 
 
 @pytest.mark.parametrize("path", ["vote", "claim", "release"])

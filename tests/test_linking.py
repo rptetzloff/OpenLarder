@@ -40,7 +40,7 @@ def heritage(openlib):
 @pytest.fixture
 async def admin(client, broker, adb, heritage):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -408,9 +408,9 @@ async def test_a_reference_open_library_does_not_have(admin) -> None:
 
 async def test_only_an_admin_can_link(client, broker, heritage, adb) -> None:
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     book = await _manual(client)
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await _preview(client, book, HERITAGE)).status_code == 403
     assert (await _link(client, book, HERITAGE)).status_code == 403
     assert heritage.requests == []

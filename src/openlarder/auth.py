@@ -180,12 +180,21 @@ CurrentUser = Annotated[User, Depends(require_user)]
 Viewer = Annotated[User | None, Depends(current_user)]
 
 
-async def require_admin(user: CurrentUser) -> User:
-    if not user.is_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an admin can do that yet.")
+async def require_moderator(user: CurrentUser) -> User:
+    """Edits the catalog directly (roles.py)."""
+    if not user.may_edit:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a moderator can do that yet.")
     return user
 
 
+async def require_admin(user: CurrentUser) -> User:
+    """Runs the site: imports, monitoring (roles.py)."""
+    if not user.at_least("admin"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an administrator can do that.")
+    return user
+
+
+ModeratorUser = Annotated[User, Depends(require_moderator)]
 AdminUser = Annotated[User, Depends(require_admin)]
 
 

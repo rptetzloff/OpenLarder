@@ -11,7 +11,7 @@ document.title = "API usage · Admin · OpenLarder";
 const days = ref(7);
 const page = ref<UsagePage | null>(null);
 const error = ref("");
-const allowed = computed(() => !!props.user?.is_admin);
+const allowed = computed(() => !!props.user?.may_run);
 const n = (v: number) => v.toLocaleString();
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -40,7 +40,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" current="/admin/api" />
+  <AdminBar v-if="user?.may_edit" :user="user" current="/admin/api" />
   <article class="wide">
     <nav class="crumbs" aria-label="Breadcrumb">
       <a href="/admin">Admin</a>
@@ -55,7 +55,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
         the address itself isn't kept. Kept 30 days.
       </p>
     </div>
-    <p v-if="!user?.is_admin" class="status">This is for admins.</p>
+    <p v-if="!user?.may_run" class="status">This is for administrators.</p>
     <template v-else>
       <div class="kind-filter" role="group" aria-label="Over">
         <button

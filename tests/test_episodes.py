@@ -12,7 +12,7 @@ from fake_broker import _sign_in
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -72,7 +72,7 @@ async def test_a_bad_show_is_refused(admin, body) -> None:
 
 
 async def test_only_admins_add_shows(admin, adb) -> None:
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     response = await admin.post("/api/sources/shows", json={"kind": "podcast", "title": "X"})
     assert response.status_code == 403
 

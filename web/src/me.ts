@@ -1,3 +1,13 @@
+export type Role = "user" | "contributor" | "moderator" | "admin" | "owner";
+
+export const ROLE_LABELS: Record<Role, string> = {
+  user: "User",
+  contributor: "Contributor",
+  moderator: "Moderator",
+  admin: "Administrator",
+  owner: "Owner",
+};
+
 // What /api/auth/me returns. display_name is null until the person chooses
 // one, which the app asks for before anything else.
 export interface Me {
@@ -5,9 +15,14 @@ export interface Me {
   display_name: string | null;
   suggested_name: string | null;
   account_url: string | null;
-  // May add books directly, until review exists.
-  is_admin: boolean;
-  is_enterer: boolean;
+  // Their role, and what it lets them do (roles.py): edit the catalog
+  // (moderator up), run the site (administrator up), claim requests
+  // (contributor up), and the roles they may give or take away.
+  role: Role;
+  may_edit: boolean;
+  may_run: boolean;
+  may_claim: boolean;
+  grants: Role[];
   // Their buy-link shops (shops.ts); null until chosen.
   shops: { order: string[]; hidden: string[] } | null;
 }

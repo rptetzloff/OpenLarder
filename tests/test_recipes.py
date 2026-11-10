@@ -33,7 +33,7 @@ async def book(adb):
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -249,7 +249,7 @@ async def test_only_an_admin_can_write(client, broker, book, adb) -> None:
 
 async def test_a_non_admin_cannot_change_or_remove(admin, client, broker, book, adb) -> None:
     recipe_id = (await _add(admin, book["work"])).json()["id"]
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await admin.put(f"/api/recipes/{recipe_id}", json=_body())).status_code == 403
     assert (await admin.delete(f"/api/recipes/{recipe_id}")).status_code == 403
     assert await adb.scalar(text("SELECT count(*) FROM recipes")) == 1

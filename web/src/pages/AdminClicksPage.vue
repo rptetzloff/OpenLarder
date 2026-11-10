@@ -11,7 +11,7 @@ document.title = "Buy-link clicks · Admin · OpenLarder";
 const days = ref(30);
 const page = ref<ClicksPage | null>(null);
 const error = ref("");
-const allowed = computed(() => !!props.user?.is_admin);
+const allowed = computed(() => !!props.user?.may_run);
 const n = (v: number) => v.toLocaleString();
 // The busiest day's bar is full width.
 const most = computed(() => Math.max(1, ...(page.value?.by_day.map((d) => d.clicks) ?? [1])));
@@ -32,7 +32,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" current="/admin/clicks" />
+  <AdminBar v-if="user?.may_edit" :user="user" current="/admin/clicks" />
   <article class="wide">
     <nav class="crumbs" aria-label="Breadcrumb">
       <a href="/admin">Admin</a>
@@ -46,7 +46,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
         The shops' own reports say what was bought.
       </p>
     </div>
-    <p v-if="!user?.is_admin" class="status">This is for admins.</p>
+    <p v-if="!user?.may_run" class="status">This is for administrators.</p>
     <template v-else>
       <div class="kind-filter" role="group" aria-label="Over">
         <button

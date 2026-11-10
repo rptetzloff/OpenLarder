@@ -11,7 +11,7 @@ from fake_broker import _sign_in
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -213,7 +213,7 @@ async def test_another_books_edition_is_refused(admin) -> None:
 
 async def test_only_admins_edit_books(admin, adb) -> None:
     book = await _book(admin)
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await _edit(admin, book, title="Mine")).status_code == 403
 
 

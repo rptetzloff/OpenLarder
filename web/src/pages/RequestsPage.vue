@@ -13,7 +13,7 @@ import {
 } from "../requests";
 
 // Ask for a book to be indexed, vote for what others asked for, and (as an
-// enterer) claim one to queue it up. *Ray, 2026-11-09.*
+// contributor) claim one to queue it up. *Ray, 2026-11-09.*
 const props = defineProps<{ user: Me | null | undefined }>();
 document.title = "Requests · OpenLarder";
 
@@ -28,7 +28,7 @@ const sort = ref<"votes" | "new">("votes");
 const page = ref<RequestPage | null>(null);
 const error = ref("");
 const busy = ref(false);
-const enters = computed(() => !!(props.user?.is_enterer || props.user?.is_admin));
+const enters = computed(() => !!props.user?.may_claim);
 
 const form = ref({ isbn: "", title: "", author: "", note: "", website: "" });
 const said = ref<{ text: string; href?: string } | null>(null);
@@ -97,7 +97,7 @@ function turnDown(r: BookRequest) {
       <h1>Requests</h1>
       <p class="muted">
         Ask for a cookbook, or another source, to be indexed. If someone asked for it already,
-        yours counts as a vote. Enterers claim a request to queue it up, though anyone may enter it
+        yours counts as a vote. Contributors claim a request to queue it up, though anyone may enter it
         sooner; a claim with nothing done for 30 days is open again.
       </p>
     </div>
@@ -186,7 +186,7 @@ function turnDown(r: BookRequest) {
           <p v-if="r.note" class="request-note">{{ r.note }}</p>
           <p class="muted request-state">
             <template v-if="r.status === 'claimed' && r.claimed_by">
-              Claimed by {{ r.claimed_by.name ?? "an enterer" }} on {{ day(r.claimed_at!) }}
+              Claimed by {{ r.claimed_by.name ?? "a contributor" }} on {{ day(r.claimed_at!) }}
             </template>
             <template v-else-if="r.status === 'done'">Indexed</template>
             <template v-else-if="r.status === 'declined'">Declined: {{ r.reason }}</template>
@@ -213,7 +213,7 @@ function turnDown(r: BookRequest) {
               Claim
             </button>
             <button
-              v-if="r.status === 'claimed' && (r.claimed_by?.id === user?.id || user?.is_admin)"
+              v-if="r.status === 'claimed' && (r.claimed_by?.id === user?.id || user?.may_edit)"
               type="button"
               class="secondary small"
               :disabled="busy"
@@ -231,7 +231,7 @@ function turnDown(r: BookRequest) {
               Mark done
             </button>
             <button
-              v-if="user?.is_admin"
+              v-if="user?.may_edit"
               type="button"
               class="secondary small"
               :disabled="busy"

@@ -77,7 +77,7 @@ document.title = "Privacy policy · OpenLarder";
       <li>
         the identifier Authgear gives your account, which is how OpenLarder recognises you;
       </li>
-      <li>whether your account is an admin's;</li>
+      <li>your account's role: contributor, moderator or administrator, if it has one;</li>
       <li>
         the family collections you add: each one's name, whether it is private, when you ticked
         that you understand what is kept, and each of its recipes' titles and ingredient names,

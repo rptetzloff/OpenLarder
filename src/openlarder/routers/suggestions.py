@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import Float, case, func, select
 
 from openlarder import ingredients, visibility
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder.auth import ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
     Ingredient,
@@ -286,7 +286,7 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
 
 @router.get("", response_model=SuggestionPage)
 async def list_suggestions(
-    admin: AdminUser,
+    admin: ModeratorUser,
     session: Session,
     state: Literal["open", "decided"] = "open",
     kind: Literal["merge", "parent", "line_fix", "tag"] | None = None,
@@ -368,7 +368,7 @@ async def _has_tag(session, recipe_id: uuid.UUID, tag_id: uuid.UUID) -> bool:
 
 @router.post("/{suggestion_id}/accept", response_model=SuggestionOut, dependencies=[SameOrigin])
 async def accept(
-    suggestion_id: uuid.UUID, body: Accept, admin: AdminUser, session: Session
+    suggestion_id: uuid.UUID, body: Accept, admin: ModeratorUser, session: Session
 ) -> SuggestionOut:
     row = await _open_or_404(session, admin, suggestion_id)
     if row.kind == "tag":
@@ -415,6 +415,8 @@ async def accept(
 
 
 @router.post("/{suggestion_id}/dismiss", response_model=SuggestionOut, dependencies=[SameOrigin])
-async def dismiss(suggestion_id: uuid.UUID, admin: AdminUser, session: Session) -> SuggestionOut:
+async def dismiss(
+    suggestion_id: uuid.UUID, admin: ModeratorUser, session: Session
+) -> SuggestionOut:
     row = await _open_or_404(session, admin, suggestion_id)
     return await _decide(session, admin, row, "dismissed")

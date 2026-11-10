@@ -127,24 +127,33 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       (2026-11-09); worth bringing forward once the API sees real use.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central
       and Wikidata (aliases, hierarchy; allergens are Phase 2).
-- [ ] **Contributions**: review queue, edit history and the ODbL contributor
-      agreement, together, then trust levels and a report button. Until then
-      only admins add to the catalog. The ingredient matching flow's
-      suggestions and "new ingredient" step wait on this too.
+- [ ] **Roles** *(Ray, 2026-11-10)*: done (#101). User, contributor,
+      moderator, administrator, owner (roles.py), in place of the admin
+      and enterer flags. Moderators edit the catalog, work flags and
+      suggestions, decline requests and make contributors; administrators
+      also run imports, API usage and buy-link clicks and make moderators;
+      only the owner makes administrators, and the owner is set in the
+      database. People and roles at `/admin/people`.
+- [ ] **Contributions**, next *(Ray, 2026-11-10: "build review first")*:
+      review queue, edit history and the ODbL contributor agreement,
+      together, so a contributor's additions wait for a moderator. Then
+      trust levels and a report button. Until then only moderators and up
+      add to the catalog; contributors claim requests. The ingredient
+      matching flow's suggestions and "new ingredient" step wait on this too.
 
 ## Planned features
 
 - [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*
       Anyone, signed in or not, asks for a cookbook or another source to
-      be entered; approved enterers claim a request and queue it up; a
+      be entered; contributors claim a request and queue it up; a
       claim doesn't stop it being done sooner by someone else.
       **Step 1 done (#100):** `/requests`: ask by ISBN (title and author
       from Open Library) or by title; a book already here with recipes is
       pointed to, and one already asked for gets a vote, once per account
       or per address (kept as its pseudonym). Signed out: 5 asks a day per
       address and a hidden field for bots, no email and no following
-      (Ray: "rate-limited, no tracking"). Enterers are a role admins grant
-      at `/admin/enterers`. Open, claimed, done, declined with a reason;
+      (Ray: "rate-limited, no tracking"). Claiming is for contributors and
+      up (Roles, #101). Open, claimed, done, declined with a reason;
       a claim with nothing done for 30 days reads as open again (Ray:
       "lapse after 30 days idle"). Tabs by state with counts, most wanted
       or newest, and "Yours".

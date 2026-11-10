@@ -18,7 +18,9 @@ async def setup(client, broker, adb):
     broker.subject = "ann"
     await _sign_in(client, broker)  # the client is now Ann's
     ann, bo = await _user_id(adb, "ann"), await _user_id(adb, "bo")
-    await adb.execute(text("UPDATE users SET is_admin = (subject = 'ann')"))
+    await adb.execute(
+        text("UPDATE users SET role = CASE WHEN subject = 'ann' THEN 'admin' ELSE 'user' END")
+    )
     work = await adb.scalar(text("INSERT INTO sources (title) VALUES ('Pink Cake') RETURNING id"))
     recipes = {}
     for owner, title in ((ann, "Ann's Cake"), (bo, "Bo's Bread")):

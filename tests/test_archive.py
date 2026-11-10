@@ -90,7 +90,7 @@ async def test_an_unreachable_archive_is_none_not_an_error() -> None:
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -195,7 +195,7 @@ async def test_page_actions_are_for_admins(admin, client, adb) -> None:
     recipe = await _web_recipe(admin)
     page = await _page_id(client, recipe)
     assert (await admin.post(f"/api/web-pages/{uuid.uuid4()}/archive")).status_code == 404
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (await admin.post(f"/api/web-pages/{page}/archive")).status_code == 403
     assert (await admin.post("/api/web-pages/archive-missing")).status_code == 403
     gone = await admin.put(f"/api/web-pages/{page}/gone", json={"gone": True})

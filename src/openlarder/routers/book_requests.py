@@ -7,10 +7,10 @@ address; one already in the catalog with recipes is pointed to. Signed-out
 asking is limited per address, and a field people never see catches bots.
 An address is kept only as its pseudonym (usage.py), to count one vote.
 
-Enterers, a role admins grant, and admins claim a request to queue it up.
+Contributors (roles.py) and those above them claim a request to queue it up.
 A claim doesn't stop anyone entering the book sooner, and lapses after
 CLAIM_LAPSES with nothing done: it reads as open again, and anyone may
-claim it. An enterer releases a claim, or marks it done; an admin
+claim it. A contributor releases a claim, or marks it done; a moderator
 declines a request, saying why.
 """
 
@@ -18,14 +18,13 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import aliased
 
 from openlarder import isbn, openlibrary, usage
-from openlarder.auth import AdminUser, CurrentUser, SameOrigin, Viewer
+from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import BookRequest, Edition, Recipe, RequestVote, Source, User
 from openlarder.ratelimit import _address
@@ -310,9 +309,10 @@ async def vote(
 
 
 def _may_enter(user: User) -> None:
-    if not (user.is_enterer or user.is_admin):
+    if not user.may_claim:
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "Only enterers claim requests. An admin can make you one."
+            status.HTTP_403_FORBIDDEN,
+            "Only contributors claim requests. A moderator can make you one.",
         )
 
 
@@ -345,7 +345,7 @@ async def release(
     request_id: uuid.UUID, request: Request, user: CurrentUser, session: Session
 ) -> RequestOut:
     row = await _request_or_404(session, request_id)
-    if row.status != "claimed" or not (row.claimed_by == user.id or user.is_admin):
+    if row.status != "claimed" or not (row.claimed_by == user.id or user.may_edit):
         raise HTTPException(status.HTTP_409_CONFLICT, "It isn't your claim to release.")
     row.status, row.claimed_by, row.claimed_at, row.active_at = "open", None, None, None
     return await _one(session, row, request, user)
@@ -362,7 +362,7 @@ class Done(BaseModel):
 async def mark_done(
     request_id: uuid.UUID, body: Done, request: Request, user: CurrentUser, session: Session
 ) -> RequestOut:
-    """The book is entered: by its claimer, or any enterer or admin."""
+    """The book is entered: by its claimer, or any contributor or above."""
     _may_enter(user)
     row = await _request_or_404(session, request_id)
     if row.status in ("done", "declined"):
@@ -383,9 +383,9 @@ class Decline(BaseModel):
     "/api/requests/{request_id}/decline", response_model=RequestOut, dependencies=[SameOrigin]
 )
 async def decline(
-    request_id: uuid.UUID, body: Decline, request: Request, admin: AdminUser, session: Session
+    request_id: uuid.UUID, body: Decline, request: Request, admin: ModeratorUser, session: Session
 ) -> RequestOut:
-    """An admin turns a request down, saying why (not a cookbook, a duplicate)."""
+    """A moderator turns a request down, saying why (not a cookbook, a duplicate)."""
     reason = _squash(body.reason)
     if not reason:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Say why it's declined.")
@@ -394,69 +394,3 @@ async def decline(
         raise HTTPException(status.HTTP_409_CONFLICT, "That request is closed.")
     row.status, row.claimed_by, row.reason, row.closed_at = "declined", None, reason, func.now()
     return await _one(session, row, request, admin)
-
-
-# Enterers, for admins
-
-
-class EntererOut(BaseModel):
-    id: uuid.UUID
-    name: str | None
-    is_enterer: bool
-    is_admin: bool
-    claims: int
-
-
-@router.get("/api/admin/people", response_model=list[EntererOut])
-async def people(
-    admin: AdminUser, session: Session, q: str = Query("", max_length=100)
-) -> list[EntererOut]:
-    """Enterers, and others found by name to make one."""
-    claimed = aliased(BookRequest)
-    claims = (
-        select(func.count())
-        .where(claimed.claimed_by == User.id, claimed.status == "claimed")
-        .scalar_subquery()
-    )
-    query = select(User, claims)
-    words = q.strip()
-    if words:
-        query = query.where(User.display_name.ilike(f"%{words}%"))
-    else:
-        query = query.where(or_(User.is_enterer, User.is_admin))
-    rows = await session.execute(query.order_by(func.lower(User.display_name)).limit(50))
-    return [
-        EntererOut(
-            id=u.id, name=u.display_name, is_enterer=u.is_enterer, is_admin=u.is_admin, claims=n
-        )
-        for u, n in rows
-    ]
-
-
-class EntererIn(BaseModel):
-    is_enterer: bool
-
-
-@router.put(
-    "/api/admin/people/{user_id}/enterer", response_model=EntererOut, dependencies=[SameOrigin]
-)
-async def set_enterer(
-    user_id: uuid.UUID, body: EntererIn, admin: AdminUser, session: Session
-) -> EntererOut:
-    person = await session.get(User, user_id)
-    if person is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such person.")
-    person.is_enterer = body.is_enterer
-    await session.commit()
-    claims = await session.scalar(
-        select(func.count()).where(
-            BookRequest.claimed_by == user_id, BookRequest.status == "claimed"
-        )
-    )
-    return EntererOut(
-        id=person.id,
-        name=person.display_name,
-        is_enterer=person.is_enterer,
-        is_admin=person.is_admin,
-        claims=claims or 0,
-    )

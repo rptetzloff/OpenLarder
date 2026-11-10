@@ -24,7 +24,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
 from openlarder import author_facts, author_merge, openlibrary, visibility, wikidata
-from openlarder.auth import AdminUser, SameOrigin, Viewer
+from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
 from openlarder.routers.ingredients import contains_pattern
@@ -283,7 +283,7 @@ class AuthorIn(BaseModel):
 
 @router.patch("/{author_id}", response_model=AuthorSummary, dependencies=[SameOrigin])
 async def edit_author(
-    author_id: uuid.UUID, body: AuthorIn, admin: AdminUser, session: Session
+    author_id: uuid.UUID, body: AuthorIn, admin: ModeratorUser, session: Session
 ) -> AuthorSummary:
     author = await _author_or_404(session, author_id)
     name = " ".join(body.name.split())
@@ -312,7 +312,7 @@ class LinkIn(BaseModel):
     dependencies=[SameOrigin],
 )
 async def add_link(
-    author_id: uuid.UUID, body: LinkIn, admin: AdminUser, session: Session
+    author_id: uuid.UUID, body: LinkIn, admin: ModeratorUser, session: Session
 ) -> LinkOut:
     """The author's own website or account. Only http and https, so a link
     can't run script on the page that shows it."""
@@ -343,7 +343,7 @@ async def add_link(
     dependencies=[SameOrigin],
 )
 async def remove_link(
-    author_id: uuid.UUID, link_id: uuid.UUID, admin: AdminUser, session: Session
+    author_id: uuid.UUID, link_id: uuid.UUID, admin: ModeratorUser, session: Session
 ) -> Response:
     link = await session.get(AuthorLink, link_id)
     if link is None or link.author_id != author_id:
@@ -359,7 +359,7 @@ class MergeInto(BaseModel):
 
 @router.post("/{author_id}/merge", response_model=AuthorSummary, dependencies=[SameOrigin])
 async def merge_author(
-    author_id: uuid.UUID, body: MergeInto, admin: AdminUser, session: Session
+    author_id: uuid.UUID, body: MergeInto, admin: ModeratorUser, session: Session
 ) -> AuthorSummary:
     """Merge this author into another; answers with the one that's left."""
     gone = await _author_or_404(session, author_id)
@@ -402,7 +402,7 @@ def _unavailable(exc: wikidata.Unavailable) -> HTTPException:
 
 @router.post("/wikidata", response_model=WikidataRun, dependencies=[SameOrigin])
 async def check_wikidata(
-    admin: AdminUser, session: Session, transport: WikidataTransport
+    admin: ModeratorUser, session: Session, transport: WikidataTransport
 ) -> WikidataRun:
     """Ask Wikidata about the next batch of authors not asked lately; the
     admin page calls this until none remain."""
@@ -445,7 +445,7 @@ class WikidataIn(BaseModel):
 async def set_wikidata(
     author_id: uuid.UUID,
     body: WikidataIn,
-    admin: AdminUser,
+    admin: ModeratorUser,
     session: Session,
     transport: WikidataTransport,
 ) -> AuthorOut:

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from openlarder.archiving import ArchiverDep
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder.auth import ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import WebPage
 
@@ -39,7 +39,7 @@ async def _page_or_404(session: Session, page_id: uuid.UUID) -> WebPage:
 )
 async def archive_now(
     page_id: uuid.UUID,
-    admin: AdminUser,
+    admin: ModeratorUser,
     session: Session,
     background: BackgroundTasks,
     archiver: ArchiverDep,
@@ -57,7 +57,7 @@ async def archive_now(
     dependencies=[SameOrigin],
 )
 async def archive_missing(
-    admin: AdminUser, session: Session, background: BackgroundTasks, archiver: ArchiverDep
+    admin: ModeratorUser, session: Session, background: BackgroundTasks, archiver: ArchiverDep
 ) -> Queued:
     """Ask for every page with no copy yet, oldest first."""
     pages = list(
@@ -71,7 +71,9 @@ async def archive_missing(
 
 
 @router.put("/{page_id}/gone", response_model=GoneIn, dependencies=[SameOrigin])
-async def mark_gone(page_id: uuid.UUID, body: GoneIn, admin: AdminUser, session: Session) -> GoneIn:
+async def mark_gone(
+    page_id: uuid.UUID, body: GoneIn, admin: ModeratorUser, session: Session
+) -> GoneIn:
     """The page no longer has the recipe (or has it again)."""
     page = await _page_or_404(session, page_id)
     page.gone = body.gone

@@ -40,7 +40,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AdminBar v-if="user?.is_admin" current="/admin/imports" />
+  <AdminBar v-if="user?.may_edit" :user="user" current="/admin/imports" />
   <article class="wide">
     <nav class="crumbs" aria-label="Breadcrumb">
       <a href="/admin">Admin</a>
@@ -51,7 +51,7 @@ onMounted(async () => {
       <h1>Import history</h1>
       <p class="muted">Every bulk import, newest first, with what it added and its report.</p>
     </div>
-    <p v-if="!user?.is_admin" class="status">This is for admins.</p>
+    <p v-if="!user?.may_run" class="status">This is for administrators.</p>
     <p v-else-if="failed" role="alert">The history couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="runs === null" class="status">Loading…</p>
     <p v-else-if="runs.length === 0" class="status">

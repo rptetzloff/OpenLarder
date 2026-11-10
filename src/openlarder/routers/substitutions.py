@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from openlarder import substitutions
-from openlarder.auth import AdminUser, SameOrigin
+from openlarder.auth import ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import Substitution, Tag, TagKind
 
@@ -76,7 +76,7 @@ class DietIn(BaseModel):
 
 
 @router.post("/api/diets", response_model=Diet, dependencies=[SameOrigin])
-async def add_diet(body: DietIn, admin: AdminUser, session: Session) -> Diet:
+async def add_diet(body: DietIn, admin: ModeratorUser, session: Session) -> Diet:
     """A new diet, or the one already by that name."""
     try:
         diet = await substitutions.add_diet(session, body.name)
@@ -106,7 +106,7 @@ class SwapIn(BaseModel):
     status_code=status.HTTP_201_CREATED,
     dependencies=[SameOrigin],
 )
-async def add_swap(body: SwapIn, admin: AdminUser, session: Session) -> SwapOut:
+async def add_swap(body: SwapIn, admin: ModeratorUser, session: Session) -> SwapOut:
     try:
         row = await substitutions.add(
             session,
@@ -135,7 +135,7 @@ async def add_swap(body: SwapIn, admin: AdminUser, session: Session) -> SwapOut:
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[SameOrigin],
 )
-async def remove_swap(swap_id: uuid.UUID, admin: AdminUser, session: Session) -> Response:
+async def remove_swap(swap_id: uuid.UUID, admin: ModeratorUser, session: Session) -> Response:
     swap = await session.get(Substitution, swap_id)
     if swap is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such swap.")

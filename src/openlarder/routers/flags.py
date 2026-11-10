@@ -57,8 +57,8 @@ class Resolve(BaseModel):
 def _visible(user: User, scope: str):
     """The recipes whose flags this person may see in this view."""
     if scope == "all":
-        if not user.is_admin:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an admin can see every flag.")
+        if not user.may_edit:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a moderator can see every flag.")
         return None
     return Recipe.created_by == user.id
 
@@ -132,7 +132,7 @@ async def recipe_flags(recipe_id: uuid.UUID, user: CurrentUser, session: Session
         session, user, await session.get_one(Source, recipe.source_id)
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
-    if not (user.is_admin or recipe.created_by == user.id):
+    if not (user.may_edit or recipe.created_by == user.id):
         return []
     book = await session.get(Source, recipe.source_id)
     flags = (
@@ -155,9 +155,9 @@ async def resolve(
         session, user, await session.get_one(Source, recipe.source_id)
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such flag.")
-    if not (user.is_admin or recipe.created_by == user.id):
+    if not (user.may_edit or recipe.created_by == user.id):
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "Only an admin or whoever added the recipe can do that."
+            status.HTTP_403_FORBIDDEN, "Only a moderator or whoever added the recipe can do that."
         )
     if flag.resolved_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "That flag has already been dealt with.")

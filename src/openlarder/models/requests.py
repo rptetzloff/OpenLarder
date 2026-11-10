@@ -1,6 +1,6 @@
 """Requests for a cookbook, or another source, to be indexed (routers/
-book_requests.py). *Ray, 2026-11-09:* anyone asks; enterers, a role admins
-grant, claim a request and queue it up; a claim lapses after 30 days with
+book_requests.py). *Ray, 2026-11-09:* anyone asks; contributors and up
+(roles.py) claim a request and queue it up; a claim lapses after 30 days with
 nothing done, and doesn't stop anyone entering the book sooner."""
 
 import uuid

@@ -11,7 +11,7 @@ from fake_broker import _sign_in
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET is_admin = true"))
+    await adb.execute(text("UPDATE users SET role = 'admin'"))
     return client
 
 
@@ -245,7 +245,7 @@ async def test_only_admins_fix_authors(admin, adb) -> None:
     link = (
         await admin.post(f"/api/authors/{yotam}/links", json={"url": "https://a.example"})
     ).json()
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (
         await admin.patch(f"/api/authors/{yotam}", json={"name": "X", "kind": "person"})
     ).status_code == 403
@@ -357,7 +357,7 @@ async def test_a_merge_needs_two_authors_and_an_admin(admin, adb) -> None:
     assert (await admin.post(f"/api/authors/{mine}/merge", json={"into": mine})).status_code == 422
     missing = await admin.post(f"/api/authors/{mine}/merge", json={"into": str(uuid.uuid4())})
     assert missing.status_code == 404
-    await adb.execute(text("UPDATE users SET is_admin = false"))
+    await adb.execute(text("UPDATE users SET role = 'user'"))
     assert (
         await admin.post(f"/api/authors/{theirs}/merge", json={"into": mine})
     ).status_code == 403

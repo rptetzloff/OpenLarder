@@ -173,7 +173,7 @@ async function saveSharing() {
   }
 }
 const sharedNames = computed(() => (book.value?.shared_with ?? []).map((g) => g.name).join(", "));
-const adminTools = computed(() => !!props.user?.is_admin && book.value?.kind !== "family");
+const adminTools = computed(() => !!props.user?.may_edit && book.value?.kind !== "family");
 
 onMounted(async () => {
   await load();
@@ -248,7 +248,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             v-if="book.editable"
             what="source"
             :selected="book.tags.map((t) => t.id)"
-            :can-add="!!user?.is_admin"
+            :can-add="!!user?.may_edit"
             :save="saveTags"
           />
           <ul class="tags">

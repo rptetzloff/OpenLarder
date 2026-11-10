@@ -22,7 +22,7 @@ from sqlalchemy import delete, exists, func, select
 from openlarder import books as books_module
 from openlarder import buying, isbn, linking, openlibrary, references, refresh, visibility, web
 from openlarder import recipes as recipes_module
-from openlarder.auth import AdminUser, CurrentUser, SameOrigin, Viewer
+from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.buying import BuyLink
 from openlarder.db import Session
@@ -516,7 +516,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
     dependencies=[SameOrigin],
 )
 async def add_by_isbn(
-    body: AddByIsbn, admin: AdminUser, session: Session, transport: Transport
+    body: AddByIsbn, admin: ModeratorUser, session: Session, transport: Transport
 ) -> Added:
     try:
         isbn13 = isbn.normalise(body.isbn)
@@ -569,7 +569,9 @@ class AddedManually(BaseModel):
 
 
 @router.post("/manual", response_model=AddedManually, dependencies=[SameOrigin])
-async def add_without_isbn(body: WithoutIsbn, admin: AdminUser, session: Session) -> AddedManually:
+async def add_without_isbn(
+    body: WithoutIsbn, admin: ModeratorUser, session: Session
+) -> AddedManually:
     """A book Open Library can't supply: no ISBN, or one Open Library doesn't know."""
     title = " ".join(body.title.split())
     authors = [a for a in (" ".join(x.split()) for x in body.authors) if a]
@@ -654,7 +656,7 @@ async def _plan(
     "/{source_id}/open-library/preview", response_model=LinkPreview, dependencies=[SameOrigin]
 )
 async def preview_link(
-    source_id: uuid.UUID, body: LinkIn, admin: AdminUser, session: Session, transport: Transport
+    source_id: uuid.UUID, body: LinkIn, admin: ModeratorUser, session: Session, transport: Transport
 ) -> LinkPreview:
     """What linking would do, for the admin to check it's the same book."""
     _, plan = await _plan(source_id, body, session, transport)
@@ -694,7 +696,7 @@ async def preview_link(
 
 @router.post("/{source_id}/open-library", response_model=Added, dependencies=[SameOrigin])
 async def link(
-    source_id: uuid.UUID, body: LinkIn, admin: AdminUser, session: Session, transport: Transport
+    source_id: uuid.UUID, body: LinkIn, admin: ModeratorUser, session: Session, transport: Transport
 ) -> Added:
     """Link the book, looking the record up again rather than trusting the preview's."""
     work, plan = await _plan(source_id, body, session, transport)
@@ -712,7 +714,9 @@ class Relinked(BaseModel):
 
 
 @router.post("/{source_id}/references", response_model=Relinked, dependencies=[SameOrigin])
-async def relink_references(source_id: uuid.UUID, admin: AdminUser, session: Session) -> Relinked:
+async def relink_references(
+    source_id: uuid.UUID, admin: ModeratorUser, session: Session
+) -> Relinked:
     """Link a book's page references again: for recipes stored before linking
     existed, which the Admin page runs over every book."""
     work = await session.get(Source, source_id)
@@ -755,7 +759,7 @@ class BookIn(BaseModel):
 
 @router.put("/{source_id}", response_model=Added, dependencies=[SameOrigin])
 async def edit_book(
-    source_id: uuid.UUID, body: BookIn, admin: AdminUser, session: Session
+    source_id: uuid.UUID, body: BookIn, admin: ModeratorUser, session: Session
 ) -> Added:
     """Fix what a book says about itself (books.edit_book)."""
     work = await session.get(Source, source_id)
@@ -836,7 +840,7 @@ def _out(differences: list[refresh.Difference]) -> list[DifferenceOut]:
 
 @router.post("/{source_id}/open-library/check", response_model=Checked, dependencies=[SameOrigin])
 async def check_open_library(
-    source_id: uuid.UUID, admin: AdminUser, session: Session, transport: Transport
+    source_id: uuid.UUID, admin: ModeratorUser, session: Session, transport: Transport
 ) -> Checked:
     """What differs between the book as stored and Open Library now. Changes
     nothing (refresh.py)."""
@@ -853,7 +857,7 @@ async def check_open_library(
 
 @router.post("/{source_id}/open-library/take", response_model=Taken, dependencies=[SameOrigin])
 async def take_from_open_library(
-    source_id: uuid.UUID, body: TakeIn, admin: AdminUser, session: Session, transport: Transport
+    source_id: uuid.UUID, body: TakeIn, admin: ModeratorUser, session: Session, transport: Transport
 ) -> Taken:
     """Take the ticked differences from Open Library, fetched again now."""
     work = await session.get(Source, source_id)
@@ -877,7 +881,7 @@ class WebsiteIn(BaseModel):
 
 
 @router.post("/websites", response_model=AddedManually, dependencies=[SameOrigin])
-async def add_website(body: WebsiteIn, admin: AdminUser, session: Session) -> AddedManually:
+async def add_website(body: WebsiteIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A website as a source, one per site: the one already here for that
     host if there is one. Nothing is fetched from the site (web.py)."""
     try:
@@ -923,14 +927,16 @@ class ShowIn(BaseModel):
 
 
 @router.post("/periodicals", response_model=AddedManually, dependencies=[SameOrigin])
-async def add_periodical(body: PeriodicalIn, admin: AdminUser, session: Session) -> AddedManually:
+async def add_periodical(
+    body: PeriodicalIn, admin: ModeratorUser, session: Session
+) -> AddedManually:
     """A magazine or newspaper as a source: the one already here of that
     kind and name, or a new one. Its issues are added as recipes name them."""
     return await _add_named(session, admin, body.kind, body.title, body.authors)
 
 
 @router.post("/shows", response_model=AddedManually, dependencies=[SameOrigin])
-async def add_show(body: ShowIn, admin: AdminUser, session: Session) -> AddedManually:
+async def add_show(body: ShowIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A TV show, podcast or video channel as a source: the one already here
     of that kind and name, or a new one. Its episodes are added as recipes
     name them."""
@@ -944,7 +950,7 @@ class NamedIn(BaseModel):
 
 
 @router.post("/social", response_model=AddedManually, dependencies=[SameOrigin])
-async def add_social(body: NamedIn, admin: AdminUser, session: Session) -> AddedManually:
+async def add_social(body: NamedIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A social media account as a source, on any platform: the one already
     here by that name, or a new one. Its recipes are on its posts, by
     address."""
@@ -952,14 +958,14 @@ async def add_social(body: NamedIn, admin: AdminUser, session: Session) -> Added
 
 
 @router.post("/packaging", response_model=AddedManually, dependencies=[SameOrigin])
-async def add_packaging(body: NamedIn, admin: AdminUser, session: Session) -> AddedManually:
+async def add_packaging(body: NamedIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A product whose packaging prints recipes: the one already here by that
     name, or a new one."""
     return await _add_named(session, admin, "packaging", body.title, body.authors)
 
 
 async def _add_named(
-    session: Session, admin: AdminUser, kind: str, title: str, authors: list[str]
+    session: Session, admin: ModeratorUser, kind: str, title: str, authors: list[str]
 ) -> AddedManually:
     """A source known only by its kind and name."""
     title = " ".join(title.split())
@@ -1002,7 +1008,7 @@ class FamilyChange(BaseModel):
 
 
 def _check_public(user: CurrentUser, private: bool) -> None:
-    if not private and not user.is_admin:
+    if not private and not user.may_edit:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "A family collection stays private until OpenLarder reviews what people add.",
