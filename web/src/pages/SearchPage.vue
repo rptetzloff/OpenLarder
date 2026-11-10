@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LarderPicker from "../components/LarderPicker.vue";
 import { KINDS, listTags, type Tag } from "../tags";
 import { computed, onMounted, ref, watch } from "vue";
 import { findBooks } from "../books";
@@ -37,9 +38,14 @@ const ALL_KINDS = KIND_GROUPS.flatMap((g) => g.kinds);
 
 const params = new URLSearchParams(location.search);
 const chosen = ref<Named[]>([]);
-// With what's in your larder (routers/larder.py) instead of ingredients
-// chosen here; each thing in it counts as what's above it too.
-const useLarder = ref(params.get("larder") === "1");
+// With what's in your larder (routers/larder.py), as well as ingredients
+// chosen: the lists ticked, only some things in them, or all but some. An
+// older link's larder=1 ticks every list.
+const larderLists = ref<string[]>(params.getAll("ll"));
+const larderOnly = ref<string[]>(params.getAll("li"));
+const larderOut = ref<string[]>(params.getAll("lx"));
+const larderAll = params.get("larder") === "1";
+const useLarder = computed(() => !!larderLists.value.length || !!larderOnly.value.length);
 // What you don't have or want (Ray, 2026-11-08): recipes needing one are left
 // out; a line offering something else ("butter or oil") doesn't need it.
 const unwanted = ref<Named[]>([]);
@@ -74,7 +80,7 @@ const searching = computed(
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx"]) {
     url.searchParams.delete(key);
   }
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
@@ -84,7 +90,9 @@ function toAddress() {
   for (const k of narrowedKinds.value) url.searchParams.append("kind", k);
   for (const t of tags.value) url.searchParams.append("tag", t);
   if (page.value > 1) url.searchParams.set("page", String(page.value));
-  if (useLarder.value) url.searchParams.set("larder", "1");
+  for (const id of larderLists.value) url.searchParams.append("ll", id);
+  for (const id of larderOnly.value) url.searchParams.append("li", id);
+  for (const id of larderOut.value) url.searchParams.append("lx", id);
   history.replaceState(null, "", url);
 }
 
@@ -110,6 +118,9 @@ async function run(toPage = 1) {
         without: unwanted.value.map((i) => i.id),
         tags: tags.value,
         larder: useLarder.value,
+        larderLists: larderLists.value,
+        larderItems: larderOnly.value,
+        larderWithout: larderOut.value,
       },
     );
     if (mine !== latest) return;
@@ -270,6 +281,7 @@ onMounted(async () => {
   const sources = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_SOURCES);
   try {
     if (!ids.length && !title.value.trim() && !tags.value.length && !useLarder.value) {
+      // larder=1 alone: the picker ticks every list, then searches.
       // Sources, before anything to search by: their names are all to show.
       for (const id of sources) {
         const res = await fetch(`/api/sources/${id}`);
@@ -291,6 +303,9 @@ onMounted(async () => {
       without: params.getAll("x").slice(0, MAX_INGREDIENTS),
       tags: tags.value,
       larder: useLarder.value,
+      larderLists: larderLists.value,
+      larderItems: larderOnly.value,
+      larderWithout: larderOut.value,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
@@ -313,33 +328,15 @@ onMounted(async () => {
     <h1>Search</h1>
 
     <form class="search-panel" role="search" @submit.prevent="run()">
-      <div v-if="user" class="larder-toggle">
-        <button
-          type="button"
-          class="secondary small"
-          :aria-pressed="useLarder"
-          @click="
-            useLarder = !useLarder;
-            run();
-          "
-        >
-          Use my larder
-        </button>
-        <span class="help">
-          <template v-if="useLarder && result?.larder_items != null">
-            {{ result.larder_items.toLocaleString() }}
-            {{ result.larder_items === 1 ? "thing" : "things" }} from your larder count.
-          </template>
-          <a href="/larder">Your larder</a>
-        </span>
-      </div>
-      <template v-if="useLarder">
-        <p class="help">
-          Each thing in your larder counts as itself and what's above it: chipotle hot sauce is hot
-          sauce too. Things you're out of don't count.
-        </p>
-      </template>
-      <template v-else>
+      <LarderPicker
+        v-if="user"
+        v-model:lists="larderLists"
+        v-model:only="larderOnly"
+        v-model:leave-out="larderOut"
+        :counted="result?.larder_items"
+        :tick-all="larderAll"
+        @change="run()"
+      />
       <label for="search-ingredient">I have</label>
       <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
         <span v-for="i in chosen" :key="i.id" class="chip">
@@ -372,7 +369,6 @@ onMounted(async () => {
       <p id="search-ingredient-help" class="help">
         An ingredient also finds what's under it: cheese finds cheddar.
       </p>
-      </template>
 
       <label for="search-unwanted" class="panel-gap">I don't have or don't want</label>
       <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">

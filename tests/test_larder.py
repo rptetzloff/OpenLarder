@@ -252,3 +252,74 @@ async def test_moving_needs_both_lists_changeable(people, adb) -> None:
     item = await _item(cy, own, "Flour")
     moved = await cy.patch(f"/api/larder/items/{item['id']}", json={"list_id": shared})
     assert moved.status_code == 403
+
+
+# Narrowing a big larder (Ray, 2026-11-10: "a restaurant sized pantry")
+
+
+async def _stocked(people, adb):
+    mo, ann = await people("mo", role="moderator"), await people("ann")
+    for name in ("Butter", "Flour", "Saffron", "Rice"):
+        await _ingredient(adb, name)
+    await _recipes(
+        mo,
+        adb,
+        ("Shortbread", ["Butter", "Flour"]),
+        ("Paella", ["Saffron", "Rice"]),
+        ("Plain Rice", ["Rice"]),
+    )
+    fridge, pantry = await _list(ann, "Fridge"), await _list(ann, "Pantry")
+    butter = await _item(ann, fridge, "Butter")
+    flour = await _item(ann, pantry, "Flour")
+    saffron = await _item(ann, pantry, "Saffron")
+    rice = await _item(ann, pantry, "Rice")
+    return (
+        ann,
+        {"fridge": fridge, "pantry": pantry},
+        {
+            "butter": butter["id"],
+            "flour": flour["id"],
+            "saffron": saffron["id"],
+            "rice": rice["id"],
+        },
+    )
+
+
+async def _titles(c, **params):
+    found = (await c.get("/api/search", params={"larder": "true", **params})).json()
+    return found["larder_items"], sorted(r["title"] for r in found["recipes"])
+
+
+async def test_a_larder_search_narrows_to_lists_things_or_less_some(people, adb) -> None:
+    ann, lists, items = await _stocked(people, adb)
+    assert await _titles(ann) == (4, ["Paella", "Plain Rice", "Shortbread"])
+    assert await _titles(ann, larder_list=[lists["fridge"]]) == (1, ["Shortbread"])
+    assert await _titles(ann, larder_item=[items["saffron"]]) == (1, ["Paella"])
+    # Only-these wins over lists.
+    assert await _titles(ann, larder_item=[items["rice"]], larder_list=[lists["fridge"]]) == (
+        1,
+        ["Paella", "Plain Rice"],
+    )
+    assert await _titles(ann, larder_without=[items["saffron"], items["rice"]]) == (
+        2,
+        ["Shortbread"],
+    )
+
+
+async def test_a_larder_and_ingredients_typed_in_count_together(people, adb) -> None:
+    ann, lists, _ = await _stocked(people, adb)
+    rice = await adb.scalar(text("SELECT id FROM ingredients WHERE name = 'Rice'"))
+    found = (
+        await ann.get(
+            "/api/search",
+            params={"larder": "true", "larder_list": [lists["fridge"]], "ingredient": [str(rice)]},
+        )
+    ).json()
+    assert sorted(r["title"] for r in found["recipes"]) == ["Paella", "Plain Rice", "Shortbread"]
+
+
+async def test_someone_elses_list_or_thing_counts_for_nothing(people, adb) -> None:
+    ann, lists, items = await _stocked(people, adb)
+    bo = await people("bo")
+    assert await _titles(bo, larder_list=[lists["pantry"]]) == (0, [])
+    assert await _titles(bo, larder_item=[items["rice"]]) == (0, [])

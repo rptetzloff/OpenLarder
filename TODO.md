@@ -367,6 +367,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         their groups see each list; view members see it, edit and admin
         members change what's on it; renaming, removing and sharing stay the
         owner's. Search with your larder counts the lists shared with you.
+      - [x] Narrowing a big larder (#120). *Ray, 2026-11-10: "a restaurant
+        sized pantry".* Search's "From my larder" section, beside "I have"
+        (both count): tick lists, then only some things, or all but some
+        (`larder_list`, `larder_item`, `larder_without`; `ll`, `li`, `lx` in
+        the address). The larder page searches with one list, or with the
+        things ticked.
       - [ ] A book shelf ("books I own") alongside, Phase 2.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged

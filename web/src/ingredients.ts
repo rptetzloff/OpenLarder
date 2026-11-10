@@ -188,6 +188,9 @@ export async function searchRecipes(
     without = [],
     tags = [],
     larder = false,
+    larderLists = [],
+    larderItems = [],
+    larderWithout = [],
   }: {
     offset?: number;
     sources?: string[];
@@ -195,8 +198,12 @@ export async function searchRecipes(
     kinds?: string[];
     without?: string[];
     tags?: string[];
-    // With what's in your larder, instead of the ingredients given.
+    // With what's in your larder too: the lists, only some things in them,
+    // or all but some.
     larder?: boolean;
+    larderLists?: string[];
+    larderItems?: string[];
+    larderWithout?: string[];
   } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
@@ -205,7 +212,12 @@ export async function searchRecipes(
   for (const kind of kinds) query.append("kind", kind);
   for (const id of without) query.append("without", id);
   for (const id of tags) query.append("tag", id);
-  if (larder) query.set("larder", "true");
+  if (larder) {
+    query.set("larder", "true");
+    for (const id of larderLists) query.append("larder_list", id);
+    for (const id of larderItems) query.append("larder_item", id);
+    for (const id of larderWithout) query.append("larder_without", id);
+  }
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");
