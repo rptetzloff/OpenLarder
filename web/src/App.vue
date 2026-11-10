@@ -645,9 +645,39 @@ button.secondary[aria-current="page"] {
   .source-head {
     grid-template-columns: 6rem minmax(0, 1fr);
   }
-  .source-elsewhere {
+  .source-side {
     grid-column: 1 / -1;
   }
+}
+/* Beside the cover: where to buy the selected edition, then elsewhere. */
+.source-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.source-buy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.source-buy h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.source-buy .buy-edition {
+  margin: -0.25rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.source-buy .button-outline {
+  display: block;
+  text-align: center;
+}
+.source-buy .buy-note {
+  margin: 0.125rem 0 0;
 }
 .source-cover {
   width: 100%;
@@ -843,9 +873,6 @@ button.secondary[aria-current="page"] {
 }
 .buy-row a {
   color: var(--link);
-}
-.buy-row a.button-outline {
-  color: var(--fg);
 }
 .buy-note {
   margin: 0.375rem 0 0;
