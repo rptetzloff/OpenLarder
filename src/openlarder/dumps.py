@@ -11,7 +11,8 @@ no who-added-what, no edit history.
 Two zips a week, each with a README giving the licence and attribution:
 one CSV per table, and the same catalog as JSON Lines with each recipe's
 places and ingredients inside it. They're uploaded under dumps/ with the
-date, and recorded in the dumps table, which /data lists.
+date, and recorded in the dumps table, which /data lists. A dump older than
+OPENLARDER_DUMPS_KEEP_DAYS (a year unless set) is deleted from both.
 """
 
 import asyncio
@@ -361,6 +362,37 @@ async def build(
     return dump
 
 
+async def prune(session: AsyncSession, settings: Settings, transport=None) -> int:
+    """Delete dumps older than OPENLARDER_DUMPS_KEEP_DAYS from the bucket and
+    the list; the newest is always kept. How many went."""
+    cutoff = datetime.now(UTC) - timedelta(days=settings.dumps_keep_days)
+    newest = await session.scalar(select(func.max(Dump.built_at)))
+    old = list(
+        await session.scalars(
+            select(Dump)
+            .where(Dump.built_at < cutoff, Dump.built_at < newest)
+            .order_by(Dump.built_at)
+        )
+    )
+    for dump in old:
+        for key in (dump.csv_key, dump.json_key):
+            await s3.delete(
+                settings.dumps_endpoint,
+                settings.dumps_bucket,
+                key,
+                settings.dumps_access_key,
+                settings.dumps_secret_key,
+                settings.dumps_region,
+                transport,
+            )
+        # Gone from the list only once both files are gone from the bucket.
+        await session.delete(dump)
+        await session.commit()
+    if old:
+        log.info("Deleted %s data dumps older than %s days", len(old), settings.dumps_keep_days)
+    return len(old)
+
+
 async def due(session: AsyncSession) -> bool:
     last = await session.scalar(select(func.max(Dump.built_at)))
     return last is None or datetime.now(UTC) - last >= EVERY
@@ -380,6 +412,7 @@ async def keep_weekly(factory: async_sessionmaker) -> None:
                         try:
                             if await due(session):
                                 await build(session, settings)
+                            await prune(session, settings)
                         finally:
                             await session.execute(text("SELECT pg_advisory_unlock(7461)"))
             except Exception:

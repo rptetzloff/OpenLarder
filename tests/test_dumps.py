@@ -128,7 +128,7 @@ async def test_an_admin_builds_one_and_anyone_finds_it(store, catalog, people, c
     assert all(a.startswith("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/") for a in store.auth)
     listed = (await client.get("/api/dumps")).json()
     assert listed["available"] and listed["latest"]["json_url"] == built["json_url"]
-    assert "ODbL" in listed["attribution"]
+    assert "ODbL" in listed["attribution"] and listed["keep_days"] == 365
 
 
 async def test_the_files_hold_the_public_catalog_only(store, catalog, people) -> None:
@@ -202,3 +202,81 @@ async def test_one_is_due_a_week_after_the_last(adb) -> None:
     assert not await dumps.due(adb)
     await adb.execute(text("UPDATE dumps SET built_at = now() - interval '7 days 1 minute'"))
     assert await dumps.due(adb)
+
+
+async def test_dumps_older_than_a_year_are_deleted(store, adb, configure) -> None:
+    from openlarder.models import Dump
+
+    configure(_settings(**STORE))
+    settings = Settings(**STORE)
+    for age, stamp in ((400, "old"), (200, "kept"), (1, "new")):
+        adb.add(
+            Dump(
+                csv_key=f"dumps/{stamp}-csv.zip",
+                csv_bytes=1,
+                json_key=f"dumps/{stamp}-jsonl.zip",
+                json_bytes=1,
+                counts={},
+            )
+        )
+        await adb.flush()
+        await adb.execute(
+            text(
+                "UPDATE dumps SET built_at = now() - make_interval(days => :d) WHERE csv_key = :k"
+            ),
+            {"d": age, "k": f"dumps/{stamp}-csv.zip"},
+        )
+    deleted = []
+    store.handle = lambda request: (
+        deleted.append((request.method, request.url.path)),
+        httpx2.Response(204),
+    )[1]
+    gone = await dumps.prune(adb, settings, httpx2.MockTransport(store.handle))
+    assert gone == 1
+    assert deleted == [
+        ("DELETE", "/openlarder-data/dumps/old-csv.zip"),
+        ("DELETE", "/openlarder-data/dumps/old-jsonl.zip"),
+    ]
+    left = set(await adb.scalars(text("SELECT csv_key FROM dumps")))
+    assert left == {"dumps/kept-csv.zip", "dumps/new-csv.zip"}
+
+
+async def test_the_newest_is_kept_however_old(store, adb) -> None:
+    from openlarder.models import Dump
+
+    adb.add(Dump(csv_key="a", csv_bytes=1, json_key="b", json_bytes=1, counts={}))
+    await adb.flush()
+    await adb.execute(text("UPDATE dumps SET built_at = now() - interval '800 days'"))
+    assert (
+        await dumps.prune(
+            adb, Settings(**STORE), httpx2.MockTransport(lambda r: httpx2.Response(204))
+        )
+        == 0
+    )
+
+
+async def test_a_failed_delete_keeps_the_dump_listed(store, adb) -> None:
+    from openlarder import s3
+    from openlarder.models import Dump
+
+    for age in (400, 1):
+        adb.add(Dump(csv_key=f"k{age}", csv_bytes=1, json_key=f"j{age}", json_bytes=1, counts={}))
+        await adb.flush()
+        await adb.execute(
+            text(
+                "UPDATE dumps SET built_at = now() - make_interval(days => :d) WHERE csv_key = :k"
+            ),
+            {"d": age, "k": f"k{age}"},
+        )
+    with pytest.raises(s3.UploadFailed):
+        await dumps.prune(
+            adb, Settings(**STORE), httpx2.MockTransport(lambda r: httpx2.Response(403))
+        )
+    assert await adb.scalar(text("SELECT count(*) FROM dumps")) == 2
+
+
+def test_keeping_is_a_setting() -> None:
+    assert Settings(**STORE).dumps_keep_days == 365
+    assert Settings(**STORE, dumps_keep_days=90).dumps_keep_days == 90
+    with pytest.raises(ValidationError):
+        Settings(**STORE, dumps_keep_days=1)

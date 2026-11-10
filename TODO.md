@@ -128,6 +128,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       with a README giving the ODbL and its attribution, uploaded to
       S3-compatible storage (R2) and listed at `/data`. An administrator can
       build one now from Admin. Needs the `OPENLARDER_DUMPS_` settings.
+      Kept a year, then deleted from the bucket and the list (#115; *Ray,
+      2026-11-10: 12 months*), `OPENLARDER_DUMPS_KEEP_DAYS` to change it.
       - [ ] Ray: an R2 bucket with public reading, and its API token.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central
       and Wikidata (aliases, hierarchy; allergens are Phase 2).

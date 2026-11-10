@@ -75,10 +75,11 @@ not all, the app refuses to start.
 | `OPENLARDER_DUMPS_SECRET_KEY` | Its secret. Never committed |
 | `OPENLARDER_DUMPS_PUBLIC_URL` | Where the bucket is read from: its custom domain (`https://data.openlarder.com`) or its `r2.dev` address |
 | `OPENLARDER_DUMPS_REGION` | `auto` unless set, which R2 wants; another store's region otherwise |
+| `OPENLARDER_DUMPS_KEEP_DAYS` | How long a dump is kept, `365` unless set (at least 7). Older ones are deleted from the bucket and `/data`; the newest always stays |
 
 The bucket needs public reading (R2: a custom domain or the r2.dev address
-under the bucket's Settings). Old dumps stay in the bucket; a lifecycle rule
-there can clear those older than a few months.
+under the bucket's Settings). The access key needs to delete too, which R2's
+Object Read & Write does.
 
 ### Sign-in
 

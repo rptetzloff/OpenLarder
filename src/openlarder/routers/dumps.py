@@ -33,6 +33,8 @@ class Dumps(BaseModel):
     attribution: str
     latest: DumpOut | None
     older: list[DumpOut]
+    # How long each is kept (OPENLARDER_DUMPS_KEEP_DAYS).
+    keep_days: int
 
 
 def _out(dump: Dump, settings) -> DumpOut:
@@ -62,6 +64,7 @@ async def list_dumps(session: Session, settings: Config) -> Dumps:
         attribution=dumps.ATTRIBUTION,
         latest=built[0] if built else None,
         older=built[1:],
+        keep_days=settings.dumps_keep_days,
     )
 
 

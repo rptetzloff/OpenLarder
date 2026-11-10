@@ -67,6 +67,24 @@ def signed_headers(
     }
 
 
+async def delete(
+    endpoint: str,
+    bucket: str,
+    key: str,
+    access_key: str,
+    secret_key: str,
+    region: str = "auto",
+    transport: httpx2.AsyncBaseTransport | None = None,
+) -> None:
+    """Remove a file; one already gone counts as removed (S3 answers 204)."""
+    url = f"{endpoint.rstrip('/')}/{bucket}/{key}"
+    headers = signed_headers("DELETE", url, b"", access_key, secret_key, region)
+    async with httpx2.AsyncClient(transport=transport, timeout=60) as client:
+        response = await client.delete(url, headers=headers)
+    if response.status_code >= 300 and response.status_code != 404:
+        raise UploadFailed(f"{response.status_code} from the store: {response.text[:300]}")
+
+
 async def put(
     endpoint: str,
     bucket: str,
