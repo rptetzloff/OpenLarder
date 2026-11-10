@@ -43,7 +43,7 @@ docker compose up --build        # http://localhost:8000
 | --- | --- |
 | `OPENLARDER_ENVIRONMENT` | `production` on the live site. Anything else (`development` unless set, `staging`) shows a band above the header on every page saying it's that site |
 | `OPENLARDER_NOTICE` | Optional. A line of plain text shown in that band instead, in any environment, production included: "Down for maintenance at 9pm" |
-| `OPENLARDER_META_TAGS` | Optional. `<meta>` tags for every page's head, as JSON by name, for site verification: `{"impact-site-verification": "56d10364-..."}` (Barnes & Noble's affiliate programme, through Impact). Each is written with both `content` and `value`, so Google's and Impact's checks both find it |
+| `OPENLARDER_META_TAGS` | Optional. `<meta>` tags for every page's head, as JSON by name, for site verification: `{"impact-site-verification": "56d10364-..."}` (Barnes & Noble's affiliate programme, through Impact). Each is written first in the head with the standard `content`, except Impact's, which is written with `value` alone, as its snippet has it |
 
 ### Sign-in
 
