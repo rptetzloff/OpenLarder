@@ -5,6 +5,8 @@ everything else, with unknown paths falling back to index.html so client-side
 routes survive a reload.
 """
 
+import asyncio
+import logging
 import mimetypes
 import secrets
 from contextlib import asynccontextmanager
@@ -16,10 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from openlarder import __version__
+from openlarder import __version__, usage
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
-from openlarder.db import dispose_engine
+from openlarder.db import dispose_engine, session_factory
 from openlarder.ratelimit import rate_limit
 from openlarder.routers import (
     account,
@@ -32,6 +34,7 @@ from openlarder.routers import (
     health,
     imports,
     ingredients,
+    monitoring,
     recipes,
     search,
     sources,
@@ -50,7 +53,15 @@ mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # API usage is written a minute at a time, and once more at shutdown.
+    writer = asyncio.create_task(usage.keep_writing(session_factory()))
     yield
+    writer.cancel()
+    try:
+        async with session_factory()() as session:
+            await usage.flush(session)
+    except Exception:
+        logging.getLogger(__name__).exception("Writing API usage at shutdown failed")
     await dispose_engine()
 
 
@@ -117,6 +128,7 @@ app.include_router(flags.router)
 app.include_router(go.router)
 app.include_router(groups.router)
 app.include_router(ingredients.router)
+app.include_router(monitoring.router)
 app.include_router(search.router)
 app.include_router(substitutions.router)
 app.include_router(suggestions.router)

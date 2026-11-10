@@ -6,6 +6,8 @@ import { takeRememberedInvite } from "./groups";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
+import AdminApiUsagePage from "./pages/AdminApiUsagePage.vue";
+import AdminClicksPage from "./pages/AdminClicksPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
@@ -51,6 +53,8 @@ const onGroups = path === "/groups";
 const onImport = path === "/admin/import";
 const onImports = path === "/admin/imports";
 const onSuggestions = path === "/admin/suggestions";
+const onApiUsage = path === "/admin/api";
+const onClicks = path === "/admin/clicks";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
@@ -160,6 +164,8 @@ onMounted(async () => {
     <AdminImportPage v-else-if="onImport" :user="user" />
     <AdminImportsPage v-else-if="onImports" :user="user" />
     <SuggestionsPage v-else-if="onSuggestions" :user="user" />
+    <AdminApiUsagePage v-else-if="onApiUsage" :user="user" />
+    <AdminClicksPage v-else-if="onClicks" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
@@ -2055,6 +2061,49 @@ button.primary.small {
 }
 .account-panels {
   margin-top: 2rem;
+}
+/* Admin monitoring: API usage and buy-link clicks. */
+.usage-table .numeric,
+.clicks-panels .numeric {
+  text-align: right;
+}
+.usage-table td.warn {
+  color: var(--error);
+  font-weight: 700;
+}
+.clicks-panels {
+  margin-top: 1rem;
+}
+.clicks-panels .tool-panel h2 {
+  margin-bottom: 0.75rem;
+}
+.day-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+.day-bars li {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.125rem 0;
+}
+.day-bar {
+  height: 0.75rem;
+  min-width: 2px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.day-count {
+  text-align: right;
+}
+@media (max-width: 40rem) {
+  .usage-table .numeric,
+  .clicks-panels .numeric {
+    text-align: left;
+  }
 }
 .api-keys {
   margin-top: 1rem;

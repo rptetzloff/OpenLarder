@@ -183,9 +183,10 @@ AS_THE_SITE = {"Sec-Fetch-Site": "same-origin"}
 
 @pytest.fixture(autouse=True)
 def _fresh_rate_limits():
-    from openlarder import ratelimit
+    from openlarder import ratelimit, usage
 
     ratelimit.reset()
+    usage.reset()
 
 
 @pytest.fixture

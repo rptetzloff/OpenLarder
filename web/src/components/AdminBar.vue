@@ -9,6 +9,8 @@ const LINKS = [
   ["/admin/imports", "Import history"],
   ["/admin/flags", "Flagged recipes"],
   ["/admin/suggestions", "Suggestions"],
+  ["/admin/api", "API usage"],
+  ["/admin/clicks", "Buy-link clicks"],
 ] as const;
 </script>
 

@@ -117,6 +117,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       and the docs and the keys panel say them as set. A key reads what
       someone signed out sees; writes need an account. The site's own pages
       are never limited. Counts are in memory, so a deploy resets them.
+      **Monitoring (#99):** Admin's API usage page lists each outside caller
+      by day (a key by its name and owner; no key, by a keyed pseudonym of
+      its address and its network, never the address; 30 days, migration
+      0037), and revokes any key; Buy-link clicks shows clicks by shop,
+      book, page and day (Ray, 2026-11-09).
 - [ ] **Data dumps**: weekly ODbL dumps, which let the anonymous limits stay
       tight without being unfriendly. Ray put them in Phase 3
       (2026-11-09); worth bringing forward once the API sees real use.
@@ -128,6 +133,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       suggestions and "new ingredient" step wait on this too.
 
 ## Planned features
+
+- [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*
+      Anyone, signed in or not, asks for a cookbook or another source to
+      be entered, and the request goes into a tracking system. Approved
+      enterers volunteer to claim a request and queue it up; a claim
+      doesn't stop it being done sooner by someone else. To settle when
+      it's built:
+      - what a request takes: an ISBN or title (matched against Open
+        Library, and against what's already here or already asked for, so
+        a second request adds a vote rather than a duplicate), and an
+        optional note;
+      - signed-out requests: a rate limit and a challenge against spam,
+        and whether the requester can follow it (by email, which brings
+        its own privacy wording, or only by watching the public list);
+      - who is an "approved enterer": a role an admin grants, ahead of the
+        trust levels in Contributions;
+      - the states a request moves through (asked, claimed, in progress,
+        done, declined with a reason), whether a claim lapses if nothing
+        happens for a while, and closing a request when its book is
+        entered by anyone;
+      - a public list of what's asked for, most wanted first, and each
+        enterer's queue.
 
 - [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
       book or a blog or an instagram post or a tv episode or a magazine

@@ -149,6 +149,18 @@ async function archiveAll() {
           </a>
         </li>
         <li>
+          <a href="/admin/api">
+            <h2>API usage</h2>
+            <p>Programs reading the API, busiest first, to spot abuse; keys can be revoked there.</p>
+          </a>
+        </li>
+        <li>
+          <a href="/admin/clicks">
+            <h2>Buy-link clicks</h2>
+            <p>Clicks on the shops' links, by shop, book, page and day.</p>
+          </a>
+        </li>
+        <li>
           <a href="/admin/imports">
             <h2>Import history</h2>
             <p class="count">{{ n(imports, "import", "imports") }}</p>
