@@ -9,7 +9,7 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -19,6 +19,7 @@ from openlarder import __version__
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine
+from openlarder.ratelimit import rate_limit
 from openlarder.routers import (
     account,
     auth,
@@ -48,12 +49,38 @@ async def lifespan(_app: FastAPI):
     await dispose_engine()
 
 
+def api_description() -> str:
+    """The docs' opening, with the limits as set (ratelimit.py)."""
+    s = get_settings()
+    return f"""
+The catalog's public, read-only API: sources, editions, recipes, ingredients,
+authors, tags and search. The data is open under the
+[ODbL](https://opendatacommons.org/licenses/odbl/1-0/): use it, and keep what
+you make from it open too, saying it's from OpenLarder.
+
+**No key is needed** to start. Without one, each address may make
+{s.api_reads_per_minute} plain reads and {s.api_searches_per_minute} searches a
+minute (`/api/search`, or a list searched with `q`), and
+{s.api_requests_per_day:,} requests a day (UTC). **A free key** raises them to
+{s.api_key_reads_per_minute}, {s.api_key_searches_per_minute} and
+{s.api_key_requests_per_day:,}: make one on Your account at openlarder.com, and
+send it as `Authorization: Bearer ol_...` (or `X-API-Key: ol_...`). A key reads
+what someone signed out sees; writing needs a signed-in account.
+
+Each answer says `RateLimit-Limit`, `RateLimit-Remaining` and
+`RateLimit-Policy`; over a limit, the answer is 429 with `Retry-After`.
+"""
+
+
 app = FastAPI(
     title="OpenLarder",
     version=__version__,
+    description=api_description(),
     lifespan=lifespan,
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+    # Limits /api reads from outside the site (ratelimit.py).
+    dependencies=[Depends(rate_limit)],
 )
 
 settings = get_settings()

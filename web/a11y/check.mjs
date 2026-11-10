@@ -41,6 +41,8 @@ async function api(path, who, body, method = body ? "POST" : "GET") {
     method,
     headers: {
       Cookie: `openlarder_session=${TOKENS[who]}`,
+      // As the site's own pages: the API's rate limit leaves them alone.
+      "Sec-Fetch-Site": "same-origin",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

@@ -176,10 +176,24 @@ def configure(adb: AsyncSession, broker: FakeBroker, ia: FakeArchive) -> Iterato
         app.dependency_overrides.clear()
 
 
+# The header a browser adds to a page's requests to its own site: tests act
+# as the site, which the API's rate limit leaves alone (ratelimit.py).
+AS_THE_SITE = {"Sec-Fetch-Site": "same-origin"}
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    from openlarder import ratelimit
+
+    ratelimit.reset()
+
+
 @pytest.fixture
 async def client(configure) -> AsyncIterator[httpx2.AsyncClient]:
     async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx2.ASGITransport(app=app),
+        base_url="http://testserver",
+        headers=AS_THE_SITE,
     ) as c:
         yield c
 
@@ -230,6 +244,7 @@ async def people(client, adb):
                     transport=httpx2.ASGITransport(app=app),
                     base_url="http://testserver",
                     cookies={SESSION_COOKIE: token},
+                    headers=AS_THE_SITE,
                 )
             )
             return c

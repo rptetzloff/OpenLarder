@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import ApiKeys from "../components/ApiKeys.vue";
 import NameForm from "../components/NameForm.vue";
 import { fetchFlags } from "../flags";
 import { listGroups } from "../groups";
@@ -81,6 +82,7 @@ const n = (v: number | null, one: string, many: string) =>
           </p>
         </section>
       </div>
+      <ApiKeys />
     </template>
   </article>
 </template>

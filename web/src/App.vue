@@ -2018,6 +2018,38 @@ button.primary.small {
 .account-panels {
   margin-top: 2rem;
 }
+.api-keys {
+  margin-top: 1rem;
+}
+.api-keys .muted a {
+  color: var(--link);
+}
+.key-list {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.key-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+.key-list .muted {
+  font-size: 0.875rem;
+}
+.key-form input {
+  font: inherit;
+  flex: 1 1 14rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
 /* Tags: chips under a title, each a search; and choosing them. */
 .tag-chips {
   display: flex;
