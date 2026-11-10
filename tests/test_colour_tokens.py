@@ -31,6 +31,7 @@ PAIRS = [
     ("error", "bg", TEXT),
     ("border", "bg", BOUNDARY),  # input edges
     ("accent", "bg", BOUNDARY),  # button edges
+    ("focus", "bg", BOUNDARY),  # the keyboard focus ring
 ]
 
 

@@ -48,3 +48,11 @@ async def test_a_missing_asset_is_a_404_nobody_keeps(tmp_path) -> None:
     assert missing.headers["cache-control"] == "no-store"
     assert present.status_code == 200
     assert "cache-control" not in present.headers
+
+
+def test_fonts_go_out_as_fonts() -> None:
+    import mimetypes
+
+    import openlarder.main  # noqa: F401  (registers the types)
+
+    assert mimetypes.guess_type("outfit-400.woff2")[0] == "font/woff2"

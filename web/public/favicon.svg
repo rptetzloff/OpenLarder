@@ -1,12 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenLarder">
-  <!-- A placeholder mark until there is a real one: a larder jar with an
-       index card for a label. Its own dark tile, so it reads on light and
-       dark tabs alike. -->
-  <rect width="64" height="64" rx="14" fill="#1f1e1c"/>
-  <rect x="20" y="11" width="24" height="7" rx="2" fill="#e0a24a"/>
-  <rect x="23" y="18" width="18" height="5" fill="#b9792f"/>
-  <rect x="15" y="23" width="34" height="31" rx="8" fill="#e0a24a"/>
-  <rect x="20" y="31" width="24" height="14" rx="2" fill="#fbfaf7"/>
-  <rect x="23" y="35" width="18" height="2" rx="1" fill="#1f1e1c"/>
-  <rect x="23" y="39.5" width="11" height="2" rx="1" fill="#1f1e1c"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="OpenLarder"><title>OpenLarder</title><circle cx="80" cy="80" r="70" fill="#2E4A3B"/><path d="M44 28H64V102H126V124H44Z" fill="#E8B866"/><rect x="70" y="46" width="17" height="56" rx="2" fill="#FAF6EC"/><rect x="93" y="68" width="29" height="34" rx="7" fill="#B5532C"/></svg>

@@ -5,6 +5,7 @@ everything else, with unknown paths falling back to index.html so client-side
 routes survive a reload.
 """
 
+import mimetypes
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,6 +42,10 @@ from openlarder.routers import (
 )
 
 WEB_DIR = Path(__file__).parent / "web"
+# The slim image has no system MIME table, so the brand's fonts and the web
+# manifest would go out as application/octet-stream.
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 @asynccontextmanager

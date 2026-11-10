@@ -105,8 +105,8 @@ onMounted(async () => {
       <a href="/" class="brand">
         <!-- The full logo, in the version for the page's light or dark; CSS
              shows the one that matches data-theme. -->
-        <img class="for-light" src="/logo-light.svg" alt="OpenLarder" width="140" height="36" />
-        <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="140" height="36" />
+        <img class="for-light" src="/logo-light.svg" alt="OpenLarder" width="150" height="44" />
+        <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="150" height="44" />
       </a>
       <nav class="primary-nav" aria-label="Main">
         <a
@@ -196,56 +196,94 @@ onMounted(async () => {
 </template>
 
 <style>
-/* The design's colours, once (Ray's wireframes, 2026-11-08): light as
-   drawn, and dark when chosen in the footer or, by default, when the device
-   is set to dark. data-theme on <html> is always "light" or "dark" (see
-   index.html and theme.ts). --accent is the primary
-   action (the blue Search button); --line is a divider, lighter than
-   --border, which input edges use and which keeps 3:1 against --bg. */
+/* The brand's type (the brand kit, made with Claude for Ray, 2026-11-09): Outfit, served from here
+   rather than a font service, so no one else hears of a visit. */
+@font-face {
+  font-family: "Outfit";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/outfit-300.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Outfit";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/outfit-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Outfit";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/outfit-700.woff2") format("woff2");
+}
+
+/* The brand's colours, once: the kit's THEMES.md (2026-11-09), light and dark.
+   data-theme on <html> is always "light" or "dark" (see index.html and
+   theme.ts). The kit's tokens map onto these: --bg, --surface (cards,
+   panels, bands), --fg, --muted, --accent (its primary: buttons), --link,
+   --line (its border: hairlines) and --focus. Two the kit leaves to the
+   site: --border, input and button edges, which must keep 3:1 against
+   --bg and so is darker than the kit's hairline; and the tints for chips,
+   admin bands, "fine" tags and errors, drawn from its colours. Light links
+   are only just 4.5:1 on ivory, so they're never set on a band darker than
+   it. test_colour_tokens.py checks every pair a page puts together. */
 :root {
-  --bg: #ffffff;
-  --surface: #f3f2ef;
-  --fg: #1a1a19;
-  --muted: #5f5e5a;
-  --link: #1f5fbf;
-  --accent: #1f5fbf;
-  --accent-hover: #194f9f;
-  --on-accent: #ffffff;
-  --border: #8a877f;
-  --line: #e3e2de;
-  --chip: #e8eef7;
-  --ok-bg: #e3f1e6;
-  --admin-bg: #fdf3d3;
-  --admin-line: #ecd58a;
-  --error: #b3261e;
+  --bg: #faf6ec;
+  --surface: #ffffff;
+  --fg: #2e4a3b;
+  --muted: #56665c;
+  --link: #b5532c;
+  --accent: #2e4a3b;
+  --accent-hover: #1f3329;
+  --on-accent: #faf6ec;
+  --focus: #b5532c;
+  --border: #8a8775;
+  --line: #e4ddcb;
+  --chip: #f3e4c2;
+  --ok-bg: #e1ebdf;
+  --admin-bg: #f6e3b8;
+  --admin-line: #e8b866;
+  --error: #a8321e;
   --page: 72rem;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #161615;
-  --surface: #22211f;
-  --fg: #ecebe6;
-  --muted: #a8a59c;
-  --link: #8ab4f8;
-  /* Light blue with dark text: white on it would be under 3:1. */
-  --accent: #8ab4f8;
-  --accent-hover: #a8c7fa;
-  --on-accent: #0b1f3a;
-  --border: #77746c;
-  --line: #34332f;
-  --chip: #1f2c40;
-  --ok-bg: #1d3324;
-  --admin-bg: #3a3016;
-  --admin-line: #5c4c1f;
+  --bg: #14201a;
+  --surface: #1c2b23;
+  --fg: #f2ede0;
+  --muted: #a9b5ac;
+  --link: #e58b63;
+  --accent: #e8b866;
+  --accent-hover: #f0c987;
+  --on-accent: #14201a;
+  --focus: #e8b866;
+  --border: #6f8577;
+  --line: #34493d;
+  --chip: #24372d;
+  --ok-bg: #22402e;
+  --admin-bg: #3a3218;
+  --admin-line: #6b5520;
   --error: #f2a8a2;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.5;
+  font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 .site-header {
   border-bottom: 1px solid var(--line);
@@ -281,7 +319,7 @@ body {
 }
 .brand img {
   display: block;
-  height: 2.25rem;
+  height: 2.75rem;
   width: auto;
 }
 .primary-nav {
@@ -342,7 +380,7 @@ a.button-outline {
     width: 100%;
   }
   .brand img {
-    height: 2rem;
+    height: 2.25rem;
   }
 }
 .site-footer {
