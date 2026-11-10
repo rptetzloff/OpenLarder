@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BookMerge from "../components/BookMerge.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import ShopChooser from "../components/ShopChooser.vue";
 import { REVIEW_LABELS } from "../review";
@@ -209,6 +210,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <a v-if="isBook" href="#open-library">
               {{ book.open_library_url ? "Check Open Library" : "Link to Open Library" }}
             </a>
+            <a v-if="isBook" href="#merge">Merge</a>
             <a href="/admin/flags">Flagged recipes</a>
           </div>
         </div>
@@ -517,6 +519,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
       <p v-if="isBook" class="status credit-line">
         Book details and covers from <a href="https://openlibrary.org">Open Library</a>.
       </p>
+      <BookMerge v-if="adminTools && isBook" :id="book.id" :title="book.title" />
       <HistoryPanel kind="sources" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>

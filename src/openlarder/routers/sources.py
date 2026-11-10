@@ -19,8 +19,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, exists, func, select
 
+from openlarder import (
+    book_merge,
+    buying,
+    history,
+    isbn,
+    linking,
+    openlibrary,
+    references,
+    refresh,
+    visibility,
+    web,
+)
 from openlarder import books as books_module
-from openlarder import buying, isbn, linking, openlibrary, references, refresh, visibility, web
 from openlarder import recipes as recipes_module
 from openlarder.agreement import Agreed, Contributing, require_agreement
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
@@ -1216,3 +1227,54 @@ async def share(
         session.add(SourceGroup(source_id=collection.id, group_id=group_id))
     await session.commit()
     return await _shared_with(session, collection, user)
+
+
+# Merging two records of one book (book_merge.py)
+
+
+class MergeInto(BaseModel):
+    into: uuid.UUID
+
+
+class MergePlan(BaseModel):
+    editions: int
+    recipes: int
+    credits: int
+    same_titles: list[str]
+
+
+async def _two_books(session, user: User, gone_id: uuid.UUID, kept_id: uuid.UUID):
+    gone, kept = await session.get(Source, gone_id), await session.get(Source, kept_id)
+    for source in (gone, kept):
+        if source is None or not await visibility.can_see(session, user, source):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    return gone, kept
+
+
+@router.get("/{source_id}/merge", response_model=MergePlan)
+async def merge_plan(
+    source_id: uuid.UUID, into: uuid.UUID, admin: ModeratorUser, session: Session
+) -> MergePlan:
+    """What merging this book into another would move."""
+    gone, kept = await _two_books(session, admin, source_id, into)
+    try:
+        found = await book_merge.plan(session, gone, kept)
+    except book_merge.CantMerge as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    return MergePlan(**found.__dict__)
+
+
+@router.post("/{source_id}/merge", response_model=Added, dependencies=AGREED)
+async def merge_book(
+    source_id: uuid.UUID, body: MergeInto, admin: ModeratorUser, session: Session
+) -> Added:
+    """Merge this book into another; answers with the one that's left."""
+    gone, kept = await _two_books(session, admin, source_id, body.into)
+    await history.via(session, f"merge:{gone.id}")
+    try:
+        await book_merge.merge(session, gone, kept)
+    except book_merge.CantMerge as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    await session.commit()
+    log.info("%s merged book %s into %s", admin.id, source_id, body.into)
+    return Added(id=kept.id)
