@@ -14,6 +14,7 @@ const LINKS = [
   ["/admin/imports", "Import history", true],
   ["/admin/flags", "Flagged recipes", false],
   ["/admin/suggestions", "Suggestions", false],
+  ["/admin/changes", "Recent changes", false],
   ["/admin/people", "People", false],
   ["/admin/api", "API usage", true],
   ["/admin/clicks", "Buy-link clicks", true],

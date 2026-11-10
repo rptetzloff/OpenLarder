@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import HistoryPanel from "../components/HistoryPanel.vue";
 import {
   addLink,
   type Author,
@@ -331,6 +332,7 @@ onMounted(load);
           </ul>
         </div>
       </section>
+      <HistoryPanel kind="authors" :id="id" />
     </template>
   </article>
 </template>

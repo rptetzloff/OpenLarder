@@ -79,6 +79,11 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>your account's role: contributor, moderator or administrator, if it has one;</li>
       <li>
+        what you add to or change in the catalog, with your display name and when: its edit
+        history, which anyone who can see the record can read. For a family collection, only
+        those who can see the collection see its history;
+      </li>
+      <li>
         the family collections you add: each one's name, whether it is private, when you ticked
         that you understand what is kept, and each of its recipes' titles and ingredient names,
         never amounts or the method. A private collection is shown to no one but you and the

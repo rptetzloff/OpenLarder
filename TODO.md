@@ -134,12 +134,26 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       also run imports, API usage and buy-link clicks and make moderators;
       only the owner makes administrators, and the owner is set in the
       database. People and roles at `/admin/people`.
-- [ ] **Contributions**, next *(Ray, 2026-11-10: "build review first")*:
-      review queue, edit history and the ODbL contributor agreement,
-      together, so a contributor's additions wait for a moderator. Then
-      trust levels and a report button. Until then only moderators and up
-      add to the catalog; contributors claim requests. The ingredient
-      matching flow's suggestions and "new ingredient" step wait on this too.
+- [ ] **Contributions** *(Ray, 2026-11-10: "build review first")*: review
+      queue, edit history and the ODbL contributor agreement, so a
+      contributor's additions wait for a moderator. Ray's calls: first
+      books and their recipes; hidden until approved; history of every
+      catalog change. In order:
+      - [x] Edit history (#102): a trigger records every catalog row added,
+        changed or removed, by whom and through what, grouped by request.
+        A History panel on each source, recipe, ingredient and author page;
+        Recent changes at `/admin/changes` for moderators. Family
+        collections' history only with the collection; an ingredient first
+        named in a private recipe doesn't say who made it.
+      - [ ] The ODbL contributor agreement before a first contribution,
+        then contributors add books and recipes, pending until a moderator
+        approves them, hidden from everyone else (the public site, the
+        API, the n8n views).
+      - [ ] One-click revert of a change.
+      - [ ] Then trust levels and a report button. The ingredient matching
+        flow's suggestions and "new ingredient" step wait on this too.
+      - [ ] Edit history keeps everything forever: check its size once the
+        household index is imported again (~400,000 rows for 19,000 recipes).
 
 ## Planned features
 

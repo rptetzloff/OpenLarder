@@ -21,7 +21,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import Float, case, func, select
 
-from openlarder import ingredients, visibility
+from openlarder import history, ingredients, visibility
 from openlarder.auth import ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -371,6 +371,8 @@ async def accept(
     suggestion_id: uuid.UUID, body: Accept, admin: ModeratorUser, session: Session
 ) -> SuggestionOut:
     row = await _open_or_404(session, admin, suggestion_id)
+    # Applied as the moderator's edit, marked with what suggested it.
+    await history.via(session, f"suggestion:{row.id}")
     if row.kind == "tag":
         target = _tag_target(row)
         recipe = await session.get(Recipe, target[0]) if target else None

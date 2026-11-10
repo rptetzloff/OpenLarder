@@ -7,6 +7,7 @@ import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import AdminApiUsagePage from "./pages/AdminApiUsagePage.vue";
+import AdminChangesPage from "./pages/AdminChangesPage.vue";
 import AdminClicksPage from "./pages/AdminClicksPage.vue";
 import AdminPeoplePage from "./pages/AdminPeoplePage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
@@ -58,6 +59,7 @@ const onSuggestions = path === "/admin/suggestions";
 const onApiUsage = path === "/admin/api";
 const onClicks = path === "/admin/clicks";
 const onPeople = path === "/admin/people";
+const onChanges = path === "/admin/changes";
 const onRequests = path === "/requests";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
@@ -172,6 +174,7 @@ onMounted(async () => {
     <AdminApiUsagePage v-else-if="onApiUsage" :user="user" />
     <AdminClicksPage v-else-if="onClicks" :user="user" />
     <AdminPeoplePage v-else-if="onPeople" :user="user" />
+    <AdminChangesPage v-else-if="onChanges" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
@@ -2152,6 +2155,44 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+/* Edit history: on each record's page, folded away, and Recent changes. */
+.history-panel {
+  margin-top: 2rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+.history-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.change-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+.change-list > li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.change-head {
+  margin: 0 0 0.25rem;
+}
+.change-entries,
+.change-fields {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+.change-fields {
+  color: var(--muted);
+}
+.change-action {
+  font-weight: 600;
+}
+.change-action.removed {
+  color: var(--error);
 }
 /* Admin monitoring: API usage and buy-link clicks. */
 .usage-table .numeric,

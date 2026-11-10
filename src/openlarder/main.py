@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from openlarder import __version__, usage
+from openlarder import __version__, history, usage
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine, session_factory
@@ -44,6 +44,9 @@ from openlarder.routers import (
     suggestions,
     tags,
     web_pages,
+)
+from openlarder.routers import (
+    history as history_routes,
 )
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -102,6 +105,8 @@ app = FastAPI(
 )
 
 settings = get_settings()
+# Each request's writes are one change in the edit history (history.py).
+app.add_middleware(history.Middleware)
 app.add_middleware(
     SessionMiddleware,
     # Without sign-in configured nothing is ever written to this cookie, so a
@@ -130,6 +135,7 @@ app.include_router(covers.router)
 app.include_router(flags.router)
 app.include_router(go.router)
 app.include_router(groups.router)
+app.include_router(history_routes.router)
 app.include_router(ingredients.router)
 app.include_router(monitoring.router)
 app.include_router(people.router)

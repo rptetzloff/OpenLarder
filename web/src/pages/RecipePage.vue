@@ -2,6 +2,7 @@
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
+import HistoryPanel from "../components/HistoryPanel.vue";
 import { setRecipeTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
 import { issueName } from "../books";
@@ -387,6 +388,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           </p>
         </aside>
       </div>
+      <HistoryPanel kind="recipes" :id="id" />
     </template>
   </article>
 </template>
