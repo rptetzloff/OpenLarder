@@ -534,6 +534,13 @@ button.secondary[aria-current="page"] {
 .filters .check {
   font-weight: normal;
 }
+/* The tag filters, after the source kinds. */
+.filters fieldset + fieldset {
+  margin-top: 1.25rem;
+}
+.filters > button.link {
+  margin-top: 0.75rem;
+}
 .filters button.link,
 .results a,
 .search-page .suggestions button.link {
@@ -1917,6 +1924,69 @@ button.primary.small {
 }
 .account-panels {
   margin-top: 2rem;
+}
+/* Tags: chips under a title, each a search; and choosing them. */
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+.tag-chips li {
+  margin: 0;
+}
+.tag-chips a {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--fg);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.tag-chips a:hover {
+  text-decoration: underline;
+}
+.tag-editor {
+  margin: 0.25rem 0 0.75rem;
+}
+.tag-editor[open] {
+  max-width: 48rem;
+}
+.tag-kind {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 0;
+}
+.tag-kind legend {
+  margin-bottom: 0.375rem;
+  font-weight: 600;
+}
+.tag-kind .kind-filter {
+  margin: 0;
+}
+.tag-editor .help {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.tag-new {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.tag-new label {
+  font-weight: 600;
+}
+.tag-new select,
+.tag-new input {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
 }
 /* Groups: the list, a group's page and an invite. */
 .group-form {

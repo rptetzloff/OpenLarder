@@ -532,3 +532,21 @@ async def test_a_suggestion_naming_a_private_ingredient_stays_hidden(secret, peo
     for action in ("accept", "dismiss"):
         refused = await admin.post(f"/api/suggestions/{suggestion}/{action}", json={})
         assert refused.status_code == 404
+
+
+async def test_searching_by_tag_leaves_out_the_private_collection(secret, people, adb) -> None:
+    """A tag on Ann's box, and on her stew, finds nothing for anyone else."""
+    vegan = await adb.scalar(text("SELECT id FROM tags WHERE kind = 'diet' AND name = 'Vegan'"))
+    await adb.execute(
+        text("INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (:r, :t)"),
+        {"r": uuid.UUID(secret["stew"]), "t": vegan},
+    )
+    await adb.execute(
+        text("INSERT INTO source_tags (source_id, tag_id) VALUES (:s, :t)"),
+        {"s": uuid.UUID(secret["box"]), "t": vegan},
+    )
+    for who in (await people("ada", admin=True), await people("bo")):
+        found = (await who.get("/api/search", params={"tag": str(vegan)})).json()
+        assert found["recipes"] == [] and found["total"] == 0
+    mine = (await secret["ann"].get("/api/search", params={"tag": str(vegan)})).json()
+    assert [r["id"] for r in mine["recipes"]] == [secret["stew"]]

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import TagEditor from "../components/TagEditor.vue";
+import { setRecipeTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
 import { issueName } from "../books";
 import FlagItem from "../components/FlagItem.vue";
@@ -137,6 +139,13 @@ async function remove() {
     error.value = e instanceof Error ? e.message : String(e);
   }
 }
+
+// Tags: the recipe's own; its source's come with it.
+async function saveTags(ids: string[]) {
+  recipe.value!.tags = await setRecipeTags(recipe.value!.id, ids);
+}
+// "book", "site": what the source is, for a tag that came from it.
+const sourceWord = computed(() => (recipe.value?.source.kind === "book" ? "book" : "source"));
 </script>
 
 <template>
@@ -157,6 +166,20 @@ async function remove() {
         <h1>{{ recipe.title }}</h1>
         <span v-if="recipe.used_in.length" class="badge">Component recipe</span>
       </div>
+      <ul v-if="recipe.tags.length" class="tag-chips" aria-label="Tags">
+        <li v-for="t in recipe.tags" :key="t.id">
+          <a :href="`/search?tag=${t.id}`">{{ t.name }}</a
+          ><span v-if="t.from_source" class="visually-hidden"> (from the {{ sourceWord }})</span>
+        </li>
+      </ul>
+      <TagEditor
+        v-if="recipe.editable"
+        what="recipe"
+        :selected="recipe.tags.filter((t) => !t.from_source).map((t) => t.id)"
+        :inherited="recipe.tags.filter((t) => t.from_source).map((t) => t.id)"
+        :can-add="!!user?.is_admin"
+        :save="saveTags"
+      />
 
       <div class="recipe-layout">
         <div class="recipe-main">

@@ -75,10 +75,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       **Chapters (#91):** a recipe's chapter in its book, imported from the
       index's Tag column (running an import again fills it in on recipes
       already there), entered in the recipe form and Enter a whole book,
-      shown on the recipe and filtering the book's recipe table. Next:
-      **tags** from a fixed list per kind, on sources and recipes, shown
-      and searchable; then **model suggestions** for tags, as an n8n
-      workflow into the Suggestions queue.
+      shown on the recipe and filtering the book's recipe table. **Tags
+      (#92):** courses, cuisines and techniques start the list (migration
+      0032; diets came with 0018); whoever may change a source tags it
+      and its recipes from "Edit tags", and admins add to the list there;
+      tags show as chips that search by them, and search filters by
+      them, on their own too. Next: **model suggestions** for tags, as an
+      n8n workflow into the Suggestions queue.
 - [ ] **Bookshop.org affiliate links**: the purchase_links table exists, with
       nothing to fill or show it.
 - [ ] **Read-only public API**: the routes are public and documented at
