@@ -16,8 +16,9 @@ address bar ("none"). A program can copy that header, which is fine: the
 limit is a courtesy for an open catalog, not a lock. Writes need a signed-in
 account whatever the key.
 
-Counts are kept in memory, one process serving, and never stored; a deploy
-starts them afresh. An address is seen only as a key to its count.
+The limits' counts are kept in memory, one process serving; a deploy starts
+them afresh. usage.py keeps a daily record per caller for admins, an address
+only as a pseudonym and its network.
 """
 
 import math
@@ -27,6 +28,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException, Request, Response, status
 from sqlalchemy import select
 
+from openlarder import usage
 from openlarder.auth import hash_token
 from openlarder.config import Settings, get_settings
 from openlarder.db import Session
@@ -154,9 +156,11 @@ async def rate_limit(request: Request, response: Response, session: Session) -> 
         if key.last_used_at is None or now - key.last_used_at > TOUCH_EVERY:
             key.last_used_at = now
             await session.commit()
-        caller = f"key:{key.id}"
+        caller, key_id, address = f"key:{key.id}", key.id, None
     else:
-        caller = f"ip:{_address(request)}"
+        address = _address(request)
+        # Counted under a pseudonym of the address, never the address.
+        caller, key_id = f"ip:{usage.pseudonym(address)}", None
     reads, searches, per_day = limits(get_settings(), keyed=given is not None)
     search = is_search(request)
     per_minute = searches if search else reads
@@ -176,6 +180,7 @@ async def rate_limit(request: Request, response: Response, session: Session) -> 
             "RateLimit-Remaining": "0",
             "RateLimit-Policy": policy,
         }
+        usage.record(caller, key_id, address, search=search, refused=True)
         raise _refuse(
             f"Over {per_day:,} requests today (UTC).{raise_it}",
             (midnight - clock).total_seconds(),
@@ -188,7 +193,9 @@ async def rate_limit(request: Request, response: Response, session: Session) -> 
         "RateLimit-Policy": policy,
     }
     if not allowed:
+        usage.record(caller, key_id, address, search=search, refused=True)
         kind = "searches" if search else "requests"
         raise _refuse(f"Over {per_minute} {kind} a minute.{raise_it}", wait, headers)
     _days[caller] = (today, used + 1)
+    usage.record(caller, key_id, address, search=search, refused=False)
     response.headers.update(headers)

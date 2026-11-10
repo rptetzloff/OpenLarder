@@ -179,6 +179,8 @@ function pages(s) {
     ["/admin/flags", "admin"],
     ["/admin/imports", "admin"],
     ["/admin/suggestions", "admin"],
+    ["/admin/api", "admin"],
+    ["/admin/clicks", "admin"],
     ["/admin/suggestions", "cook"],
     ["/privacy", null],
     ["/terms", null],

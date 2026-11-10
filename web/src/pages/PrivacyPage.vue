@@ -30,10 +30,14 @@ document.title = "Privacy policy · OpenLarder";
       to build profiles of anyone.
     </p>
     <p>
-      Programs reading OpenLarder's public API are limited in how often they may ask. To do that,
-      the server counts each program's requests by its API key, or by its IP address when it has
-      none. The counts are kept in memory for a minute or two and never stored. An API key belongs
-      to the account that made it, which can see when the key was last used and revoke it.
+      Programs reading OpenLarder's public API are limited in how often they may ask, and their
+      use is recorded so that misuse can be seen and stopped. A program is counted by its API key,
+      or, without one, by a name made from its IP address with a secret key (the same each day,
+      but not something the address can be worked out from) and its network (the address with its
+      last part removed). The IP address itself is not stored. What's kept is how many requests
+      each made each day and when it was last seen, for 30 days. An API key belongs to the account
+      that made it, which can see when the key was last used and revoke it. The site's own pages
+      aren't counted.
     </p>
     <p>
       Book covers come from <a href="https://openlibrary.org">Open Library</a>, run by the

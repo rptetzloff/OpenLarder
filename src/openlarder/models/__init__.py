@@ -27,8 +27,10 @@ from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.imports import ImportRun, ImportRunLine
 from openlarder.models.suggestions import IngredientEmbedding, Suggestion
+from openlarder.models.usage import ApiUsage
 
 __all__ = [
+    "ApiUsage",
     "ApiKey",
     "Author",
     "AuthorLink",

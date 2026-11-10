@@ -117,6 +117,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       and the docs and the keys panel say them as set. A key reads what
       someone signed out sees; writes need an account. The site's own pages
       are never limited. Counts are in memory, so a deploy resets them.
+      **Monitoring (#99):** Admin's API usage page lists each outside caller
+      by day (a key by its name and owner; no key, by a keyed pseudonym of
+      its address and its network, never the address; 30 days, migration
+      0037), and revokes any key; Buy-link clicks shows clicks by shop,
+      book, page and day (Ray, 2026-11-09).
 - [ ] **Data dumps**: weekly ODbL dumps, which let the anonymous limits stay
       tight without being unfriendly. Ray put them in Phase 3
       (2026-11-09); worth bringing forward once the API sees real use.
