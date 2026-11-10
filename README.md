@@ -45,6 +45,25 @@ docker compose up --build        # http://localhost:8000
 | `OPENLARDER_NOTICE` | Optional. A line of plain text shown in that band instead, in any environment, production included: "Down for maintenance at 9pm" |
 | `OPENLARDER_META_TAGS` | Optional. `<meta>` tags for every page's head, as JSON by name, for site verification: `{"impact-site-verification": "56d10364-..."}` (Barnes & Noble's affiliate programme, through Impact). Each is written first in the head with the standard `content`, except Impact's, which is written with `value` alone, as its snippet has it |
 
+### Data dumps
+
+The weekly ODbL dumps (dumps.py) go to S3-compatible object storage, and
+/data links them. Without these settings there are no dumps; with some but
+not all, the app refuses to start.
+
+| Variable | Value |
+| --- | --- |
+| `OPENLARDER_DUMPS_ENDPOINT` | The store's API address. For Cloudflare R2, `https://<account id>.r2.cloudflarestorage.com` |
+| `OPENLARDER_DUMPS_BUCKET` | The bucket, e.g. `openlarder-data` |
+| `OPENLARDER_DUMPS_ACCESS_KEY` | An access key that can write to the bucket. For R2: an R2 API token with Object Read & Write on that bucket gives this and the next |
+| `OPENLARDER_DUMPS_SECRET_KEY` | Its secret. Never committed |
+| `OPENLARDER_DUMPS_PUBLIC_URL` | Where the bucket is read from: its custom domain (`https://data.openlarder.com`) or its `r2.dev` address |
+| `OPENLARDER_DUMPS_REGION` | `auto` unless set, which R2 wants; another store's region otherwise |
+
+The bucket needs public reading (R2: a custom domain or the r2.dev address
+under the bucket's Settings). Old dumps stay in the bucket; a lifecycle rule
+there can clear those older than a few months.
+
 ### Sign-in
 
 Sign-in goes through Authgear Cloud at `auth.openlarder.com` (see

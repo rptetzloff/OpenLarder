@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import { type WikidataRun, checkWikidata } from "../authors";
 import { type BookSummary, listSources } from "../books";
+import { buildDump, size } from "../dumps";
 import { fetchFlags } from "../flags";
 import { reviewQueue } from "../review";
 import { fetchSuggestions } from "../suggestions";
@@ -40,6 +41,22 @@ watch(
   },
   { immediate: true },
 );
+// A data dump now, rather than waiting for the week's (dumps.py).
+const dumping = ref(false);
+const dumped = ref("");
+const dumpError = ref("");
+async function dumpNow() {
+  dumping.value = true;
+  dumped.value = dumpError.value = "";
+  try {
+    const d = await buildDump();
+    dumped.value = `Built: ${size(d.csv_bytes)} of CSV and ${size(d.json_bytes)} of JSON Lines.`;
+  } catch (e) {
+    dumpError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    dumping.value = false;
+  }
+}
 // Wikidata's facts for every author it may know (by Open Library or
 // Wikidata ID), a batch at a time; each batch is one query.
 const asking = ref(false);
@@ -240,6 +257,18 @@ async function archiveAll() {
               </li>
             </ul>
           </template>
+        </section>
+        <section v-if="user.may_run" class="tool-panel" aria-labelledby="dump-title">
+          <h3 id="dump-title">Data dump</h3>
+          <p class="muted">
+            The public catalog as CSV and JSON Lines, uploaded to the data bucket and listed on
+            <a href="/data">Open data</a>. One is built each week; this builds one now.
+          </p>
+          <button type="button" class="primary" :disabled="dumping" @click="dumpNow">
+            {{ dumping ? "Building…" : "Build a dump now" }}
+          </button>
+          <p v-if="dumped" class="status" aria-live="polite">{{ dumped }}</p>
+          <p v-if="dumpError" class="error" role="alert">{{ dumpError }}</p>
         </section>
       </div>
     </template>
