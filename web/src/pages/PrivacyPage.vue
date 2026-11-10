@@ -43,6 +43,11 @@ document.title = "Privacy policy · OpenLarder";
       then sees your visit as anyone's would, and tracks the purchase under its own privacy
       policy.
     </p>
+    <p>
+      You can choose which shops show and in what order. Signed in, that choice is kept with your
+      account. Signed out, your browser keeps it in its own storage, not in a cookie, and it is
+      never sent to OpenLarder.
+    </p>
 
     <h2>Accounts</h2>
     <p>
