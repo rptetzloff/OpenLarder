@@ -513,7 +513,9 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
                     if e.open_library_cover_id
                     else None
                 ),
-                buy=buying.links(e.id, e.isbn13, work.kind),
+                buy=buying.links(
+                    e.id, e.isbn13, work.kind, work.title, credits[0][1] if credits else None
+                ),
             )
             for page, e in pages
         ],

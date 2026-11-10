@@ -1,5 +1,6 @@
 """Runtime configuration, read once from the environment."""
 
+import re
 from functools import lru_cache
 
 from pydantic import field_validator, model_validator
@@ -35,9 +36,17 @@ class Settings(BaseSettings):
     # Off for checks that add web recipes but shouldn't ask the real Internet
     # Archive for anything (the accessibility job in CI, a local run of it).
     archive_web_pages: bool = True
-    # Bookshop.org's affiliate ID (buying.py). Buy links show only once it's
-    # set: a link that earns nothing isn't shown. *Ray, 2026-11-09.*
+    # Buy links (buying.py), each shown only once its setting is here: a link
+    # that earns nothing isn't shown. *Ray, 2026-11-09.* Bookshop.org's
+    # affiliate ID, and Amazon's Associates tag ("openlarder-20").
     bookshop_affiliate_id: str | None = None
+    amazon_tag: str | None = None
+    # The others come through affiliate networks: each is the network's
+    # deep-link template, https, with {url} where the shop's address goes.
+    barnes_noble_link: str | None = None
+    thriftbooks_link: str | None = None
+    bookoutlet_link: str | None = None
+    kobo_link: str | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -55,6 +64,26 @@ class Settings(BaseSettings):
         value = (value or "").strip() or None
         if value is not None and not value.isdigit():
             raise ValueError("OPENLARDER_BOOKSHOP_AFFILIATE_ID is a number, like 12345.")
+        return value
+
+    @field_validator("amazon_tag")
+    @classmethod
+    def _tag_shape(cls, value: str | None) -> str | None:
+        value = (value or "").strip() or None
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}", value):
+            raise ValueError("OPENLARDER_AMAZON_TAG is an Associates tag, like openlarder-20.")
+        return value
+
+    @field_validator("barnes_noble_link", "thriftbooks_link", "bookoutlet_link", "kobo_link")
+    @classmethod
+    def _deep_link(cls, value: str | None, info) -> str | None:
+        value = (value or "").strip() or None
+        if value is not None and not (value.startswith("https://") and "{url}" in value):
+            name = f"OPENLARDER_{info.field_name.upper()}"
+            raise ValueError(
+                f"{name} is the affiliate network's deep link, starting https:// and with"
+                " {url} where the shop's address goes."
+            )
         return value
 
     @field_validator("public_url")

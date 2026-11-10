@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { buyHref, DISCLOSURE } from "../buying";
+import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -296,15 +296,36 @@ async function saveTags(ids: string[]) {
             <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
           </template>
         </div>
-        <aside v-if="book.open_library_url || book.host" class="source-elsewhere">
-          <h2>Elsewhere</h2>
-          <p v-if="book.host">
-            <a :href="`https://${book.host}`" rel="nofollow noopener">{{ book.host }}</a>
-          </p>
-          <p v-if="book.open_library_url">
-            <a :href="book.open_library_url">See it on Open Library</a>
-          </p>
-        </aside>
+        <div
+          v-if="edition?.buy.length || book.open_library_url || book.host"
+          class="source-side"
+        >
+          <!-- The selected edition's shops, beside the cover: the tabs below
+               change which edition this is. -->
+          <aside v-if="edition?.buy.length" class="source-buy" aria-labelledby="buy-title">
+            <h2 id="buy-title">Buy this edition</h2>
+            <p v-if="book.editions.length > 1" class="buy-edition">{{ editionLabel(edition) }}</p>
+            <a
+              v-for="b in edition.buy"
+              :key="b.retailer"
+              :href="buyHref(b)"
+              rel="sponsored noopener"
+              class="button-outline"
+              >{{ b.label }}</a
+            >
+            <p class="buy-note">{{ DISCLOSURE }}</p>
+            <p v-for="n in notes(edition.buy)" :key="n" class="buy-note">{{ n }}</p>
+          </aside>
+          <aside v-if="book.open_library_url || book.host" class="source-elsewhere">
+            <h2>Elsewhere</h2>
+            <p v-if="book.host">
+              <a :href="`https://${book.host}`" rel="nofollow noopener">{{ book.host }}</a>
+            </p>
+            <p v-if="book.open_library_url">
+              <a :href="book.open_library_url">See it on Open Library</a>
+            </p>
+          </aside>
+        </div>
       </div>
 
       <section v-if="isBook && book.editions.length" class="source-section">
@@ -338,20 +359,6 @@ async function saveTags(ids: string[]) {
             <dd><a :href="edition.open_library_url">This edition</a></dd>
           </div>
         </dl>
-        <div v-if="edition?.buy.length" class="buy-links">
-          <p class="buy-row">
-            <span>Buy this edition:</span>
-            <a
-              v-for="b in edition.buy"
-              :key="b.retailer"
-              :href="buyHref(b)"
-              rel="sponsored noopener"
-              class="button-outline"
-              >{{ b.label }}</a
-            >
-          </p>
-          <p class="buy-note">{{ DISCLOSURE }}</p>
-        </div>
       </section>
 
       <section v-if="book.ingredients.length" class="source-section">
@@ -441,8 +448,11 @@ async function saveTags(ids: string[]) {
             </tr>
           </tbody>
         </table>
-        <p v-else-if="book.recipes.length" class="status">
+        <p v-else-if="book.recipes.length && (filter.trim() || chapter)" class="status">
           No recipe here matches{{ filter ? ` “${filter}”` : "" }}{{ chapter ? ` in “${chapter}”` : "" }}.
+        </p>
+        <p v-else-if="book.recipes.length" class="status">
+          None of its recipes is recorded in this edition yet.
         </p>
         <p v-else class="status">No recipes indexed yet.</p>
         <div v-if="isBook && book.editions.length > 1" class="table-foot">
