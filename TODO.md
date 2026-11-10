@@ -91,8 +91,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       policy. Each goes through `/go/bookshop/<edition>`, which counts the
       click (edition, shop, time, page; nothing about who) and skips bots.
       Hidden until `OPENLARDER_BOOKSHOP_AFFILIATE_ID` is set in Coolify
-      (Ray, 2026-11-09: no account yet). Still to come: a page showing the
-      clicks, and Amazon once there's traffic.
+      (Ray, 2026-11-09: no account yet). **More shops (#95):** Barnes &
+      Noble, ThriftBooks, Book Outlet, Amazon and Kobo (ebooks, searched by
+      title and author), each shown once its setting is in Coolify: Amazon's
+      Associates tag (`OPENLARDER_AMAZON_TAG`, with its required wording
+      beside its link), and for the others the affiliate network's deep
+      link with `{url}` where the shop's address goes
+      (`OPENLARDER_BARNES_NOBLE_LINK`, `_THRIFTBOOKS_LINK`,
+      `_BOOKOUTLET_LINK`, `_KOBO_LINK`). Audiobook shops left out (Ray).
+      Still to come: a page showing the clicks.
 - [ ] **Read-only public API**: the routes are public and documented at
       `/api/docs`; API keys, rate limits and periodic data dumps aren't built.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central

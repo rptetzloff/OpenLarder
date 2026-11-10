@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { buyHref, DISCLOSURE } from "../buying";
+import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setRecipeTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -267,6 +267,7 @@ const sourceWord = computed(() => (recipe.value?.source.kind === "book" ? "book"
                     >
                   </p>
                   <p class="buy-note">{{ DISCLOSURE }}</p>
+                  <p v-for="n in notes(edition.buy)" :key="n" class="buy-note">{{ n }}</p>
                 </div>
               </template>
               <p v-if="recipe.chapter" class="find-chapter">In “{{ recipe.chapter }}”</p>

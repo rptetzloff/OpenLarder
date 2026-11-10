@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { buyHref, DISCLOSURE } from "../buying";
+import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -351,6 +351,7 @@ async function saveTags(ids: string[]) {
             >
           </p>
           <p class="buy-note">{{ DISCLOSURE }}</p>
+          <p v-for="n in notes(edition.buy)" :key="n" class="buy-note">{{ n }}</p>
         </div>
       </section>
 

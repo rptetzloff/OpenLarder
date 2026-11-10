@@ -5,7 +5,14 @@ export interface BuyLink {
   retailer: string;
   label: string;
   url: string;
+  // What the shop's programme asks to be said beside its link (Amazon's).
+  note: string | null;
 }
+
+// Each shop's own words, once each, for the links shown.
+export const notes = (links: BuyLink[]) => [
+  ...new Set(links.map((l) => l.note).filter((n): n is string => !!n)),
+];
 
 // The link, saying which page it was clicked on: a path, nothing more.
 export const buyHref = (link: BuyLink) =>

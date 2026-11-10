@@ -35,8 +35,9 @@ document.title = "Privacy policy · OpenLarder";
       doesn't contact Open Library to show a cover.
     </p>
     <p>
-      A book's page can have links to buy it from a bookshop, such as Bookshop.org. OpenLarder
-      earns a commission on what's bought through them. A buy link goes through OpenLarder
+      A book's page can have links to buy it from bookshops such as Bookshop.org, Barnes &amp;
+      Noble, ThriftBooks, Book Outlet, Amazon and Kobo. OpenLarder earns a commission on what's
+      bought through them. A buy link goes through OpenLarder
       first, which counts the click: which book, which shop, when, and which OpenLarder page it
       was on. It records nothing about who clicked: no account, IP address or cookie. The shop
       then sees your visit as anyone's would, and tracks the purchase under its own privacy

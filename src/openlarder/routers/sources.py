@@ -466,7 +466,13 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
                     if e.open_library_edition_id
                     else None
                 ),
-                buy=buying.links(e.id, e.isbn13, work.kind),
+                buy=buying.links(
+                    e.id,
+                    e.isbn13,
+                    work.kind,
+                    work.title,
+                    credits[0][0].credited_as if credits else None,
+                ),
             )
             for e in editions
         ],

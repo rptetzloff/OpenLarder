@@ -119,6 +119,11 @@ jobs:
             -e OPENLARDER_DATABASE_URL=postgresql+psycopg://openlarder:openlarder@localhost:5432/openlarder \
             -e OPENLARDER_ARCHIVE_WEB_PAGES=false \
             -e OPENLARDER_BOOKSHOP_AFFILIATE_ID=12345 \
+            -e OPENLARDER_AMAZON_TAG=openlarder-20 \
+            -e 'OPENLARDER_BARNES_NOBLE_LINK=https://click.example/deeplink?murl={url}' \
+            -e 'OPENLARDER_THRIFTBOOKS_LINK=https://click.example/deeplink?murl={url}' \
+            -e 'OPENLARDER_BOOKOUTLET_LINK=https://click.example/deeplink?murl={url}' \
+            -e 'OPENLARDER_KOBO_LINK=https://click.example/deeplink?murl={url}' \
             openlarder:a11y
           for i in $(seq 1 60); do curl -sf localhost:8000/readyz && exit 0; sleep 2; done
           docker logs app; exit 1
