@@ -15,6 +15,7 @@ export interface Dumps {
   attribution: string;
   latest: Dump | null;
   older: Dump[];
+  keep_days: number;
 }
 
 export async function listDumps(): Promise<Dumps> {

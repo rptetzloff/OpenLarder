@@ -3,7 +3,7 @@
 import re
 from functools import lru_cache
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     dumps_secret_key: str | None = None
     dumps_public_url: str | None = None
     dumps_region: str = "auto"
+    # How long a dump is kept before it's deleted from the bucket and the
+    # list. *Ray, 2026-11-10: 12 months; R2's free space is limited.*
+    dumps_keep_days: int = Field(default=365, ge=7)
     # Page-view counts with Umami (analytics.py): its tracker script's
     # address (https://stats.example.com/script.js) and the site's id there.
     # Both or none; none, and nothing is counted.

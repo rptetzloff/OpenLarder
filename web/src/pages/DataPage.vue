@@ -75,6 +75,10 @@ onMounted(async () => {
 
       <template v-if="dumps.older.length">
         <h2>Earlier weeks</h2>
+        <p class="muted">
+          Each week's is kept for
+          {{ dumps.keep_days === 365 ? "a year" : `${dumps.keep_days} days` }}.
+        </p>
         <ul class="dump-list">
           <li v-for="d in dumps.older" :key="d.built_at">
             {{ day(d.built_at) }}:
