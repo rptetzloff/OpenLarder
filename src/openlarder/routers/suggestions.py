@@ -1,5 +1,6 @@
 """The admin queue of what local models suggest (SCOPING.md, LLM-assisted
-data processing): merging two ingredients, or putting one under another.
+data processing): merging two ingredients, putting one under another, or
+tagging a recipe.
 
 n8n adds them; an admin accepts or dismisses each here. Accepting runs the
 same merge or set-parent as doing it by hand on the ingredient's page, so
@@ -7,6 +8,9 @@ its checks apply. A suggestion naming an ingredient the admin can't see is
 left out, as everywhere else: n8n read public data, but an ingredient can
 come to be used only by a private collection since. One naming an
 ingredient that has gone (merged or deleted since) can only be dismissed.
+A tag suggestion is the same for its recipe: hidden if the recipe has come
+to be private, dismissable only if the recipe or the tag has gone; accepting
+tags the recipe, as "Edit tags" would.
 """
 
 import uuid
@@ -20,12 +24,22 @@ from sqlalchemy import Float, case, func, select
 from openlarder import ingredients, visibility
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Ingredient, IngredientOption, Suggestion, User
+from openlarder.models import (
+    Ingredient,
+    IngredientOption,
+    Recipe,
+    RecipeTag,
+    Source,
+    SourceTag,
+    Suggestion,
+    Tag,
+    User,
+)
 
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 PAGE = 50
 # What accepting can do; line fixes wait for Workflow 3 and a page of their own.
-ACTIONABLE = {"merge", "parent"}
+ACTIONABLE = {"merge", "parent", "tag"}
 
 
 class Side(BaseModel):
@@ -34,6 +48,25 @@ class Side(BaseModel):
     name: str
     recipes: int
     exists: bool
+
+
+class RecipeRef(BaseModel):
+    id: uuid.UUID
+    # Its title now, or the model's if it has gone.
+    title: str
+    chapter: str | None = None
+    source_id: uuid.UUID | None = None
+    source_title: str | None = None
+    exists: bool
+
+
+class TagRef(BaseModel):
+    id: uuid.UUID
+    kind: str
+    name: str
+    exists: bool
+    # The recipe has it already, its own or its source's.
+    already: bool = False
 
 
 class SuggestionOut(BaseModel):
@@ -45,6 +78,9 @@ class SuggestionOut(BaseModel):
     keep: Literal["a", "b"] | None
     a: Side | None
     b: Side | None
+    # tag: the recipe, and the tag for it.
+    recipe: RecipeRef | None = None
+    tag: TagRef | None = None
     reason: str | None
     similarity: float | None
     # merge-v2 on: the model's word for how sure it is. A 12B model asked
@@ -82,6 +118,17 @@ def _ids(row: Suggestion) -> tuple[uuid.UUID, uuid.UUID] | None:
         return None
 
 
+def _tag_target(row: Suggestion) -> tuple[uuid.UUID, uuid.UUID] | None:
+    """A tag suggestion's recipe and tag; None if it doesn't name both."""
+    p = row.proposal if isinstance(row.proposal, dict) else {}
+    if row.kind != "tag":
+        return None
+    try:
+        return uuid.UUID(str(p["recipe_id"])), uuid.UUID(str(p["tag_id"]))
+    except (KeyError, ValueError):
+        return None
+
+
 def _similarity():
     # n8n writes it as a string ("0.9888"); anything else sorts last.
     raw = Suggestion.proposal["similarity"].astext
@@ -104,12 +151,27 @@ def _hidden_ingredient_ids(viewer: User):
 
 async def _visible(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion]:
     named = {i for r in rows if (ids := _ids(r)) for i in ids}
-    if not named:
-        return rows
-    hidden = set(
-        await session.scalars(_hidden_ingredient_ids(viewer).where(Ingredient.id.in_(named)))
+    hidden = (
+        set(await session.scalars(_hidden_ingredient_ids(viewer).where(Ingredient.id.in_(named))))
+        if named
+        else set()
     )
-    return [r for r in rows if not ((ids := _ids(r)) and hidden & set(ids))]
+    tagged = {t[0] for r in rows if (t := _tag_target(r))}
+    hidden_recipes = (
+        set(
+            await session.scalars(
+                select(Recipe.id).where(Recipe.id.in_(tagged), ~visibility.recipes_seen_by(viewer))
+            )
+        )
+        if tagged
+        else set()
+    )
+    return [
+        r
+        for r in rows
+        if not ((ids := _ids(r)) and hidden & set(ids))
+        and not ((t := _tag_target(r)) and t[0] in hidden_recipes)
+    ]
 
 
 async def _out(session, viewer: User, rows: list[Suggestion]) -> list[SuggestionOut]:
@@ -136,6 +198,21 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
             )
         ).all()
     )
+    targets = {r.id: t for r in rows if (t := _tag_target(r))}
+    recipes = {
+        rid: (title, chapter, sid, stitle)
+        for rid, title, chapter, sid, stitle in await session.execute(
+            select(Recipe.id, Recipe.title, Recipe.chapter, Source.id, Source.title)
+            .join(Source, Source.id == Recipe.source_id)
+            .where(Recipe.id.in_([t[0] for t in targets.values()]))
+        )
+    }
+    tags = {
+        t.id: t
+        for t in await session.scalars(
+            select(Tag).where(Tag.id.in_([t[1] for t in targets.values()]))
+        )
+    }
     out = []
     for r in rows:
         p = r.proposal if isinstance(r.proposal, dict) else {}
@@ -157,6 +234,26 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
             similarity = None
         keep = p.get("keep_name")
         certainty = p.get("certainty")
+        recipe_ref = tag_ref = None
+        if r.id in targets:
+            rid, tid = targets[r.id]
+            found = recipes.get(rid)
+            recipe_ref = RecipeRef(
+                id=rid,
+                title=found[0] if found else str(p.get("recipe_title") or "(unnamed)"),
+                chapter=found[1] if found else None,
+                source_id=found[2] if found else None,
+                source_title=found[3] if found else None,
+                exists=found is not None,
+            )
+            tag = tags.get(tid)
+            tag_ref = TagRef(
+                id=tid,
+                kind=str(tag.kind) if tag else str(p.get("tag_kind") or ""),
+                name=tag.name if tag else str(p.get("tag_name") or "(unnamed)"),
+                exists=tag is not None,
+                already=bool(found and tag and await _has_tag(session, rid, tid)),
+            )
         out.append(
             SuggestionOut(
                 id=r.id,
@@ -174,11 +271,14 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 status=r.status,
                 created_at=r.created_at,
                 decided_at=r.decided_at,
+                recipe=recipe_ref,
+                tag=tag_ref,
                 actionable=r.kind in ACTIONABLE
-                and a is not None
-                and b is not None
-                and a.exists
-                and b.exists,
+                and (
+                    bool(recipe_ref and tag_ref and recipe_ref.exists and tag_ref.exists)
+                    if r.kind == "tag"
+                    else (a is not None and b is not None and a.exists and b.exists)
+                ),
             )
         )
     return out
@@ -189,7 +289,7 @@ async def list_suggestions(
     admin: AdminUser,
     session: Session,
     state: Literal["open", "decided"] = "open",
-    kind: Literal["merge", "parent", "line_fix"] | None = None,
+    kind: Literal["merge", "parent", "line_fix", "tag"] | None = None,
     offset: int = Query(0, ge=0),
 ) -> SuggestionPage:
     # The queue is small (hundreds), and which an admin may see depends on
@@ -252,11 +352,38 @@ async def _decide(session, admin: User, row: Suggestion, outcome: str) -> Sugges
     return (await _out(session, admin, [row]))[0]
 
 
+async def _has_tag(session, recipe_id: uuid.UUID, tag_id: uuid.UUID) -> bool:
+    """The recipe has the tag, its own or its source's."""
+    own = select(RecipeTag).where(RecipeTag.recipe_id == recipe_id, RecipeTag.tag_id == tag_id)
+    inherited = (
+        select(SourceTag)
+        .join(Recipe, Recipe.source_id == SourceTag.source_id)
+        .where(Recipe.id == recipe_id, SourceTag.tag_id == tag_id)
+    )
+    return bool(
+        await session.scalar(select(own.exists()))
+        or await session.scalar(select(inherited.exists()))
+    )
+
+
 @router.post("/{suggestion_id}/accept", response_model=SuggestionOut, dependencies=[SameOrigin])
 async def accept(
     suggestion_id: uuid.UUID, body: Accept, admin: AdminUser, session: Session
 ) -> SuggestionOut:
     row = await _open_or_404(session, admin, suggestion_id)
+    if row.kind == "tag":
+        target = _tag_target(row)
+        recipe = await session.get(Recipe, target[0]) if target else None
+        tag = await session.get(Tag, target[1]) if target else None
+        if recipe is None or tag is None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "This can't be accepted: its recipe or its tag has gone. Dismiss it.",
+            )
+        # Already there, its own or its source's: nothing to add.
+        if not await _has_tag(session, recipe.id, tag.id):
+            session.add(RecipeTag(recipe_id=recipe.id, tag_id=tag.id))
+        return await _decide(session, admin, row, "accepted")
     ids = _ids(row)
     found = [await session.get(Ingredient, i) for i in ids] if ids else []
     if row.kind not in ACTIONABLE or len(found) != 2 or None in found:

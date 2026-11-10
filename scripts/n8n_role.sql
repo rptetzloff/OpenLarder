@@ -15,6 +15,6 @@ CREATE ROLE :"role" LOGIN PASSWORD :'password';
 GRANT CONNECT ON DATABASE :"DBNAME" TO :"role";
 GRANT USAGE ON SCHEMA public TO :"role";
 GRANT SELECT ON public_ingredients, public_ingredient_aliases, public_ingredient_lines,
-  public_open_flags TO :"role";
+  public_open_flags, public_recipes, public_tags, public_recipe_tags TO :"role";
 GRANT SELECT, INSERT, UPDATE, DELETE ON ingredient_embeddings TO :"role";
 GRANT SELECT, INSERT ON suggestions TO :"role";

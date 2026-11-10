@@ -1949,6 +1949,14 @@ button.primary.small {
 .tag-chips a:hover {
   text-decoration: underline;
 }
+.tag-chip {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--fg);
+  font-size: 0.875rem;
+}
 .tag-editor {
   margin: 0.25rem 0 0.75rem;
 }

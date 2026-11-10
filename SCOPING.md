@@ -371,6 +371,13 @@ A reply that doesn't parse, or says "different", is dropped. "Same" becomes a `m
 
 *Workflow 3: fixes for flagged lines (same pattern).* It takes open flags of the kinds a model can help with (typos, suspicious splits) on public recipes, and sends each with its line, its source and the nearest canonical names as context. The schema is `suggested_text`, `split`, `reason` and `confidence`, and results are stored as `line_fix`.
 
+*Workflow 4: tags for recipes (after tagging by hand and by source; Ray, 2026-11-09).* It reads `public_recipes` (title, chapter, source), the lines of each from `public_ingredient_lines`, the list from `public_tags`, and what each recipe has already from `public_recipe_tags` (its own and its source's). It takes recipes with no course tag, up to 500 a run, and skips any recipe and tag already suggested, whatever the status, so a dismissed tag stays dismissed. Each recipe goes to `/api/chat` (`gemma4:12b`, `temperature: 0`) with the tags it could have, those it has left out, as a numbered list by kind. The schema is `reason` first (generated before the answer), then `tags`: a list of `{ "tag_id", "certainty" }`, where `certainty` is `certain`, `likely` or `unsure`, and `tag_id` must be one from the list. The system prompt is conservative:
+- tag what the recipe plainly is, from its title, chapter and ingredients ("Seeded Rye Loaf" in "Yeast Breads" is Bread); never guess a cuisine from one ingredient;
+- a diet only when every line fits it with nothing to swap (no butter for Vegan), and never Gluten-Free, which a recipe's flour alone can't settle: it comes from the book;
+- at most one course, and nothing rather than a guess.
+
+Unsure answers and tag IDs not on the list are dropped. Each answer that's left becomes a `tag` suggestion: `target` is `[recipe_id, tag_id]`, and `proposal` holds `recipe_id`, `tag_id`, `recipe_title`, `tag_name` and `certainty`. `confidence` is 0.9 for certain and 0.6 for likely, and `prompt_version` is `tag-v1`. Accepting tags the recipe as "Edit tags" would; one the recipe has already, its own or its source's, adds nothing.
+
 *On the site*
 
 - **Admin → Suggestions:** filtered by kind and sorted by confidence, with Accept and Dismiss. Accept calls the existing rename, merge or set-parent code as the admin, so history and rules apply as if it were done by hand.

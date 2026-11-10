@@ -39,3 +39,19 @@ FROM pair, (VALUES ('merge', 'same', '0.9875', 'Quick-Cook Oats', true, 'certain
      LATERAL (SELECT CASE WHEN real THEN b ELSE gen_random_uuid() END AS x) AS other
 WHERE a IS NOT NULL
 ON CONFLICT DO NOTHING;
+
+-- A tag suggestion, as Workflow 4 writes one, for a recipe of a small public
+-- source of its own (the check's catalog is added later, through the API).
+WITH s AS (
+  INSERT INTO sources (title) VALUES ('Tag Suggestion Kitchen') RETURNING id
+), r AS (
+  INSERT INTO recipes (source_id, title, chapter)
+  SELECT id, 'Seeded Rye Loaf', 'Yeast Breads' FROM s RETURNING id
+)
+INSERT INTO suggestions (kind, target, proposal, reason, confidence, model, prompt_version)
+SELECT 'tag', jsonb_build_array(r.id::text, t.id::text),
+       jsonb_build_object('recipe_id', r.id, 'tag_id', t.id, 'recipe_title', 'Seeded Rye Loaf',
+                          'tag_name', t.name, 'certainty', 'certain'),
+       'A loaf of bread, in the Yeast Breads chapter.', 0.9, 'gemma4:12b', 'tag-v1'
+FROM r, tags t WHERE t.kind = 'course' AND t.name = 'Bread'
+ON CONFLICT DO NOTHING;
