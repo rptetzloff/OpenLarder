@@ -198,9 +198,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       can't render the pages); robots.txt keeps crawlers off /go/. The
       daily cap now survives a deploy.
 
-- [ ] **Analytics with Umami**, next. *Ray, 2026-11-10: self-hosted for
-      now.* The tracking script on every page, its address and site id as
-      settings, the privacy page saying what it records and where.
+- [x] **Analytics with Umami** (#114). *Ray, 2026-11-10: self-hosted; honour
+      Do Not Track and Global Privacy Control; path only, secrets removed.*
+      A loader in every page's head skips the tracker for DNT or GPC, and
+      sends one page view a load by hand: the path without a query string,
+      invite links as /invite, no title (a private collection's name is in
+      it), the referrer cut to its site. Settings: `OPENLARDER_UMAMI_SCRIPT_URL`
+      and `OPENLARDER_UMAMI_WEBSITE_ID`; the privacy page says what's
+      recorded and where.
 
 ## Planned features
 

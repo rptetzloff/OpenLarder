@@ -1,4 +1,14 @@
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
+
+// Where page views are counted, if they are (analytics.py, /api/site).
+const analyticsHost = ref<string | null>(null);
+onMounted(async () => {
+  const site = await fetch("/api/site")
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+  analyticsHost.value = site?.analytics_host ?? null;
+});
 // Written from what the code does, not from a template. When what is
 // stored, who processes it, or which cookies are set changes, this page
 // changes in the same pull request.
@@ -8,7 +18,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 9 November 2026</p>
+    <p class="updated">Last updated 10 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -19,9 +29,21 @@ document.title = "Privacy policy · OpenLarder";
 
     <h2>Browsing</h2>
     <p>
-      You can read the catalog without an account. OpenLarder has no advertising, no analytics
-      and no tracking scripts, and it does not sell or share personal information.
+      You can read the catalog without an account. OpenLarder has no advertising and no
+      third-party tracking, and it does not sell or share personal information.
     </p>
+    <p v-if="analyticsHost">
+      OpenLarder counts page views with <a href="https://umami.is">Umami</a>, which runs on
+      OpenLarder's own server at {{ analyticsHost }}, not a third party's. It sets no cookies and
+      keeps no IP address. For each page it records the page's path, without anything after a
+      “?” (so no search words) and with invite links cut to just /invite, plus the site you came
+      from (its address only), your browser, operating system, device type, screen size,
+      language, and the country, region and city your connection comes from. Page titles aren't
+      sent, so a private
+      collection's name never is. If your browser asks sites not to track you (Do Not Track, or
+      Global Privacy Control), the counting script isn't loaded at all and nothing is sent.
+    </p>
+    <p v-else>OpenLarder doesn't count page views.</p>
     <p>
       The site is served through Cloudflare, which sees each visitor's IP address and request in
       order to deliver the site and block attacks. See

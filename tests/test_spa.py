@@ -86,3 +86,47 @@ def test_a_bad_tag_name_is_refused() -> None:
     with pytest.raises(ValidationError):
         Settings(meta_tags={'x" onload="alert(1)': "v"})
     assert Settings(meta_tags={"impact-site-verification": "56d1"}).meta_tags
+
+
+def test_the_analytics_loader_goes_last_in_the_head(tmp_path) -> None:
+    from openlarder import analytics
+    from openlarder.config import Settings
+
+    (tmp_path / "index.html").write_text("<html><head><title>x</title></head><body></body></html>")
+    settings = Settings(
+        umami_script_url="https://stats.openlarder.com/script.js", umami_website_id="abc-123"
+    )
+    page = spa_response(tmp_path, "sources/1", None, analytics.loader(settings)).body.decode()
+    assert page.index("<title>") < page.index("stats.openlarder.com") < page.index("</head>")
+    assert '"abc-123"' in page and 'data-auto-track", "false"' in page
+    assert "globalPrivacyControl" in page and "doNotTrack" in page
+    assert analytics.loader(Settings()) == ""
+
+
+def test_a_setting_cant_break_out_of_the_script() -> None:
+    from openlarder import analytics
+    from openlarder.config import Settings
+
+    settings = Settings.model_construct(
+        umami_script_url="https://x.example/a.js", umami_website_id='"</script><script>alert(1)'
+    )
+    tag = analytics.loader(settings)
+    assert tag.count("</script>") == 1 and "alert(1)" in tag
+
+
+def test_umami_needs_both_settings() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from openlarder.config import Settings
+
+    with pytest.raises(ValidationError, match="go together"):
+        Settings(umami_website_id="abc")
+    with pytest.raises(ValidationError, match="https"):
+        Settings(umami_script_url="http://stats.example/script.js", umami_website_id="abc")
+    assert (
+        Settings(
+            umami_script_url="https://stats.openlarder.com/script.js", umami_website_id="abc"
+        ).analytics_host
+        == "stats.openlarder.com"
+    )

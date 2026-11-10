@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from openlarder import __version__, crawlers, dumps, history, ratelimit, usage
+from openlarder import __version__, analytics, crawlers, dumps, history, ratelimit, usage
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine, session_factory
@@ -218,7 +218,7 @@ def meta_tags(tags: dict[str, str]) -> str:
 
 
 def spa_response(
-    web_dir: Path, path: str, tags: dict[str, str] | None = None
+    web_dir: Path, path: str, tags: dict[str, str] | None = None, head_end: str = ""
 ) -> FileResponse | HTMLResponse:
     """A file from the built SPA, or its index.html for any other path, with
     the configured <meta> tags in its head, where a site checker reading
@@ -235,12 +235,16 @@ def spa_response(
         if candidate.name != "index.html":
             return FileResponse(candidate)
     headers = {"Cache-Control": "no-cache"}
-    if not tags:
+    if not tags and not head_end:
         return FileResponse(web_dir / "index.html", headers=headers)
     page = (web_dir / "index.html").read_text(encoding="utf-8")
-    # First in the head, before every other tag: Impact's check looks for
-    # its tag there and fails it anywhere else.
-    page = re.sub(r"(<head[^>]*>)", lambda m: m.group(1) + meta_tags(tags), page, count=1)
+    if tags:
+        # First in the head, before every other tag: Impact's check looks
+        # for its tag there and fails it anywhere else.
+        page = re.sub(r"(<head[^>]*>)", lambda m: m.group(1) + meta_tags(tags), page, count=1)
+    if head_end:
+        # Last in the head: the analytics loader (analytics.py).
+        page = page.replace("</head>", head_end + "</head>", 1)
     return HTMLResponse(page, headers=headers)
 
 
@@ -269,4 +273,5 @@ if WEB_DIR.is_dir():
     @app.get("/{path:path}", include_in_schema=False)
     # Annotated Response: FastAPI can't make a response model of a union.
     async def spa(path: str) -> Response:
-        return spa_response(WEB_DIR, path, get_settings().meta_tags)
+        settings = get_settings()
+        return spa_response(WEB_DIR, path, settings.meta_tags, analytics.loader(settings))
