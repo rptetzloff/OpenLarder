@@ -35,7 +35,7 @@ from sqlalchemy import (
     false,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.schema import UniqueConstraint
 from sqlalchemy.sql import text
@@ -69,6 +69,10 @@ class User(Timestamps, Base):
     suggested_name: Mapped[str | None] = mapped_column(Text)
     # May add to the catalog directly, until review exists (migration 0010).
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    # Buy-link shops in the order the person wants them, and those they've
+    # hidden: {"order": [...], "hidden": [...]} (buying.RETAILERS' keys).
+    # None until they choose. *Ray, 2026-11-09.*
+    shop_preferences: Mapped[dict | None] = mapped_column(JSONB)
 
 
 class UserSession(Base):

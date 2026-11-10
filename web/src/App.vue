@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
 import NameForm from "./components/NameForm.vue";
 import { takeRememberedInvite } from "./groups";
@@ -88,6 +89,7 @@ onMounted(async () => {
   try {
     const res = await fetch("/api/auth/me");
     user.value = res.ok ? await res.json() : null;
+    adoptAccount(user.value);
   } catch {
     user.value = null;
   }
@@ -387,6 +389,13 @@ button.secondary {
 button.secondary:hover {
   background: var(--surface);
 }
+button.secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.secondary:disabled:hover {
+  background: var(--bg);
+}
 button.secondary[aria-current="page"] {
   border-color: var(--fg);
   font-weight: 700;
@@ -678,6 +687,42 @@ button.secondary[aria-current="page"] {
 }
 .source-buy .buy-note {
   margin: 0.125rem 0 0;
+}
+/* Choosing the shops, under the buttons. */
+.shop-chooser {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+.shop-chooser summary {
+  color: var(--link);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.shop-chooser .help {
+  margin: 0.5rem 0;
+  color: var(--muted);
+}
+.shop-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shop-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-top: 1px solid var(--line);
+}
+.shop-list label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.shop-moves {
+  display: flex;
+  gap: 0.25rem;
 }
 .source-cover {
   width: 100%;

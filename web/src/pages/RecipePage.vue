@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setRecipeTags } from "../tags";
@@ -147,6 +148,9 @@ async function saveTags(ids: string[]) {
 }
 // "book", "site": what the source is, for a tag that came from it.
 const sourceWord = computed(() => (recipe.value?.source.kind === "book" ? "book" : "source"));
+
+// This edition's shops, in the reader's order, without those hidden.
+const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []));
 </script>
 
 <template>
@@ -255,11 +259,11 @@ const sourceWord = computed(() => (recipe.value?.source.kind === "book" ? "book"
                   </template>
                   <span v-else class="find-edition-only">{{ editionLabel(edition) }}</span>
                 </div>
-                <div v-if="edition.buy.length" class="buy-links">
+                <div v-if="buyLinks.length" class="buy-links">
                   <p class="buy-row">
                     <span>Buy the book:</span>
                     <a
-                      v-for="b in edition.buy"
+                      v-for="b in buyLinks"
                       :key="b.retailer"
                       :href="buyHref(b)"
                       rel="sponsored noopener"
@@ -267,7 +271,7 @@ const sourceWord = computed(() => (recipe.value?.source.kind === "book" ? "book"
                     >
                   </p>
                   <p class="buy-note">{{ DISCLOSURE }}</p>
-                  <p v-for="n in notes(edition.buy)" :key="n" class="buy-note">{{ n }}</p>
+                  <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>
                 </div>
               </template>
               <p v-if="recipe.chapter" class="find-chapter">In “{{ recipe.chapter }}”</p>

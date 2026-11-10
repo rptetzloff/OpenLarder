@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ShopChooser from "../components/ShopChooser.vue";
+import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
@@ -182,6 +184,9 @@ onMounted(async () => {
 async function saveTags(ids: string[]) {
   book.value!.tags = await setSourceTags(book.value!.id, ids);
 }
+
+// The selected edition's shops, in the reader's order, without those hidden.
+const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []));
 </script>
 
 <template>
@@ -297,16 +302,16 @@ async function saveTags(ids: string[]) {
           </template>
         </div>
         <div
-          v-if="edition?.buy.length || book.open_library_url || book.host"
+          v-if="buyLinks.length || book.open_library_url || book.host"
           class="source-side"
         >
           <!-- The selected edition's shops, beside the cover: the tabs below
                change which edition this is. -->
-          <aside v-if="edition?.buy.length" class="source-buy" aria-labelledby="buy-title">
+          <aside v-if="edition && buyLinks.length" class="source-buy" aria-labelledby="buy-title">
             <h2 id="buy-title">Buy this edition</h2>
             <p v-if="book.editions.length > 1" class="buy-edition">{{ editionLabel(edition) }}</p>
             <a
-              v-for="b in edition.buy"
+              v-for="b in buyLinks"
               :key="b.retailer"
               :href="buyHref(b)"
               rel="sponsored noopener"
@@ -314,7 +319,8 @@ async function saveTags(ids: string[]) {
               >{{ b.label }}</a
             >
             <p class="buy-note">{{ DISCLOSURE }}</p>
-            <p v-for="n in notes(edition.buy)" :key="n" class="buy-note">{{ n }}</p>
+            <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>
+            <ShopChooser v-if="edition.buy.length > 1" :links="edition.buy" :signed-in="!!user" />
           </aside>
           <aside v-if="book.open_library_url || book.host" class="source-elsewhere">
             <h2>Elsewhere</h2>

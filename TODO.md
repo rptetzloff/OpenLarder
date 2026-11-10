@@ -99,7 +99,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       link with `{url}` where the shop's address goes
       (`OPENLARDER_BARNES_NOBLE_LINK`, `_THRIFTBOOKS_LINK`,
       `_BOOKOUTLET_LINK`, `_KOBO_LINK`). Audiobook shops left out (Ray).
-      Still to come: a page showing the clicks.
+      The buttons stack beside the cover. **Your shops (#96):** "Choose
+      your shops" under them puts them in your order and hides the rest,
+      one always left; kept with the account when signed in (migration
+      0035), in the browser otherwise. Still to come: a page showing the
+      clicks.
 - [ ] **Read-only public API**: the routes are public and documented at
       `/api/docs`; API keys, rate limits and periodic data dumps aren't built.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central
