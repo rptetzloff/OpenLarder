@@ -56,3 +56,29 @@ def test_fonts_go_out_as_fonts() -> None:
     import openlarder.main  # noqa: F401  (registers the types)
 
     assert mimetypes.guess_type("outfit-400.woff2")[0] == "font/woff2"
+
+
+def test_configured_meta_tags_go_in_every_pages_head(tmp_path) -> None:
+    """Site verification (Impact, for Barnes & Noble's affiliate programme)."""
+    (tmp_path / "index.html").write_text("<html><head><title>x</title></head><body></body></html>")
+    tags = {"impact-site-verification": "56d1-abc", "google-site-verification": 'a"b'}
+    for path in ("", "sources/123"):
+        response = spa_response(tmp_path, path, tags)
+        page = response.body.decode()
+        assert (
+            '<meta name="impact-site-verification" content="56d1-abc" value="56d1-abc" />'
+            '<meta name="google-site-verification" content="a&quot;b" value="a&quot;b" />'
+            "</head>"
+        ) in page
+        assert response.headers["cache-control"] == "no-cache"
+
+
+def test_a_bad_tag_name_is_refused() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from openlarder.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(meta_tags={'x" onload="alert(1)': "v"})
+    assert Settings(meta_tags={"impact-site-verification": "56d1"}).meta_tags
