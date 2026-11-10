@@ -22,6 +22,9 @@ class Site(BaseModel):
     production: bool
     # The line for the band above the header; None for no band.
     notice: str | None
+    # Where page views are counted (Umami's host), for the privacy page;
+    # None when they aren't.
+    analytics_host: str | None = None
 
 
 @router.get("/api/site", response_model=Site)
@@ -35,4 +38,9 @@ async def site(settings: Config) -> Site:
             f"This is OpenLarder's {name} site, for trying things out: what's here may change or"
             " disappear without warning."
         )
-    return Site(environment=environment, production=production, notice=notice)
+    return Site(
+        environment=environment,
+        production=production,
+        notice=notice,
+        analytics_host=settings.analytics_host,
+    )

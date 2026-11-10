@@ -45,6 +45,22 @@ docker compose up --build        # http://localhost:8000
 | `OPENLARDER_NOTICE` | Optional. A line of plain text shown in that band instead, in any environment, production included: "Down for maintenance at 9pm" |
 | `OPENLARDER_META_TAGS` | Optional. `<meta>` tags for every page's head, as JSON by name, for site verification: `{"impact-site-verification": "56d10364-..."}` (Barnes & Noble's affiliate programme, through Impact). Each is written first in the head with the standard `content`, except Impact's, which is written with `value` alone, as its snippet has it |
 
+### Analytics
+
+Page views are counted with a self-hosted [Umami](https://umami.is)
+(analytics.py). Without these settings nothing is counted; one without the
+other, and the app refuses to start.
+
+| Variable | Value |
+| --- | --- |
+| `OPENLARDER_UMAMI_SCRIPT_URL` | The tracker's address on the Umami server, `https://<umami host>/script.js` |
+| `OPENLARDER_UMAMI_WEBSITE_ID` | The site's id in Umami (Settings → Websites → the site's tracking code shows it) |
+
+A browser asking not to be tracked (Do Not Track or Global Privacy Control)
+never loads the tracker. A page view sends the path only (no query string,
+invite links as /invite), no page title, and the referring site's address
+only. The privacy page names the Umami host when it's set.
+
 ### Data dumps
 
 The weekly ODbL dumps (dumps.py) go to S3-compatible object storage, and

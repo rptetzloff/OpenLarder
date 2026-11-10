@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     dumps_secret_key: str | None = None
     dumps_public_url: str | None = None
     dumps_region: str = "auto"
+    # Page-view counts with Umami (analytics.py): its tracker script's
+    # address (https://stats.example.com/script.js) and the site's id there.
+    # Both or none; none, and nothing is counted.
+    umami_script_url: str | None = None
+    umami_website_id: str | None = None
     # Buy links (buying.py), each shown only once its setting is here: a link
     # that earns nothing isn't shown. *Ray, 2026-11-09.* Bookshop.org's
     # affiliate ID, and Amazon's Associates tag ("openlarder-20").
@@ -164,6 +169,25 @@ class Settings(BaseSettings):
                 if not dumps[name].startswith(("https://", "http://")):
                     raise ValueError(f"{name} is a web address, starting https://")
         return self
+
+    @model_validator(mode="after")
+    def _umami_complete(self) -> "Settings":
+        url, site = self.umami_script_url, self.umami_website_id
+        if bool(url) != bool(site):
+            raise ValueError(
+                "Umami is half configured; OPENLARDER_UMAMI_SCRIPT_URL and"
+                " OPENLARDER_UMAMI_WEBSITE_ID go together"
+            )
+        if url and not url.startswith("https://"):
+            raise ValueError("OPENLARDER_UMAMI_SCRIPT_URL is a web address, starting https://")
+        return self
+
+    @property
+    def analytics_host(self) -> str | None:
+        """Where the counts go, for the privacy page."""
+        if not self.umami_script_url:
+            return None
+        return self.umami_script_url.split("/")[2]
 
     @property
     def dumps_configured(self) -> bool:
