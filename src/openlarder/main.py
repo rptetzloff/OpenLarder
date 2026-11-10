@@ -153,9 +153,11 @@ def meta_tags(tags: dict[str, str]) -> str:
     """OPENLARDER_META_TAGS as <meta> tags. Each carries its value as both
     content, the standard attribute (Google, Bing), and value, which
     Impact's verification asks for (Barnes & Noble's affiliate programme,
-    *Ray, 2026-11-10*): one setting fits either."""
+    *Ray, 2026-11-10*): one setting fits either. value comes straight after
+    name, as in Impact's own snippet, since its check failed with content
+    between them."""
     return "".join(
-        f'<meta name="{html.escape(n)}" content="{html.escape(v)}" value="{html.escape(v)}" />'
+        f'<meta name="{html.escape(n)}" value="{html.escape(v)}" content="{html.escape(v)}" />'
         for n, v in tags.items()
     )
 
