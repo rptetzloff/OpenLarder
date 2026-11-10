@@ -56,6 +56,9 @@ async function seed() {
     title: "The A11y Kitchen",
     authors: ["Ann Author", "Pat Photographer"],
     year: 2020,
+    // An ISBN, so its pages show buy links when an affiliate ID is set, as
+    // CI's is (a made-up one; the check never follows a link).
+    isbn: "9780393541113",
   });
   const edition = (await api(`/api/sources/${book.id}`, "admin")).editions[0].id;
   const recipe = (title, page, ingredients) =>

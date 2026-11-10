@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from openlarder import (
     archiving,
+    buying,
     detector,
     ingredients,
     openlibrary,
@@ -26,6 +27,7 @@ from openlarder import (
 from openlarder import lines as line_reading
 from openlarder.archiving import ArchiverDep
 from openlarder.auth import CurrentUser, SameOrigin, Viewer
+from openlarder.buying import BuyLink
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
@@ -204,6 +206,8 @@ class PageOut(BaseModel):
     published_year: int | None
     page: str | None
     cover_url: str | None = None
+    # Where to buy this edition, through /go/; none until an affiliate ID.
+    buy: list[BuyLink] = []
 
 
 class WebPageOut(BaseModel):
@@ -509,6 +513,7 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
                     if e.open_library_cover_id
                     else None
                 ),
+                buy=buying.links(e.id, e.isbn13, work.kind),
             )
             for page, e in pages
         ],

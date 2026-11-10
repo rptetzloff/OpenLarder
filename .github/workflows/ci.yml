@@ -118,6 +118,7 @@ jobs:
           docker run -d --name app --network host \
             -e OPENLARDER_DATABASE_URL=postgresql+psycopg://openlarder:openlarder@localhost:5432/openlarder \
             -e OPENLARDER_ARCHIVE_WEB_PAGES=false \
+            -e OPENLARDER_BOOKSHOP_AFFILIATE_ID=12345 \
             openlarder:a11y
           for i in $(seq 1 60); do curl -sf localhost:8000/readyz && exit 0; sleep 2; done
           docker logs app; exit 1

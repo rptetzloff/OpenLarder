@@ -831,6 +831,27 @@ button.secondary[aria-current="page"] {
 .recipe-table .chapter-note {
   font-size: 0.8125rem;
 }
+.buy-links {
+  margin-top: 0.75rem;
+}
+.buy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+}
+.buy-row a {
+  color: var(--link);
+}
+.buy-row a.button-outline {
+  color: var(--fg);
+}
+.buy-note {
+  margin: 0.375rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
 .find-chapter {
   margin: 0.5rem 0 0;
   color: var(--muted);

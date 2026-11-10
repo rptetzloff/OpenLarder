@@ -1,5 +1,6 @@
 // What /api/recipes returns, and saving one.
 
+import type { BuyLink } from "./buying";
 import type { Swap } from "./substitutions";
 import type { RecipeTag } from "./tags";
 
@@ -10,6 +11,8 @@ export interface RecipePage {
   published_year: number | null;
   page: string | null;
   cover_url: string | null;
+  // Where to buy this edition; none until an affiliate ID is set.
+  buy: BuyLink[];
 }
 
 export interface Recipe {

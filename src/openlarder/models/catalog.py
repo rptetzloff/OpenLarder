@@ -262,6 +262,27 @@ class PurchaseLink(Timestamps, Base):
     url: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class PurchaseClick(Base):
+    """A click on a buy link (routers/go.py): which edition, which shop, when,
+    and from which OpenLarder page. Nothing about who clicked."""
+
+    __tablename__ = "purchase_clicks"
+    __table_args__ = (
+        CheckConstraint("retailer <> ''", name="retailer_not_empty"),
+        Index("ix_purchase_clicks_clicked_at", "clicked_at"),
+        Index("ix_purchase_clicks_edition_id", "edition_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    edition_id: Mapped[uuid.UUID] = _fk("editions.id", ondelete="CASCADE")
+    retailer: Mapped[str] = mapped_column(Text, nullable=False)
+    # The path of the page the link was on ("/recipes/…"), when known.
+    page: Mapped[str | None] = mapped_column(Text)
+    clicked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+
 class Recipe(Timestamps, Base):
     __tablename__ = "recipes"
     __table_args__ = (
