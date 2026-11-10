@@ -1,9 +1,19 @@
-"""The personal larder (migration 0046, routers/larder.py): each person's
-lists of what they have. Private; not catalog data."""
+"""The personal larder (migrations 0046, 0047; routers/larder.py): each
+person's lists of what they have, and the groups they share them with.
+Private; not catalog data."""
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    PrimaryKeyConstraint,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -48,3 +58,21 @@ class LarderItem(Timestamps, Base):
     # have, low (running low: still counts), or out (kept on the list, not
     # counted). No amounts.
     state: Mapped[str] = mapped_column(Text, nullable=False, server_default="have")
+
+
+class LarderListGroup(Base):
+    """A list shared with a group: its view members see it, its edit and
+    admin members change what's on it (migration 0047)."""
+
+    __tablename__ = "larder_list_groups"
+    __table_args__ = (PrimaryKeyConstraint("list_id", "group_id"),)
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("larder_lists.id", ondelete="CASCADE"), nullable=False
+    )
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

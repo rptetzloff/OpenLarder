@@ -160,3 +160,95 @@ async def test_merging_an_ingredient_keeps_larder_items(people, adb) -> None:
     assert r.status_code == 200, r.text
     [after] = (await ann.get("/api/larder")).json()["lists"][0]["items"]
     assert after["ingredient"] == "Coriander"
+
+
+# Sharing with household groups
+
+
+async def _group_of(ann, *members):
+    """Ann's group, with each (client, role) joined."""
+    from test_groups import _group, _join
+
+    group = await _group(ann)
+    for client, role in members:
+        await _join(client, ann, group, role)
+    return group
+
+
+async def test_a_list_is_shared_with_a_group(people, adb) -> None:
+    ann, bob, cy, dee = (
+        await people("ann"),
+        await people("bob"),
+        await people("cy"),
+        await people("dee"),
+    )
+    group = await _group_of(ann, (bob, "view"), (cy, "edit"))
+    pantry = await _list(ann, "Family pantry")
+    await _ingredient(adb, "Butter")
+    await _item(ann, pantry, "Butter")
+    # Shared with nobody yet: nobody else sees it.
+    assert (await bob.get("/api/larder")).json()["lists"] == []
+    r = await ann.put(f"/api/larder/lists/{pantry}/groups", json={"groups": [group]})
+    assert r.status_code == 200 and [g["id"] for g in r.json()["shared_with"]] == [group]
+    [seen] = (await bob.get("/api/larder")).json()["lists"]
+    assert (seen["name"], seen["mine"], seen["editable"], seen["owner_name"]) == (
+        "Family pantry",
+        False,
+        False,
+        "ann",
+    )
+    assert (await dee.get("/api/larder")).json()["lists"] == []
+    # A viewer can't change it; an editor can; only the owner renames or shares.
+    assert (
+        await bob.post(f"/api/larder/lists/{pantry}/items", json={"name": "Eggs"})
+    ).status_code == 403
+    assert (
+        await cy.post(f"/api/larder/lists/{pantry}/items", json={"name": "Eggs"})
+    ).status_code == 201
+    butter = next(
+        i
+        for i in (await cy.get("/api/larder")).json()["lists"][0]["items"]
+        if i["name"] == "Butter"
+    )
+    assert (
+        await cy.patch(f"/api/larder/items/{butter['id']}", json={"state": "low"})
+    ).status_code == 200
+    assert (
+        await cy.patch(f"/api/larder/lists/{pantry}", json={"name": "Mine now"})
+    ).status_code == 403
+    assert (
+        await cy.put(f"/api/larder/lists/{pantry}/groups", json={"groups": []})
+    ).status_code == 403
+    assert (await cy.delete(f"/api/larder/lists/{pantry}")).status_code == 403
+    assert (
+        await dee.patch(f"/api/larder/items/{butter['id']}", json={"state": "out"})
+    ).status_code == 404
+    # Unshared, it's gone for them again.
+    await ann.put(f"/api/larder/lists/{pantry}/groups", json={"groups": []})
+    assert (await cy.get("/api/larder")).json()["lists"] == []
+
+
+async def test_only_your_own_groups_and_shared_lists_count_in_search(people, adb) -> None:
+    ann, bob, mo = await people("ann"), await people("bob"), await people("mo", role="moderator")
+    stranger = await _group_of(bob)
+    pantry = await _list(ann)
+    r = await ann.put(f"/api/larder/lists/{pantry}/groups", json={"groups": [stranger]})
+    assert r.status_code == 404
+    group = await _group_of(ann, (bob, "view"))
+    await ann.put(f"/api/larder/lists/{pantry}/groups", json={"groups": [group]})
+    await _ingredient(adb, "Butter")
+    await _item(ann, pantry, "Butter")
+    await _recipes(mo, adb, ("Shortbread", ["Butter"]))
+    found = (await bob.get("/api/search", params={"larder": "true"})).json()
+    assert found["larder_items"] == 1 and [r["title"] for r in found["recipes"]] == ["Shortbread"]
+
+
+async def test_moving_needs_both_lists_changeable(people, adb) -> None:
+    ann, cy = await people("ann"), await people("cy")
+    group = await _group_of(ann, (cy, "view"))
+    shared = await _list(ann, "Shared")
+    await ann.put(f"/api/larder/lists/{shared}/groups", json={"groups": [group]})
+    own = await _list(cy, "Cy's")
+    item = await _item(cy, own, "Flour")
+    moved = await cy.patch(f"/api/larder/items/{item['id']}", json={"list_id": shared})
+    assert moved.status_code == 403

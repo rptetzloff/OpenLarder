@@ -15,6 +15,7 @@ import {
   removeItem,
   removeList,
   renameList,
+  shareList,
 } from "../larder";
 import type { Me } from "../me";
 
@@ -84,6 +85,16 @@ const choose = (item: Item, picked: Named) =>
     choosing.value = null;
   });
 const unmatch = (item: Item) => act(() => changeItem(item.id, { ingredient_id: "none" }));
+// The list whose sharing is open.
+const sharing = ref<string | null>(null);
+function toggleGroup(list: List, groupId: string, on: boolean) {
+  const ids = new Set(list.shared_with.map((g) => g.id));
+  if (on) ids.add(groupId);
+  else ids.delete(groupId);
+  act(() => shareList(list.id, [...ids]));
+}
+// The lists an item can move to: those you may change.
+const movable = computed(() => (larder.value?.lists ?? []).filter((l) => l.editable));
 
 watch(
   () => props.user,
@@ -101,7 +112,8 @@ watch(
       <p class="muted">
         What you have, in lists of your own. Each thing is matched to an ingredient, so
         <a href="/search?larder=1">search</a> can find what you can make with it, and it counts as
-        what's above it too: chipotle hot sauce is hot sauce. Only you see your larder.
+        what's above it too: chipotle hot sauce is hot sauce. Only you see your larder, and the
+        household <a href="/groups">groups</a> you share a list with.
       </p>
     </div>
     <p v-if="user === null" class="status">
@@ -125,16 +137,49 @@ watch(
           >
             <div class="larder-list-head">
               <h2 :id="`list-${list.id}`">{{ list.name }}</h2>
-              <span>
+              <span v-if="list.mine">
                 <button type="button" class="link" :disabled="busy" @click="rename(list)">
                   Rename
+                </button>
+                <button
+                  v-if="larder.groups.length"
+                  type="button"
+                  class="link"
+                  :aria-expanded="sharing === list.id"
+                  @click="sharing = sharing === list.id ? null : list.id"
+                >
+                  Share
                 </button>
                 <button type="button" class="link" :disabled="busy" @click="drop(list)">
                   Remove
                 </button>
               </span>
             </div>
-            <form class="inline-form" @submit.prevent="add(list)">
+            <p v-if="!list.mine" class="muted larder-shared">
+              {{ list.owner_name ?? "Someone" }}'s, shared with you through
+              {{ list.shared_with.map((g) => g.name).join(", ") }}{{
+                list.editable ? "" : ": you can see it, not change it"
+              }}.
+            </p>
+            <p v-else-if="list.shared_with.length && sharing !== list.id" class="muted larder-shared">
+              Shared with {{ list.shared_with.map((g) => g.name).join(", ") }}.
+            </p>
+            <fieldset v-if="list.mine && sharing === list.id" class="larder-share">
+              <legend>Who else sees it</legend>
+              <label v-for="g in larder.groups" :key="g.id" class="check">
+                <input
+                  type="checkbox"
+                  :checked="list.shared_with.some((s) => s.id === g.id)"
+                  :disabled="busy"
+                  @change="toggleGroup(list, g.id, ($event.target as HTMLInputElement).checked)"
+                />
+                {{ g.name }}
+              </label>
+              <p class="help">
+                Its members see it; editors and admins of the group change what's on it.
+              </p>
+            </fieldset>
+            <form v-if="list.editable" class="inline-form" @submit.prevent="add(list)">
               <label :for="`add-${list.id}`" class="visually-hidden">Add to {{ list.name }}</label>
               <input
                 :id="`add-${list.id}`"
@@ -152,13 +197,25 @@ watch(
                   <span v-if="item.ingredient" class="muted">
                     ·
                     <a :href="`/ingredients/${item.ingredient_id}`">{{ item.ingredient }}</a>
-                    <button type="button" class="link" :disabled="busy" @click="unmatch(item)">
+                    <button
+                      v-if="list.editable"
+                      type="button"
+                      class="link"
+                      :disabled="busy"
+                      @click="unmatch(item)"
+                    >
                       Not this
                     </button>
                   </span>
                   <span v-else class="muted">
                     · not matched, so search can't use it
-                    <button type="button" class="link" :disabled="busy" @click="choosing = item.id">
+                    <button
+                      v-if="list.editable"
+                      type="button"
+                      class="link"
+                      :disabled="busy"
+                      @click="choosing = item.id"
+                    >
                       Choose what it is
                     </button>
                   </span>
@@ -171,7 +228,10 @@ watch(
                   :exclude="[]"
                   @pick="(p) => choose(item, p)"
                 />
-                <div class="larder-item-actions">
+                <p v-if="!list.editable" class="muted larder-state">
+                  {{ STATES.find((s) => s.state === item.state)?.label }}
+                </p>
+                <div v-else class="larder-item-actions">
                   <div
                     class="kind-filter"
                     role="group"
@@ -189,14 +249,14 @@ watch(
                       {{ s.label }}
                     </button>
                   </div>
-                  <label v-if="larder.lists.length > 1" class="larder-move">
+                  <label v-if="movable.length > 1" class="larder-move">
                     <span class="visually-hidden">Move {{ item.name }} to</span>
                     <select
                       :value="item.list_id"
                       :disabled="busy"
                       @change="move(item, ($event.target as HTMLSelectElement).value)"
                     >
-                      <option v-for="l in larder.lists" :key="l.id" :value="l.id">
+                      <option v-for="l in movable" :key="l.id" :value="l.id">
                         {{ l.name }}
                       </option>
                     </select>
