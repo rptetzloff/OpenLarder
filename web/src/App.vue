@@ -2197,6 +2197,19 @@ button.primary.small {
   background: var(--bg);
   color: var(--fg);
 }
+.book-merge .merge-search {
+  font: inherit;
+  width: 100%;
+  max-width: 32rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.merge-candidates {
+  padding-left: 1.25rem;
+}
 .attribution {
   margin: 0.5rem 0 1rem;
   padding: 0.5rem 0.875rem;

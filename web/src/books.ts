@@ -221,6 +221,32 @@ export async function proposeBookChange(
   }
 }
 
+// Merging one book into another (book_merge.py): what would move, and doing it.
+export interface MergePlan {
+  editions: number;
+  recipes: number;
+  credits: number;
+  same_titles: string[];
+}
+
+export async function mergePlan(bookId: string, into: string): Promise<MergePlan> {
+  const res = await fetch(`/api/sources/${bookId}/merge?into=${into}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
+
+export async function mergeBook(bookId: string, into: string): Promise<string> {
+  const res = await fetch(`/api/sources/${bookId}/merge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ into }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't merge.");
+  return body.id;
+}
+
 // A few books with every word of q in the title, subtitle or a credited
 // name, for type-to-find pickers.
 export async function findBooks(q: string, limit = 8): Promise<BookSummary[]> {

@@ -391,9 +391,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       Beef Shank, Shin, Cheek, or Chuck" gives an option "Beef Shank, Shin,
       Cheek," with its comma (The Heritage Cookbook). lines.py's comma rule
       only expects one "or".
-- [ ] **Merge two books**: nothing can merge two records of one book yet.
-      (The two "How can it be gluten free" books are volumes 1 and 2, not a
-      duplicate; the second's title needs "Volume 2", in the book editor.)
+- [x] **Merge two books** (#116): a moderator's "Merge into another book"
+      on a book's page shows what would move, then moves its editions (buy
+      links and clicks with them), recipes and their pages, credits (one per
+      person and role), tags, requests and proposals to the book kept, with
+      the subtitle and Open Library work it lacks, and removes the other.
+      It warns of recipe titles both have. Recorded as `merge:<book>`.
+      - [ ] Undo can't reverse a merge (a recipe's places move with it, by
+        composite keys a row-by-row undo can't put back); it says so and
+        changes nothing. A dedicated "unmerge" if it's ever needed.
 - [ ] **Long-lived caching for the build's hashed files**: optional; a 404
       for a missing one is already never cached (#42).
 
