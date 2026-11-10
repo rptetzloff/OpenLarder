@@ -11,7 +11,7 @@ import httpx2
 import pytest
 from sqlalchemy import text
 
-from fake_broker import _sign_in
+from fake_broker import _sign_in, make_admins
 from fake_openlibrary import PINK_CAKE
 from openlarder import isbn, openlibrary
 
@@ -19,7 +19,7 @@ from openlarder import isbn, openlibrary
 @pytest.fixture
 async def admin(client, broker, adb, openlib):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET role = 'admin'"))
+    await adb.execute(make_admins())
     return client
 
 

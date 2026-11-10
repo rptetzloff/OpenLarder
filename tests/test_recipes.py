@@ -5,7 +5,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from fake_broker import _sign_in
+from fake_broker import _sign_in, make_admins
 from openlarder import recipes
 
 E1, E2 = uuid.uuid4(), uuid.uuid4()
@@ -33,7 +33,7 @@ async def book(adb):
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET role = 'admin'"))
+    await adb.execute(make_admins())
     return client
 
 

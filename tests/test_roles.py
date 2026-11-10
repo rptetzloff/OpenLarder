@@ -38,8 +38,12 @@ async def test_moderators_edit_the_catalog_and_admins_run_the_site(people) -> No
         await people("ad", role="admin"),
     )
     book = {"title": "Plenty", "authors": ["Yotam Ottolenghi"]}
-    assert (await con.post("/api/sources/manual", json=book)).status_code == 403
-    assert (await mo.post("/api/sources/manual", json=book)).status_code == 200
+    # A contributor's book waits for review; a moderator's is published.
+    assert (await con.post("/api/sources/manual", json=book)).status_code == 200
+    other = {"title": "Simple", "authors": ["Yotam Ottolenghi"]}
+    assert (await mo.post("/api/sources/manual", json=other)).status_code == 200
+    user = await people("plain")
+    assert (await user.post("/api/sources/manual", json={"title": "Jerusalem"})).status_code == 403
     for path in ("/api/import/runs", "/api/admin/api-usage", "/api/admin/clicks"):
         assert (await mo.get(path)).status_code == 403, path
         assert (await ad.get(path)).status_code == 200, path

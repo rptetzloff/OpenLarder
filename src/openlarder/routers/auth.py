@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from joserfc.errors import JoseError
 from pydantic import BaseModel
 
-from openlarder import roles
+from openlarder import agreement, roles
 from openlarder.auth import (
     CALLBACK_PATH,
     SESSION_COOKIE,
@@ -58,6 +58,9 @@ class Me(BaseModel):
     may_run: bool
     may_claim: bool
     grants: list[str]
+    # Whether they've accepted the contributor agreement as it reads now,
+    # which adding to the catalog needs (agreement.py).
+    agreed: bool = False
     # Their buy-link shops: {"order": [...], "hidden": [...]}, or None.
     shops: dict | None = None
 
@@ -74,6 +77,7 @@ def me_for(user: User, settings: Settings) -> Me:
         may_run=user.at_least("admin"),
         may_claim=user.may_claim,
         grants=roles.grantable(user.role),
+        agreed=agreement.has_agreed(user),
         shops=user.shop_preferences,
     )
 

@@ -145,10 +145,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         Recent changes at `/admin/changes` for moderators. Family
         collections' history only with the collection; an ingredient first
         named in a private recipe doesn't say who made it.
-      - [ ] The ODbL contributor agreement before a first contribution,
-        then contributors add books and recipes, pending until a moderator
-        approves them, hidden from everyone else (the public site, the
-        API, the n8n views).
+      - [x] The contributor agreement and review (#108). Everyone who adds
+        to the catalog accepts the agreement first (agreement.py; a new
+        version asks again), the owner included. Contributors add books (by
+        ISBN or by hand) and recipes to any book; each waits, hidden from
+        everyone but them and moderators (site, API, n8n's views, history),
+        until a moderator approves it at `/admin/review`, one at a time or
+        "approve all". Sent back with a reason, it waits again once changed.
+        Approving a book closes its requests. Contributors change only their
+        own waiting items, tags included.
+      - [ ] A lawyer's read of the agreement's wording, with the terms.
+      - [ ] Contributors' edits to published records (a title, a page), as
+        proposed changes for review.
       - [ ] One-click revert of a change.
       - [ ] Then trust levels and a report button. The ingredient matching
         flow's suggestions and "new ingredient" step wait on this too.

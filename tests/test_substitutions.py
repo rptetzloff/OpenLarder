@@ -5,7 +5,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from fake_broker import _sign_in
+from fake_broker import _sign_in, make_admins
 
 E = uuid.uuid4()
 
@@ -24,7 +24,7 @@ async def work(adb):
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET role = 'admin'"))
+    await adb.execute(make_admins())
     return client
 
 

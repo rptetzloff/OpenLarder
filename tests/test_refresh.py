@@ -6,7 +6,7 @@ import copy
 import pytest
 from sqlalchemy import text
 
-from fake_broker import _sign_in
+from fake_broker import _sign_in, make_admins
 from fake_openlibrary import PINK_CAKE
 from openlarder.openlibrary import clean_name
 
@@ -42,7 +42,7 @@ def test_open_library_names_are_cleaned(raw, name, kind) -> None:
 @pytest.fixture
 async def admin(client, broker, adb, openlib):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET role = 'admin'"))
+    await adb.execute(make_admins())
     # The edition by its own key, as a check asks for it.
     openlib.records[EDITION] = copy.deepcopy(openlib.records[f"/isbn/{PINK_CAKE}.json"])
     return client

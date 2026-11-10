@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from openlarder import (
+    agreement,
     archiving,
     buying,
     detector,
@@ -314,6 +315,11 @@ class RecipeOut(BaseModel):
     # and when.
     added_by: str | None = None
     added_on: date | None = None
+    # published, pending (waiting for a moderator) or returned (sent back,
+    # with the moderator's note); only its maker and moderators see the last
+    # two.
+    review: str = "published"
+    review_note: str | None = None
 
 
 class Created(BaseModel):
@@ -365,8 +371,12 @@ def _episode_out(episode: Episode, at: int | None) -> EpisodeOut:
 
 async def _recipe_or_404(session, recipe_id: uuid.UUID, viewer) -> Recipe:
     recipe = await session.get(Recipe, recipe_id)
-    if recipe is None or not await visibility.can_see(
-        session, viewer, await session.get_one(Source, recipe.source_id)
+    if (
+        recipe is None
+        or not visibility.sees_waiting(viewer, recipe)
+        or not await visibility.can_see(
+            session, viewer, await session.get_one(Source, recipe.source_id)
+        )
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
     return recipe
@@ -379,8 +389,26 @@ async def _editable_source(session, source_id: uuid.UUID, user) -> Source:
     if source is None or not await visibility.can_see(session, user, source):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
     if not await visibility.may_edit(session, user, source):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an admin can change that.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a moderator can change that.")
     return source
+
+
+def _catalog_write(user, source: Source, recipe: Recipe | None = None) -> None:
+    """Outside a family collection, adding to the catalog needs the
+    contributor agreement, and a contributor changes only their own
+    recipes while they wait for review."""
+    if source.kind == "family":
+        return
+    if not agreement.has_agreed(user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Accept the contributor agreement first: it's on your account page.",
+        )
+    if recipe is not None and not visibility.may_change_recipe(user, recipe):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Only a moderator can change a published recipe. Flag it if something's wrong.",
+        )
 
 
 async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
@@ -440,14 +468,14 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             Recipe.title,
         )
         .join(Recipe, Recipe.id == IngredientOption.sub_recipe_id)
-        .where(IngredientOption.recipe_id == recipe.id)
+        .where(IngredientOption.recipe_id == recipe.id, visibility.recipes_seen_by(viewer))
     ):
         linked.setdefault(line_id, {})[rank] = RecipeLink(id=sub_id, title=sub_title)
     used_in = (
         await session.execute(
             select(Recipe.id, Recipe.title)
             .join(IngredientOption, IngredientOption.recipe_id == Recipe.id)
-            .where(IngredientOption.sub_recipe_id == recipe.id)
+            .where(IngredientOption.sub_recipe_id == recipe.id, visibility.recipes_seen_by(viewer))
             .distinct()
             .order_by(Recipe.title)
         )
@@ -542,7 +570,11 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             swap_out(x)
             for x in await substitutions.listed(session, substitutions.for_recipe(recipe.id))
         ],
-        editable=viewer is not None and await visibility.may_edit(session, viewer, work),
+        editable=viewer is not None
+        and await visibility.may_edit(session, viewer, work)
+        and (work.kind == "family" or visibility.may_change_recipe(viewer, recipe)),
+        review=recipe.review,
+        review_note=recipe.review_note if recipe.review != "published" else None,
     )
 
 
@@ -566,12 +598,17 @@ async def source_recipe_lines(
     if source is None or not await visibility.can_see(session, viewer, source):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
     found: dict[uuid.UUID, list[str]] = {
-        r: [] for r in await session.scalars(select(Recipe.id).where(Recipe.source_id == source_id))
+        r: []
+        for r in await session.scalars(
+            select(Recipe.id).where(
+                Recipe.source_id == source_id, visibility.recipes_seen_by(viewer)
+            )
+        )
     }
     for recipe_id, text in await session.execute(
         select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
         .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
-        .where(Recipe.source_id == source_id)
+        .where(Recipe.source_id == source_id, visibility.recipes_seen_by(viewer))
         .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
     ):
         found[recipe_id].append(text)
@@ -592,7 +629,8 @@ async def add_recipe(
     background: BackgroundTasks,
     archiver: ArchiverDep,
 ) -> Created:
-    await _editable_source(session, source_id, user)
+    source = await _editable_source(session, source_id, user)
+    _catalog_write(user, source)
     entry = _clean(body)
     try:
         recipe = await recipes.create(session, source_id, entry)
@@ -600,6 +638,9 @@ async def add_recipe(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     # Whoever added it deals with its flags (routers/flags.py).
     recipe.created_by = user.id
+    # A contributor's waits for a moderator (migration 0041).
+    if source.kind != "family" and not user.may_edit:
+        recipe.review = "pending"
     await references.relink(session, source_id)
     await session.commit()
     if pages := await archiving.uncopied(session, recipe.id):
@@ -617,12 +658,16 @@ async def change_recipe(
     archiver: ArchiverDep,
 ) -> RecipeOut:
     recipe = await _recipe_or_404(session, recipe_id, user)
-    await _editable_source(session, recipe.source_id, user)
+    source = await _editable_source(session, recipe.source_id, user)
+    _catalog_write(user, source, recipe)
     entry = _clean(body)
     try:
         await recipes.replace(session, recipe, entry)
     except recipes.InvalidRecipe as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    # Fixed after being sent back: waiting again.
+    if recipe.review == "returned" and not user.may_edit:
+        recipe.review = "pending"
     await references.relink(session, recipe.source_id)
     await session.commit()
     if pages := await archiving.uncopied(session, recipe.id):
@@ -637,7 +682,8 @@ async def change_recipe(
 )
 async def remove_recipe(recipe_id: uuid.UUID, user: CurrentUser, session: Session) -> Response:
     recipe = await _recipe_or_404(session, recipe_id, user)
-    await _editable_source(session, recipe.source_id, user)
+    source = await _editable_source(session, recipe.source_id, user)
+    _catalog_write(user, source, recipe)
     source_id = recipe.source_id
     await references.release(session, recipe.id)
     await session.delete(recipe)

@@ -22,6 +22,7 @@ from sqlalchemy import delete, exists, func, select
 from openlarder import books as books_module
 from openlarder import buying, isbn, linking, openlibrary, references, refresh, visibility, web
 from openlarder import recipes as recipes_module
+from openlarder.agreement import Agreed, Contributing, require_agreement
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.buying import BuyLink
@@ -120,6 +121,8 @@ class RecipeSummary(BaseModel):
     line_count: int = 0
     # Another recipe here uses it as a component ("Biscuit Blend (p. 14)").
     component: bool = False
+    # published, or (for its maker and moderators) pending or returned.
+    review: str = "published"
 
 
 class IssueSummary(BaseModel):
@@ -180,9 +183,20 @@ class Book(BaseModel):
     shared_with: list[GroupRef] = []
     # A TV show's, podcast's or video channel's episodes, in order.
     episodes: list[EpisodeSummary]
+    # published, or (for its maker and moderators) pending or returned, with
+    # the moderator's note; and whether the viewer may change its details.
+    review: str = "published"
+    review_note: str | None = None
+    details_editable: bool = False
+    # Whether the viewer may change its tags (routers/tags.py).
+    tags_editable: bool = False
 
 
 TOP_INGREDIENTS = 30
+
+
+# Adding to the catalog is under the contributor agreement (agreement.py).
+AGREED = [SameOrigin, Depends(require_agreement)]
 
 
 class AddByIsbn(BaseModel):
@@ -260,7 +274,11 @@ async def list_books(
     if kind:
         query = query.where(Source.kind.in_(kind))
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    recipe_count = select(func.count()).where(Recipe.source_id == Source.id).scalar_subquery()
+    recipe_count = (
+        select(func.count())
+        .where(Recipe.source_id == Source.id, Recipe.review == "published")
+        .scalar_subquery()
+    )
     order = {
         "recent": (Source.created_at.desc(), Source.id),
         "recipes": (recipe_count.desc(), func.lower(Source.title), Source.id),
@@ -294,7 +312,7 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
         (
             await session.execute(
                 select(Recipe.source_id, func.count())
-                .where(Recipe.source_id.in_(ids))
+                .where(Recipe.source_id.in_(ids), Recipe.review == "published")
                 .group_by(Recipe.source_id)
             )
         ).all()
@@ -348,7 +366,9 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
     ).all()
     recipes = (
         await session.scalars(
-            select(Recipe).where(Recipe.source_id == source_id).order_by(func.lower(Recipe.title))
+            select(Recipe)
+            .where(Recipe.source_id == source_id, visibility.recipes_seen_by(viewer))
+            .order_by(func.lower(Recipe.title))
         )
     ).all()
     edition_order = {e.id: i for i, e in enumerate(editions)}
@@ -408,7 +428,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
     for recipe_id, line in await session.execute(
         select(RecipeIngredient.recipe_id, RecipeIngredient.original_text)
         .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
-        .where(Recipe.source_id == source_id)
+        .where(Recipe.source_id == source_id, visibility.recipes_seen_by(viewer))
         .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
     ):
         lines.setdefault(recipe_id, []).append(line)
@@ -416,8 +436,8 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         (
             await session.scalars(
                 select(IngredientOption.sub_recipe_id)
-                .join(Recipe, Recipe.id == IngredientOption.sub_recipe_id)
-                .where(Recipe.source_id == source_id)
+                .join(Recipe, Recipe.id == IngredientOption.recipe_id)
+                .where(Recipe.source_id == source_id, visibility.recipes_seen_by(viewer))
             )
         ).all()
     )
@@ -426,7 +446,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         select(Ingredient.id, Ingredient.name, uses)
         .join(IngredientOption, IngredientOption.ingredient_id == Ingredient.id)
         .join(Recipe, Recipe.id == IngredientOption.recipe_id)
-        .where(Recipe.source_id == source_id)
+        .where(Recipe.source_id == source_id, visibility.recipes_seen_by(viewer))
         .group_by(Ingredient.id, Ingredient.name)
         .order_by(uses.desc(), func.lower(Ingredient.name))
         .limit(TOP_INGREDIENTS)
@@ -438,6 +458,12 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         paywalled=work.paywalled,
         private=work.private,
         editable=viewer is not None and await visibility.may_edit(session, viewer, work),
+        review=work.review,
+        review_note=work.review_note if work.review != "published" else None,
+        details_editable=viewer is not None and _may_change_book(viewer, work),
+        tags_editable=viewer is not None
+        and await visibility.may_edit(session, viewer, work)
+        and visibility.may_tag_source(viewer, work),
         owner_name=(
             (await session.get_one(User, work.owner_id)).display_name if work.owner_id else None
         ),
@@ -489,6 +515,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
                 lines=lines.get(r.id, [])[:FIRST_LINES],
                 line_count=len(lines.get(r.id, [])),
                 component=r.id in components,
+                review=r.review,
             )
             for r in recipes
         ],
@@ -516,8 +543,10 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
     dependencies=[SameOrigin],
 )
 async def add_by_isbn(
-    body: AddByIsbn, admin: ModeratorUser, session: Session, transport: Transport
+    body: AddByIsbn, admin: Contributing, session: Session, transport: Transport
 ) -> Added:
+    """A book by its ISBN, from Open Library. A contributor's waits for
+    review (migration 0041)."""
     try:
         isbn13 = isbn.normalise(body.isbn)
     except isbn.InvalidIsbn as exc:
@@ -526,10 +555,7 @@ async def add_by_isbn(
     # Checked before asking Open Library, so a book already here costs no request.
     existing = await session.scalar(select(Edition.source_id).where(Edition.isbn13 == isbn13))
     if existing is not None:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            {"message": "That edition is already in the catalog.", "source_id": str(existing)},
-        )
+        raise await _already_here(session, admin, existing)
     try:
         found = await openlibrary.find_by_isbn(isbn13, transport)
     except openlibrary.NotFound:
@@ -546,13 +572,34 @@ async def add_by_isbn(
         source_id = await add_book(session, found)
     except AlreadyIndexed as exc:
         # Same edition under another ISBN, matched by Open Library's edition ID.
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            {"message": "That edition is already in the catalog.", "source_id": str(exc.source_id)},
-        ) from None
+        raise await _already_here(session, admin, exc.source_id) from None
+    await _mark_new(session, admin, source_id)
     await session.commit()
     log.info("%s added %s (%s)", admin.id, isbn13, found.title)
     return Added(id=source_id)
+
+
+async def _already_here(session, user: User, source_id: uuid.UUID) -> HTTPException:
+    """That book is here already: where, if the asker may see it. One
+    someone else added that's waiting for review isn't pointed to."""
+    source = await session.get_one(Source, source_id)
+    if not await visibility.can_see(session, user, source):
+        return HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"message": "Someone has added that book already; it's waiting for review."},
+        )
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        {"message": "That edition is already in the catalog.", "source_id": str(source_id)},
+    )
+
+
+async def _mark_new(session, user: User, source_id: uuid.UUID) -> None:
+    """Who added a new book; a contributor's waits for a moderator."""
+    source = await session.get_one(Source, source_id)
+    source.created_by = user.id
+    if not user.may_edit:
+        source.review = "pending"
 
 
 class WithoutIsbn(BaseModel):
@@ -570,7 +617,7 @@ class AddedManually(BaseModel):
 
 @router.post("/manual", response_model=AddedManually, dependencies=[SameOrigin])
 async def add_without_isbn(
-    body: WithoutIsbn, admin: ModeratorUser, session: Session
+    body: WithoutIsbn, admin: Contributing, session: Session
 ) -> AddedManually:
     """A book Open Library can't supply: no ISBN, or one Open Library doesn't know."""
     title = " ".join(body.title.split())
@@ -586,6 +633,12 @@ async def add_without_isbn(
     source_id, existed = await books_module.add_without_isbn(
         session, title, authors, body.year, isbn13
     )
+    if existed:
+        source = await session.get_one(Source, source_id)
+        if not await visibility.can_see(session, admin, source):
+            raise await _already_here(session, admin, source_id)
+    else:
+        await _mark_new(session, admin, source_id)
     await session.commit()
     if not existed:
         log.info("%s added %s without an ISBN", admin.id, title)
@@ -757,14 +810,26 @@ class BookIn(BaseModel):
     paywalled: bool | None = None
 
 
+def _may_change_book(user: User, work: Source) -> bool:
+    if work.kind == "family":
+        return False
+    return user.may_edit or (
+        user.may_claim and work.created_by == user.id and work.review != "published"
+    )
+
+
 @router.put("/{source_id}", response_model=Added, dependencies=[SameOrigin])
-async def edit_book(
-    source_id: uuid.UUID, body: BookIn, admin: ModeratorUser, session: Session
-) -> Added:
-    """Fix what a book says about itself (books.edit_book)."""
+async def edit_book(source_id: uuid.UUID, body: BookIn, admin: Agreed, session: Session) -> Added:
+    """Fix what a book says about itself (books.edit_book): a moderator, or
+    the contributor who added it while it waits for review."""
     work = await session.get(Source, source_id)
     if work is None or not await visibility.can_see(session, admin, work):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    if not _may_change_book(admin, work):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a moderator can change that.")
+    # Fixed after being sent back: waiting again.
+    if work.review == "returned" and not admin.may_edit:
+        work.review = "pending"
     try:
         await books_module.edit_book(
             session,
@@ -880,7 +945,7 @@ class WebsiteIn(BaseModel):
     authors: list[str] = Field(default=[], max_length=30)
 
 
-@router.post("/websites", response_model=AddedManually, dependencies=[SameOrigin])
+@router.post("/websites", response_model=AddedManually, dependencies=AGREED)
 async def add_website(body: WebsiteIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A website as a source, one per site: the one already here for that
     host if there is one. Nothing is fetched from the site (web.py)."""
@@ -926,7 +991,7 @@ class ShowIn(BaseModel):
     authors: list[str] = Field(default=[], max_length=30)
 
 
-@router.post("/periodicals", response_model=AddedManually, dependencies=[SameOrigin])
+@router.post("/periodicals", response_model=AddedManually, dependencies=AGREED)
 async def add_periodical(
     body: PeriodicalIn, admin: ModeratorUser, session: Session
 ) -> AddedManually:
@@ -935,7 +1000,7 @@ async def add_periodical(
     return await _add_named(session, admin, body.kind, body.title, body.authors)
 
 
-@router.post("/shows", response_model=AddedManually, dependencies=[SameOrigin])
+@router.post("/shows", response_model=AddedManually, dependencies=AGREED)
 async def add_show(body: ShowIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A TV show, podcast or video channel as a source: the one already here
     of that kind and name, or a new one. Its episodes are added as recipes
@@ -949,7 +1014,7 @@ class NamedIn(BaseModel):
     authors: list[str] = Field(default=[], max_length=30)
 
 
-@router.post("/social", response_model=AddedManually, dependencies=[SameOrigin])
+@router.post("/social", response_model=AddedManually, dependencies=AGREED)
 async def add_social(body: NamedIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A social media account as a source, on any platform: the one already
     here by that name, or a new one. Its recipes are on its posts, by
@@ -957,7 +1022,7 @@ async def add_social(body: NamedIn, admin: ModeratorUser, session: Session) -> A
     return await _add_named(session, admin, "social", body.title, body.authors)
 
 
-@router.post("/packaging", response_model=AddedManually, dependencies=[SameOrigin])
+@router.post("/packaging", response_model=AddedManually, dependencies=AGREED)
 async def add_packaging(body: NamedIn, admin: ModeratorUser, session: Session) -> AddedManually:
     """A product whose packaging prints recipes: the one already here by that
     name, or a new one."""

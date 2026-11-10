@@ -28,6 +28,7 @@ from fake_archive import FakeArchive
 from fake_broker import CLIENT_ID, CLIENT_SECRET, ISSUER, FakeBroker, _settings
 from fake_openlibrary import FakeOpenLibrary
 from fake_wikidata import FakeWikidata
+from openlarder.agreement import VERSION as AGREEMENT
 from openlarder.archiving import Archiver, get_archiver
 from openlarder.auth import SESSION_COOKIE, build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
@@ -233,19 +234,23 @@ async def people(client, adb):
     async with AsyncExitStack() as stack:
 
         async def person(
-            name: str, admin: bool = False, role: str | None = None
+            name: str, admin: bool = False, role: str | None = None, agreed: bool = True
         ) -> httpx2.AsyncClient:
             token = f"token-{name}-{uuid.uuid4().hex}"
             await adb.execute(
                 text(
-                    "WITH u AS (INSERT INTO users (issuer, subject, display_name, role)"
-                    " VALUES ('test', :n, :n, :a) RETURNING id)"
+                    "WITH u AS (INSERT INTO users (issuer, subject, display_name, role,"
+                    " agreed_at, agreed_version)"
+                    " VALUES ('test', :n, :n, :a, CASE WHEN :g THEN now() END,"
+                    " CASE WHEN :g THEN :v END) RETURNING id)"
                     " INSERT INTO user_sessions (user_id, token_hash, expires_at)"
                     " SELECT id, :h, now() + interval '1 day' FROM u"
                 ),
                 {
                     "n": name,
                     "a": role or ("admin" if admin else "user"),
+                    "g": agreed,
+                    "v": AGREEMENT,
                     "h": hashlib.sha256(token.encode()).digest(),
                 },
             )

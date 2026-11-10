@@ -2,13 +2,23 @@
 // The content rules here are SCOPING.md's, in plain words. SCOPING says
 // they and the allergen wording are reviewed by a lawyer; until then this is
 // an accurate account of how the site works, not legal advice.
+import { onMounted, ref } from "vue";
+import { type Agreement, readAgreement } from "../review";
+
 document.title = "Terms of service · OpenLarder";
+
+// The agreement's wording is the server's (agreement.py), so it's shown as
+// what was actually accepted.
+const agreement = ref<Agreement | null>(null);
+onMounted(async () => {
+  agreement.value = await readAgreement().catch(() => null);
+});
 </script>
 
 <template>
   <article>
     <h1>Terms of service</h1>
-    <p class="updated">Last updated 8 November 2026</p>
+    <p class="updated">Last updated 10 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks: which book, which page, and
@@ -32,7 +42,12 @@ document.title = "Terms of service · OpenLarder";
     </p>
 
     <h2>Contributing</h2>
-    <p>Contributing is not open yet. When it is, these rules apply.</p>
+    <p>
+      Contributors, whom a moderator names, add books and their recipes. What they add waits for a
+      moderator's review, seen only by them and the moderators until it's approved, and may be
+      sent back with what to fix. Everyone who adds to the catalog first accepts the contributor
+      agreement below, and accepts it again if it changes. These rules apply too.
+    </p>
     <ul>
       <li>
         <strong>Facts, not copied text.</strong> Contribute titles, page numbers, ingredient lines
@@ -51,6 +66,12 @@ document.title = "Terms of service · OpenLarder";
         display name in the edit history, and may be reviewed, corrected, reverted or removed.
       </li>
     </ul>
+
+    <h3>The contributor agreement</h3>
+    <p v-if="!agreement" class="status">Loading…</p>
+    <ol v-else class="agreement-points">
+      <li v-for="(point, i) in agreement.points" :key="i">{{ point }}</li>
+    </ol>
 
     <h2>Family collections</h2>
     <p>

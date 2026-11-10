@@ -14,10 +14,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from openlarder import visibility
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import RecipeTag, Source, SourceTag, Tag, TagKind
-from openlarder.routers.recipes import _editable_source, _recipe_or_404
+from openlarder.routers.recipes import _catalog_write, _editable_source, _recipe_or_404
 from openlarder.tagging import (
     MAX_TAGS,
     RecipeTagOut,
@@ -84,7 +85,9 @@ async def set_recipe_tags(
     """The recipe's own tags, all of them: any not given are taken off. Its
     source's come with it regardless."""
     recipe = await _recipe_or_404(session, recipe_id, user)
-    await _editable_source(session, recipe.source_id, user)
+    source = await _editable_source(session, recipe.source_id, user)
+    # A contributor tags only their own recipes while they wait for review.
+    _catalog_write(user, source, recipe)
     wanted = await _known(session, body.tags)
     await session.execute(delete(RecipeTag).where(RecipeTag.recipe_id == recipe.id))
     session.add_all(RecipeTag(recipe_id=recipe.id, tag_id=t) for t in wanted)
@@ -98,6 +101,11 @@ async def set_source_tags(
 ) -> list[TagOut]:
     """The source's tags, all of them, which every recipe in it has too."""
     source: Source = await _editable_source(session, source_id, user)
+    _catalog_write(user, source)
+    if not visibility.may_tag_source(user, source):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only a moderator can change a published source's tags."
+        )
     wanted = await _known(session, body.tags)
     await session.execute(delete(SourceTag).where(SourceTag.source_id == source.id))
     session.add_all(SourceTag(source_id=source.id, tag_id=t) for t in wanted)

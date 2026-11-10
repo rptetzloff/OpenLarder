@@ -13,6 +13,7 @@ const LINKS = [
   ["/admin/import", "Bulk import", true],
   ["/admin/imports", "Import history", true],
   ["/admin/flags", "Flagged recipes", false],
+  ["/admin/review", "Review", false],
   ["/admin/suggestions", "Suggestions", false],
   ["/admin/changes", "Recent changes", false],
   ["/admin/people", "People", false],

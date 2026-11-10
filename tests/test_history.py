@@ -27,14 +27,14 @@ async def test_a_save_is_one_change_by_whoever_made_it(people, adb) -> None:
     assert len({r["change_id"] for r in revs}) == 1
     tables = {r["table_name"] for r in revs}
     assert {"sources", "authors", "source_credits"} <= tables
-    [src] = [r for r in revs if r["table_name"] == "sources"]
+    [src] = [r for r in revs if r["table_name"] == "sources" and r["action"] == "i"]
     assert src["action"] == "i" and src["changes"]["title"] == [None, "Plenty"]
     assert "created_at" not in src["changes"] and not src["family"]
 
     await mo.put(
         f"/api/sources/{book['id']}", json={"title": "Plenty More", "authors": ["Yotam Ottolenghi"]}
     )
-    [edit] = await _revisions(adb, "table_name = 'sources' AND action = 'u'")
+    [edit] = await _revisions(adb, "table_name = 'sources' AND action = 'u' AND changes ? 'title'")
     assert edit["changes"]["title"] == ["Plenty", "Plenty More"]
     assert edit["change_id"] != src["change_id"]
 

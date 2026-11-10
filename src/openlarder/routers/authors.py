@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 import httpx2
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import aliased
 
 from openlarder import author_facts, author_merge, openlibrary, visibility, wikidata
@@ -129,7 +129,7 @@ async def list_authors(
         .join(credit, credit.source_id == Recipe.source_id)
         .where(
             credit.author_id == Author.id,
-            Recipe.source_id.in_(visibility.seen_source_ids(viewer)),
+            visibility.recipes_seen_by(viewer),
         )
         .scalar_subquery()
     )
@@ -162,7 +162,7 @@ async def list_authors(
     for author_id, source_id, title, n in await session.execute(
         select(SourceCredit.author_id, Source.id, Source.title, count)
         .join(Source, Source.id == SourceCredit.source_id)
-        .outerjoin(Recipe, Recipe.source_id == Source.id)
+        .outerjoin(Recipe, and_(Recipe.source_id == Source.id, visibility.recipes_seen_by(viewer)))
         .where(
             SourceCredit.author_id.in_([r[0] for r in rows]),
             Source.id.in_(visibility.seen_source_ids(viewer)),
