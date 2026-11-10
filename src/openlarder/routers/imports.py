@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import importer, isbn
+from openlarder import history, importer, isbn
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import ImportRun, ImportRunLine, Recipe, Source, User
@@ -171,6 +171,7 @@ async def parse(files: Files, admin: AdminUser) -> Parsed:
 
 @router.post("/recipes", response_model=BatchResult, dependencies=[SameOrigin])
 async def import_recipes(batch: Batch, admin: AdminUser, session: Session) -> BatchResult:
+    await history.via(session, f"import:{batch.run_id}" if batch.run_id else "import")
     items = []
     for i in batch.items:
         try:

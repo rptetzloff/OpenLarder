@@ -163,6 +163,12 @@ async function archiveAll() {
           </a>
         </li>
         <li>
+          <a href="/admin/changes">
+            <h2>Recent changes</h2>
+            <p>Everything added, changed or removed in the catalog, by whom.</p>
+          </a>
+        </li>
+        <li>
           <a href="/admin/people">
             <h2>People and roles</h2>
             <p>Contributors, moderators and administrators, and who can make whom one.</p>

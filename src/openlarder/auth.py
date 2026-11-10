@@ -22,7 +22,7 @@ from sqlalchemy import case, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import names
+from openlarder import history, names
 from openlarder.config import Settings, get_settings
 from openlarder.db import Session
 from openlarder.models import User, UserSession
@@ -161,11 +161,14 @@ async def current_user(
 ) -> User | None:
     if not token:
         return None
-    return await session.scalar(
+    user = await session.scalar(
         select(User)
         .join(UserSession, UserSession.user_id == User.id)
         .where(UserSession.token_hash == hash_token(token), UserSession.expires_at > func.now())
     )
+    # What they change is recorded as theirs (history.py).
+    await history.acting(session, user.id if user else None)
+    return user
 
 
 async def require_user(user: Annotated[User | None, Depends(current_user)]) -> User:

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ShopChooser from "../components/ShopChooser.vue";
+import HistoryPanel from "../components/HistoryPanel.vue";
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
@@ -485,6 +486,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
       <p v-if="isBook" class="status credit-line">
         Book details and covers from <a href="https://openlibrary.org">Open Library</a>.
       </p>
+      <HistoryPanel kind="sources" :id="id" />
     </template>
   </article>
 </template>

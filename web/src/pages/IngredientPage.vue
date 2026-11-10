@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
+import HistoryPanel from "../components/HistoryPanel.vue";
 import SwapForm from "../components/SwapForm.vue";
 import SwapList from "../components/SwapList.vue";
 import {
@@ -382,6 +383,7 @@ onMounted(() => load());
           </button>
         </p>
       </section>
+      <HistoryPanel kind="ingredients" :id="id" />
     </template>
   </article>
 </template>
