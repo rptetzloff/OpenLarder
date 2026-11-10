@@ -125,6 +125,14 @@ async function seed() {
   await api(`/api/groups/${group.id}/invites`, "cook", { role: "view" });
   await api(`/api/sources/${box.id}/groups`, "cook", { groups: [group.id] }, "PUT");
   const author = (await api(`/api/sources/${book.id}`, "admin")).credits[0].author_id;
+  // A contributor's book and recipe, waiting for review.
+  const waiting = await api("/api/sources/manual", "cook", { title: "Cy's Kitchen Notebook", authors: ["Cy Cook"] });
+  const waitingBook = await api(`/api/sources/${waiting.id}`, "cook");
+  await api(`/api/sources/${waiting.id}/recipes`, "cook", {
+    title: "Waiting Pie",
+    editions: [{ edition_id: waitingBook.editions[0].id, page: "3" }],
+    ingredients: ["Apples", "Butter"],
+  });
   // Requests: one asked for twice, one claimed, one declined.
   await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
   await api("/api/requests", "admin", { title: "plenty" });
@@ -133,7 +141,7 @@ async function seed() {
   const odd = await api("/api/requests", "cook", { title: "A Car Manual" });
   await api(`/api/requests/${odd.request.id}/decline`, "admin", { reason: "Not a cookbook." });
 
-  return { vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
+  return { waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
 }
 
 function pages(s) {
@@ -190,6 +198,8 @@ function pages(s) {
     ["/admin/clicks", "admin"],
     ["/admin/people", "admin"],
     ["/admin/changes", "admin"],
+    ["/admin/review", "admin"],
+    [`/sources/${s.waiting}`, "cook"],
     ["/requests", null],
     ["/requests", "cook"],
     ["/admin/suggestions", "cook"],

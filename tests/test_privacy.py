@@ -231,9 +231,9 @@ async def test_nobody_else_sees_or_changes_it(secret, people, client, who) -> No
     assert (await other.post(f"/api/sources/{box}/recipes", json=body)).status_code == 404
     assert (await other.put(f"/api/recipes/{stew}", json=body)).status_code == 404
     assert (await other.delete(f"/api/recipes/{stew}")).status_code == 404
-    # The book editor is a moderator's: 403 for Bob, and 404 for a moderator up.
+    # The book editor: a collection they can't see isn't there, for anyone.
     editing = await other.put(f"/api/sources/{box}", json={"title": "X"})
-    assert editing.status_code == (403 if who == "bob" else 404)
+    assert editing.status_code == 404
     assert (await other.patch(f"/api/sources/{box}/family", json={"title": "X"})).status_code == 404
     assert (await other.delete(f"/api/sources/{box}")).status_code == 404
     assert (await other.get(f"/api/recipes/{stew}/flags")).status_code == 404

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import AgreementPanel from "../components/AgreementPanel.vue";
 import { type Book, issueName, KIND_NAMES, SHOWS } from "../books";
 import type { Me } from "../me";
 import { checkLines, type LineOption, type LineReview, type Recipe, saveRecipe } from "../recipes";
@@ -10,6 +11,8 @@ import { checkLines, type LineOption, type LineReview, type Recipe, saveRecipe }
 const props = defineProps<{ bookId?: string; recipeId?: string; user?: Me | null }>();
 
 const book = ref<Book | null>(null);
+// The agreement accepted on this page, before the app knows.
+const accepted = ref(false);
 const title = ref("");
 // The chapter or section it's in, as the book names it; the ones this
 // source has already are offered as you type.
@@ -364,7 +367,16 @@ async function save(another = false) {
     <h1>{{ heading }}</h1>
     <p class="muted">Where it is and what goes in it. No amounts, method or headnotes.</p>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
+    <!-- Outside a family collection, adding to the catalog needs the agreement. -->
+    <AgreementPanel
+      v-else-if="book && !inFamily && user && !user.agreed && !accepted"
+      :agreed="false"
+      @accepted="accepted = true"
+    />
     <template v-else-if="book">
+      <p v-if="!inFamily && user && !user.may_edit" class="muted">
+        What you add waits for a moderator's review before anyone else sees it.
+      </p>
       <ol class="steps" aria-label="Steps">
         <li v-for="(name, i) in steps" :key="i">
           <button

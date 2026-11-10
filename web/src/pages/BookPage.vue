@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import ReviewNotice from "../components/ReviewNotice.vue";
 import ShopChooser from "../components/ShopChooser.vue";
+import { REVIEW_LABELS } from "../review";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
@@ -224,6 +226,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <p class="kind">{{ KIND_NAMES[book.kind] }}</p>
           <h1>{{ book.title }}</h1>
           <p v-if="book.subtitle" class="subtitle">{{ book.subtitle }}</p>
+          <ReviewNotice :review="book.review" :note="book.review_note" :what="KIND_NAMES[book.kind]" />
           <p v-if="credits.length" class="credits">
             <template v-for="(c, i) in credits" :key="i"
               ><template v-if="i > 0">, </template
@@ -246,7 +249,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </li>
           </ul>
           <TagEditor
-            v-if="book.editable"
+            v-if="book.tags_editable"
             what="source"
             :selected="book.tags.map((t) => t.id)"
             :can-add="!!user?.may_edit"
@@ -277,6 +280,13 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               :href="`/sources/${book.id}/bulk`"
               class="button-outline"
               >Enter a whole book</a
+            >
+            <!-- Its contributor fixes a book while it waits; moderators have the admin bar. -->
+            <a
+              v-if="book.details_editable && !adminTools"
+              :href="`/sources/${book.id}/edit`"
+              class="button-outline"
+              >Edit the {{ KIND_NAMES[book.kind] }}</a
             >
           </p>
           <template v-if="book.manageable">
@@ -449,6 +459,9 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               <td>
                 <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
                 <span v-if="r.component" class="badge">Component</span>
+                <span v-if="r.review !== 'published'" class="badge waiting">{{
+                  REVIEW_LABELS[r.review]
+                }}</span>
                 <div v-if="r.chapter && !chapter" class="muted chapter-note">{{ r.chapter }}</div>
               </td>
               <td class="lines">{{ lineSummary(r) || "None recorded yet" }}</td>

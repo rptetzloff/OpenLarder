@@ -4,6 +4,7 @@ import AdminBar from "../components/AdminBar.vue";
 import { type WikidataRun, checkWikidata } from "../authors";
 import { type BookSummary, listSources } from "../books";
 import { fetchFlags } from "../flags";
+import { reviewQueue } from "../review";
 import { fetchSuggestions } from "../suggestions";
 import { archiveMissing } from "../recipes";
 import type { Me } from "../me";
@@ -14,6 +15,7 @@ document.title = "Admin · OpenLarder";
 // What's waiting, on each card; null until known, or if it couldn't be.
 const openFlags = ref<number | null>(null);
 const openSuggestions = ref<number | null>(null);
+const waiting = ref<number | null>(null);
 const imports = ref<number | null>(null);
 const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -24,6 +26,7 @@ async function loadCounts() {
     props.user?.may_run
       ? fetch("/api/import/runs").then((r) => (r.ok ? r.json() : Promise.reject()))
       : Promise.reject(),
+    reviewQueue().then((q) => (waiting.value = q.pending)),
   ]);
   if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
   if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
@@ -130,6 +133,13 @@ async function archiveAll() {
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
       <ul class="link-cards">
+        <li>
+          <a href="/admin/review">
+            <h2>Review</h2>
+            <p class="count">{{ n(waiting, "waiting", "waiting") }}</p>
+            <p>Books and recipes contributors have added, for a moderator to approve.</p>
+          </a>
+        </li>
         <li>
           <a href="/admin/flags">
             <h2>Flagged recipes</h2>

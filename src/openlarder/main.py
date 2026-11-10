@@ -40,6 +40,7 @@ from openlarder.routers import (
     monitoring,
     people,
     recipes,
+    review,
     search,
     site,
     sources,
@@ -142,6 +143,7 @@ app.include_router(history_routes.router)
 app.include_router(ingredients.router)
 app.include_router(monitoring.router)
 app.include_router(people.router)
+app.include_router(review.router)
 app.include_router(search.router)
 app.include_router(site.router)
 app.include_router(substitutions.router)

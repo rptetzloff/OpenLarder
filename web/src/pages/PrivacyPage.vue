@@ -78,6 +78,7 @@ document.title = "Privacy policy · OpenLarder";
         the identifier Authgear gives your account, which is how OpenLarder recognises you;
       </li>
       <li>your account's role: contributor, moderator or administrator, if it has one;</li>
+      <li>when you accepted the contributor agreement, and which version of it, if you have;</li>
       <li>
         what you add to or change in the catalog, with your display name and when: its edit
         history, which anyone who can see the record can read. For a family collection, only

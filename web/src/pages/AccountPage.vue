@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import AgreementPanel from "../components/AgreementPanel.vue";
 import ApiKeys from "../components/ApiKeys.vue";
+import ContributionsPanel from "../components/ContributionsPanel.vue";
 import NameForm from "../components/NameForm.vue";
 import { fetchFlags } from "../flags";
 import { listGroups } from "../groups";
@@ -31,6 +33,11 @@ watch(
   },
   { immediate: true },
 );
+// Accepting the agreement changes what the whole app lets you do.
+async function accepted() {
+  const res = await fetch("/api/auth/me");
+  if (res.ok) emit("saved", await res.json());
+}
 const n = (v: number | null, one: string, many: string) =>
   v === null ? "" : `${v.toLocaleString()} ${v === 1 ? one : many}`;
 </script>
@@ -81,6 +88,10 @@ const n = (v: number | null, one: string, many: string) =>
             <a :href="user.account_url">Manage sign-in methods and passkeys</a>
           </p>
         </section>
+      </div>
+      <div v-if="user.may_claim" class="tool-panels account-panels">
+        <AgreementPanel :agreed="user.agreed" @accepted="accepted" />
+        <ContributionsPanel />
       </div>
       <ApiKeys />
     </template>

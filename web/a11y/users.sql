@@ -3,9 +3,11 @@
 -- a group. Their session tokens are fixed and known, so this is for a
 -- throwaway database only: CI's, or a local one.
 WITH people AS (
-  INSERT INTO users (issuer, subject, display_name, role)
-  VALUES ('a11y-check', 'admin', 'Ada Admin', 'owner'),
-         ('a11y-check', 'cook', 'Cy Cook', 'user')
+  -- Both have accepted the contributor agreement (its version is
+-- agreement.VERSION); Cy is a contributor, so what he adds waits for review.
+INSERT INTO users (issuer, subject, display_name, role, agreed_at, agreed_version)
+  VALUES ('a11y-check', 'admin', 'Ada Admin', 'owner', now(), '2026-11-10'),
+         ('a11y-check', 'cook', 'Cy Cook', 'contributor', now(), '2026-11-10')
   ON CONFLICT (issuer, subject) DO UPDATE SET display_name = EXCLUDED.display_name
   RETURNING id, subject
 )

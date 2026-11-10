@@ -1,3 +1,4 @@
+import type { Review } from "./review";
 // What /api/sources returns, and adding a book by ISBN.
 
 import type { BuyLink } from "./buying";
@@ -62,6 +63,8 @@ export interface Book {
     line_count: number;
     // Another recipe here uses it as a component.
     component: boolean;
+    // published, or (for its maker and moderators) waiting or sent back.
+    review: Review;
   }[];
   // A magazine's or newspaper's issues, newest first.
   issues: { id: string; label: string; published_on: string | null }[];
@@ -69,6 +72,12 @@ export interface Book {
   // change it.
   private: boolean;
   editable: boolean;
+  // published, or (for its maker and moderators) pending or returned, with
+  // the moderator's note; and whether you may change its details and tags.
+  review: Review;
+  review_note: string | null;
+  details_editable: boolean;
+  tags_editable: boolean;
   // A family collection's: whose it is, whether you may rename, delete or
   // share it, and the groups it's shared with (every one for its owner; the
   // ones you're in otherwise).
@@ -100,8 +109,33 @@ export async function addByIsbn(isbn: string): Promise<{ id: string; existing: b
   const body = await res.json().catch(() => ({}));
   if (res.status === 201) return { id: body.id, existing: false };
   if (res.status === 409 && body.detail?.source_id) return { id: body.detail.source_id, existing: true };
-  const detail = typeof body.detail === "string" ? body.detail : "That didn't work. Try again.";
-  throw new Error(detail);
+  throw new Error(reason(body));
+}
+
+// The server's reason: a sentence, or {message} (someone else's book that's
+// waiting for review is named but not linked).
+function reason(body: { detail?: unknown }): string {
+  const detail = body.detail as string | { message?: string } | undefined;
+  if (typeof detail === "string") return detail;
+  return detail?.message ?? "That didn't work. Try again.";
+}
+
+// A book Open Library doesn't know, from its title and authors. A
+// contributor's waits for review.
+export async function addManually(
+  title: string,
+  authors: string[],
+  year: number | null,
+  isbn: string,
+): Promise<{ id: string; existing: boolean }> {
+  const res = await fetch("/api/sources/manual", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, authors, year, isbn: isbn.trim() || null }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(reason(body));
+  return body;
 }
 
 // What linking a book to Open Library would do; see routers/sources.py.

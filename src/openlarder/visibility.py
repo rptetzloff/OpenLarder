@@ -17,12 +17,16 @@ Such an ingredient is hidden from anyone who can't see a recipe using it:
 an ingredient shows when nothing uses it yet, or a recipe they can see does.
 Authors are treated the same way, by the sources crediting them.
 
+What a contributor adds is hidden the same way until a moderator approves
+it (migration 0041): from everyone but them and moderators, ingredients and
+authors only it uses included.
+
 The database does not enforce any of this; tests/test_privacy.py asks every
 GET route in the app as other people and fails on anything private it
 finds, so a new route has to answer it.
 """
 
-from sqlalchemy import ColumnElement, and_, exists, false, or_, select
+from sqlalchemy import ColumnElement, and_, exists, false, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -48,15 +52,30 @@ def _shared_with(user: User):
     return select(SourceGroup.source_id).join(GroupMember, member)
 
 
+def _reviewed(model, viewer: User | None) -> ColumnElement[bool]:
+    """Published, or waiting and the viewer's own, or the viewer reviews:
+    what a contributor adds is hidden from everyone else until a moderator
+    approves it (migration 0041)."""
+    if viewer is None:
+        return model.review == "published"
+    if viewer.may_edit:
+        return true()
+    return or_(model.review == "published", model.created_by == viewer.id)
+
+
 def sources_seen_by(viewer: User | None) -> ColumnElement[bool]:
     """Every public source, the viewer's own private ones, and those shared
-    with a group they're in."""
+    with a group they're in; of those, the ones published or theirs to see
+    waiting for review."""
     if viewer is None:
-        return Source.private.is_(false())
-    return or_(
-        Source.private.is_(false()),
-        Source.owner_id == viewer.id,
-        Source.id.in_(_shared_with(viewer)),
+        return and_(Source.private.is_(false()), Source.review == "published")
+    return and_(
+        or_(
+            Source.private.is_(false()),
+            Source.owner_id == viewer.id,
+            Source.id.in_(_shared_with(viewer)),
+        ),
+        _reviewed(Source, viewer),
     )
 
 
@@ -76,11 +95,22 @@ def _hidden_source_ids(viewer: User | None):
 
 
 def _hidden_recipe_ids(viewer: User | None):
-    return select(Recipe.id).where(Recipe.source_id.in_(_hidden_source_ids(viewer)))
+    return select(Recipe.id).where(
+        or_(Recipe.source_id.in_(_hidden_source_ids(viewer)), ~_reviewed(Recipe, viewer))
+    )
+
+
+def hidden_source_ids(viewer: User | None):
+    """The sources the viewer can't see: private, or waiting and not theirs."""
+    return _hidden_source_ids(viewer)
+
+
+def hidden_recipe_ids(viewer: User | None):
+    return _hidden_recipe_ids(viewer)
 
 
 def recipes_seen_by(viewer: User | None) -> ColumnElement[bool]:
-    return Recipe.source_id.not_in(_hidden_source_ids(viewer))
+    return and_(Recipe.source_id.not_in(_hidden_source_ids(viewer)), _reviewed(Recipe, viewer))
 
 
 def options_seen_by(viewer: User | None) -> ColumnElement[bool]:
@@ -142,7 +172,17 @@ async def _shared(
     return bool(await session.scalar(select(exists().where(*member))))
 
 
+def sees_waiting(viewer: User | None, row: Source | Recipe) -> bool:
+    """Whether the viewer may see this source or recipe as far as review
+    goes: published, theirs, or theirs to review."""
+    if row.review == "published":
+        return True
+    return viewer is not None and (viewer.may_edit or row.created_by == viewer.id)
+
+
 async def can_see(session: AsyncSession, viewer: User | None, source: Source) -> bool:
+    if not sees_waiting(viewer, source):
+        return False
     if not source.private:
         return True
     if viewer is None:
@@ -159,9 +199,34 @@ def may_manage(user: User, source: Source) -> bool:
 
 
 async def may_edit(session: AsyncSession, user: User, source: Source) -> bool:
-    """Add and change a source's recipes. A family collection's: whoever may
-    manage it, and the editors and admins of a group it's shared with;
-    everything else's: a moderator or above."""
+    """Add recipes to a source. A family collection's: whoever may manage
+    it, and the editors and admins of a group it's shared with; a book's:
+    a contributor too, if it's published or theirs, and theirs wait for
+    review; everything else's: a moderator or above."""
     if source.kind == "family":
         return may_manage(user, source) or await _shared(session, user, source, EDITING_ROLES)
-    return user.may_edit
+    if user.may_edit:
+        return True
+    return (
+        user.may_claim
+        and source.kind == "book"
+        and (source.review == "published" or source.created_by == user.id)
+    )
+
+
+def may_change_recipe(user: User, recipe: Recipe) -> bool:
+    """Outside a family collection, a contributor changes and removes only
+    their own recipes while they wait for review; a moderator, any."""
+    return user.may_edit or (
+        user.may_claim and recipe.created_by == user.id and recipe.review != "published"
+    )
+
+
+def may_tag_source(user: User, source: Source) -> bool:
+    """A family collection's editors, a moderator, or the contributor who
+    added the source while it waits for review."""
+    return (
+        source.kind == "family"
+        or user.may_edit
+        or (source.created_by == user.id and source.review != "published")
+    )

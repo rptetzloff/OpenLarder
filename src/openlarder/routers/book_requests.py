@@ -237,9 +237,15 @@ async def ask(
         source_id = await session.scalar(
             select(Edition.source_id)
             .join(Source, Source.id == Edition.source_id)
-            .where(Edition.isbn13 == isbn13, Source.private.is_(False))
+            .where(
+                Edition.isbn13 == isbn13,
+                Source.private.is_(False),
+                Source.review == "published",
+            )
         )
-    if source_id and await session.scalar(select(exists().where(Recipe.source_id == source_id))):
+    if source_id and await session.scalar(
+        select(exists().where(Recipe.source_id == source_id, Recipe.review == "published"))
+    ):
         return Asked(outcome="in_catalog", source_id=source_id)
 
     # Asked for already: a vote.

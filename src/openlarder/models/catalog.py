@@ -80,7 +80,30 @@ def _trgm(table: str, column: str) -> Index:
     )
 
 
-class Source(Timestamps, Base):
+class Reviewed:
+    """Waiting for a moderator, or not (migration 0041). *Ray, 2026-11-10:*
+    a contributor's book or recipe is hidden from everyone but them and
+    moderators until approved; one sent back keeps the reason, and goes
+    back to waiting when it's changed. visibility.py applies it."""
+
+    # published, pending (waiting) or returned (sent back).
+    review: Mapped[str] = mapped_column(Text, nullable=False, server_default="published")
+    # Why it was sent back.
+    review_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+def _review_args(table: str) -> tuple:
+    return (
+        CheckConstraint("review IN ('published', 'pending', 'returned')", name="review_known"),
+        Index(f"ix_{table}_waiting", "review", postgresql_where=text("review <> 'published'")),
+    )
+
+
+class Source(Reviewed, Timestamps, Base):
     """Where recipes come from: a book, across every printing of it, a
     website, a magazine or newspaper, a TV show, podcast or video channel, a
     social media account, a product's packaging, or a family's collection.
@@ -111,6 +134,9 @@ class Source(Timestamps, Base):
             "(kind = 'family') = (acknowledged_at IS NOT NULL)", name="family_acknowledged"
         ),
         Index("ix_sources_owner_id", "owner_id"),
+        Index("ix_sources_created_by", "created_by"),
+        CheckConstraint("kind <> 'family' OR review = 'published'", name="family_not_reviewed"),
+        *_review_args("sources"),
         # The target of source_groups' key, which only allows a family
         # collection (migration 0027).
         UniqueConstraint("id", "kind"),
@@ -134,6 +160,10 @@ class Source(Timestamps, Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     subtitle: Mapped[str | None] = mapped_column(Text)
     open_library_work_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    # Who added it, from migration 0041: a contributor's waits for review.
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
 
 
 class Author(Timestamps, Base):
@@ -283,7 +313,7 @@ class PurchaseClick(Base):
     )
 
 
-class Recipe(Timestamps, Base):
+class Recipe(Reviewed, Timestamps, Base):
     __tablename__ = "recipes"
     __table_args__ = (
         UniqueConstraint("source_id", "id"),
@@ -293,6 +323,7 @@ class Recipe(Timestamps, Base):
         # Duplicate detection warns on title + work; it does not refuse.
         Index("ix_recipes_source_id_title", "source_id", "title"),
         Index("ix_recipes_created_by", "created_by"),
+        *_review_args("recipes"),
         _trgm("recipes", "title"),
     )
 

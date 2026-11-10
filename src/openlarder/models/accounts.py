@@ -56,6 +56,7 @@ class User(Timestamps, Base):
         CheckConstraint(
             "role IN ('user', 'contributor', 'moderator', 'admin', 'owner')", name="role_known"
         ),
+        CheckConstraint("(agreed_at IS NULL) = (agreed_version IS NULL)", name="agreement_whole"),
         # Unique ignoring case, so "Sarah" and "sarah" are one name. The rest
         # of the rules (allowed characters, reserved names) live in names.py.
         Index("uq_users_display_name_lower", func.lower(text("display_name")), unique=True),
@@ -76,6 +77,10 @@ class User(Timestamps, Base):
     # hidden: {"order": [...], "hidden": [...]} (buying.RETAILERS' keys).
     # None until they choose. *Ray, 2026-11-09.*
     shop_preferences: Mapped[dict | None] = mapped_column(JSONB)
+    # When they accepted the contributor agreement, and which version
+    # (agreement.py); none until then. Needed to add to the catalog.
+    agreed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    agreed_version: Mapped[str | None] = mapped_column(Text)
 
     def at_least(self, role: "roles.Role") -> bool:
         return roles.at_least(self.role, role)

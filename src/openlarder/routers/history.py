@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import and_, false, or_, select, true
+from sqlalchemy.orm import aliased
 
 from openlarder import visibility
 from openlarder.auth import ModeratorUser, Viewer
@@ -151,22 +152,47 @@ async def _current_names(session, viewer: User | None, revisions: list[Revision]
     return found
 
 
+def _hidden(viewer: User | None):
+    """Revisions the reader mustn't see: in a family collection they can't
+    see, or of a source or recipe hidden from them (private, or waiting for
+    review and not theirs), or of a recipe removed while it waited."""
+    family_unseen = and_(
+        Revision.family,
+        or_(
+            Revision.source_id.is_(None),
+            Revision.source_id.not_in(visibility.seen_source_ids(viewer)),
+        ),
+    )
+    conditions = [
+        family_unseen,
+        Revision.source_id.in_(visibility.hidden_source_ids(viewer)),
+        Revision.recipe_id.in_(visibility.hidden_recipe_ids(viewer)),
+    ]
+    if viewer is None or not viewer.may_edit:
+        gone = aliased(Revision)
+        conditions.append(
+            Revision.recipe_id.in_(
+                select(gone.record_id).where(
+                    gone.table_name == "recipes",
+                    gone.action == "d",
+                    gone.changes["review"][0].astext != "published",
+                )
+            )
+        )
+    return or_(*conditions)
+
+
 async def _changes(session, viewer: User | None, query) -> list[Change]:
     revisions = list(await session.scalars(query.order_by(Revision.id.desc()).limit(LIMIT)))
     names = await _names(session, viewer, revisions)
     current = await _current_names(session, viewer, revisions)
-    # A change that also touched a family collection the reader can't see
-    # (an ingredient first named in someone's private recipe) is shown
-    # without who made it, which would point at that collection.
+    # A change that also touched something the reader can't see (an
+    # ingredient first named in someone's private recipe, or in one waiting
+    # for review) is shown without who made it, which would point at it.
     touched_private = set(
         await session.scalars(
             select(Revision.change_id).where(
-                Revision.change_id.in_({r.change_id for r in revisions}),
-                Revision.family,
-                or_(
-                    Revision.source_id.is_(None),
-                    Revision.source_id.not_in(visibility.seen_source_ids(viewer)),
-                ),
+                Revision.change_id.in_({r.change_id for r in revisions}), _hidden(viewer)
             )
         )
     )
@@ -252,7 +278,11 @@ async def source_history(source_id: uuid.UUID, session: Session, viewer: Viewer)
     source = await session.get(Source, source_id)
     if source is None or not await visibility.can_see(session, viewer, source):
         raise _not_found("source")
-    return await _changes(session, viewer, select(Revision).where(Revision.source_id == source_id))
+    return await _changes(
+        session,
+        viewer,
+        select(Revision).where(Revision.source_id == source_id, ~_hidden(viewer)),
+    )
 
 
 @router.get("/api/recipes/{recipe_id}/history", response_model=list[Change])
@@ -321,6 +351,7 @@ async def recent_changes(
     seen_authors = select(Author.id).where(visibility.authors_seen_by(moderator))
     shown = and_(
         Revision.family.is_(false()),
+        ~_hidden(moderator),
         or_(
             Revision.table_name.not_in(
                 ("ingredients", "ingredient_aliases", "authors", "author_links", "substitutions")

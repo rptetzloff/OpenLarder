@@ -8,16 +8,19 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from openlarder import history, importer, isbn
+from openlarder.agreement import require_agreement
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import ImportRun, ImportRunLine, Recipe, Source, User
 
 router = APIRouter(prefix="/api/import", tags=["import"])
+# What an import adds is the catalog's, under the agreement (agreement.py).
+WRITES = [SameOrigin, Depends(require_agreement)]
 
 
 class Files(BaseModel):
@@ -169,7 +172,7 @@ async def parse(files: Files, admin: AdminUser) -> Parsed:
     )
 
 
-@router.post("/recipes", response_model=BatchResult, dependencies=[SameOrigin])
+@router.post("/recipes", response_model=BatchResult, dependencies=WRITES)
 async def import_recipes(batch: Batch, admin: AdminUser, session: Session) -> BatchResult:
     await history.via(session, f"import:{batch.run_id}" if batch.run_id else "import")
     items = []
@@ -211,7 +214,7 @@ async def _open_run(session, run_id: uuid.UUID) -> ImportRun:
     return run
 
 
-@router.post("/runs", status_code=status.HTTP_201_CREATED, dependencies=[SameOrigin])
+@router.post("/runs", status_code=status.HTTP_201_CREATED, dependencies=WRITES)
 async def start_run(body: RunStart, admin: AdminUser, session: Session) -> dict[str, uuid.UUID]:
     run = await importer.start_run(
         session, admin.id, body.books_in_list, body.recipes_in_file, body.untitled_rows

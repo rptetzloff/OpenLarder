@@ -10,6 +10,7 @@ import AdminApiUsagePage from "./pages/AdminApiUsagePage.vue";
 import AdminChangesPage from "./pages/AdminChangesPage.vue";
 import AdminClicksPage from "./pages/AdminClicksPage.vue";
 import AdminPeoplePage from "./pages/AdminPeoplePage.vue";
+import AdminReviewPage from "./pages/AdminReviewPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
@@ -60,6 +61,7 @@ const onApiUsage = path === "/admin/api";
 const onClicks = path === "/admin/clicks";
 const onPeople = path === "/admin/people";
 const onChanges = path === "/admin/changes";
+const onReview = path === "/admin/review";
 const onRequests = path === "/requests";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
@@ -185,6 +187,7 @@ onMounted(async () => {
     <AdminClicksPage v-else-if="onClicks" :user="user" />
     <AdminPeoplePage v-else-if="onPeople" :user="user" />
     <AdminChangesPage v-else-if="onChanges" :user="user" />
+    <AdminReviewPage v-else-if="onReview" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
@@ -2183,6 +2186,71 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+/* Review: waiting and sent-back notices, the queue, and the agreement. */
+.review-notice {
+  border: 1px solid var(--admin-line);
+  background: var(--admin-bg);
+  border-radius: 8px;
+  padding: 0.25rem 0.875rem;
+  margin: 0.75rem 0;
+  font-size: 0.9375rem;
+}
+.review-notice p {
+  margin: 0.5rem 0;
+}
+.review-reason {
+  margin: 0.25rem 0 0;
+  font-style: italic;
+}
+.badge.waiting {
+  background: var(--admin-bg);
+  color: var(--fg);
+}
+.review-group {
+  border-top: 1px solid var(--line);
+  padding: 1rem 0;
+}
+.review-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.review-head h2 {
+  font-size: 1.125rem;
+  margin: 0;
+}
+.review-head p {
+  margin: 0.25rem 0 0;
+}
+.review-items {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+.review-items > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+.review-recipes {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+.agreement-points {
+  padding-left: 1.25rem;
+}
+.agreement-points li {
+  margin: 0.5rem 0;
+}
+.add-note {
+  margin: 0 0 0.5rem;
 }
 /* Edit history: on each record's page, folded away, and Recent changes. */
 .history-panel {

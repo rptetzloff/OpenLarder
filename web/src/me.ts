@@ -23,6 +23,9 @@ export interface Me {
   may_run: boolean;
   may_claim: boolean;
   grants: Role[];
+  // Whether they've accepted the contributor agreement as it reads now,
+  // which adding to the catalog needs (agreement.py).
+  agreed: boolean;
   // Their buy-link shops (shops.ts); null until chosen.
   shops: { order: string[]; hidden: string[] } | null;
 }

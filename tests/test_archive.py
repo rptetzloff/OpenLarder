@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import text
 
 from fake_archive import FakeArchive
-from fake_broker import _settings, _sign_in
+from fake_broker import _settings, _sign_in, make_admins
 from openlarder import archive
 from openlarder.archiving import Archiver, get_archiver
 
@@ -90,7 +90,7 @@ async def test_an_unreachable_archive_is_none_not_an_error() -> None:
 @pytest.fixture
 async def admin(client, broker, adb):
     await _sign_in(client, broker)
-    await adb.execute(text("UPDATE users SET role = 'admin'"))
+    await adb.execute(make_admins())
     return client
 
 

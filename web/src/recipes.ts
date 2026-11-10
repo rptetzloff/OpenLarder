@@ -1,3 +1,4 @@
+import type { Review } from "./review";
 // What /api/recipes returns, and saving one.
 
 import type { BuyLink } from "./buying";
@@ -75,6 +76,9 @@ export interface Recipe {
   swaps: Swap[];
   // Whether you may change or remove it.
   editable: boolean;
+  // published, or (for its maker and moderators) pending or returned.
+  review: Review;
+  review_note: string | null;
   // Who added it (their public display name), and when.
   added_by: string | null;
   added_on: string | null;

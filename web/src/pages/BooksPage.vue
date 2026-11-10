@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
+import AgreementPanel from "../components/AgreementPanel.vue";
 import {
   addByIsbn,
+  addManually,
   addFamily,
   addPeriodical,
   addNamed,
@@ -179,6 +181,26 @@ async function addSite() {
   }
 }
 
+// A book without an ISBN Open Library knows.
+const handTitle = ref("");
+const handAuthors = ref("");
+const handYear = ref("");
+const handIsbn = ref("");
+const handError = ref("");
+async function addByHand() {
+  handError.value = "";
+  try {
+    const authors = handAuthors.value.split(",").map((a) => a.trim()).filter(Boolean);
+    const year = handYear.value.trim() ? Number(handYear.value) : null;
+    const { id } = await addManually(handTitle.value, authors, year, handIsbn.value);
+    location.href = `/sources/${id}`;
+  } catch (e) {
+    handError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+const reload = () => location.reload();
+
 async function add() {
   adding.value = true;
   error.value = "";
@@ -207,7 +229,12 @@ async function add() {
     </div>
 
     <div v-if="user" class="add-panels">
-      <details v-if="user.may_edit" class="add-panel">
+      <!-- Contributors add books, which wait for review; the agreement first. -->
+      <AgreementPanel v-if="user.may_claim && !user.agreed" :agreed="false" @accepted="reload" />
+      <p v-if="user.may_claim && !user.may_edit && user.agreed" class="muted add-note">
+        Books you add wait for a moderator's review before anyone else sees them.
+      </p>
+      <details v-if="user.may_claim && user.agreed" class="add-panel">
         <summary>Add a book by ISBN</summary>
         <form class="isbn-form" @submit.prevent="add">
           <label for="isbn">ISBN</label>
@@ -229,7 +256,22 @@ async function add() {
           <p v-if="error" id="isbn-error" class="error" role="alert">{{ error }}</p>
         </form>
       </details>
-      <details v-if="user.may_edit" class="add-panel">
+      <details v-if="user.may_claim && user.agreed" class="add-panel">
+        <summary>Add a book without an ISBN</summary>
+        <form class="recipe-form" @submit.prevent="addByHand">
+          <label for="hand-title">Title</label>
+          <input id="hand-title" v-model="handTitle" required maxlength="300" />
+          <label for="hand-authors">Authors (optional; separate names with commas)</label>
+          <input id="hand-authors" v-model="handAuthors" maxlength="500" />
+          <label for="hand-year">Year (optional)</label>
+          <input id="hand-year" v-model="handYear" inputmode="numeric" maxlength="4" />
+          <label for="hand-isbn">ISBN, if it has one Open Library doesn't know (optional)</label>
+          <input id="hand-isbn" v-model="handIsbn" inputmode="numeric" maxlength="40" />
+          <p v-if="handError" class="error" role="alert">{{ handError }}</p>
+          <button type="submit" class="primary">Add the book</button>
+        </form>
+      </details>
+      <details v-if="user.may_edit && user.agreed" class="add-panel">
         <summary>Add another kind of source</summary>
         <form class="recipe-form site-form" @submit.prevent="addSite">
           <label for="site-kind">What it is</label>

@@ -2,6 +2,7 @@
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
+import ReviewNotice from "../components/ReviewNotice.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import { setRecipeTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -170,6 +171,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
 
       <div class="recipe-title">
         <h1>{{ recipe.title }}</h1>
+        <ReviewNotice :review="recipe.review" :note="recipe.review_note" what="recipe" />
         <span v-if="recipe.used_in.length" class="badge">Component recipe</span>
       </div>
       <ul v-if="recipe.tags.length" class="tag-chips" aria-label="Tags">

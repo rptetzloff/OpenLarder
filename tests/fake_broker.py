@@ -152,3 +152,15 @@ def _failed(response: httpx2.Response) -> bool:
         and response.headers["location"] == "/?sign-in=failed"
         and SESSION_COOKIE not in response.cookies
     )
+
+
+# Whoever signed in becomes an administrator who has accepted the
+# contributor agreement, which adding to the catalog needs (agreement.py).
+def make_admins():
+    from sqlalchemy import text
+
+    from openlarder.agreement import VERSION
+
+    return text(
+        "UPDATE users SET role = 'admin', agreed_at = now(), agreed_version = :v"
+    ).bindparams(v=VERSION)
