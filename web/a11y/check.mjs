@@ -125,6 +125,13 @@ async function seed() {
   await api(`/api/groups/${group.id}/invites`, "cook", { role: "view" });
   await api(`/api/sources/${box.id}/groups`, "cook", { groups: [group.id] }, "PUT");
   const author = (await api(`/api/sources/${book.id}`, "admin")).credits[0].author_id;
+  // Requests: one asked for twice, one claimed, one declined.
+  await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
+  await api("/api/requests", "admin", { title: "plenty" });
+  const claimed = await api("/api/requests", "cook", { title: "Salt, Fat, Acid, Heat", author: "Samin Nosrat" });
+  await api(`/api/requests/${claimed.request.id}/claim`, "admin", {});
+  const odd = await api("/api/requests", "cook", { title: "A Car Manual" });
+  await api(`/api/requests/${odd.request.id}/decline`, "admin", { reason: "Not a cookbook." });
 
   return { vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
 }
@@ -181,6 +188,9 @@ function pages(s) {
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],
     ["/admin/clicks", "admin"],
+    ["/admin/enterers", "admin"],
+    ["/requests", null],
+    ["/requests", "cook"],
     ["/admin/suggestions", "cook"],
     ["/privacy", null],
     ["/terms", null],

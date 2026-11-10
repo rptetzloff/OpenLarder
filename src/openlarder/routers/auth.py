@@ -51,6 +51,7 @@ class Me(BaseModel):
     account_url: str | None
     # May add to the catalog directly, until review exists.
     is_admin: bool
+    is_enterer: bool = False
     # Their buy-link shops: {"order": [...], "hidden": [...]}, or None.
     shops: dict | None = None
 
@@ -63,6 +64,7 @@ def me_for(user: User, settings: Settings) -> Me:
         suggested_name=user.suggested_name if user.display_name is None else None,
         account_url=issuer.rstrip("/") + "/settings" if issuer else None,
         is_admin=user.is_admin,
+        is_enterer=user.is_enterer,
         shops=user.shop_preferences,
     )
 

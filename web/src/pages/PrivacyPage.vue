@@ -58,6 +58,12 @@ document.title = "Privacy policy · OpenLarder";
       account. Signed out, your browser keeps it in its own storage, not in a cookie, and it is
       never sent to OpenLarder.
     </p>
+    <p>
+      Anyone can <a href="/requests">ask for a book</a> to be indexed. A request shows the book,
+      the note left with it, how many asked, and the name of whoever claimed it to enter it; it
+      never shows who asked. To count each person's vote once, OpenLarder keeps your account, or,
+      signed out, the same name made from your IP address as above, never the address itself.
+    </p>
 
     <h2>Accounts</h2>
     <p>

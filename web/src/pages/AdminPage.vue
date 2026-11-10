@@ -161,6 +161,12 @@ async function archiveAll() {
           </a>
         </li>
         <li>
+          <a href="/admin/enterers">
+            <h2>Enterers</h2>
+            <p>Who may claim book requests to queue them up.</p>
+          </a>
+        </li>
+        <li>
           <a href="/admin/imports">
             <h2>Import history</h2>
             <p class="count">{{ n(imports, "import", "imports") }}</p>

@@ -184,9 +184,11 @@ AS_THE_SITE = {"Sec-Fetch-Site": "same-origin"}
 @pytest.fixture(autouse=True)
 def _fresh_rate_limits():
     from openlarder import ratelimit, usage
+    from openlarder.routers import book_requests
 
     ratelimit.reset()
     usage.reset()
+    book_requests.reset()
 
 
 @pytest.fixture
