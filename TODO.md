@@ -60,9 +60,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       Delete as buttons, and inviting in a panel beside them; an invite as
       a panel. Every page but Privacy and Terms, which stay a column for
       reading, is now in the redesigned style. **The brand (#98):** Ray's
-      kit (2026-11-09): larder green, terracotta, mustard and ivory as the
-      light theme, a dark theme drawn from the same colours (deep green,
-      ivory and mustard, since the kit has none), the horizontal logo in
+      kit (2026-11-09): its light and dark themes (THEMES.md: larder green,
+      terracotta, mustard and ivory; deep greens with ivory, mustard and
+      light terracotta), a focus ring, the horizontal logo in
       the header, Outfit served from OpenLarder itself, and the favicons,
       app icons, web manifest and social card. #17's sign-in screens
       should match: Authgear's own theming, with the same colours, logo and

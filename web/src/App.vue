@@ -220,15 +220,16 @@ onMounted(async () => {
   src: url("/fonts/outfit-700.woff2") format("woff2");
 }
 
-/* The brand's colours, once (Ray's brand kit, 2026-11-09): larder green,
-   terracotta, mustard and ivory. Light is the kit's; dark is drawn from the
-   same colours, deep green with ivory and mustard, since the kit has none.
+/* The brand's colours, once: Ray's THEMES.md (2026-11-09), light and dark.
    data-theme on <html> is always "light" or "dark" (see index.html and
-   theme.ts). --accent is the primary action (a green button); --link is
-   terracotta, which is only just 4.5:1 on ivory and too little on a darker
-   band, so --surface (cards, bands, table heads) is white, as the kit has
-   cards. --line is a hairline; --border, input edges, keeps 3:1 against
-   --bg. test_colour_tokens.py checks every pair a page puts together. */
+   theme.ts). The kit's tokens map onto these: --bg, --surface (cards,
+   panels, bands), --fg, --muted, --accent (its primary: buttons), --link,
+   --line (its border: hairlines) and --focus. Two the kit leaves to the
+   site: --border, input and button edges, which must keep 3:1 against
+   --bg and so is darker than the kit's hairline; and the tints for chips,
+   admin bands, "fine" tags and errors, drawn from its colours. Light links
+   are only just 4.5:1 on ivory, so they're never set on a band darker than
+   it. test_colour_tokens.py checks every pair a page puts together. */
 :root {
   --bg: #faf6ec;
   --surface: #ffffff;
@@ -238,6 +239,7 @@ onMounted(async () => {
   --accent: #2e4a3b;
   --accent-hover: #1f3329;
   --on-accent: #faf6ec;
+  --focus: #b5532c;
   --border: #8a8775;
   --line: #e4ddcb;
   --chip: #f3e4c2;
@@ -250,23 +252,26 @@ onMounted(async () => {
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #17261e;
-  --surface: #22382c;
-  --fg: #faf6ec;
-  --muted: #bcc5bc;
-  /* Mustard: the kit's highlight on green. Terracotta on green is under
-     4.5:1, so it isn't used for text here. */
-  --link: #e8b866;
+  --bg: #14201a;
+  --surface: #1c2b23;
+  --fg: #f2ede0;
+  --muted: #a9b5ac;
+  --link: #e58b63;
   --accent: #e8b866;
-  --accent-hover: #f0cb8a;
-  --on-accent: #1f3329;
-  --border: #7b8e80;
-  --line: #2e4a3b;
-  --chip: #2f4a3a;
-  --ok-bg: #24402f;
-  --admin-bg: #3b3317;
+  --accent-hover: #f0c987;
+  --on-accent: #14201a;
+  --focus: #e8b866;
+  --border: #6f8577;
+  --line: #34493d;
+  --chip: #24372d;
+  --ok-bg: #22402e;
+  --admin-bg: #3a3218;
   --admin-line: #6b5520;
   --error: #f2a8a2;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 body {
   margin: 0;
