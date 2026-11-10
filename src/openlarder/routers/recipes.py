@@ -42,6 +42,7 @@ from openlarder.models import (
     WebPage,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
+from openlarder.tagging import RecipeTagOut, recipe_tags
 
 router = APIRouter(tags=["recipes"])
 
@@ -283,6 +284,8 @@ class RecipeOut(BaseModel):
     title: str
     # The chapter or section of its book, as the book names it.
     chapter: str | None
+    # Its tags, and its source's (from_source).
+    tags: list[RecipeTagOut] = []
     source: SourceRef
     # A book's recipe: where it is in each edition.
     pages: list[PageOut]
@@ -468,6 +471,7 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
         id=recipe.id,
         title=recipe.title,
         chapter=recipe.chapter,
+        tags=await recipe_tags(session, recipe),
         source=SourceRef(
             id=work.id,
             title=work.title,

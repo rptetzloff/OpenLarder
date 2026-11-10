@@ -37,13 +37,23 @@ from openlarder import visibility
 from openlarder.auth import Viewer
 from openlarder.db import Session
 from openlarder.ingredients import family, rooted_family
-from openlarder.models import Ingredient, IngredientOption, Recipe, RecipeIngredient, Source
+from openlarder.models import (
+    Ingredient,
+    IngredientOption,
+    Recipe,
+    RecipeIngredient,
+    RecipeTag,
+    Source,
+    SourceTag,
+    Tag,
+)
 from openlarder.routers.ingredients import (
     UsedBy,
     contains_pattern,
     recipes_where,
     with_pages,
 )
+from openlarder.tagging import MAX_TAGS
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -94,6 +104,9 @@ class Found(BaseModel):
     # Ingredient and source IDs asked for that name nothing now.
     missing: list[uuid.UUID]
     missing_sources: list[uuid.UUID]
+    # The tags searched for, in the order asked, and those that are gone.
+    tags: list[Named] = []
+    missing_tags: list[uuid.UUID] = []
     # The title words searched for, tidied.
     q: str
     recipes: list[Hit]
@@ -120,20 +133,25 @@ async def search(
     kind: Annotated[list[Kind] | None, Query()] = None,
     # Ingredients you don't have or want (Ray, 2026-11-08).
     without: Annotated[list[uuid.UUID] | None, Query()] = None,
+    # Recipes with all of these tags, their own or their source's.
+    tag: Annotated[list[uuid.UUID] | None, Query()] = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     asked = list(dict.fromkeys(ingredient or []))
     unwanted = list(dict.fromkeys(without or []))
     words = list(dict.fromkeys(q.casefold().split()))
     shelf = list(dict.fromkeys(source or []))
-    if not asked and not words:
+    tagged = list(dict.fromkeys(tag or []))
+    if not asked and not words and not tagged:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose an ingredient or type part of a title."
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Choose an ingredient or a tag, or type part of a title.",
         )
     _too_many(len(asked), MAX_INGREDIENTS, "ingredients")
     _too_many(len(words), MAX_WORDS, "words of a title")
     _too_many(len(shelf), MAX_SOURCES, "sources")
     _too_many(len(unwanted), MAX_INGREDIENTS, "ingredients to leave out")
+    _too_many(len(tagged), MAX_TAGS, "tags")
 
     found_names = await session.execute(
         select(Ingredient.id, Ingredient.name).where(
@@ -147,6 +165,10 @@ async def search(
         )
     )
     titles = {i: t for i, t in found_titles}
+    tag_names = dict(
+        (await session.execute(select(Tag.id, Tag.name).where(Tag.id.in_(tagged)))).all()
+    )
+    tags_known = [i for i in tagged if i in tag_names]
     known = [i for i in asked if i in names]
     books = [i for i in shelf if i in titles]
     found = Found(
@@ -155,14 +177,16 @@ async def search(
         without=[Named(id=i, name=names[i]) for i in unwanted if i in names],
         missing=[i for i in asked + unwanted if i not in names],
         missing_sources=[i for i in shelf if i not in titles],
+        tags=[Named(id=i, name=tag_names[i]) for i in tags_known],
+        missing_tags=[i for i in tagged if i not in tag_names],
         q=" ".join(q.split()),
         recipes=[],
         total=0,
         # Read at call time, so a test can shrink it.
         per_page=PAGE,
     )
-    # Every ingredient asked for is gone: nothing left to search by.
-    if not known and not words:
+    # Everything asked for is gone: nothing left to search by.
+    if not known and not words and not tags_known:
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
     conditions.append(visibility.recipes_seen_by(viewer))
@@ -170,6 +194,11 @@ async def search(
         conditions.append(Recipe.source_id.in_(select(Source.id).where(Source.kind.in_(kind))))
     if books:
         conditions.append(Recipe.source_id.in_(books))
+    for t in tags_known:
+        conditions.append(
+            exists().where(RecipeTag.recipe_id == Recipe.id, RecipeTag.tag_id == t)
+            | Recipe.source_id.in_(select(SourceTag.source_id).where(SourceTag.tag_id == t))
+        )
     left_out = [i for i in unwanted if i in names]
     if left_out:
         conditions.append(~_needs_any(left_out))

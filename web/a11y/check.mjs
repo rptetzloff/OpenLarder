@@ -71,6 +71,12 @@ async function seed() {
     "Butter or coconut oil",
     "Pie crust (p. 99)",
   ]);
+  // Tags on the recipe and on its book, so both kinds of chip show.
+  const allTags = await api("/api/tags", "admin");
+  const tagged = (name) => allTags.find((t) => t.name === name).id;
+  const vegetarian = tagged("Vegetarian");
+  await api(`/api/recipes/${biscuits.id}/tags`, "admin", { tags: [vegetarian, tagged("Bread")] }, "PUT");
+  await api(`/api/sources/${book.id}/tags`, "admin", { tags: [tagged("Gluten-Free")] }, "PUT");
   // A long title, so a table that can't wrap shows up at phone width (the
   // ingredient page's did, with real titles, before this was here).
   await recipe("Slow-Roasted Aged Cheddar and Caramelised Onion Biscuits with Brown Butter", "30", [
@@ -115,7 +121,7 @@ async function seed() {
   await api(`/api/sources/${box.id}/groups`, "cook", { groups: [group.id] }, "PUT");
   const author = (await api(`/api/sources/${book.id}`, "admin")).credits[0].author_id;
 
-  return { book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
+  return { vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
 }
 
 function pages(s) {
@@ -127,6 +133,7 @@ function pages(s) {
     [`/search?i=${s.cheddar}`, null],
     ["/search?q=biscuits", null],
     ["/search?q=biscuits&kind=book&kind=website", null],
+    [`/search?tag=${s.vegetarian}`, null],
     [`/search?q=biscuits&x=${s.cheddar}`, null],
     ["/sources", null],
     ["/sources", "cook"],

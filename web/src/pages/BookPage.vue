@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import TagEditor from "../components/TagEditor.vue";
+import { setSourceTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
 import {
   type Book,
@@ -174,6 +176,11 @@ onMounted(async () => {
   await load();
   await loadSharing();
 });
+
+// Tags on the whole source, which its recipes have too.
+async function saveTags(ids: string[]) {
+  book.value!.tags = await setSourceTags(book.value!.id, ids);
+}
 </script>
 
 <template>
@@ -226,6 +233,18 @@ onMounted(async () => {
             {{ book.owner_name ?? "Someone" }}'s private family collection, shared with you
             through {{ sharedNames }}.
           </p>
+          <ul v-if="book.tags.length" class="tag-chips" aria-label="Tags">
+            <li v-for="t in book.tags" :key="t.id">
+              <a :href="`/search?tag=${t.id}&source=${book.id}`">{{ t.name }}</a>
+            </li>
+          </ul>
+          <TagEditor
+            v-if="book.editable"
+            what="source"
+            :selected="book.tags.map((t) => t.id)"
+            :can-add="!!user?.is_admin"
+            :save="saveTags"
+          />
           <ul class="tags">
             <li>
               {{ book.recipes.length.toLocaleString() }}

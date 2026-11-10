@@ -59,7 +59,7 @@ async def _swap(client, instead_of, use, **more):
 
 
 async def test_the_diets_start_seeded(client, adb) -> None:
-    await adb.execute(text("INSERT INTO tags (kind, name) VALUES ('course', 'Dessert')"))
+    await adb.execute(text("INSERT INTO tags (kind, name) VALUES ('course', 'Teatime')"))
     names = [d["name"] for d in (await client.get("/api/diets")).json()]
     assert names == [
         "AIP",
@@ -154,7 +154,7 @@ async def test_a_bad_swap_is_refused(admin, work, adb, case) -> None:
     butter, ghee = await _id(adb, "Butter"), await _id(adb, "Ghee")
     recipe = await adb.scalar(text("SELECT id FROM recipes"))
     course = await adb.scalar(
-        text("INSERT INTO tags (kind, name) VALUES ('course', 'Dessert') RETURNING id")
+        text("INSERT INTO tags (kind, name) VALUES ('course', 'Teatime') RETURNING id")
     )
     instead_of, use, more = {"ingredient_id": butter}, {"ingredient_id": ghee}, {}
     if case == "both sides":

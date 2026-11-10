@@ -1,6 +1,7 @@
 // What /api/recipes returns, and saving one.
 
 import type { Swap } from "./substitutions";
+import type { RecipeTag } from "./tags";
 
 export interface RecipePage {
   edition_id: string;
@@ -16,6 +17,8 @@ export interface Recipe {
   title: string;
   // The chapter or section of its book, as the book names it.
   chapter: string | null;
+  // Its tags, and its source's (from_source).
+  tags: RecipeTag[];
   source: {
     id: string;
     title: string;

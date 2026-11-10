@@ -222,7 +222,7 @@ def test_recipes_inherit_their_books_tags_once(db: Connection) -> None:
     work = _work(db)
     recipe = _recipe(db, work)
     gf = _diet(db, "Gluten-Free")
-    salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Salad')")
+    salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Supper')")
     db.execute(text("INSERT INTO source_tags VALUES (:w, :t)"), {"w": work, "t": gf})
     db.execute(text("INSERT INTO recipe_tags VALUES (:r, :t)"), {"r": recipe, "t": salad})
 
@@ -517,7 +517,7 @@ def test_substitution_has_one_thing_on_each_side_and_never_itself(db: Connection
 
 def test_substitution_reason_is_a_diet_and_page_needs_an_edition(db: Connection) -> None:
     butter, ghee = _ingredient(db, "butter"), _ingredient(db, "ghee")
-    salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Salad')")
+    salad = _insert(db, "INSERT INTO tags (kind, name) VALUES ('course', 'Supper')")
     _refused(
         db, lambda: _swap(db, from_ingredient_id=butter, to_ingredient_id=ghee, diet_tag_id=salad)
     )

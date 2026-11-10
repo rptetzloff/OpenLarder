@@ -43,6 +43,7 @@ from openlarder.models import (
     User,
 )
 from openlarder.routers.ingredients import contains_pattern
+from openlarder.tagging import TagOut, source_tags
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sources", tags=["sources"])
@@ -152,6 +153,8 @@ class Book(BaseModel):
     # A website's host, and whether it's behind a subscription.
     host: str | None
     paywalled: bool
+    # Its tags, which every recipe in it has too.
+    tags: list[TagOut] = []
     title: str
     subtitle: str | None
     open_library_url: str | None
@@ -439,6 +442,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         shared_with=await _shared_with(session, work, viewer),
         title=work.title,
         subtitle=work.subtitle,
+        tags=await source_tags(session, work.id),
         open_library_url=(
             openlibrary.work_url(work.open_library_work_id) if work.open_library_work_id else None
         ),

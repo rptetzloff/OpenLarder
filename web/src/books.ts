@@ -1,5 +1,7 @@
 // What /api/sources returns, and adding a book by ISBN.
 
+import type { Tag } from "./tags";
+
 export interface BookSummary {
   id: string;
   kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" | "family";
@@ -39,6 +41,8 @@ export interface Book {
   // pages: one per edition it is in, newest first; null = not recorded.
   // issue: a magazine's or newspaper's recipe's issue; pages then its page.
   // episode and at: a show's recipe's episode, and the time in it.
+  // Its tags, which every recipe in it has too.
+  tags: Tag[];
   recipes: {
     id: string;
     title: string;

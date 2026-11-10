@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { KINDS, listTags, type Tag } from "../tags";
 import { computed, onMounted, ref, watch } from "vue";
 import { findBooks } from "../books";
 import {
@@ -43,6 +44,15 @@ const asked = params.getAll("kind").filter((k) => ALL_KINDS.includes(k));
 const kinds = ref<string[]>(asked.length ? asked : [...ALL_KINDS]);
 const moreKinds = ref(KIND_GROUPS.slice(3).some((g) => g.kinds.some((k) => !kinds.value.includes(k))));
 const page = ref(Math.max(1, Number(params.get("page")) || 1));
+// Recipes with every tag ticked; diet and course show, the rest on request.
+const allTags = ref<Tag[]>([]);
+const tags = ref<string[]>(params.getAll("tag"));
+const moreTags = ref(false);
+const tagGroups = computed(() =>
+  KINDS.map((k) => ({ ...k, tags: allTags.value.filter((t) => t.kind === k.kind) })).filter(
+    (k) => k.tags.length && (moreTags.value || k.kind === "diet" || k.kind === "course"),
+  ),
+);
 const result = ref<SearchResult | null>(null);
 const missing = ref(0);
 const failed = ref(false);
@@ -52,16 +62,21 @@ let latest = 0;
 const narrowedKinds = computed(() =>
   kinds.value.length === ALL_KINDS.length ? [] : kinds.value,
 );
-const searching = computed(() => !!chosen.value.length || !!title.value.trim());
+const searching = computed(
+  () => !!chosen.value.length || !!title.value.trim() || !!tags.value.length,
+);
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "page"]) url.searchParams.delete(key);
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page"]) {
+    url.searchParams.delete(key);
+  }
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
   for (const b of shelf.value) url.searchParams.append("source", b.id);
   for (const i of chosen.value) url.searchParams.append("i", i.id);
   if (title.value.trim()) url.searchParams.set("q", title.value.trim());
   for (const k of narrowedKinds.value) url.searchParams.append("kind", k);
+  for (const t of tags.value) url.searchParams.append("tag", t);
   if (page.value > 1) url.searchParams.set("page", String(page.value));
   history.replaceState(null, "", url);
 }
@@ -86,6 +101,7 @@ async function run(toPage = 1) {
         q: title.value,
         kinds: narrowedKinds.value,
         without: unwanted.value.map((i) => i.id),
+        tags: tags.value,
       },
     );
     if (mine !== latest) return;
@@ -103,6 +119,10 @@ watch(title, () => {
   titleTimer = setTimeout(() => run(), 300);
 });
 watch(kinds, () => run(), { deep: true });
+watch(tags, () => run(), { deep: true });
+function toggleTag(id: string, on: boolean) {
+  tags.value = on ? [...tags.value, id] : tags.value.filter((t) => t !== id);
+}
 
 // Type-to-find, for sources and for ingredients: suggestions from the
 // server, leaving out what's already chosen.
@@ -229,10 +249,19 @@ const summary = computed(() => {
 });
 
 onMounted(async () => {
+  listTags()
+    .then((found) => {
+      allTags.value = found;
+      // A tag in the link that's in the hidden kinds: show them.
+      if (found.some((t) => tags.value.includes(t.id) && !["diet", "course"].includes(t.kind))) {
+        moreTags.value = true;
+      }
+    })
+    .catch(() => {});
   const ids = params.getAll("i").slice(0, MAX_INGREDIENTS);
   const sources = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_SOURCES);
   try {
-    if (!ids.length && !title.value.trim()) {
+    if (!ids.length && !title.value.trim() && !tags.value.length) {
       // Sources, before anything to search by: their names are all to show.
       for (const id of sources) {
         const res = await fetch(`/api/sources/${id}`);
@@ -252,11 +281,16 @@ onMounted(async () => {
       q: title.value,
       kinds: narrowedKinds.value,
       without: params.getAll("x").slice(0, MAX_INGREDIENTS),
+      tags: tags.value,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
     shelf.value = first.sources;
-    missing.value = first.missing.length + first.missing_sources.length;
+    missing.value =
+      first.missing.length + first.missing_sources.length + first.missing_tags.length;
+    if (first.missing_tags.length) {
+      tags.value = tags.value.filter((t) => !first.missing_tags.includes(t));
+    }
     result.value = first;
     if (missing.value || page.value > 1) run(page.value);
   } catch {
@@ -417,13 +451,33 @@ onMounted(async () => {
             {{ moreKinds ? "Fewer kinds" : "More kinds" }}
           </button>
         </fieldset>
+        <fieldset v-for="g in tagGroups" :key="g.kind">
+          <legend>{{ g.label }}</legend>
+          <label v-for="t in g.tags" :key="t.id" class="check">
+            <input
+              type="checkbox"
+              :checked="tags.includes(t.id)"
+              @change="toggleTag(t.id, ($event.target as HTMLInputElement).checked)"
+            />
+            {{ t.name }}
+          </label>
+        </fieldset>
+        <button
+          v-if="allTags.length"
+          type="button"
+          class="link"
+          :aria-expanded="moreTags"
+          @click="moreTags = !moreTags"
+        >
+          {{ moreTags ? "Fewer tags" : "Cuisine and technique" }}
+        </button>
       </aside>
 
       <section id="results" class="results" aria-live="polite" :aria-busy="loading">
         <p v-if="failed" role="alert">The search didn't work. Try again.</p>
         <p v-else-if="!searching" class="status">
-          Add what you have, or words of a title, and the recipes you're closest to making come
-          first, with where to find them.
+          Add what you have, words of a title or a tag, and the recipes you're closest to making
+          come first, with where to find them.
         </p>
         <template v-else-if="result">
           <h2 class="results-head">
