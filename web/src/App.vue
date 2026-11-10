@@ -8,6 +8,7 @@ import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
 import AdminApiUsagePage from "./pages/AdminApiUsagePage.vue";
 import AdminClicksPage from "./pages/AdminClicksPage.vue";
+import AdminEnterersPage from "./pages/AdminEnterersPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
@@ -26,6 +27,7 @@ import BulkEntryPage from "./pages/BulkEntryPage.vue";
 import BooksPage from "./pages/BooksPage.vue";
 import RecipeFormPage from "./pages/RecipeFormPage.vue";
 import RecipePage from "./pages/RecipePage.vue";
+import RequestsPage from "./pages/RequestsPage.vue";
 import SearchPage from "./pages/SearchPage.vue";
 import SuggestionsPage from "./pages/SuggestionsPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
@@ -55,6 +57,8 @@ const onImports = path === "/admin/imports";
 const onSuggestions = path === "/admin/suggestions";
 const onApiUsage = path === "/admin/api";
 const onClicks = path === "/admin/clicks";
+const onEnterers = path === "/admin/enterers";
+const onRequests = path === "/requests";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
@@ -78,6 +82,7 @@ const SECTIONS = [
   { href: "/sources", label: "Sources" },
   { href: "/ingredients", label: "Ingredients" },
   { href: "/authors", label: "Authors" },
+  { href: "/requests", label: "Requests" },
 ];
 const inSection = (href: string) => path === href || path.startsWith(`${href}/`);
 // undefined while asking, null when signed out.
@@ -166,6 +171,8 @@ onMounted(async () => {
     <SuggestionsPage v-else-if="onSuggestions" :user="user" />
     <AdminApiUsagePage v-else-if="onApiUsage" :user="user" />
     <AdminClicksPage v-else-if="onClicks" :user="user" />
+    <AdminEnterersPage v-else-if="onEnterers" :user="user" />
+    <RequestsPage v-else-if="onRequests" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
@@ -2061,6 +2068,82 @@ button.primary.small {
 }
 .account-panels {
   margin-top: 2rem;
+}
+/* Requests for books: the ask form, then the list with votes on the left. */
+.request-ask {
+  margin-bottom: 1.5rem;
+}
+.request-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.request-sort {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.request-sort select {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.request-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.request-list > li {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
+  align-items: start;
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+}
+.request-votes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.request-votes strong {
+  font-size: 1.375rem;
+  color: var(--fg);
+}
+.request-title {
+  font-size: 1.125rem;
+  margin: 0;
+}
+.request-body p {
+  margin: 0.25rem 0 0;
+}
+.request-note {
+  font-style: italic;
+}
+.request-state {
+  font-size: 0.875rem;
+}
+.request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+@media (max-width: 40rem) {
+  .request-list > li {
+    grid-template-columns: 3rem minmax(0, 1fr);
+  }
+  .request-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
 }
 /* Admin monitoring: API usage and buy-link clicks. */
 .usage-table .numeric,

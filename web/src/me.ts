@@ -7,6 +7,7 @@ export interface Me {
   account_url: string | null;
   // May add books directly, until review exists.
   is_admin: boolean;
+  is_enterer: boolean;
   // Their buy-link shops (shops.ts); null until chosen.
   shops: { order: string[]; hidden: string[] } | null;
 }

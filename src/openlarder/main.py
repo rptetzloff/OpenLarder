@@ -27,6 +27,7 @@ from openlarder.routers import (
     account,
     auth,
     authors,
+    book_requests,
     covers,
     flags,
     go,
@@ -121,6 +122,7 @@ app.include_router(auth.router)
 app.include_router(account.router)
 app.include_router(sources.router)
 app.include_router(authors.router)
+app.include_router(book_requests.router)
 app.include_router(recipes.router)
 app.include_router(imports.router)
 app.include_router(covers.router)

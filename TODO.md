@@ -136,25 +136,24 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 - [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*
       Anyone, signed in or not, asks for a cookbook or another source to
-      be entered, and the request goes into a tracking system. Approved
-      enterers volunteer to claim a request and queue it up; a claim
-      doesn't stop it being done sooner by someone else. To settle when
-      it's built:
-      - what a request takes: an ISBN or title (matched against Open
-        Library, and against what's already here or already asked for, so
-        a second request adds a vote rather than a duplicate), and an
-        optional note;
-      - signed-out requests: a rate limit and a challenge against spam,
-        and whether the requester can follow it (by email, which brings
-        its own privacy wording, or only by watching the public list);
-      - who is an "approved enterer": a role an admin grants, ahead of the
-        trust levels in Contributions;
-      - the states a request moves through (asked, claimed, in progress,
-        done, declined with a reason), whether a claim lapses if nothing
-        happens for a while, and closing a request when its book is
-        entered by anyone;
-      - a public list of what's asked for, most wanted first, and each
-        enterer's queue.
+      be entered; approved enterers claim a request and queue it up; a
+      claim doesn't stop it being done sooner by someone else.
+      **Step 1 done (#100):** `/requests`: ask by ISBN (title and author
+      from Open Library) or by title; a book already here with recipes is
+      pointed to, and one already asked for gets a vote, once per account
+      or per address (kept as its pseudonym). Signed out: 5 asks a day per
+      address and a hidden field for bots, no email and no following
+      (Ray: "rate-limited, no tracking"). Enterers are a role admins grant
+      at `/admin/enterers`. Open, claimed, done, declined with a reason;
+      a claim with nothing done for 30 days reads as open again (Ray:
+      "lapse after 30 days idle"). Tabs by state with counts, most wanted
+      or newest, and "Yours".
+      - [ ] Step 2: close a request when its book is entered by anyone
+        (adding an edition with its ISBN), link a claim to the book as
+        it's entered, and count work on it (a recipe added) as activity
+        that keeps the claim alive.
+      - [ ] The anonymous daily count is in memory, per process; move it
+        to the database if there's ever more than one app process.
 
 - [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
       book or a blog or an instagram post or a tv episode or a magazine

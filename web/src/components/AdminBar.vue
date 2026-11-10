@@ -11,6 +11,7 @@ const LINKS = [
   ["/admin/suggestions", "Suggestions"],
   ["/admin/api", "API usage"],
   ["/admin/clicks", "Buy-link clicks"],
+  ["/admin/enterers", "Enterers"],
 ] as const;
 </script>
 
