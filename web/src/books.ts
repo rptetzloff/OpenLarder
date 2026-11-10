@@ -204,6 +204,23 @@ export async function saveBook(bookId: string, body: BookIn): Promise<void> {
   }
 }
 
+// Suggest a change to a published source's details, for a moderator to
+// apply (routers/proposals.py).
+export async function proposeBookChange(
+  bookId: string,
+  body: BookIn & { reason: string | null },
+): Promise<void> {
+  const res = await fetch(`/api/sources/${bookId}/proposals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const out = await res.json().catch(() => ({}));
+    throw new Error(typeof out.detail === "string" ? out.detail : "That didn't send. Try again.");
+  }
+}
+
 // A few books with every word of q in the title, subtitle or a credited
 // name, for type-to-find pickers.
 export async function findBooks(q: string, limit = 8): Promise<BookSummary[]> {

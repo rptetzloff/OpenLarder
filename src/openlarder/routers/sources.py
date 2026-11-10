@@ -810,26 +810,9 @@ class BookIn(BaseModel):
     paywalled: bool | None = None
 
 
-def _may_change_book(user: User, work: Source) -> bool:
-    if work.kind == "family":
-        return False
-    return user.may_edit or (
-        user.may_claim and work.created_by == user.id and work.review != "published"
-    )
-
-
-@router.put("/{source_id}", response_model=Added, dependencies=[SameOrigin])
-async def edit_book(source_id: uuid.UUID, body: BookIn, admin: Agreed, session: Session) -> Added:
-    """Fix what a book says about itself (books.edit_book): a moderator, or
-    the contributor who added it while it waits for review."""
-    work = await session.get(Source, source_id)
-    if work is None or not await visibility.can_see(session, admin, work):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
-    if not _may_change_book(admin, work):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a moderator can change that.")
-    # Fixed after being sent back: waiting again.
-    if work.review == "returned" and not admin.may_edit:
-        work.review = "pending"
+async def apply_book_edit(session, work: Source, body: BookIn) -> None:
+    """Make the source say what the edit does (books.edit_book): the route's,
+    and an applied proposal's (routers/proposals.py)."""
     try:
         await books_module.edit_book(
             session,
@@ -850,6 +833,29 @@ async def edit_book(source_id: uuid.UUID, body: BookIn, admin: Agreed, session: 
                 status.HTTP_422_UNPROCESSABLE_CONTENT, "Only a website is behind a subscription."
             )
         work.paywalled = body.paywalled
+
+
+def _may_change_book(user: User, work: Source) -> bool:
+    if work.kind == "family":
+        return False
+    return user.may_edit or (
+        user.may_claim and work.created_by == user.id and work.review != "published"
+    )
+
+
+@router.put("/{source_id}", response_model=Added, dependencies=[SameOrigin])
+async def edit_book(source_id: uuid.UUID, body: BookIn, admin: Agreed, session: Session) -> Added:
+    """Fix what a book says about itself (books.edit_book): a moderator, or
+    the contributor who added it while it waits for review."""
+    work = await session.get(Source, source_id)
+    if work is None or not await visibility.can_see(session, admin, work):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
+    if not _may_change_book(admin, work):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a moderator can change that.")
+    # Fixed after being sent back: waiting again.
+    if work.review == "returned" and not admin.may_edit:
+        work.review = "pending"
+    await apply_book_edit(session, work, body)
     await session.commit()
     log.info("%s edited book %s", admin.id, source_id)
     return Added(id=work.id)

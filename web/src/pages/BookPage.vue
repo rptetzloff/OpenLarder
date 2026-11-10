@@ -2,6 +2,9 @@
 import ReviewNotice from "../components/ReviewNotice.vue";
 import ShopChooser from "../components/ShopChooser.vue";
 import { REVIEW_LABELS } from "../review";
+
+// Back from suggesting a change (BookEditPage's propose).
+const proposed = new URLSearchParams(location.search).has("proposed");
 import HistoryPanel from "../components/HistoryPanel.vue";
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
@@ -227,6 +230,9 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <h1>{{ book.title }}</h1>
           <p v-if="book.subtitle" class="subtitle">{{ book.subtitle }}</p>
           <ReviewNotice :review="book.review" :note="book.review_note" :what="KIND_NAMES[book.kind]" />
+          <p v-if="proposed" class="status" role="status">
+            Thanks: your suggestion is with the moderators.
+          </p>
           <p v-if="credits.length" class="credits">
             <template v-for="(c, i) in credits" :key="i"
               ><template v-if="i > 0">, </template
@@ -280,6 +286,18 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               :href="`/sources/${book.id}/bulk`"
               class="button-outline"
               >Enter a whole book</a
+            >
+            <!-- A contributor suggests a change to a published source's details. -->
+            <a
+              v-if="
+                !book.details_editable &&
+                user?.may_claim &&
+                book.review === 'published' &&
+                book.kind !== 'family'
+              "
+              :href="`/sources/${book.id}/propose`"
+              class="button-outline"
+              >Suggest a change</a
             >
             <!-- Its contributor fixes a book while it waits; moderators have the admin bar. -->
             <a

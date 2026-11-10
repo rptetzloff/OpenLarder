@@ -39,9 +39,14 @@ async def test_a_proposal_waits_and_changes_nothing(people, client, adb) -> None
     assert r.status_code == 201, r.text
     p = r.json()
     assert p["status"] == "open" and p["by"] == "con" and not p["changed_since"]
-    assert p["current"]["ingredients"] == ["eggs"]
-    assert p["proposed"]["ingredients"] == ["eggs", "tomatoes"]
-    assert p["proposed"]["places"][0].endswith("page 14")
+    differs = {d["label"]: d for d in p["differences"]}
+    assert set(differs) == {"Where", "Ingredients"}
+    assert (differs["Ingredients"]["now"], differs["Ingredients"]["proposed"]) == (
+        "eggs",
+        "eggs; tomatoes",
+    )
+    assert differs["Where"]["proposed"].endswith("page 14")
+    assert p["kind"] == "recipe" and p["href"] == f"/recipes/{recipe}"
     shown = (await client.get(f"/api/recipes/{recipe}")).json()
     assert shown["ingredients"] == ["eggs"] and shown["pages"][0]["page"] == "12"
     # Nothing in the history from checking it.
@@ -67,7 +72,8 @@ async def test_proposing_again_replaces_the_first(people, adb) -> None:
     await con.post(f"/api/recipes/{recipe}/proposals", json=_edit(edition, page="14"))
     await con.post(f"/api/recipes/{recipe}/proposals", json=_edit(edition, page="15"))
     [p] = (await mo.get("/api/review/proposals")).json()
-    assert p["proposed"]["places"][0].endswith("page 15")
+    [where] = [d for d in p["differences"] if d["label"] == "Where"]
+    assert where["proposed"].endswith("page 15")
 
 
 async def test_applying_saves_it_as_the_contributors(people, client, adb) -> None:
@@ -155,3 +161,76 @@ async def test_what_cant_be_proposed(people, adb) -> None:
     assert (
         await con.post(f"/api/recipes/{fudge}/proposals", json=_edit(edition))
     ).status_code == 404
+
+
+# A source's details
+
+
+def _book_edit(adb_edition, title="Plenty More", year=2014, authors=("Yotam Ottolenghi",)):
+    return {
+        "title": title,
+        "credits": [{"name": a} for a in authors],
+        "editions": [{"id": adb_edition, "published_year": year}],
+    }
+
+
+async def test_a_book_change_is_proposed_and_applied(people, client, adb) -> None:
+    mo, con = await people("mo", role="moderator"), await people("con", role="contributor")
+    book, edition, _ = await _published(mo, adb)
+    r = await con.post(
+        f"/api/sources/{book}/proposals",
+        json={**_book_edit(edition), "reason": "The cover says Plenty More."},
+    )
+    assert r.status_code == 201, r.text
+    p = r.json()
+    assert p["kind"] == "source" and p["recipe_id"] is None and p["href"] == f"/sources/{book}"
+    differs = {d["label"]: d for d in p["differences"]}
+    assert differs["Title"] == {"label": "Title", "now": "Plenty", "proposed": "Plenty More"}
+    assert differs["Credits"]["proposed"] == "Yotam Ottolenghi (author)"
+    assert "2014" in differs["Editions"]["proposed"]
+    # Nothing changed yet.
+    assert (await client.get(f"/api/sources/{book}")).json()["title"] == "Plenty"
+    assert [x["id"] for x in (await mo.get("/api/review/proposals")).json()] == [p["id"]]
+    applied = await mo.post(f"/api/proposals/{p['id']}", json={"action": "apply"})
+    assert applied.status_code == 200, applied.text
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    assert shown["title"] == "Plenty More"
+    assert [c["credited_as"] for c in shown["credits"]] == ["Yotam Ottolenghi"]
+    assert shown["editions"][0]["published_year"] == 2014
+    newest = (await client.get(f"/api/sources/{book}/history")).json()[0]
+    assert newest["by"] == "con" and newest["via"] == f"proposal:{p['id']}"
+
+
+async def test_a_book_changed_since_needs_saying_so(people, adb) -> None:
+    mo, con = await people("mo", role="moderator"), await people("con", role="contributor")
+    book, edition, _ = await _published(mo, adb)
+    p = (await con.post(f"/api/sources/{book}/proposals", json=_book_edit(edition))).json()
+    # A recipe added to it isn't a change to its details.
+    await mo.post(
+        f"/api/sources/{book}/recipes",
+        json={"title": "Another", "editions": [{"edition_id": edition}], "ingredients": []},
+    )
+    assert not (await mo.get("/api/review/proposals")).json()[0]["changed_since"]
+    await mo.put(f"/api/sources/{book}", json={"title": "Plenty!", "credits": []})
+    assert (await mo.get("/api/review/proposals")).json()[0]["changed_since"]
+    refused = await mo.post(f"/api/proposals/{p['id']}", json={"action": "apply"})
+    assert refused.status_code == 409
+
+
+async def test_what_book_changes_cant_be_proposed(people, adb) -> None:
+    mo, con = await people("mo", role="moderator"), await people("con", role="contributor")
+    book, edition, _ = await _published(mo, adb)
+    assert (
+        await mo.post(f"/api/sources/{book}/proposals", json=_book_edit(edition))
+    ).status_code == 409
+    bad = await con.post(f"/api/sources/{book}/proposals", json=_book_edit(edition, title=" "))
+    assert bad.status_code == 422
+    own = (await con.post("/api/sources/manual", json={"title": "Mine", "authors": []})).json()[
+        "id"
+    ]
+    assert (await con.post(f"/api/sources/{own}/proposals", json={"title": "X"})).status_code == 409
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Box", "acknowledged": True})
+    ).json()["id"]
+    assert (await con.post(f"/api/sources/{box}/proposals", json={"title": "X"})).status_code == 404
