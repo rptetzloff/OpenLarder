@@ -59,8 +59,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       group's collections and members as tables, its admin's Rename and
       Delete as buttons, and inviting in a panel beside them; an invite as
       a panel. Every page but Privacy and Terms, which stay a column for
-      reading, is now in the redesigned style. **The brand (#98):** Ray's
-      kit (2026-11-09): its light and dark themes (THEMES.md: larder green,
+      reading, is now in the redesigned style. **The brand (#98):** the
+      kit made with Claude in the chat app for Ray (2026-11-09): its light and dark themes (THEMES.md: larder green,
       terracotta, mustard and ivory; deep greens with ivory, mustard and
       light terracotta), a focus ring, the horizontal logo in
       the header, Outfit served from OpenLarder itself, and the favicons,

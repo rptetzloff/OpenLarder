@@ -196,7 +196,7 @@ onMounted(async () => {
 </template>
 
 <style>
-/* The brand's type (Ray's brand kit, 2026-11-09): Outfit, served from here
+/* The brand's type (the brand kit, made with Claude for Ray, 2026-11-09): Outfit, served from here
    rather than a font service, so no one else hears of a visit. */
 @font-face {
   font-family: "Outfit";
@@ -220,7 +220,7 @@ onMounted(async () => {
   src: url("/fonts/outfit-700.woff2") format("woff2");
 }
 
-/* The brand's colours, once: Ray's THEMES.md (2026-11-09), light and dark.
+/* The brand's colours, once: the kit's THEMES.md (2026-11-09), light and dark.
    data-theme on <html> is always "light" or "dark" (see index.html and
    theme.ts). The kit's tokens map onto these: --bg, --surface (cards,
    panels, bands), --fg, --muted, --accent (its primary: buttons), --link,
