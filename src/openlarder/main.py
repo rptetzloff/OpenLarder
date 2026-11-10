@@ -9,6 +9,7 @@ import asyncio
 import html
 import logging
 import mimetypes
+import re
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -183,7 +184,10 @@ def spa_response(
     if not tags:
         return FileResponse(web_dir / "index.html", headers=headers)
     page = (web_dir / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(page.replace("</head>", meta_tags(tags) + "</head>", 1), headers=headers)
+    # First in the head, before every other tag: Impact's check looks for
+    # its tag there and fails it anywhere else.
+    page = re.sub(r"(<head[^>]*>)", lambda m: m.group(1) + meta_tags(tags), page, count=1)
+    return HTMLResponse(page, headers=headers)
 
 
 class Assets(StaticFiles):
