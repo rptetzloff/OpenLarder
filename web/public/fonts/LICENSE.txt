@@ -1,0 +1,4 @@
+Outfit is licensed under the SIL Open Font License, Version 1.1.
+Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+Full license text: https://openfontlicense.org
+These are the Latin-subset WOFF2 files for weights 300, 400 and 700.

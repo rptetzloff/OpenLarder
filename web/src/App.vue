@@ -105,8 +105,8 @@ onMounted(async () => {
       <a href="/" class="brand">
         <!-- The full logo, in the version for the page's light or dark; CSS
              shows the one that matches data-theme. -->
-        <img class="for-light" src="/logo-light.svg" alt="OpenLarder" width="140" height="36" />
-        <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="140" height="36" />
+        <img class="for-light" src="/logo-light.svg" alt="OpenLarder" width="150" height="44" />
+        <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="150" height="44" />
       </a>
       <nav class="primary-nav" aria-label="Main">
         <a
@@ -196,56 +196,89 @@ onMounted(async () => {
 </template>
 
 <style>
-/* The design's colours, once (Ray's wireframes, 2026-11-08): light as
-   drawn, and dark when chosen in the footer or, by default, when the device
-   is set to dark. data-theme on <html> is always "light" or "dark" (see
-   index.html and theme.ts). --accent is the primary
-   action (the blue Search button); --line is a divider, lighter than
-   --border, which input edges use and which keeps 3:1 against --bg. */
+/* The brand's type (Ray's brand kit, 2026-11-09): Outfit, served from here
+   rather than a font service, so no one else hears of a visit. */
+@font-face {
+  font-family: "Outfit";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/outfit-300.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Outfit";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/outfit-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Outfit";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/outfit-700.woff2") format("woff2");
+}
+
+/* The brand's colours, once (Ray's brand kit, 2026-11-09): larder green,
+   terracotta, mustard and ivory. Light is the kit's; dark is drawn from the
+   same colours, deep green with ivory and mustard, since the kit has none.
+   data-theme on <html> is always "light" or "dark" (see index.html and
+   theme.ts). --accent is the primary action (a green button); --link is
+   terracotta, which is only just 4.5:1 on ivory and too little on a darker
+   band, so --surface (cards, bands, table heads) is white, as the kit has
+   cards. --line is a hairline; --border, input edges, keeps 3:1 against
+   --bg. test_colour_tokens.py checks every pair a page puts together. */
 :root {
-  --bg: #ffffff;
-  --surface: #f3f2ef;
-  --fg: #1a1a19;
-  --muted: #5f5e5a;
-  --link: #1f5fbf;
-  --accent: #1f5fbf;
-  --accent-hover: #194f9f;
-  --on-accent: #ffffff;
-  --border: #8a877f;
-  --line: #e3e2de;
-  --chip: #e8eef7;
-  --ok-bg: #e3f1e6;
-  --admin-bg: #fdf3d3;
-  --admin-line: #ecd58a;
-  --error: #b3261e;
+  --bg: #faf6ec;
+  --surface: #ffffff;
+  --fg: #2e4a3b;
+  --muted: #56665c;
+  --link: #b5532c;
+  --accent: #2e4a3b;
+  --accent-hover: #1f3329;
+  --on-accent: #faf6ec;
+  --border: #8a8775;
+  --line: #e4ddcb;
+  --chip: #f3e4c2;
+  --ok-bg: #e1ebdf;
+  --admin-bg: #f6e3b8;
+  --admin-line: #e8b866;
+  --error: #a8321e;
   --page: 72rem;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #161615;
-  --surface: #22211f;
-  --fg: #ecebe6;
-  --muted: #a8a59c;
-  --link: #8ab4f8;
-  /* Light blue with dark text: white on it would be under 3:1. */
-  --accent: #8ab4f8;
-  --accent-hover: #a8c7fa;
-  --on-accent: #0b1f3a;
-  --border: #77746c;
-  --line: #34332f;
-  --chip: #1f2c40;
-  --ok-bg: #1d3324;
-  --admin-bg: #3a3016;
-  --admin-line: #5c4c1f;
+  --bg: #17261e;
+  --surface: #22382c;
+  --fg: #faf6ec;
+  --muted: #bcc5bc;
+  /* Mustard: the kit's highlight on green. Terracotta on green is under
+     4.5:1, so it isn't used for text here. */
+  --link: #e8b866;
+  --accent: #e8b866;
+  --accent-hover: #f0cb8a;
+  --on-accent: #1f3329;
+  --border: #7b8e80;
+  --line: #2e4a3b;
+  --chip: #2f4a3a;
+  --ok-bg: #24402f;
+  --admin-bg: #3b3317;
+  --admin-line: #6b5520;
   --error: #f2a8a2;
 }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.5;
+  font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 .site-header {
   border-bottom: 1px solid var(--line);
@@ -281,7 +314,7 @@ body {
 }
 .brand img {
   display: block;
-  height: 2.25rem;
+  height: 2.75rem;
   width: auto;
 }
 .primary-nav {
@@ -342,7 +375,7 @@ a.button-outline {
     width: 100%;
   }
   .brand img {
-    height: 2rem;
+    height: 2.25rem;
   }
 }
 .site-footer {

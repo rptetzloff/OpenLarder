@@ -59,10 +59,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       group's collections and members as tables, its admin's Rename and
       Delete as buttons, and inviting in a panel beside them; an invite as
       a panel. Every page but Privacy and Terms, which stay a column for
-      reading, is now in the redesigned style. #17's sign-in screens
-      should match. Fonts are the system's; the wireframes look like Inter,
-      which could be served from OpenLarder itself (not Google Fonts, which
-      would tell Google who visits).
+      reading, is now in the redesigned style. **The brand (#98):** Ray's
+      kit (2026-11-09): larder green, terracotta, mustard and ivory as the
+      light theme, a dark theme drawn from the same colours (deep green,
+      ivory and mustard, since the kit has none), the horizontal logo in
+      the header, Outfit served from OpenLarder itself, and the favicons,
+      app icons, web manifest and social card. #17's sign-in screens
+      should match: Authgear's own theming, with the same colours, logo and
+      Outfit.
 - [x] **Wikidata facts on author pages** (#90): born and died (years
       only), country and website, from Wikidata's query service, found by
       the author's Open Library ID or a Wikidata item an admin gives on the
