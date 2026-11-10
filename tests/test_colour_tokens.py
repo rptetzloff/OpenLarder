@@ -32,6 +32,7 @@ PAIRS = [
     ("border", "bg", BOUNDARY),  # input edges
     ("accent", "bg", BOUNDARY),  # button edges
     ("focus", "bg", BOUNDARY),  # the keyboard focus ring
+    ("notice-fg", "notice-bg", TEXT),  # the band saying this isn't production
 ]
 
 

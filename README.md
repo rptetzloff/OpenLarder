@@ -37,6 +37,13 @@ Or the whole thing as it deploys, built from the Dockerfile:
 docker compose up --build        # http://localhost:8000
 ```
 
+### Which site this is
+
+| Variable | Value |
+| --- | --- |
+| `OPENLARDER_ENVIRONMENT` | `production` on the live site. Anything else (`development` unless set, `staging`) shows a band above the header on every page saying it's that site |
+| `OPENLARDER_NOTICE` | Optional. A line of plain text shown in that band instead, in any environment, production included: "Down for maintenance at 9pm" |
+
 ### Sign-in
 
 Sign-in goes through Authgear Cloud at `auth.openlarder.com` (see

@@ -96,7 +96,14 @@ const needsName = computed(() => !!user.value && !user.value.display_name && !pa
 // the server log, out of reach of whoever might be forging the request.
 const signInFailed = new URLSearchParams(location.search).get("sign-in") === "failed";
 
+// The band above the header: this isn't production, or a notice.
+const notice = ref<string | null>(null);
+
 onMounted(async () => {
+  fetch("/api/site")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((site) => (notice.value = site?.notice ?? null))
+    .catch(() => {});
   try {
     const res = await fetch("/api/auth/me");
     user.value = res.ok ? await res.json() : null;
@@ -111,6 +118,9 @@ onMounted(async () => {
 </script>
 
 <template>
+  <aside v-if="notice" class="site-notice" aria-label="About this site">
+    <p>{{ notice }}</p>
+  </aside>
   <header class="site-header">
     <div class="bar">
       <a href="/" class="brand">
@@ -263,6 +273,8 @@ onMounted(async () => {
   --admin-bg: #f6e3b8;
   --admin-line: #e8b866;
   --error: #a8321e;
+  --notice-bg: #b5532c;
+  --notice-fg: #ffffff;
   --page: 72rem;
   color-scheme: light;
 }
@@ -284,6 +296,8 @@ onMounted(async () => {
   --admin-bg: #3a3218;
   --admin-line: #6b5520;
   --error: #f2a8a2;
+  --notice-bg: #e58b63;
+  --notice-fg: #14201a;
 }
 :focus-visible {
   outline: 2px solid var(--focus);
@@ -664,6 +678,20 @@ button.secondary[aria-current="page"] {
 }
 
 /* The yellow band of admin tools under the header, from the wireframes. */
+/* The band above the header on a site that isn't production, or with a
+   notice (routers/site.py). */
+.site-notice {
+  background: var(--notice-bg);
+  color: var(--notice-fg);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.site-notice p {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0.5rem 1rem;
+  text-align: center;
+}
 .admin-bar {
   background: var(--admin-bg);
   border-bottom: 1px solid var(--admin-line);
