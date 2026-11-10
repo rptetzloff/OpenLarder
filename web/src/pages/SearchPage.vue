@@ -10,6 +10,9 @@ import {
   whereItIs,
 } from "../ingredients";
 
+import type { Me } from "../me";
+
+defineProps<{ user?: Me | null }>();
 document.title = "Search · OpenLarder";
 
 // What can I make from these sources with what I have? Ingredients you have
@@ -34,6 +37,9 @@ const ALL_KINDS = KIND_GROUPS.flatMap((g) => g.kinds);
 
 const params = new URLSearchParams(location.search);
 const chosen = ref<Named[]>([]);
+// With what's in your larder (routers/larder.py) instead of ingredients
+// chosen here; each thing in it counts as what's above it too.
+const useLarder = ref(params.get("larder") === "1");
 // What you don't have or want (Ray, 2026-11-08): recipes needing one are left
 // out; a line offering something else ("butter or oil") doesn't need it.
 const unwanted = ref<Named[]>([]);
@@ -63,12 +69,12 @@ const narrowedKinds = computed(() =>
   kinds.value.length === ALL_KINDS.length ? [] : kinds.value,
 );
 const searching = computed(
-  () => !!chosen.value.length || !!title.value.trim() || !!tags.value.length,
+  () => useLarder.value || !!chosen.value.length || !!title.value.trim() || !!tags.value.length,
 );
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder"]) {
     url.searchParams.delete(key);
   }
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
@@ -78,6 +84,7 @@ function toAddress() {
   for (const k of narrowedKinds.value) url.searchParams.append("kind", k);
   for (const t of tags.value) url.searchParams.append("tag", t);
   if (page.value > 1) url.searchParams.set("page", String(page.value));
+  if (useLarder.value) url.searchParams.set("larder", "1");
   history.replaceState(null, "", url);
 }
 
@@ -102,6 +109,7 @@ async function run(toPage = 1) {
         kinds: narrowedKinds.value,
         without: unwanted.value.map((i) => i.id),
         tags: tags.value,
+        larder: useLarder.value,
       },
     );
     if (mine !== latest) return;
@@ -261,7 +269,7 @@ onMounted(async () => {
   const ids = params.getAll("i").slice(0, MAX_INGREDIENTS);
   const sources = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_SOURCES);
   try {
-    if (!ids.length && !title.value.trim() && !tags.value.length) {
+    if (!ids.length && !title.value.trim() && !tags.value.length && !useLarder.value) {
       // Sources, before anything to search by: their names are all to show.
       for (const id of sources) {
         const res = await fetch(`/api/sources/${id}`);
@@ -282,6 +290,7 @@ onMounted(async () => {
       kinds: narrowedKinds.value,
       without: params.getAll("x").slice(0, MAX_INGREDIENTS),
       tags: tags.value,
+      larder: useLarder.value,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
@@ -304,6 +313,33 @@ onMounted(async () => {
     <h1>Search</h1>
 
     <form class="search-panel" role="search" @submit.prevent="run()">
+      <div v-if="user" class="larder-toggle">
+        <button
+          type="button"
+          class="secondary small"
+          :aria-pressed="useLarder"
+          @click="
+            useLarder = !useLarder;
+            run();
+          "
+        >
+          Use my larder
+        </button>
+        <span class="help">
+          <template v-if="useLarder && result?.larder_items != null">
+            {{ result.larder_items.toLocaleString() }}
+            {{ result.larder_items === 1 ? "thing" : "things" }} from your larder count.
+          </template>
+          <a href="/larder">Your larder</a>
+        </span>
+      </div>
+      <template v-if="useLarder">
+        <p class="help">
+          Each thing in your larder counts as itself and what's above it: chipotle hot sauce is hot
+          sauce too. Things you're out of don't count.
+        </p>
+      </template>
+      <template v-else>
       <label for="search-ingredient">I have</label>
       <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
         <span v-for="i in chosen" :key="i.id" class="chip">
@@ -336,6 +372,7 @@ onMounted(async () => {
       <p id="search-ingredient-help" class="help">
         An ingredient also finds what's under it: cheese finds cheddar.
       </p>
+      </template>
 
       <label for="search-unwanted" class="panel-gap">I don't have or don't want</label>
       <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
@@ -482,7 +519,7 @@ onMounted(async () => {
         <template v-else-if="result">
           <h2 class="results-head">
             {{ summary }}
-            <span v-if="chosen.length" class="muted"> · closest to made first</span>
+            <span v-if="chosen.length || useLarder" class="muted"> · closest to made first</span>
           </h2>
           <ul class="hits">
             <li v-for="r in result.recipes" :key="r.id" class="hit">

@@ -36,10 +36,12 @@ from sqlalchemy.orm import aliased
 from openlarder import visibility
 from openlarder.auth import Viewer
 from openlarder.db import Session
-from openlarder.ingredients import family, rooted_family
+from openlarder.ingredients import family, rooted_ancestry, rooted_family
 from openlarder.models import (
     Ingredient,
     IngredientOption,
+    LarderItem,
+    LarderList,
     Recipe,
     RecipeIngredient,
     RecipeTag,
@@ -113,6 +115,9 @@ class Found(BaseModel):
     total: int
     # Recipes a page holds, so a listing can number its pages.
     per_page: int = 0
+    # Searched with the viewer's larder: how many of its items counted
+    # (have or running low, matched to an ingredient).
+    larder_items: int | None = None
 
 
 def _too_many(n: int, limit: int, what: str) -> None:
@@ -135,14 +140,23 @@ async def search(
     without: Annotated[list[uuid.UUID] | None, Query()] = None,
     # Recipes with all of these tags, their own or their source's.
     tag: Annotated[list[uuid.UUID] | None, Query()] = None,
+    # With what's in your larder instead of ingredients chosen one by one:
+    # each item counts as itself and everything above it (Chipotle Hot Sauce
+    # is hot sauce too). Ray, 2026-11-10.
+    larder: bool = False,
     offset: int = Query(0, ge=0),
 ) -> Found:
+    stocked: list[uuid.UUID] = []
+    if larder:
+        if viewer is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search with your larder.")
+        stocked = await larder_ingredients(session, viewer)
     asked = list(dict.fromkeys(ingredient or []))
     unwanted = list(dict.fromkeys(without or []))
     words = list(dict.fromkeys(q.casefold().split()))
     shelf = list(dict.fromkeys(source or []))
     tagged = list(dict.fromkeys(tag or []))
-    if not asked and not words and not tagged:
+    if not asked and not words and not tagged and not larder:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "Choose an ingredient or a tag, or type part of a title.",
@@ -185,8 +199,12 @@ async def search(
         # Read at call time, so a test can shrink it.
         per_page=PAGE,
     )
+    if larder:
+        found.larder_items = len(stocked)
+        if not stocked:
+            return found
     # Everything asked for is gone: nothing left to search by.
-    if not known and not words and not tags_known:
+    if not known and not words and not tags_known and not stocked:
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
     conditions.append(visibility.recipes_seen_by(viewer))
@@ -202,12 +220,34 @@ async def search(
     left_out = [i for i in unwanted if i in names]
     if left_out:
         conditions.append(~_needs_any(left_out))
+    if stocked:
+        found.recipes, found.total = await _best_match(
+            session, stocked, conditions, offset, upward=True
+        )
+        return found
     if not known:
         page, found.total = await recipes_where(session, *conditions, offset=offset, limit=PAGE)
         found.recipes = [Hit(**r.model_dump()) for r in page]
         return found
     found.recipes, found.total = await _best_match(session, known, conditions, offset)
     return found
+
+
+async def larder_ingredients(session: Session, viewer) -> list[uuid.UUID]:
+    """The ingredients the viewer's larder has (have or running low), of those
+    they may see."""
+    return list(
+        await session.scalars(
+            select(func.distinct(LarderItem.ingredient_id))
+            .join(LarderList, LarderList.id == LarderItem.list_id)
+            .join(Ingredient, Ingredient.id == LarderItem.ingredient_id)
+            .where(
+                LarderList.owner_id == viewer.id,
+                LarderItem.state.in_(("have", "low")),
+                visibility.ingredients_seen_by(viewer),
+            )
+        )
+    )
 
 
 def _needs_any(unwanted: list[uuid.UUID]):
@@ -231,16 +271,22 @@ def _needs_any(unwanted: list[uuid.UUID]):
     )
 
 
-async def _best_match(session: Session, have: list[uuid.UUID], conditions, offset: int):
+async def _best_match(
+    session: Session, have: list[uuid.UUID], conditions, offset: int, upward: bool = False
+):
     """Recipes covering any line with what you have: those using the most of
     your ingredients first, then by the share of their lines you have (so
     complete ones come first), fewest still needed, then book and title.
     *Ray, 2026-11-08:* frog's legs and garlic should put the recipes using
     both first; ranking by share alone put one-line garlic pastes there."""
-    yours = family(*have, name="yours")
-    # Which of yours each match is under: to count how many of yours a
-    # recipe uses, and to say which.
-    roots = rooted_family(*have, name="yours_by_root")
+    # Which of yours each match is under (or, from a larder, above): to count
+    # how many of yours a recipe uses, and to say which.
+    if upward:
+        roots = rooted_ancestry(*have, name="yours_by_root")
+        yours = select(rooted_ancestry(*have, name="yours").c.id)
+    else:
+        roots = rooted_family(*have, name="yours_by_root")
+        yours = family(*have, name="yours")
     used = (
         select(
             IngredientOption.recipe_id.label("recipe_id"),

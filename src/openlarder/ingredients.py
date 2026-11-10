@@ -27,6 +27,7 @@ from openlarder.models import (
     Ingredient,
     IngredientAlias,
     IngredientOption,
+    LarderItem,
     Recipe,
     RecipeIngredient,
     Substitution,
@@ -221,6 +222,10 @@ async def merge(session: AsyncSession, source: Ingredient, target: Ingredient) -
     await session.execute(
         update(IngredientAlias).where(IngredientAlias.ingredient_id == s).values(ingredient_id=t)
     )
+    # People's larders keep what they have, under the name kept.
+    await session.execute(
+        update(LarderItem).where(LarderItem.ingredient_id == s).values(ingredient_id=t)
+    )
     await _merge_substitutions(session, s, t)
     await session.execute(
         update(Ingredient).where(Ingredient.parent_id == s, Ingredient.id != t).values(parent_id=t)
@@ -290,6 +295,23 @@ def rooted_family(*ingredient_ids: uuid.UUID, name: str = "rooted"):
         .cte(name=name, recursive=True)
     )
     return tree.union(select(tree.c.root, Ingredient.id).where(Ingredient.parent_id == tree.c.id))
+
+
+def rooted_ancestry(*ingredient_ids: uuid.UUID, name: str = "ancestry"):
+    """The other way from rooted_family: each ingredient and everything above
+    it, (root, id), so having Chipotle Hot Sauce counts as having Hot Sauce
+    (the larder; Ray, 2026-11-10), but not the other way round."""
+    tree = (
+        select(Ingredient.id.label("root"), Ingredient.id.label("id"))
+        .where(Ingredient.id.in_(ingredient_ids))
+        .cte(name=name, recursive=True)
+    )
+    above = aliased(Ingredient)
+    return tree.union(
+        select(tree.c.root, above.parent_id)
+        .select_from(above)
+        .where(above.id == tree.c.id, above.parent_id.is_not(None))
+    )
 
 
 async def set_parent(

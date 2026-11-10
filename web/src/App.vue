@@ -23,6 +23,7 @@ import GroupsPage from "./pages/GroupsPage.vue";
 import InvitePage from "./pages/InvitePage.vue";
 import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
+import LarderPage from "./pages/LarderPage.vue";
 import BookEditPage from "./pages/BookEditPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BulkEntryPage from "./pages/BulkEntryPage.vue";
@@ -68,6 +69,7 @@ const onPeople = path === "/admin/people";
 const onChanges = path === "/admin/changes";
 const onReview = path === "/admin/review";
 const onRequests = path === "/requests";
+const onLarder = path === "/larder";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
@@ -150,6 +152,7 @@ onMounted(async () => {
       <div class="account">
         <template v-if="user">
           <a v-if="user.may_edit" href="/admin">Admin</a>
+          <a href="/larder" :aria-current="onLarder ? 'page' : undefined">Larder</a>
           <a href="/groups">Groups</a>
           <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
           <!-- A form, not fetch: signing out ends at the broker, which ends the
@@ -179,7 +182,7 @@ onMounted(async () => {
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
     <IngredientsPage v-else-if="onIngredients" />
-    <SearchPage v-else-if="onSearch" />
+    <SearchPage v-else-if="onSearch" :user="user" />
     <AuthorsPage v-else-if="onAuthors" />
     <AuthorPage v-else-if="authorId" :id="authorId" :user="user" />
     <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
@@ -196,6 +199,7 @@ onMounted(async () => {
     <AdminChangesPage v-else-if="onChanges" :user="user" />
     <AdminReviewPage v-else-if="onReview" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
+    <LarderPage v-else-if="onLarder" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
@@ -2196,6 +2200,68 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+.larder-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.larder-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+.larder-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.larder-list-head .link + .link {
+  margin-left: 0.5rem;
+}
+.larder-items {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+.larder-items > li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+.larder-items > li.state-out .larder-item-name strong {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.larder-item-name .link {
+  margin-left: 0.25rem;
+}
+.larder-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+.larder-item-actions .kind-filter {
+  margin: 0;
+}
+.larder-move select {
+  font: inherit;
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.larder-summary .button-outline {
+  margin-left: 0.5rem;
+}
+.larder-new {
+  margin-top: 1.5rem;
+  max-width: 32rem;
 }
 .book-merge .merge-search {
   font: inherit;
