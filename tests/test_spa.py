@@ -60,7 +60,9 @@ def test_fonts_go_out_as_fonts() -> None:
 
 def test_configured_meta_tags_go_in_every_pages_head(tmp_path) -> None:
     """Site verification (Impact, for Barnes & Noble's affiliate programme)."""
-    (tmp_path / "index.html").write_text("<html><head><title>x</title></head><body></body></html>")
+    (tmp_path / "index.html").write_text(
+        '<html><head lang="en"><meta charset="UTF-8" /><title>x</title></head><body></body></html>'
+    )
     tags = {"impact-site-verification": "56d1-abc", "google-site-verification": 'a"b'}
     for path in ("", "sources/123"):
         response = spa_response(tmp_path, path, tags)
@@ -68,8 +70,10 @@ def test_configured_meta_tags_go_in_every_pages_head(tmp_path) -> None:
         assert (
             '<meta name="impact-site-verification" value="56d1-abc" content="56d1-abc" />'
             '<meta name="google-site-verification" value="a&quot;b" content="a&quot;b" />'
-            "</head>"
+            '<meta charset="UTF-8" />'
         ) in page
+        # First in the head, before any other tag (Impact's rule).
+        assert page.index("impact-site-verification") < page.index("charset")
         assert response.headers["cache-control"] == "no-cache"
 
 
