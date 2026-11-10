@@ -150,17 +150,20 @@ app.include_router(tags.router)
 app.include_router(web_pages.router)
 
 
+# Tags whose checker reads value, as its own snippet has it, and nothing
+# else: Impact's (Barnes & Noble's affiliate programme), which failed with
+# content beside it. *Ray, 2026-11-10.*
+VALUE_ONLY = {"impact-site-verification"}
+
+
 def meta_tags(tags: dict[str, str]) -> str:
-    """OPENLARDER_META_TAGS as <meta> tags. Each carries its value as both
-    content, the standard attribute (Google, Bing), and value, which
-    Impact's verification asks for (Barnes & Noble's affiliate programme,
-    *Ray, 2026-11-10*): one setting fits either. value comes straight after
-    name, as in Impact's own snippet, since its check failed with content
-    between them."""
-    return "".join(
-        f'<meta name="{html.escape(n)}" value="{html.escape(v)}" content="{html.escape(v)}" />'
-        for n, v in tags.items()
-    )
+    """OPENLARDER_META_TAGS as <meta> tags: the standard content attribute
+    (Google, Bing), or value alone for those in VALUE_ONLY."""
+    out = []
+    for name, value in tags.items():
+        attribute = "value" if name.lower() in VALUE_ONLY else "content"
+        out.append(f'<meta name="{html.escape(name)}" {attribute}="{html.escape(value)}" />')
+    return "".join(out)
 
 
 def spa_response(
