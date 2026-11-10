@@ -2274,6 +2274,9 @@ button.primary.small {
 .change-head {
   margin: 0 0 0.25rem;
 }
+.change-undo {
+  margin-left: 0.75rem;
+}
 .change-entries,
 .change-fields {
   margin: 0;

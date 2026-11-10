@@ -499,7 +499,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
       <p v-if="isBook" class="status credit-line">
         Book details and covers from <a href="https://openlibrary.org">Open Library</a>.
       </p>
-      <HistoryPanel kind="sources" :id="id" />
+      <HistoryPanel kind="sources" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>
 </template>

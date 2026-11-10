@@ -35,6 +35,15 @@ async function get(url: string): Promise<Change[]> {
 
 export const historyOf = (kind: Kind, id: string) => get(`/api/${kind}/${id}/history`);
 
+// Undo a change (revert.py): resolves to how many rows it undid, or
+// rejects with why it can't be (a later change to the same records).
+export async function revertChange(id: string): Promise<number> {
+  const res = await fetch(`/api/changes/${id}/revert`, { method: "POST" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body.undone;
+}
+
 export const recentChanges = (by: string) =>
   get(`/api/changes${by ? `?by=${encodeURIComponent(by)}` : ""}`);
 
@@ -49,6 +58,7 @@ export function cameThrough(via: string | null): string | null {
   if (!via) return null;
   if (via.startsWith("import")) return "a bulk import";
   if (via.startsWith("suggestion")) return "an accepted suggestion";
+  if (via.startsWith("revert")) return "an undo";
   return via;
 }
 
