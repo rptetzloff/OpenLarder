@@ -1,4 +1,4 @@
-from openlarder.models.accounts import User, UserSession
+from openlarder.models.accounts import ApiKey, User, UserSession
 from openlarder.models.base import Base
 from openlarder.models.catalog import (
     Author,
@@ -29,6 +29,7 @@ from openlarder.models.imports import ImportRun, ImportRunLine
 from openlarder.models.suggestions import IngredientEmbedding, Suggestion
 
 __all__ = [
+    "ApiKey",
     "Author",
     "AuthorLink",
     "Base",

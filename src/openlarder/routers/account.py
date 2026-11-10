@@ -1,12 +1,19 @@
-"""The signed-in person's own account: their display name, and their shops."""
+"""The signed-in person's own account: their display name, their shops,
+and their API keys."""
 
-from fastapi import APIRouter, HTTPException, status
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from openlarder import buying, names
-from openlarder.auth import CurrentUser, SameOrigin
+from openlarder.auth import CurrentUser, SameOrigin, hash_token, new_token
 from openlarder.db import Session
+from openlarder.models import ApiKey
+from openlarder.ratelimit import KEY_PREFIX
 from openlarder.routers.auth import Config, Me, me_for
 
 router = APIRouter(prefix="/api/account", tags=["account"])
@@ -59,3 +66,73 @@ async def set_shops(body: Shops, user: CurrentUser, session: Session, settings: 
     user.shop_preferences = {"order": order, "hidden": hidden}
     await session.commit()
     return me_for(user, settings)
+
+
+# API keys (ratelimit.py): made, listed and revoked by their owner.
+
+MAX_KEYS = 5
+
+
+class KeyIn(BaseModel):
+    name: str = Field(max_length=60)
+
+
+class KeyOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    # The key's start, to tell keys apart; the key itself is shown once.
+    prefix: str
+    created_at: datetime
+    last_used_at: datetime | None
+
+
+class KeyMade(KeyOut):
+    # The key, shown this once: only its hash is kept.
+    key: str
+
+
+def _key_out(k: ApiKey) -> KeyOut:
+    return KeyOut(
+        id=k.id, name=k.name, prefix=k.prefix, created_at=k.created_at, last_used_at=k.last_used_at
+    )
+
+
+@router.get("/keys", response_model=list[KeyOut])
+async def list_keys(user: CurrentUser, session: Session) -> list[KeyOut]:
+    keys = await session.scalars(
+        select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.created_at)
+    )
+    return [_key_out(k) for k in keys]
+
+
+@router.post(
+    "/keys", response_model=KeyMade, status_code=status.HTTP_201_CREATED, dependencies=[SameOrigin]
+)
+async def make_key(body: KeyIn, user: CurrentUser, session: Session) -> KeyMade:
+    name = " ".join(body.name.split())
+    if not name:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give the key a name.")
+    held = await session.scalar(
+        select(func.count()).select_from(ApiKey).where(ApiKey.user_id == user.id)
+    )
+    if (held or 0) >= MAX_KEYS:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"{MAX_KEYS} keys at most: revoke one you don't use."
+        )
+    token = KEY_PREFIX + new_token()
+    key = ApiKey(user_id=user.id, name=name, prefix=token[:10], token_hash=hash_token(token))
+    session.add(key)
+    await session.commit()
+    await session.refresh(key)
+    return KeyMade(**_key_out(key).model_dump(), key=token)
+
+
+@router.delete("/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[SameOrigin])
+async def revoke_key(key_id: uuid.UUID, user: CurrentUser, session: Session) -> Response:
+    """Revoked is deleted: it stops working at once."""
+    key = await session.get(ApiKey, key_id)
+    if key is None or key.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such key.")
+    await session.delete(key)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

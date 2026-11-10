@@ -104,8 +104,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       one always left; kept with the account when signed in (migration
       0035), in the browser otherwise. Still to come: a page showing the
       clicks.
-- [ ] **Read-only public API**: the routes are public and documented at
-      `/api/docs`; API keys, rate limits and periodic data dumps aren't built.
+- [x] **Read-only public API** (#97): the routes are public and documented
+      at `/api/docs`. Programs need no key, at 60 requests a minute per
+      address; a free key from Your account raises it to 600 (Ray,
+      2026-11-09: anonymous allowed, keys self-serve). A key reads what
+      someone signed out sees. The site's own pages are never limited.
+      Limits are settings (`OPENLARDER_API_LIMIT_ANONYMOUS`, `_KEY`).
+      Data dumps wait for Phase 3 (Ray, 2026-11-09).
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central
       and Wikidata (aliases, hierarchy; allergens are Phase 2).
 - [ ] **Contributions**: review queue, edit history and the ODbL contributor

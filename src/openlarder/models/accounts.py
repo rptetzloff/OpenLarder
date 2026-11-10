@@ -96,3 +96,31 @@ class UserSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # Null for sessions started before migration 0007.
     id_token: Mapped[str | None] = mapped_column(Text)
+
+
+class ApiKey(Base):
+    """A key for reading the public API at a higher rate (ratelimit.py). Shown
+    once when made; only its hash is kept, as with session tokens. A key
+    reads what someone signed out sees, never its owner's private
+    collections, so a leaked key exposes nothing private."""
+
+    __tablename__ = "api_keys"
+    __table_args__ = (
+        CheckConstraint("octet_length(token_hash) = 32", name="token_hash_is_sha256"),
+        CheckConstraint("name <> ''", name="name_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # What its owner calls it ("Meal planner").
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # The key's start, to tell keys apart once it's no longer shown.
+    prefix: Mapped[str] = mapped_column(Text, nullable=False)
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # Updated at most hourly.
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

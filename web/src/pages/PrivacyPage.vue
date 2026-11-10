@@ -30,6 +30,12 @@ document.title = "Privacy policy · OpenLarder";
       to build profiles of anyone.
     </p>
     <p>
+      Programs reading OpenLarder's public API are limited in how often they may ask. To do that,
+      the server counts each program's requests by its API key, or by its IP address when it has
+      none. The counts are kept in memory for a minute or two and never stored. An API key belongs
+      to the account that made it, which can see when the key was last used and revoke it.
+    </p>
+    <p>
       Book covers come from <a href="https://openlibrary.org">Open Library</a>, run by the
       Internet Archive. OpenLarder fetches each one and serves it itself, so your browser
       doesn't contact Open Library to show a cover.

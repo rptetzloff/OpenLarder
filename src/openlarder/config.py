@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     thriftbooks_link: str | None = None
     bookoutlet_link: str | None = None
     kobo_link: str | None = None
+    # Requests a minute to /api from outside the site (ratelimit.py): without
+    # a key, per address; with one, per key. *Ray, 2026-11-09.*
+    api_limit_anonymous: int = 60
+    api_limit_key: int = 600
 
     @field_validator("database_url")
     @classmethod
