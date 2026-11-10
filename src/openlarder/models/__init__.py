@@ -23,6 +23,7 @@ from openlarder.models.catalog import (
     TagKind,
     WebPage,
 )
+from openlarder.models.dumps import Dump
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.history import Revision
@@ -39,6 +40,7 @@ __all__ = [
     "AuthorLink",
     "Base",
     "BookRequest",
+    "Dump",
     "Edition",
     "Episode",
     "FlagKind",

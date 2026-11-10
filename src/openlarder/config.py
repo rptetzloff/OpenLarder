@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     # Off for checks that add web recipes but shouldn't ask the real Internet
     # Archive for anything (the accessibility job in CI, a local run of it).
     archive_web_pages: bool = True
+    # Weekly ODbL data dumps (dumps.py), uploaded to S3-compatible object
+    # storage: Cloudflare R2 or any other. *Ray, 2026-11-10.* All of the
+    # first four or none; none, and there are no dumps. The endpoint is the
+    # store's own (https://<account>.r2.cloudflarestorage.com); the public
+    # URL is where the bucket is read from (a custom domain, or r2.dev).
+    dumps_endpoint: str | None = None
+    dumps_bucket: str | None = None
+    dumps_access_key: str | None = None
+    dumps_secret_key: str | None = None
+    dumps_public_url: str | None = None
+    dumps_region: str = "auto"
     # Buy links (buying.py), each shown only once its setting is here: a link
     # that earns nothing isn't shown. *Ray, 2026-11-09.* Bookshop.org's
     # affiliate ID, and Amazon's Associates tag ("openlarder-20").
@@ -135,6 +146,28 @@ class Settings(BaseSettings):
                 # Refuse to start rather than serve a sign-in button that fails.
                 raise ValueError("sign-in is half configured; missing " + ", ".join(missing))
         return self
+
+    @model_validator(mode="after")
+    def _dumps_complete(self) -> "Settings":
+        dumps = {
+            "OPENLARDER_DUMPS_ENDPOINT": self.dumps_endpoint,
+            "OPENLARDER_DUMPS_BUCKET": self.dumps_bucket,
+            "OPENLARDER_DUMPS_ACCESS_KEY": self.dumps_access_key,
+            "OPENLARDER_DUMPS_SECRET_KEY": self.dumps_secret_key,
+            "OPENLARDER_DUMPS_PUBLIC_URL": self.dumps_public_url,
+        }
+        if any(dumps.values()):
+            missing = [name for name, value in dumps.items() if not value]
+            if missing:
+                raise ValueError("data dumps are half configured; missing " + ", ".join(missing))
+            for name in ("OPENLARDER_DUMPS_ENDPOINT", "OPENLARDER_DUMPS_PUBLIC_URL"):
+                if not dumps[name].startswith(("https://", "http://")):
+                    raise ValueError(f"{name} is a web address, starting https://")
+        return self
+
+    @property
+    def dumps_configured(self) -> bool:
+        return bool(self.dumps_bucket)
 
     @property
     def sign_in_configured(self) -> bool:

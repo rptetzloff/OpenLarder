@@ -224,6 +224,7 @@ function pages(s) {
     ["/requests", null],
     ["/requests", "cook"],
     ["/admin/suggestions", "cook"],
+    ["/data", null],
     ["/privacy", null],
     ["/terms", null],
   ];

@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from openlarder import __version__, crawlers, history, ratelimit, usage
+from openlarder import __version__, crawlers, dumps, history, ratelimit, usage
 from openlarder.auth import SIGN_IN_COOKIE
 from openlarder.config import get_settings
 from openlarder.db import dispose_engine, session_factory
@@ -51,6 +51,9 @@ from openlarder.routers import (
     web_pages,
 )
 from openlarder.routers import (
+    dumps as dumps_routes,
+)
+from openlarder.routers import (
     history as history_routes,
 )
 
@@ -76,8 +79,11 @@ async def lifespan(_app: FastAPI):
         logging.getLogger(__name__).exception("Fetching crawlers' address ranges failed")
     # API usage is written a minute at a time, and once more at shutdown.
     writer = asyncio.create_task(usage.keep_writing(session_factory()))
+    # The weekly ODbL data dump, when it's set up (dumps.py).
+    weekly = asyncio.create_task(dumps.keep_weekly(session_factory()))
     yield
     writer.cancel()
+    weekly.cancel()
     try:
         async with session_factory()() as session:
             await usage.flush(session)
@@ -106,6 +112,10 @@ what someone signed out sees; writing needs a signed-in account.
 
 Each answer says `RateLimit-Limit`, `RateLimit-Remaining` and
 `RateLimit-Policy`; over a limit, the answer is 429 with `Retry-After`.
+
+**Want all of it?** Take the weekly data dump instead of paging through the
+API: the whole public catalog as CSV or JSON Lines, at openlarder.com/data
+(and `/api/dumps`).
 """
 
 
@@ -173,6 +183,7 @@ app.include_router(book_requests.router)
 app.include_router(recipes.router)
 app.include_router(imports.router)
 app.include_router(covers.router)
+app.include_router(dumps_routes.router)
 app.include_router(flags.router)
 app.include_router(go.router)
 app.include_router(groups.router)

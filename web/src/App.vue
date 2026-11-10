@@ -32,6 +32,7 @@ import RecipePage from "./pages/RecipePage.vue";
 import RequestsPage from "./pages/RequestsPage.vue";
 import SearchPage from "./pages/SearchPage.vue";
 import SuggestionsPage from "./pages/SuggestionsPage.vue";
+import DataPage from "./pages/DataPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
 
@@ -39,7 +40,11 @@ import TermsPage from "./pages/TermsPage.vue";
 // is chosen from the address. A handful of pages, one with an ID in it,
 // still don't need a router library; that changes when pages need nested
 // routes or navigation without a full load.
-const pages: Record<string, unknown> = { "/privacy": PrivacyPage, "/terms": TermsPage };
+const pages: Record<string, unknown> = {
+  "/privacy": PrivacyPage,
+  "/terms": TermsPage,
+  "/data": DataPage,
+};
 // Books became sources (migration 0019): an old /books address, saved or
 // shared, goes to the same page under /sources.
 if (/^\/books(\/|$)/.test(location.pathname)) {
@@ -214,6 +219,7 @@ onMounted(async () => {
         <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a></span
       >
       <a href="/api/docs">API</a>
+      <a href="/data">Open data</a>
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
       <span class="theme-choice">
@@ -2190,6 +2196,15 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+.attribution {
+  margin: 0.5rem 0 1rem;
+  padding: 0.5rem 0.875rem;
+  border-left: 3px solid var(--accent);
+  font-style: italic;
+}
+.dump-list {
+  padding-left: 1.25rem;
 }
 /* Review: waiting and sent-back notices, the queue, and the agreement. */
 .review-notice {

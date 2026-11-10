@@ -122,9 +122,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       its address and its network, never the address; 30 days, migration
       0037), and revokes any key; Buy-link clicks shows clicks by shop,
       book, page and day (Ray, 2026-11-09).
-- [ ] **Data dumps**: weekly ODbL dumps, which let the anonymous limits stay
-      tight without being unfriendly. Ray put them in Phase 3
-      (2026-11-09); worth bringing forward once the API sees real use.
+- [x] **Data dumps** (#113). *Ray, 2026-11-10: object storage; CSV and
+      JSON Lines.* Weekly, the public catalog (what someone signed out sees;
+      nothing about accounts) as a zip of CSVs and a zip of JSON Lines, each
+      with a README giving the ODbL and its attribution, uploaded to
+      S3-compatible storage (R2) and listed at `/data`. An administrator can
+      build one now from Admin. Needs the `OPENLARDER_DUMPS_` settings.
+      - [ ] Ray: an R2 bucket with public reading, and its API token.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central
       and Wikidata (aliases, hierarchy; allergens are Phase 2).
 - [ ] **Roles** *(Ray, 2026-11-10)*: done (#101). User, contributor,
@@ -193,6 +197,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       `X-Robots-Tag: noindex` (robots.txt can't block /api, or Google
       can't render the pages); robots.txt keeps crawlers off /go/. The
       daily cap now survives a deploy.
+
+- [ ] **Analytics with Umami**, next. *Ray, 2026-11-10: self-hosted for
+      now.* The tracking script on every page, its address and site id as
+      settings, the privacy page saying what it records and where.
 
 ## Planned features
 
