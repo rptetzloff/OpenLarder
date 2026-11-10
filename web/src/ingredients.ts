@@ -147,6 +147,8 @@ export async function deleteAlias(id: string, aliasId: string): Promise<void> {
 }
 
 export interface SearchResult {
+  // With your larder: how many of its things counted.
+  larder_items?: number | null;
   // The sources searched within, if any were.
   sources: Named[];
   ingredients: Named[];
@@ -185,6 +187,7 @@ export async function searchRecipes(
     kinds = [],
     without = [],
     tags = [],
+    larder = false,
   }: {
     offset?: number;
     sources?: string[];
@@ -192,6 +195,8 @@ export async function searchRecipes(
     kinds?: string[];
     without?: string[];
     tags?: string[];
+    // With what's in your larder, instead of the ingredients given.
+    larder?: boolean;
   } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
@@ -200,6 +205,7 @@ export async function searchRecipes(
   for (const kind of kinds) query.append("kind", kind);
   for (const id of without) query.append("without", id);
   for (const id of tags) query.append("tag", id);
+  if (larder) query.set("larder", "true");
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

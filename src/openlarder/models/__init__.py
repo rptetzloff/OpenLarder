@@ -28,6 +28,7 @@ from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.history import Revision
 from openlarder.models.imports import ImportRun, ImportRunLine
+from openlarder.models.larder import LarderItem, LarderList
 from openlarder.models.proposals import Proposal
 from openlarder.models.requests import BookRequest, RequestVote
 from openlarder.models.suggestions import IngredientEmbedding, Suggestion
@@ -53,6 +54,8 @@ __all__ = [
     "Ingredient",
     "IngredientAlias",
     "IngredientOption",
+    "LarderItem",
+    "LarderList",
     "Issue",
     "Proposal",
     "PurchaseClick",

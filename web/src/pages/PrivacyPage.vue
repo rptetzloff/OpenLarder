@@ -102,6 +102,11 @@ document.title = "Privacy policy · OpenLarder";
       <li>your account's role: contributor, moderator or administrator, if it has one;</li>
       <li>when you accepted the contributor agreement, and which version of it, if you have;</li>
       <li>
+        your larder, if you keep one: your lists' names, and each thing's name, the ingredient
+        it's matched to, and whether you have it, are low or are out of it. Only you see it; it
+        isn't part of the open data, the edit history or the API;
+      </li>
+      <li>
         what you add to or change in the catalog, with your display name and when: its edit
         history, which anyone who can see the record can read. For a family collection, only
         those who can see the collection see its history;

@@ -150,6 +150,13 @@ async function seed() {
     editions: [],
     reason: "The cover has a subtitle.",
   });
+  // Cy's larder: matched, unmatched, and out.
+  const pantry = await api("/api/larder/lists", "cook", { name: "Pantry" });
+  await api("/api/larder/lists", "cook", { name: "Spice drawer" });
+  await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: "Aged cheddar" });
+  await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: "Grandma's mystery jar" });
+  const butter = await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: "Butter" });
+  await api(`/api/larder/items/${butter.id}`, "cook", { state: "out" }, "PATCH");
   // Requests: one asked for twice, one claimed, one declined.
   await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
   await api("/api/requests", "admin", { title: "plenty" });
@@ -225,6 +232,9 @@ function pages(s) {
     ["/requests", "cook"],
     ["/admin/suggestions", "cook"],
     ["/data", null],
+    ["/larder", "cook"],
+    ["/search?larder=1", "cook"],
+    ["/larder", null],
     ["/privacy", null],
     ["/terms", null],
   ];
