@@ -18,7 +18,7 @@ from sqlalchemy import func, or_, select, update
 from openlarder import agreement
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import BookRequest, Edition, Recipe, Source, User
+from openlarder.models import BookRequest, Edition, Proposal, Recipe, Source, User
 
 router = APIRouter(tags=["review"])
 WAITING = ("pending", "returned")
@@ -43,7 +43,8 @@ class Group(BaseModel):
 
 class Queue(BaseModel):
     groups: list[Group]
-    # Waiting for a moderator (not those sent back).
+    # Waiting for a moderator: books and recipes (not those sent back) and
+    # proposed changes.
     pending: int
 
 
@@ -99,8 +100,10 @@ async def queue(moderator: ModeratorUser, session: Session) -> Queue:
         Recipe.review.in_(WAITING),
     )
     pending = (
-        await session.scalar(select(func.count()).where(Source.review == "pending"))
-    ) + await session.scalar(select(func.count()).where(Recipe.review == "pending"))
+        (await session.scalar(select(func.count()).where(Source.review == "pending")))
+        + await session.scalar(select(func.count()).where(Recipe.review == "pending"))
+        + await session.scalar(select(func.count()).where(Proposal.status == "open"))
+    )
     return Queue(groups=groups, pending=pending)
 
 

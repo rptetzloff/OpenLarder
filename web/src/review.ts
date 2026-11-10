@@ -46,6 +46,36 @@ export const approveAll = (sourceId: string) =>
 
 export const myContributions = () => send<Group[]>("/api/account/contributions");
 
+// Proposed changes to published recipes (routers/proposals.py).
+export interface Version {
+  title: string;
+  chapter: string | null;
+  places: string[];
+  ingredients: string[];
+}
+
+export interface Proposal {
+  id: string;
+  recipe_id: string;
+  recipe_title: string;
+  source_id: string;
+  source_title: string;
+  by: string | null;
+  reason: string | null;
+  status: "open" | "applied" | "declined" | "withdrawn";
+  note: string | null;
+  created_at: string;
+  changed_since: boolean;
+  current: Version;
+  proposed: Version;
+}
+
+export const openProposals = () => send<Proposal[]>("/api/review/proposals");
+export const myProposals = () => send<Proposal[]>("/api/account/proposals");
+export const decideProposal = (id: string, action: "apply" | "decline", note?: string, anyway = false) =>
+  send<Proposal>(`/api/proposals/${id}`, "POST", { action, note: note ?? null, anyway });
+export const withdrawProposal = (id: string) => send<void>(`/api/proposals/${id}`, "DELETE");
+
 export const readAgreement = () => send<Agreement>("/api/agreement");
 
 export const acceptAgreement = (version: string) =>

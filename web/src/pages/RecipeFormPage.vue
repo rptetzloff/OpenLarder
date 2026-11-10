@@ -3,12 +3,28 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import { type Book, issueName, KIND_NAMES, SHOWS } from "../books";
 import type { Me } from "../me";
-import { checkLines, type LineOption, type LineReview, type Recipe, saveRecipe } from "../recipes";
+import {
+  checkLines,
+  type LineOption,
+  type LineReview,
+  proposeChange,
+  type Recipe,
+  saveRecipe,
+} from "../recipes";
 
 // New when bookId is given, editing when recipeId is. Ray's wireframe: four
 // steps, the source, the recipe and where it is, its ingredients, then a
 // look over it all before saving.
-const props = defineProps<{ bookId?: string; recipeId?: string; user?: Me | null }>();
+// With propose, the edit is sent as a suggestion for a moderator to apply
+// (routers/proposals.py), for a contributor and a published recipe.
+const props = defineProps<{
+  bookId?: string;
+  recipeId?: string;
+  user?: Me | null;
+  propose?: boolean;
+}>();
+// Why, for the moderator, when suggesting.
+const reason = ref("");
 
 const book = ref<Book | null>(null);
 // The agreement accepted on this page, before the app knows.
@@ -70,7 +86,9 @@ const kindName = computed(() => {
   const name = KIND_NAMES[book.value?.kind ?? ""] ?? "source";
   return name[0].toUpperCase() + name.slice(1);
 });
-const heading = computed(() => (props.recipeId ? "Change a recipe" : "Add a recipe"));
+const heading = computed(() =>
+  props.propose ? "Suggest a change" : props.recipeId ? "Change a recipe" : "Add a recipe",
+);
 
 function label(e: { title: string | null; published_year: number | null; isbn13: string | null }) {
   return [e.title ?? book.value?.title, e.published_year, e.isbn13 && `ISBN ${e.isbn13}`]
@@ -315,8 +333,7 @@ async function save(another = false) {
   saving.value = true;
   error.value = "";
   try {
-    const id = await saveRecipe(
-      {
+    const body = {
         title: title.value,
         editions:
           onWeb.value || inIssue.value || inEpisode.value || onPackaging.value || inFamily.value
@@ -340,7 +357,14 @@ async function save(another = false) {
           : null,
         chapter: chapter.value.trim() || null,
         ingredients: lines.value,
-      },
+    };
+    if (props.propose && props.recipeId) {
+      await proposeChange(props.recipeId, { ...body, reason: reason.value.trim() || null });
+      location.href = `/recipes/${props.recipeId}?proposed=1`;
+      return;
+    }
+    const id = await saveRecipe(
+      body,
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
     );
     location.href = another ? `/sources/${book.value!.id}/recipes/new` : `/recipes/${id}`;
@@ -362,7 +386,7 @@ async function save(another = false) {
         <a :href="`/recipes/${recipeId}`">{{ savedTitle }}</a>
       </template>
       <span aria-hidden="true">/</span>
-      <span aria-current="page">{{ recipeId ? "Change" : "Add a recipe" }}</span>
+      <span aria-current="page">{{ propose ? "Suggest a change" : recipeId ? "Change" : "Add a recipe" }}</span>
     </nav>
     <h1>{{ heading }}</h1>
     <p class="muted">Where it is and what goes in it. No amounts, method or headnotes.</p>
@@ -728,10 +752,28 @@ async function save(another = false) {
                 <button type="button" class="link" @click="go(3)">Look again</button>
               </p>
             </template>
+            <template v-if="propose">
+              <label for="propose-reason" class="form-heading">Why (optional)</label>
+              <textarea
+                id="propose-reason"
+                v-model="reason"
+                rows="2"
+                maxlength="500"
+                placeholder="It's on page 14 in my copy"
+              ></textarea>
+            </template>
             <div class="add-actions">
               <p v-if="error" class="error" role="alert">{{ error }}</p>
               <button type="button" class="primary" :disabled="saving" @click="save()">
-                {{ saving ? "Saving…" : "Save" }}
+                {{
+                  propose
+                    ? saving
+                      ? "Sending…"
+                      : "Send the suggestion"
+                    : saving
+                      ? "Saving…"
+                      : "Save"
+                }}
               </button>
               <button
                 v-if="!recipeId"
@@ -744,9 +786,13 @@ async function save(another = false) {
               </button>
               <p class="help">
                 {{
-                  book.private
-                    ? "Only you, and the groups you share it with, see it."
-                    : "It publishes as soon as it's saved, as open data under the ODbL."
+                  propose
+                    ? "A moderator looks at it beside the recipe as it is, and applies it or says why not."
+                    : book.private
+                      ? "Only you, and the groups you share it with, see it."
+                      : !inFamily && !user?.may_edit
+                        ? "It waits for a moderator's review, then publishes as open data under the ODbL."
+                        : "It publishes as soon as it's saved, as open data under the ODbL."
                 }}
               </p>
             </div>

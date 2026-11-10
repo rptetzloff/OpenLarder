@@ -155,8 +155,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         Approving a book closes its requests. Contributors change only their
         own waiting items, tags included.
       - [ ] A lawyer's read of the agreement's wording, with the terms.
-      - [ ] Contributors' edits to published records (a title, a page), as
-        proposed changes for review.
+      - [x] Proposed changes to published recipes (#110): a contributor's
+        "Suggest a change" sends the edit, checked as a save would be, with
+        why; a moderator sees it beside the recipe as it is at
+        `/admin/review` and applies it (saved as the contributor's edit,
+        through "proposal:<id>") or declines it with a reason. Applying
+        after the recipe has changed since needs saying so.
+      - [ ] The same for books' details (title, credits, editions).
       - [x] One-click revert (#109): a moderator's Undo on any change in a
         record's history or Recent changes puts back what it removed, sets
         back what it changed and takes away what it added, as a new change
