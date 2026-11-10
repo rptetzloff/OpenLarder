@@ -47,10 +47,16 @@ class Settings(BaseSettings):
     thriftbooks_link: str | None = None
     bookoutlet_link: str | None = None
     kobo_link: str | None = None
-    # Requests a minute to /api from outside the site (ratelimit.py): without
-    # a key, per address; with one, per key. *Ray, 2026-11-09.*
-    api_limit_anonymous: int = 60
-    api_limit_key: int = 600
+    # Limits on /api from outside the site (ratelimit.py): without a key,
+    # per address; with one, per key, about ten times as much. Plain reads
+    # and searches a minute, and all requests a day (UTC). *Ray, 2026-11-09:
+    # start low, loosen once there's real traffic.*
+    api_reads_per_minute: int = 60
+    api_searches_per_minute: int = 10
+    api_requests_per_day: int = 1000
+    api_key_reads_per_minute: int = 600
+    api_key_searches_per_minute: int = 100
+    api_key_requests_per_day: int = 10000
 
     @field_validator("database_url")
     @classmethod

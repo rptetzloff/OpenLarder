@@ -49,24 +49,33 @@ async def lifespan(_app: FastAPI):
     await dispose_engine()
 
 
-API_DESCRIPTION = """
+def api_description() -> str:
+    """The docs' opening, with the limits as set (ratelimit.py)."""
+    s = get_settings()
+    return f"""
 The catalog's public, read-only API: sources, editions, recipes, ingredients,
 authors, tags and search. The data is open under the
 [ODbL](https://opendatacommons.org/licenses/odbl/1-0/): use it, and keep what
 you make from it open too, saying it's from OpenLarder.
 
-**No key is needed** to start, at 60 requests a minute per address. **A free
-key** raises that to 600 a minute: make one on Your account at
-openlarder.com, and send it as `Authorization: Bearer ol_...` (or
-`X-API-Key: ol_...`). Each answer says `X-RateLimit-Limit` and
-`X-RateLimit-Remaining`; over the limit, the answer is 429 with
-`Retry-After`. A key reads what someone signed out sees.
+**No key is needed** to start. Without one, each address may make
+{s.api_reads_per_minute} plain reads and {s.api_searches_per_minute} searches a
+minute (`/api/search`, or a list searched with `q`), and
+{s.api_requests_per_day:,} requests a day (UTC). **A free key** raises them to
+{s.api_key_reads_per_minute}, {s.api_key_searches_per_minute} and
+{s.api_key_requests_per_day:,}: make one on Your account at openlarder.com, and
+send it as `Authorization: Bearer ol_...` (or `X-API-Key: ol_...`). A key reads
+what someone signed out sees; writing needs a signed-in account.
+
+Each answer says `RateLimit-Limit`, `RateLimit-Remaining` and
+`RateLimit-Policy`; over a limit, the answer is 429 with `Retry-After`.
 """
+
 
 app = FastAPI(
     title="OpenLarder",
     version=__version__,
-    description=API_DESCRIPTION,
+    description=api_description(),
     lifespan=lifespan,
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",

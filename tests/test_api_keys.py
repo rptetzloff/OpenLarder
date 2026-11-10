@@ -11,9 +11,15 @@ from openlarder.main import app
 
 @pytest.fixture
 def small_limits(monkeypatch):
-    monkeypatch.setattr(
-        ratelimit, "get_settings", lambda: _settings(api_limit_anonymous=3, api_limit_key=5)
+    settings = _settings(
+        api_reads_per_minute=3,
+        api_searches_per_minute=2,
+        api_requests_per_day=8,
+        api_key_reads_per_minute=5,
+        api_key_searches_per_minute=4,
+        api_key_requests_per_day=50,
     )
+    monkeypatch.setattr(ratelimit, "get_settings", lambda: settings)
 
 
 @pytest.fixture
@@ -74,10 +80,11 @@ async def test_without_a_key_the_limit_is_per_address(outside, small_limits) -> 
     for left in (2, 1, 0):
         ok = await outside.get("/api/tags")
         assert ok.status_code == 200
-        assert (ok.headers["x-ratelimit-limit"], ok.headers["x-ratelimit-remaining"]) == (
+        assert (ok.headers["ratelimit-limit"], ok.headers["ratelimit-remaining"]) == (
             "3",
             str(left),
         )
+        assert ok.headers["ratelimit-policy"] == "3;w=60, 8;w=86400"
     over = await outside.get("/api/tags")
     assert over.status_code == 429
     assert int(over.headers["retry-after"]) >= 1
@@ -130,3 +137,31 @@ async def test_a_key_reads_what_someone_signed_out_sees(people, outside, adb) ->
     assert (await ann.get(f"/api/sources/{box}")).status_code == 200
     with_key = await outside.get(f"/api/sources/{box}", headers={"X-API-Key": key})
     assert with_key.status_code == 404
+
+
+async def test_searches_have_their_own_smaller_limit(outside, small_limits) -> None:
+    for path in ("/api/search?q=cake", "/api/sources?q=cake"):
+        assert (await outside.get(path)).status_code == 200
+    over = await outside.get("/api/ingredients?q=salt")
+    assert over.status_code == 429
+    assert "searches a minute" in over.json()["detail"]
+    # Plain reads still have their own.
+    assert (await outside.get("/api/tags")).status_code == 200
+
+
+async def test_the_daily_cap_counts_every_request(outside, monkeypatch) -> None:
+    roomy = _settings(api_reads_per_minute=100, api_searches_per_minute=100, api_requests_per_day=4)
+    monkeypatch.setattr(ratelimit, "get_settings", lambda: roomy)
+    for path in ("/api/tags", "/api/search?q=x", "/api/tags", "/api/sources?q=y"):
+        assert (await outside.get(path)).status_code == 200
+    capped = await outside.get("/api/tags")
+    assert capped.status_code == 429
+    assert "today" in capped.json()["detail"]
+    assert 1 <= int(capped.headers["retry-after"]) <= 86400
+
+
+async def test_the_limits_as_set_are_published(client, configure) -> None:
+    configure(_settings(api_reads_per_minute=7, api_key_requests_per_day=70000))
+    shown = (await client.get("/api/account/api-limits")).json()
+    assert shown["without_key"]["reads_per_minute"] == 7
+    assert shown["with_key"]["requests_per_day"] == 70000

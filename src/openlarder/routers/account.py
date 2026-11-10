@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from openlarder import buying, names
+from openlarder import buying, names, ratelimit
 from openlarder.auth import CurrentUser, SameOrigin, hash_token, new_token
 from openlarder.db import Session
 from openlarder.models import ApiKey
@@ -136,3 +136,27 @@ async def revoke_key(key_id: uuid.UUID, user: CurrentUser, session: Session) -> 
     await session.delete(key)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class Limits(BaseModel):
+    reads_per_minute: int
+    searches_per_minute: int
+    requests_per_day: int
+
+
+class LimitsOut(BaseModel):
+    without_key: Limits
+    with_key: Limits
+
+
+@router.get("/api-limits", response_model=LimitsOut)
+async def api_limits(settings: Config) -> LimitsOut:
+    """The API's limits as set, for the keys panel to say."""
+
+    def named(keyed: bool) -> Limits:
+        reads, searches, per_day = ratelimit.limits(settings, keyed=keyed)
+        return Limits(
+            reads_per_minute=reads, searches_per_minute=searches, requests_per_day=per_day
+        )
+
+    return LimitsOut(without_key=named(False), with_key=named(True))

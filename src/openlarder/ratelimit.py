@@ -1,16 +1,23 @@
 """Rate limits on the public API (SCOPING.md, API).
 
-Anyone may read /api without a key, at api_limit_anonymous requests a minute
-per address; a key (Authorization: Bearer ol_..., or X-API-Key) raises it to
-api_limit_key a minute. *Ray, 2026-11-09.* The site's own pages are never
-limited: a browser marks the requests a page makes on its own site
-(Sec-Fetch-Site: same-origin), and one typed into the address bar ("none").
-That header can be copied by a program, which is fine: the limit is a
-courtesy for an open catalog, not a lock, and the data dumps are the way to
-take everything.
+Programs may read /api without a key, at a low rate per address; a free key
+(Authorization: Bearer ol_..., or X-API-Key) raises every limit about ten
+times, so anyone doing real work identifies themselves and has someone to
+hear from. *Ray, 2026-11-09.* Three limits apply, each a setting:
 
-Counts are kept in memory, one process serving, and never stored; an
-address is seen only as a key to its count.
+- plain reads (a book, a recipe, an ingredient): a minute's allowance;
+- searches, the expensive ones (/api/search, and a list searched with q):
+  a smaller minute's allowance;
+- all requests together: a daily cap, reset at midnight UTC.
+
+The site's own pages are never limited: a browser marks the requests a page
+makes on its own site (Sec-Fetch-Site: same-origin), and one typed into the
+address bar ("none"). A program can copy that header, which is fine: the
+limit is a courtesy for an open catalog, not a lock. Writes need a signed-in
+account whatever the key.
+
+Counts are kept in memory, one process serving, and never stored; a deploy
+starts them afresh. An address is seen only as a key to its count.
 """
 
 import math
@@ -21,27 +28,31 @@ from fastapi import HTTPException, Request, Response, status
 from sqlalchemy import select
 
 from openlarder.auth import hash_token
-from openlarder.config import get_settings
+from openlarder.config import Settings, get_settings
 from openlarder.db import Session
 from openlarder.models import ApiKey
 
 KEY_PREFIX = "ol_"
 # Paths that sign in and out: a browser's, never a program's to count.
 _UNCOUNTED = ("/api/auth/",)
+SEARCH_PATHS = ("/api/search",)
 TOUCH_EVERY = timedelta(hours=1)
 
 # Bucket name -> (tokens left, when last filled).
 _buckets: dict[str, tuple[float, float]] = {}
+# Caller -> (UTC day, requests that day).
+_days: dict[str, tuple[str, int]] = {}
 _last_sweep = 0.0
 
 
 def reset() -> None:
     """Forget every count (tests)."""
     _buckets.clear()
+    _days.clear()
 
 
-def _sweep(now: float) -> None:
-    """Drop buckets full again, so the table doesn't grow without end."""
+def _sweep(now: float, today: str) -> None:
+    """Drop full buckets and past days, so the tables don't grow without end."""
     global _last_sweep
     if now - _last_sweep < 60:
         return
@@ -49,6 +60,9 @@ def _sweep(now: float) -> None:
     for name, (_, at) in list(_buckets.items()):
         if now - at > 120:
             del _buckets[name]
+    for name, (day, _) in list(_days.items()):
+        if day != today:
+            del _days[name]
 
 
 def _take(name: str, per_minute: int) -> tuple[bool, int, float]:
@@ -56,7 +70,6 @@ def _take(name: str, per_minute: int) -> tuple[bool, int, float]:
     whether there was a token, how many are left, and the seconds until the
     next one."""
     now = time.monotonic()
-    _sweep(now)
     tokens, at = _buckets.get(name, (float(per_minute), now))
     tokens = min(float(per_minute), tokens + (now - at) * per_minute / 60)
     if tokens < 1:
@@ -83,6 +96,40 @@ def _given_key(request: Request) -> str | None:
     return request.headers.get("x-api-key", "").strip() or None
 
 
+def is_search(request: Request) -> bool:
+    """The expensive kind: the search, or a list searched by words."""
+    return request.url.path.startswith(SEARCH_PATHS) or bool(
+        request.query_params.get("q", "").strip()
+    )
+
+
+def limits(settings: Settings, keyed: bool) -> tuple[int, int, int]:
+    """(reads a minute, searches a minute, requests a day)."""
+    if keyed:
+        return (
+            settings.api_key_reads_per_minute,
+            settings.api_key_searches_per_minute,
+            settings.api_key_requests_per_day,
+        )
+    return (
+        settings.api_reads_per_minute,
+        settings.api_searches_per_minute,
+        settings.api_requests_per_day,
+    )
+
+
+def _refuse(message: str, wait: float, headers: dict[str, str]) -> HTTPException:
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        message,
+        headers={
+            **headers,
+            "Retry-After": str(max(1, math.ceil(wait))),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 async def rate_limit(request: Request, response: Response, session: Session) -> None:
     """For every route: limit /api reads by others than the site's pages."""
     path = request.url.path
@@ -91,7 +138,6 @@ async def rate_limit(request: Request, response: Response, session: Session) -> 
     given = _given_key(request)
     if given is None and request.headers.get("sec-fetch-site") in ("same-origin", "none"):
         return
-    settings = get_settings()
     if given is not None:
         key = (
             await session.scalar(select(ApiKey).where(ApiKey.token_hash == hash_token(given)))
@@ -108,16 +154,41 @@ async def rate_limit(request: Request, response: Response, session: Session) -> 
         if key.last_used_at is None or now - key.last_used_at > TOUCH_EVERY:
             key.last_used_at = now
             await session.commit()
-        name, limit = f"key:{key.id}", settings.api_limit_key
+        caller = f"key:{key.id}"
     else:
-        name, limit = f"ip:{_address(request)}", settings.api_limit_anonymous
-    allowed, left, wait = _take(name, limit)
-    headers = {"X-RateLimit-Limit": str(limit), "X-RateLimit-Remaining": str(left)}
-    if not allowed:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            f"Over {limit} requests a minute. "
-            + ("A free API key, from Your account, raises it." if given is None else "Slow down."),
-            headers={**headers, "Retry-After": str(math.ceil(wait)), "Cache-Control": "no-store"},
+        caller = f"ip:{_address(request)}"
+    reads, searches, per_day = limits(get_settings(), keyed=given is not None)
+    search = is_search(request)
+    per_minute = searches if search else reads
+    policy = f"{per_minute};w=60, {per_day};w=86400"
+    raise_it = "" if given else " A free API key, from Your account, raises it."
+
+    clock = datetime.now(UTC)
+    today = clock.date().isoformat()
+    _sweep(time.monotonic(), today)
+    day, used = _days.get(caller, (today, 0))
+    if day != today:
+        used = 0
+    if used >= per_day:
+        midnight = datetime.combine(clock.date() + timedelta(days=1), datetime.min.time(), UTC)
+        headers = {
+            "RateLimit-Limit": str(per_day),
+            "RateLimit-Remaining": "0",
+            "RateLimit-Policy": policy,
+        }
+        raise _refuse(
+            f"Over {per_day:,} requests today (UTC).{raise_it}",
+            (midnight - clock).total_seconds(),
+            headers,
         )
+    allowed, left, wait = _take(f"{caller}:{'search' if search else 'read'}", per_minute)
+    headers = {
+        "RateLimit-Limit": str(per_minute),
+        "RateLimit-Remaining": str(left),
+        "RateLimit-Policy": policy,
+    }
+    if not allowed:
+        kind = "searches" if search else "requests"
+        raise _refuse(f"Over {per_minute} {kind} a minute.{raise_it}", wait, headers)
+    _days[caller] = (today, used + 1)
     response.headers.update(headers)

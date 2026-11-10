@@ -20,6 +20,16 @@ async function send<T>(url: string, method: string, body?: unknown): Promise<T> 
   return data as T;
 }
 
+export interface Limits {
+  reads_per_minute: number;
+  searches_per_minute: number;
+  requests_per_day: number;
+}
+
+// The API's limits as set, without a key and with one.
+export const apiLimits = () =>
+  send<{ without_key: Limits; with_key: Limits }>("/api/account/api-limits", "GET");
+
 export const listKeys = () => send<ApiKey[]>("/api/account/keys", "GET");
 // The key itself comes back this once.
 export const makeKey = (name: string) =>

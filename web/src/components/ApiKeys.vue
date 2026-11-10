@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { type ApiKey, listKeys, makeKey, revokeKey } from "../apiKeys";
+import { apiLimits, type ApiKey, type Limits, listKeys, makeKey, revokeKey } from "../apiKeys";
 
 // Your API keys: make one (shown once), see when each was last used, revoke.
 const keys = ref<ApiKey[] | null>(null);
+const limits = ref<{ without_key: Limits; with_key: Limits } | null>(null);
+const said = (l: Limits) =>
+  `${l.reads_per_minute.toLocaleString()} reads and ${l.searches_per_minute.toLocaleString()} searches a minute, ${l.requests_per_day.toLocaleString()} requests a day`;
 const name = ref("");
 const made = ref<string | null>(null);
 const copied = ref(false);
@@ -24,7 +27,12 @@ async function act(work: () => Promise<void>) {
   }
 }
 
-onMounted(() => act(async () => void (keys.value = await listKeys())));
+onMounted(() => {
+  act(async () => void (keys.value = await listKeys()));
+  apiLimits()
+    .then((found) => (limits.value = found))
+    .catch(() => {});
+});
 
 const make = () =>
   act(async () => {
@@ -57,8 +65,10 @@ async function copy() {
   <section class="tool-panel api-keys" aria-labelledby="keys-title">
     <h2 id="keys-title">API keys</h2>
     <p class="muted">
-      The <a href="/api/docs">public API</a> needs no key, at 60 requests a minute. A key raises it
-      to 600. It reads what someone signed out sees, never your private collections.
+      The <a href="/api/docs">public API</a> needs no key<template v-if="limits">
+        ({{ said(limits.without_key) }})</template
+      >; a key raises that<template v-if="limits"> to {{ said(limits.with_key) }}</template
+      >. It reads what someone signed out sees, never your private collections.
     </p>
     <p v-if="keys === null && !error" class="status">Loading…</p>
     <ul v-else-if="keys?.length" class="key-list">
