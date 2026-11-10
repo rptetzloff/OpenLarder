@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import ApiKeys from "../components/ApiKeys.vue";
 import ContributionsPanel from "../components/ContributionsPanel.vue";
+import ProposalsPanel from "../components/ProposalsPanel.vue";
 import NameForm from "../components/NameForm.vue";
 import { fetchFlags } from "../flags";
 import { listGroups } from "../groups";
@@ -92,6 +93,7 @@ const n = (v: number | null, one: string, many: string) =>
       <div v-if="user.may_claim" class="tool-panels account-panels">
         <AgreementPanel :agreed="user.agreed" @accepted="accepted" />
         <ContributionsPanel />
+        <ProposalsPanel v-if="!user.may_edit" />
       </div>
       <ApiKeys />
     </template>

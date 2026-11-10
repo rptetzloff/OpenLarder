@@ -74,6 +74,7 @@ const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
 const authorId = match(`/authors/${UUID}`);
 const editRecipeId = match(`/recipes/${UUID}/edit`);
+const proposeRecipeId = match(`/recipes/${UUID}/propose`);
 const groupId = match(`/groups/${UUID}`);
 // An invite link's token (secrets.token_urlsafe).
 const inviteCode = match("/invite/([A-Za-z0-9_-]+)");
@@ -195,6 +196,7 @@ onMounted(async () => {
     <BookEditPage v-else-if="editBookId" :id="editBookId" />
     <BulkEntryPage v-else-if="bulkFor" :id="bulkFor" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" :user="user" />
+    <RecipeFormPage v-else-if="proposeRecipeId" :recipe-id="proposeRecipeId" :user="user" propose />
     <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
     <template v-else>
       <p v-if="signInFailed" class="sign-in-failed" role="alert">
@@ -2242,6 +2244,17 @@ button.primary.small {
 .review-recipes {
   margin: 0.25rem 0 0;
   padding-left: 1.25rem;
+}
+.review-proposals {
+  margin-bottom: 1.5rem;
+}
+.review-head h3 {
+  font-size: 1.0625rem;
+  margin: 0;
+}
+.proposal-diff th[scope="row"] {
+  width: 7rem;
+  text-align: left;
 }
 .agreement-points {
   padding-left: 1.25rem;

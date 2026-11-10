@@ -15,6 +15,9 @@ import type { Me } from "../me";
 import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
 import type { Thing } from "../substitutions";
 
+// Back from suggesting a change (RecipeFormPage's propose).
+const proposed = new URLSearchParams(location.search).has("proposed");
+
 // A recipe's page, laid out from Ray's wireframe (2026-11-08): where to find
 // it, what goes in it, what uses it, and what can stand in.
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
@@ -365,6 +368,21 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               />
             </ul>
           </section>
+          <!-- A contributor suggests a change to a published recipe; a moderator applies it. -->
+          <div
+            v-if="
+              !recipe.editable &&
+              user?.may_claim &&
+              recipe.review === 'published' &&
+              recipe.source.kind !== 'family'
+            "
+            class="recipe-actions"
+          >
+            <p v-if="proposed" class="status" role="status">
+              Thanks: your suggestion is with the moderators.
+            </p>
+            <a :href="`/recipes/${recipe.id}/propose`" class="button-outline">Suggest a change</a>
+          </div>
           <div v-if="recipe.editable" class="recipe-actions">
             <a :href="`/recipes/${recipe.id}/edit`" class="button-outline">Edit</a>
             <button type="button" class="secondary" @click="remove">Remove</button>

@@ -130,6 +130,23 @@ export async function saveRecipe(
   return out.id;
 }
 
+// Suggest a change to a published recipe, for a moderator to apply
+// (routers/proposals.py).
+export async function proposeChange(
+  recipeId: string,
+  body: RecipeIn & { reason: string | null },
+): Promise<void> {
+  const res = await fetch(`/api/recipes/${recipeId}/proposals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof out.detail === "string" ? out.detail : "That didn't send. Try again.");
+  }
+}
+
 export async function removeRecipe(recipeId: string): Promise<void> {
   const res = await fetch(`/api/recipes/${recipeId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("That didn't remove it. Try again.");

@@ -133,6 +133,14 @@ async function seed() {
     editions: [{ edition_id: waitingBook.editions[0].id, page: "3" }],
     ingredients: ["Apples", "Butter"],
   });
+  // A change Cy suggests to a published recipe.
+  const biscuitPage = await api(`/api/recipes/${biscuits.id}`, "admin");
+  await api(`/api/recipes/${biscuits.id}/proposals`, "cook", {
+    title: biscuitPage.title,
+    editions: biscuitPage.pages.map((p) => ({ edition_id: p.edition_id, page: "31" })),
+    ingredients: [...biscuitPage.ingredients, "Chives"],
+    reason: "Page 31 in my printing.",
+  });
   // Requests: one asked for twice, one claimed, one declined.
   await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
   await api("/api/requests", "admin", { title: "plenty" });
@@ -200,6 +208,9 @@ function pages(s) {
     ["/admin/changes", "admin"],
     ["/admin/review", "admin"],
     [`/sources/${s.waiting}`, "cook"],
+    [`/recipes/${s.biscuits.id}/propose`, "cook"],
+    [`/recipes/${s.biscuits.id}`, "cook"],
+    ["/account", "admin"],
     ["/requests", null],
     ["/requests", "cook"],
     ["/admin/suggestions", "cook"],
