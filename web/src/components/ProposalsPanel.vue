@@ -2,7 +2,8 @@
 import { onMounted, ref } from "vue";
 import { type Proposal, myProposals, withdrawProposal } from "../review";
 
-// The changes you've suggested to published recipes, and what became of them.
+// The changes you've suggested to published recipes and sources, and what
+// became of them.
 const proposals = ref<Proposal[] | null>(null);
 const error = ref("");
 const STATES: Record<Proposal["status"], string> = {
@@ -21,7 +22,7 @@ async function load() {
 }
 
 async function withdraw(p: Proposal) {
-  if (!confirm(`Withdraw your suggestion for “${p.recipe_title}”?`)) return;
+  if (!confirm(`Withdraw your suggestion for “${p.title}”?`)) return;
   try {
     await withdrawProposal(p.id);
     await load();
@@ -37,14 +38,14 @@ onMounted(load);
   <section class="tool-panel" aria-labelledby="proposals-mine-title">
     <h2 id="proposals-mine-title">Suggested changes</h2>
     <p class="muted">
-      Changes you've suggested to published recipes. A moderator applies them or says why not.
+      Changes you've suggested to published recipes and sources. A moderator applies them or says why not.
     </p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-else-if="!proposals" class="status">Loading…</p>
     <ul v-else-if="proposals.length" class="review-items">
       <li v-for="p in proposals" :key="p.id">
         <div>
-          <a :href="`/recipes/${p.recipe_id}`">{{ p.recipe_title }}</a>
+          <a :href="p.href">{{ p.title }}</a>
           <span class="muted"> · {{ STATES[p.status] }}</span>
           <p v-if="p.status === 'declined' && p.note" class="review-reason">“{{ p.note }}”</p>
         </div>

@@ -141,6 +141,15 @@ async function seed() {
     ingredients: [...biscuitPage.ingredients, "Chives"],
     reason: "Page 31 in my printing.",
   });
+  // And one to the book's details.
+  const bookPage = await api(`/api/sources/${book.id}`, "admin");
+  await api(`/api/sources/${book.id}/proposals`, "cook", {
+    title: bookPage.title,
+    subtitle: "Recipes for Every Reader",
+    credits: bookPage.credits.map((c) => ({ author_id: c.author_id, name: c.credited_as, role: c.role })),
+    editions: [],
+    reason: "The cover has a subtitle.",
+  });
   // Requests: one asked for twice, one claimed, one declined.
   await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
   await api("/api/requests", "admin", { title: "plenty" });
@@ -209,6 +218,7 @@ function pages(s) {
     ["/admin/review", "admin"],
     [`/sources/${s.waiting}`, "cook"],
     [`/recipes/${s.biscuits.id}/propose`, "cook"],
+    [`/sources/${s.book.id}/propose`, "cook"],
     [`/recipes/${s.biscuits.id}`, "cook"],
     ["/account", "admin"],
     ["/requests", null],

@@ -60,13 +60,13 @@ function sendBack(what: "sources" | "recipes", item: Item) {
 }
 
 function apply(p: Proposal) {
-  if (p.changed_since && !confirm("The recipe has changed since this was suggested. Apply it anyway, replacing that change?"))
+  if (p.changed_since && !confirm("It has changed since this was suggested. Apply it anyway, replacing that change?"))
     return;
   act(() => decideProposal(p.id, "apply", undefined, p.changed_since));
 }
 
 function declineProposal(p: Proposal) {
-  const note = prompt(`Why not apply the change to “${p.recipe_title}”? The contributor reads this.`)?.trim();
+  const note = prompt(`Why not apply the change to “${p.title}”? The contributor reads this.`)?.trim();
   if (note) act(() => decideProposal(p.id, "decline", note));
 }
 
@@ -87,7 +87,7 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
     <div class="list-head">
       <h1>Review</h1>
       <p class="muted">
-        Changes contributors have suggested to published recipes, then the books and recipes they've
+        Changes contributors have suggested to published recipes and sources, then the books and recipes they've
         added, oldest first. Until approved, only they and moderators see them. Send one back with
         what needs fixing, and it returns here once they've changed it.
       </p>
@@ -103,13 +103,14 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
           <div class="review-head">
             <div>
               <h3>
-                <a :href="`/recipes/${p.recipe_id}`">{{ p.recipe_title }}</a>
-                <span class="muted"> in {{ p.source_title }}</span>
+                <a :href="p.href">{{ p.title }}</a>
+                <span v-if="p.kind === 'recipe'" class="muted"> in {{ p.source_title }}</span>
+                <span v-else class="muted"> (its details)</span>
               </h3>
               <p class="muted">Suggested by {{ p.by ?? "someone" }} on {{ day(p.created_at) }}</p>
               <p v-if="p.reason" class="review-reason">“{{ p.reason }}”</p>
               <p v-if="p.changed_since" class="error">
-                The recipe has changed since; applying this replaces that change.
+                It has changed since; applying this replaces that change.
               </p>
             </div>
             <div class="row-actions">

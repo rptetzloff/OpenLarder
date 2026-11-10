@@ -46,28 +46,28 @@ export const approveAll = (sourceId: string) =>
 
 export const myContributions = () => send<Group[]>("/api/account/contributions");
 
-// Proposed changes to published recipes (routers/proposals.py).
-export interface Version {
-  title: string;
-  chapter: string | null;
-  places: string[];
-  ingredients: string[];
+// Proposed changes to published recipes and sources (routers/proposals.py).
+export interface Difference {
+  label: string;
+  now: string;
+  proposed: string;
 }
 
 export interface Proposal {
   id: string;
-  recipe_id: string;
-  recipe_title: string;
+  kind: "recipe" | "source";
+  title: string;
+  href: string;
   source_id: string;
   source_title: string;
+  recipe_id: string | null;
   by: string | null;
   reason: string | null;
   status: "open" | "applied" | "declined" | "withdrawn";
   note: string | null;
   created_at: string;
   changed_since: boolean;
-  current: Version;
-  proposed: Version;
+  differences: Difference[];
 }
 
 export const openProposals = () => send<Proposal[]>("/api/review/proposals");

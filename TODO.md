@@ -161,7 +161,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         `/admin/review` and applies it (saved as the contributor's edit,
         through "proposal:<id>") or declines it with a reason. Applying
         after the recipe has changed since needs saying so.
-      - [ ] The same for books' details (title, credits, editions).
+      - [x] The same for sources' details (#112): title, subtitle, credits
+        and editions, from "Suggest a change" on a published source's page,
+        applied through the same edit a moderator makes. A recipe added to
+        the source isn't counted as a change since.
       - [x] One-click revert (#109): a moderator's Undo on any change in a
         record's history or Recent changes puts back what it removed, sets
         back what it changed and takes away what it added, as a new change

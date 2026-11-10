@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { type Book, type BookIn, KIND_NAMES, saveBook } from "../books";
+import { type Book, type BookIn, KIND_NAMES, proposeBookChange, saveBook } from "../books";
 
-const props = defineProps<{ id: string }>();
+// With propose, the edit is sent as a suggestion for a moderator to apply
+// (routers/proposals.py), for a contributor and a published source.
+const props = defineProps<{ id: string; propose?: boolean }>();
+const reason = ref("");
 
 const ROLES = ["author", "editor", "contributor", "photographer", "illustrator", "translator"];
 
@@ -59,6 +62,15 @@ async function save() {
   }
   saving.value = true;
   try {
+    if (props.propose) {
+      await proposeBookChange(props.id, {
+        ...form.value,
+        editions,
+        reason: reason.value.trim() || null,
+      });
+      location.href = `/sources/${props.id}?proposed=1`;
+      return;
+    }
     await saveBook(props.id, { ...form.value, editions });
     location.href = `/sources/${props.id}`;
   } catch (e) {
@@ -71,7 +83,10 @@ async function save() {
 <template>
   <article>
     <p><a :href="`/sources/${id}`">← {{ book?.title ?? "Back to the book" }}</a></p>
-    <h1>Edit {{ KIND_NAMES[book?.kind ?? "book"] }}</h1>
+    <h1>{{ propose ? "Suggest a change to the" : "Edit" }} {{ KIND_NAMES[book?.kind ?? "book"] }}</h1>
+    <p v-if="propose" class="muted">
+      A moderator sees what you'd change beside how it reads now, and applies it or says why not.
+    </p>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <form v-else-if="form && book" class="recipe-form" @submit.prevent="save">
       <label for="book-title">Title</label>
@@ -156,9 +171,19 @@ async function save() {
         />
       </fieldset>
 
+      <template v-if="propose">
+        <label for="book-reason">Why (optional)</label>
+        <textarea
+          id="book-reason"
+          v-model="reason"
+          rows="2"
+          maxlength="500"
+          placeholder="The cover gives the subtitle"
+        ></textarea>
+      </template>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button type="submit" class="primary" :disabled="saving">
-        {{ saving ? "Saving…" : "Save" }}
+        {{ propose ? (saving ? "Sending…" : "Send the suggestion") : saving ? "Saving…" : "Save" }}
       </button>
     </form>
     <p v-else class="status">Loading…</p>

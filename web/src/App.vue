@@ -69,6 +69,7 @@ const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.
 const bookId = match(`/sources/${UUID}`);
 const newRecipeFor = match(`/sources/${UUID}/recipes/new`);
 const editBookId = match(`/sources/${UUID}/edit`);
+const proposeBookId = match(`/sources/${UUID}/propose`);
 const bulkFor = match(`/sources/${UUID}/bulk`);
 const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
@@ -194,6 +195,7 @@ onMounted(async () => {
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />
     <BookEditPage v-else-if="editBookId" :id="editBookId" />
+    <BookEditPage v-else-if="proposeBookId" :id="proposeBookId" propose />
     <BulkEntryPage v-else-if="bulkFor" :id="bulkFor" />
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" :user="user" />
     <RecipeFormPage v-else-if="proposeRecipeId" :recipe-id="proposeRecipeId" :user="user" propose />

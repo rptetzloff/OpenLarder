@@ -17,17 +17,23 @@ class Proposal(Base):
         CheckConstraint(
             "status IN ('open', 'applied', 'declined', 'withdrawn')", name="status_known"
         ),
+        CheckConstraint("(recipe_id IS NULL) <> (source_id IS NULL)", name="one_target"),
         Index("ix_proposals_open", "created_at", postgresql_where=text("status = 'open'")),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    recipe_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False, index=True
+    # What it's for: a recipe, or a source's own details (migration 0044).
+    recipe_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recipes.id", ondelete="CASCADE"), index=True
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.id", ondelete="CASCADE"), index=True
     )
     proposed_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
-    # The edit as the recipe form sends it (routers/recipes.RecipeIn).
+    # The edit as the form sends it (routers/recipes.RecipeIn, or
+    # routers/sources.BookIn).
     body: Mapped[dict] = mapped_column(JSONB, nullable=False)
     # Why, in the contributor's words.
     reason: Mapped[str | None] = mapped_column(Text)
