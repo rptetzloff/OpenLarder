@@ -246,3 +246,21 @@ async def test_a_change_names_what_it_changed(people, client, adb) -> None:
     )
     [changed, _] = (await client.get(f"/api/ingredients/{eggs}/history")).json()
     assert changed["entries"][0]["name"] == "eggs"
+
+
+async def test_a_sources_own_changes_show_while_something_is_hidden(people, client, adb) -> None:
+    """With a recipe waiting for review somewhere, a source's changes to its
+    own details (no recipe) still show to everyone."""
+    mo, con = await people("mo", role="moderator"), await people("con", role="contributor")
+    book = (await mo.post("/api/sources/manual", json={"title": "Plenty", "authors": []})).json()[
+        "id"
+    ]
+    edition = await adb.scalar(text("SELECT id FROM editions WHERE source_id = :s"), {"s": book})
+    await con.post(
+        f"/api/sources/{book}/recipes",
+        json={"title": "Waiting", "editions": [{"edition_id": str(edition)}], "ingredients": []},
+    )
+    await mo.put(f"/api/sources/{book}", json={"title": "Plenty More", "credits": []})
+    newest = (await client.get(f"/api/sources/{book}/history")).json()[0]
+    assert newest["by"] == "mo"
+    assert any(e["what"] == "source" and e["action"] == "changed" for e in newest["entries"])

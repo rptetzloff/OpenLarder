@@ -14,7 +14,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import and_, false, or_, select, true
+from sqlalchemy import and_, false, func, or_, select, true
 from sqlalchemy.orm import aliased
 
 from openlarder import revert, visibility
@@ -179,7 +179,10 @@ def _hidden(viewer: User | None):
                 )
             )
         )
-    return or_(*conditions)
+    # A revision of no recipe (the source's own rows) has recipe_id NULL, and
+    # NULL IN (...) is unknown, not false, once anything is hidden: unknown
+    # counts as not hidden, or "NOT hidden" would drop it too.
+    return func.coalesce(or_(*conditions), false())
 
 
 async def _changes(session, viewer: User | None, query) -> list[Change]:
