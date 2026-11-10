@@ -155,6 +155,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] Edit history keeps everything forever: check its size once the
         household index is imported again (~400,000 rows for 19,000 recipes).
 
+- [x] **A band saying which site this is** (#103). *Ray, 2026-11-10.*
+      `OPENLARDER_ENVIRONMENT` other than `production` shows one above the
+      header on every page; `OPENLARDER_NOTICE` puts a line of your own
+      there in any environment. Set `production` on the live site when it
+      exists.
+
 ## Planned features
 
 - [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*

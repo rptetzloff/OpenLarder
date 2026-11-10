@@ -12,7 +12,12 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://openlarder:openlarder@localhost:54320/openlarder"
     database_echo: bool = False
+    # "production", or anything else ("development", "staging"): anything
+    # else shows a band on every page saying so (routers/site.py).
     environment: str = "development"
+    # A line for the band on every page, in any environment, in place of
+    # the environment's own ("Down for maintenance at 9pm"). Plain text.
+    notice: str | None = None
 
     # Sign-in through the identity broker (Authgear). All three or none:
     # with none, the site runs without sign-in and /api/auth/login says so.
