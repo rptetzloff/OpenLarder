@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     # A line for the band on every page, in any environment, in place of
     # the environment's own ("Down for maintenance at 9pm"). Plain text.
     notice: str | None = None
+    # <meta> tags for every page's head, by name: site verification for
+    # affiliate programmes and search engines, as JSON, e.g.
+    # {"impact-site-verification": "56d1..."}. Their values are public.
+    meta_tags: dict[str, str] = {}
+
+    @field_validator("meta_tags")
+    @classmethod
+    def _meta_tags_plain(cls, tags: dict[str, str]) -> dict[str, str]:
+        for name, value in tags.items():
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9:._-]{0,63}", name):
+                raise ValueError(f"OPENLARDER_META_TAGS: {name!r} isn't a tag name")
+            if not value or len(value) > 500 or not value.isprintable():
+                raise ValueError(f"OPENLARDER_META_TAGS: {name}'s value is empty or too long")
+        return tags
 
     # Sign-in through the identity broker (Authgear). All three or none:
     # with none, the site runs without sign-in and /api/auth/login says so.

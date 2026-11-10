@@ -6,6 +6,7 @@ routes survive a reload.
 """
 
 import asyncio
+import html
 import logging
 import mimetypes
 import secrets
@@ -13,7 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -148,8 +149,23 @@ app.include_router(tags.router)
 app.include_router(web_pages.router)
 
 
-def spa_response(web_dir: Path, path: str) -> FileResponse:
-    """A file from the built SPA, or its index.html for any other path.
+def meta_tags(tags: dict[str, str]) -> str:
+    """OPENLARDER_META_TAGS as <meta> tags. Each carries its value as both
+    content, the standard attribute (Google, Bing), and value, which
+    Impact's verification asks for (Barnes & Noble's affiliate programme,
+    *Ray, 2026-11-10*): one setting fits either."""
+    return "".join(
+        f'<meta name="{html.escape(n)}" content="{html.escape(v)}" value="{html.escape(v)}" />'
+        for n, v in tags.items()
+    )
+
+
+def spa_response(
+    web_dir: Path, path: str, tags: dict[str, str] | None = None
+) -> FileResponse | HTMLResponse:
+    """A file from the built SPA, or its index.html for any other path, with
+    the configured <meta> tags in its head, where a site checker reading
+    the raw page finds them.
 
     index.html is sent with no-cache: it names the build's hashed scripts, and
     a browser that reused an old copy would ask for scripts a new deploy has
@@ -161,7 +177,11 @@ def spa_response(web_dir: Path, path: str) -> FileResponse:
     if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
         if candidate.name != "index.html":
             return FileResponse(candidate)
-    return FileResponse(web_dir / "index.html", headers={"Cache-Control": "no-cache"})
+    headers = {"Cache-Control": "no-cache"}
+    if not tags:
+        return FileResponse(web_dir / "index.html", headers=headers)
+    page = (web_dir / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(page.replace("</head>", meta_tags(tags) + "</head>", 1), headers=headers)
 
 
 class Assets(StaticFiles):
@@ -187,5 +207,6 @@ if WEB_DIR.is_dir():
     app.mount("/assets", Assets(directory=WEB_DIR / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
-    async def spa(path: str) -> FileResponse:
-        return spa_response(WEB_DIR, path)
+    # Annotated Response: FastAPI can't make a response model of a union.
+    async def spa(path: str) -> Response:
+        return spa_response(WEB_DIR, path, get_settings().meta_tags)
