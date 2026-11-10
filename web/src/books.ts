@@ -1,5 +1,6 @@
 // What /api/sources returns, and adding a book by ISBN.
 
+import type { BuyLink } from "./buying";
 import type { Tag } from "./tags";
 
 export interface BookSummary {
@@ -25,6 +26,8 @@ export interface Edition {
   published_year: number | null;
   cover_url: string | null;
   open_library_url: string | null;
+  // Where to buy it; none until an affiliate ID is set.
+  buy: BuyLink[];
 }
 
 export interface Book {

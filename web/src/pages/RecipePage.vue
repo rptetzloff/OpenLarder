@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buyHref, DISCLOSURE } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setRecipeTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -253,6 +254,19 @@ const sourceWord = computed(() => (recipe.value?.source.kind === "book" ? "book"
                     </select>
                   </template>
                   <span v-else class="find-edition-only">{{ editionLabel(edition) }}</span>
+                </div>
+                <div v-if="edition.buy.length" class="buy-links">
+                  <p class="buy-row">
+                    <span>Buy the book:</span>
+                    <a
+                      v-for="b in edition.buy"
+                      :key="b.retailer"
+                      :href="buyHref(b)"
+                      rel="sponsored noopener"
+                      >{{ b.label }}</a
+                    >
+                  </p>
+                  <p class="buy-note">{{ DISCLOSURE }}</p>
                 </div>
               </template>
               <p v-if="recipe.chapter" class="find-chapter">In “{{ recipe.chapter }}”</p>

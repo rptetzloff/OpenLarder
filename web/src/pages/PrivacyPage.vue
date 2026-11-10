@@ -8,7 +8,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 8 November 2026</p>
+    <p class="updated">Last updated 9 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -33,6 +33,14 @@ document.title = "Privacy policy · OpenLarder";
       Book covers come from <a href="https://openlibrary.org">Open Library</a>, run by the
       Internet Archive. OpenLarder fetches each one and serves it itself, so your browser
       doesn't contact Open Library to show a cover.
+    </p>
+    <p>
+      A book's page can have links to buy it from a bookshop, such as Bookshop.org. OpenLarder
+      earns a commission on what's bought through them. A buy link goes through OpenLarder
+      first, which counts the click: which book, which shop, when, and which OpenLarder page it
+      was on. It records nothing about who clicked: no account, IP address or cookie. The shop
+      then sees your visit as anyone's would, and tracks the purchase under its own privacy
+      policy.
     </p>
 
     <h2>Accounts</h2>

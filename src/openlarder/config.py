@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # Off for checks that add web recipes but shouldn't ask the real Internet
     # Archive for anything (the accessibility job in CI, a local run of it).
     archive_web_pages: bool = True
+    # Bookshop.org's affiliate ID (buying.py). Buy links show only once it's
+    # set: a link that earns nothing isn't shown. *Ray, 2026-11-09.*
+    bookshop_affiliate_id: str | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -45,6 +48,14 @@ class Settings(BaseSettings):
             if url.startswith(scheme):
                 return "postgresql+psycopg://" + url[len(scheme) :]
         return url
+
+    @field_validator("bookshop_affiliate_id")
+    @classmethod
+    def _affiliate_digits(cls, value: str | None) -> str | None:
+        value = (value or "").strip() or None
+        if value is not None and not value.isdigit():
+            raise ValueError("OPENLARDER_BOOKSHOP_AFFILIATE_ID is a number, like 12345.")
+        return value
 
     @field_validator("public_url")
     @classmethod

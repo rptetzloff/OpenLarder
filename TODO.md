@@ -85,8 +85,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       recipe tags for n8n, granted to its role); accepting tags the
       recipe. Workflow 4 is specified in SCOPING.md for Ray to build in
       n8n. Then this item is done.
-- [ ] **Bookshop.org affiliate links**: the purchase_links table exists, with
-      nothing to fill or show it.
+- [x] **Bookshop.org affiliate links** (#94): "Buy this edition" on a book's
+      page and in a recipe's Find it in box, made from the edition's ISBN,
+      with the commission said beside them and a paragraph in the privacy
+      policy. Each goes through `/go/bookshop/<edition>`, which counts the
+      click (edition, shop, time, page; nothing about who) and skips bots.
+      Hidden until `OPENLARDER_BOOKSHOP_AFFILIATE_ID` is set in Coolify
+      (Ray, 2026-11-09: no account yet). Still to come: a page showing the
+      clicks, and Amazon once there's traffic.
 - [ ] **Read-only public API**: the routes are public and documented at
       `/api/docs`; API keys, rate limits and periodic data dumps aren't built.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central

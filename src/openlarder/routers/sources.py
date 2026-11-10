@@ -20,10 +20,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, exists, func, select
 
 from openlarder import books as books_module
-from openlarder import isbn, linking, openlibrary, references, refresh, visibility, web
+from openlarder import buying, isbn, linking, openlibrary, references, refresh, visibility, web
 from openlarder import recipes as recipes_module
 from openlarder.auth import AdminUser, CurrentUser, SameOrigin, Viewer
 from openlarder.books import AlreadyIndexed, add_book
+from openlarder.buying import BuyLink
 from openlarder.db import Session
 from openlarder.models import (
     Author,
@@ -86,6 +87,8 @@ class EditionOut(BaseModel):
     published_year: int | None
     cover_url: str | None
     open_library_url: str | None
+    # Where to buy it, through /go/; none until an affiliate ID is set.
+    buy: list[BuyLink] = []
 
 
 class PlaceSummary(BaseModel):
@@ -463,6 +466,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
                     if e.open_library_edition_id
                     else None
                 ),
+                buy=buying.links(e.id, e.isbn13, work.kind),
             )
             for e in editions
         ],

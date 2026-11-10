@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buyHref, DISCLOSURE } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -337,6 +338,20 @@ async function saveTags(ids: string[]) {
             <dd><a :href="edition.open_library_url">This edition</a></dd>
           </div>
         </dl>
+        <div v-if="edition?.buy.length" class="buy-links">
+          <p class="buy-row">
+            <span>Buy this edition:</span>
+            <a
+              v-for="b in edition.buy"
+              :key="b.retailer"
+              :href="buyHref(b)"
+              rel="sponsored noopener"
+              class="button-outline"
+              >{{ b.label }}</a
+            >
+          </p>
+          <p class="buy-note">{{ DISCLOSURE }}</p>
+        </div>
       </section>
 
       <section v-if="book.ingredients.length" class="source-section">
