@@ -321,6 +321,19 @@ async def test_the_views_for_n8n_leave_out_the_private_collection(secret, adb) -
     assert "Zanzibar Moonsalt" not in lines
     flags = list(await adb.scalars(text("SELECT recipe_id FROM public_open_flags")))
     assert uuid.UUID(secret["stew"]) not in flags
+    # Workflow 4's views (0033), with the stew and its box tagged.
+    vegan = await adb.scalar(text("SELECT id FROM tags WHERE name = 'Vegan'"))
+    await adb.execute(
+        text("INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (:r, :t)"),
+        {"r": uuid.UUID(secret["stew"]), "t": vegan},
+    )
+    await adb.execute(
+        text("INSERT INTO source_tags (source_id, tag_id) VALUES (:s, :t)"),
+        {"s": uuid.UUID(secret["box"]), "t": vegan},
+    )
+    recipes = list(await adb.scalars(text("SELECT id FROM public_recipes")))
+    tagged = list(await adb.scalars(text("SELECT recipe_id FROM public_recipe_tags")))
+    assert uuid.UUID(secret["stew"]) not in recipes + tagged
 
 
 async def test_counts_leave_out_what_you_cant_see(secret, people, adb) -> None:
@@ -550,3 +563,23 @@ async def test_searching_by_tag_leaves_out_the_private_collection(secret, people
         assert found["recipes"] == [] and found["total"] == 0
     mine = (await secret["ann"].get("/api/search", params={"tag": str(vegan)})).json()
     assert [r["id"] for r in mine["recipes"]] == [secret["stew"]]
+
+
+async def test_a_tag_suggestion_for_a_private_recipe_stays_hidden(secret, people, adb) -> None:
+    """The stew is in Ann's box: no admin is shown a tag suggestion for it,
+    or can act on one."""
+    vegan = await adb.scalar(text("SELECT id FROM tags WHERE name = 'Vegan'"))
+    proposal = {"recipe_id": secret["stew"], "tag_id": str(vegan)}
+    suggestion = await adb.scalar(
+        text(
+            "INSERT INTO suggestions (kind, target, proposal, model, prompt_version)"
+            " VALUES ('tag', CAST(:t AS jsonb), CAST(:p AS jsonb), 'm', 'v') RETURNING id"
+        ),
+        {"t": json.dumps([secret["stew"], str(vegan)]), "p": json.dumps(proposal)},
+    )
+    admin = await people("ada", admin=True)
+    page = (await admin.get("/api/suggestions")).json()
+    assert page["suggestions"] == [] and page["open_by_kind"] == {}
+    for action in ("accept", "dismiss"):
+        refused = await admin.post(f"/api/suggestions/{suggestion}/{action}", json={})
+        assert refused.status_code == 404

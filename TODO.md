@@ -80,8 +80,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       0032; diets came with 0018); whoever may change a source tags it
       and its recipes from "Edit tags", and admins add to the list there;
       tags show as chips that search by them, and search filters by
-      them, on their own too. Next: **model suggestions** for tags, as an
-      n8n workflow into the Suggestions queue.
+      them, on their own too. **Tag suggestions (#93):** the queue takes
+      kind `tag` (migration 0033, with public views of recipes, tags and
+      recipe tags for n8n, granted to its role); accepting tags the
+      recipe. Workflow 4 is specified in SCOPING.md for Ray to build in
+      n8n. Then this item is done.
 - [ ] **Bookshop.org affiliate links**: the purchase_links table exists, with
       nothing to fill or show it.
 - [ ] **Read-only public API**: the routes are public and documented at

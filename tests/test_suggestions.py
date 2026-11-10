@@ -115,7 +115,9 @@ async def n8n(adb):
 async def test_the_role_reads_the_views_and_not_the_tables(n8n, adb) -> None:
     await _ingredient(adb, "rhubarb")
     assert [r.name for r in await n8n("SELECT name FROM public_ingredients")] == ["rhubarb"]
-    for table in ("ingredients", "recipe_ingredients", "sources", "users"):
+    for view in ("public_recipes", "public_tags", "public_recipe_tags"):
+        await n8n(f"SELECT 1 FROM {view}")
+    for table in ("ingredients", "recipe_ingredients", "sources", "users", "recipe_tags"):
         with pytest.raises(DBAPIError, match="permission denied"):
             await n8n(f"SELECT 1 FROM {table}")
 
@@ -291,3 +293,94 @@ async def test_certain_comes_first_then_likely_then_the_closest(people, adb) -> 
         ("Flax", "likely"),
         ("Oats", None),
     ]
+
+
+# Tag suggestions (0033): Workflow 4 suggests tags for recipes.
+
+
+async def _recipe(adb, title, *, chapter=None):
+    source = await adb.scalar(
+        text("INSERT INTO sources (title) VALUES ('Biscuit Book') RETURNING id")
+    )
+    return await adb.scalar(
+        text("INSERT INTO recipes (source_id, title, chapter) VALUES (:s, :t, :c) RETURNING id"),
+        {"s": source, "t": title, "c": chapter},
+    )
+
+
+async def _tag_id(adb, name):
+    return await adb.scalar(text("SELECT id FROM tags WHERE name = :n"), {"n": name})
+
+
+async def _suggest_tag(adb, recipe, tag, certainty="likely"):
+    proposal = {
+        "recipe_id": str(recipe),
+        "tag_id": str(tag),
+        "recipe_title": "model's title",
+        "tag_name": "model's tag",
+        "certainty": certainty,
+    }
+    return await adb.scalar(
+        text(
+            "INSERT INTO suggestions (kind, target, proposal, reason, confidence, model,"
+            " prompt_version) VALUES ('tag', CAST(:t AS jsonb), CAST(:p AS jsonb),"
+            " 'It is a bread.', 0.6, 'gemma4:12b', 'tag-v1') RETURNING id"
+        ),
+        {"t": json.dumps([str(recipe), str(tag)]), "p": json.dumps(proposal)},
+    )
+
+
+async def test_a_tag_suggestion_is_listed_and_accepted(people, adb) -> None:
+    biscuits = await _recipe(adb, "Cheddar Biscuits", chapter="Biscuits")
+    bread = await _tag_id(adb, "Bread")
+    suggestion = await _suggest_tag(adb, biscuits, bread)
+    admin = await people("ada", admin=True)
+    page = (await admin.get("/api/suggestions", params={"kind": "tag"})).json()
+    assert page["open_by_kind"] == {"tag": 1}
+    listed = page["suggestions"][0]
+    assert (listed["recipe"]["title"], listed["recipe"]["chapter"]) == (
+        "Cheddar Biscuits",
+        "Biscuits",
+    )
+    assert (listed["tag"]["name"], listed["tag"]["kind"], listed["tag"]["already"]) == (
+        "Bread",
+        "course",
+        False,
+    )
+    assert listed["actionable"] and listed["certainty"] == "likely"
+    done = await admin.post(f"/api/suggestions/{suggestion}/accept", json={})
+    assert done.status_code == 200, done.text
+    assert done.json()["tag"]["already"]
+    tags = (await admin.get(f"/api/recipes/{biscuits}")).json()["tags"]
+    assert [t["name"] for t in tags] == ["Bread"]
+
+
+async def test_accepting_a_tag_the_recipe_has_adds_nothing(people, adb) -> None:
+    biscuits = await _recipe(adb, "Cheddar Biscuits")
+    bread = await _tag_id(adb, "Bread")
+    await adb.execute(
+        text(
+            "INSERT INTO source_tags (source_id, tag_id)"
+            " SELECT source_id, :t FROM recipes WHERE id = :r"
+        ),
+        {"t": bread, "r": biscuits},
+    )
+    suggestion = await _suggest_tag(adb, biscuits, bread)
+    admin = await people("ada", admin=True)
+    listed = (await admin.get("/api/suggestions")).json()["suggestions"][0]
+    assert listed["tag"]["already"]
+    assert (await admin.post(f"/api/suggestions/{suggestion}/accept", json={})).status_code == 200
+    assert await adb.scalar(text("SELECT count(*) FROM recipe_tags")) == 0
+
+
+async def test_a_tag_suggestion_for_a_gone_recipe_is_only_dismissed(people, adb) -> None:
+    biscuits = await _recipe(adb, "Cheddar Biscuits")
+    suggestion = await _suggest_tag(adb, biscuits, await _tag_id(adb, "Bread"))
+    await adb.execute(text("DELETE FROM recipes WHERE id = :r"), {"r": biscuits})
+    admin = await people("ada", admin=True)
+    listed = (await admin.get("/api/suggestions")).json()["suggestions"][0]
+    assert not listed["actionable"]
+    assert (listed["recipe"]["title"], listed["recipe"]["exists"]) == ("model's title", False)
+    assert (await admin.post(f"/api/suggestions/{suggestion}/accept", json={})).status_code == 409
+    dismissed = await admin.post(f"/api/suggestions/{suggestion}/dismiss")
+    assert dismissed.json()["status"] == "dismissed"

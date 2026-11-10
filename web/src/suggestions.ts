@@ -9,11 +9,21 @@ export interface Side {
 
 export interface Suggestion {
   id: string;
-  kind: "merge" | "parent" | "line_fix";
+  kind: "merge" | "parent" | "line_fix" | "tag";
   decision: string | null;
   keep: "a" | "b" | null;
   a: Side | null;
   b: Side | null;
+  // tag: the recipe, and the tag for it.
+  recipe: {
+    id: string;
+    title: string;
+    chapter: string | null;
+    source_id: string | null;
+    source_title: string | null;
+    exists: boolean;
+  } | null;
+  tag: { id: string; kind: string; name: string; exists: boolean; already: boolean } | null;
   reason: string | null;
   similarity: number | null;
   // merge-v2 on: the model's word for how sure it is.
@@ -36,6 +46,7 @@ export interface SuggestionPage {
 export const KIND_LABELS: Record<string, string> = {
   merge: "Same ingredient",
   parent: "One under another",
+  tag: "Tag a recipe",
   line_fix: "Line fix",
 };
 

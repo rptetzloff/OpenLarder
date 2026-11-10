@@ -16,7 +16,11 @@ const busy = ref(false);
 // For "one under another": which goes under which.
 const child = computed(() => (s.value.decision === "b_under_a" ? s.value.b : s.value.a));
 const parent = computed(() => (s.value.decision === "b_under_a" ? s.value.a : s.value.b));
-const gone = computed(() => [s.value.a, s.value.b].some((side) => side && !side.exists));
+const gone = computed(
+  () =>
+    [s.value.a, s.value.b].some((side) => side && !side.exists) ||
+    (s.value.kind === "tag" && !(s.value.recipe?.exists && s.value.tag?.exists)),
+);
 
 function uses(side: Side) {
   return side.recipes === 1 ? "1 recipe" : `${side.recipes.toLocaleString()} recipes`;
@@ -66,6 +70,22 @@ async function act(action: "accept" | "dismiss") {
         <span v-else>{{ parent.name }} (gone)</span>
       </p>
     </template>
+    <template v-else-if="s.kind === 'tag' && s.recipe && s.tag">
+      <h2>Tag it {{ s.tag.name }}?</h2>
+      <p>
+        <a v-if="s.recipe.exists" :href="`/recipes/${s.recipe.id}`">{{ s.recipe.title }}</a>
+        <span v-else>{{ s.recipe.title }} (gone)</span>
+        <template v-if="s.recipe.source_title">
+          in <a :href="`/sources/${s.recipe.source_id}`">{{ s.recipe.source_title }}</a></template
+        ><template v-if="s.recipe.chapter">, “{{ s.recipe.chapter }}”</template>
+      </p>
+      <p>
+        <span class="tag-chip">{{ s.tag.name }}</span>
+        <span class="muted"> · {{ s.tag.kind }}</span>
+        <span v-if="s.tag.already" class="muted"> · it has this tag already</span>
+        <span v-if="!s.tag.exists" class="muted"> (gone)</span>
+      </p>
+    </template>
     <h2 v-else>{{ s.kind }}</h2>
     <p v-if="s.reason" class="suggestion-reason">{{ s.reason }}</p>
     <p class="byline">
@@ -80,7 +100,11 @@ async function act(action: "accept" | "dismiss") {
     </p>
     <template v-else>
       <p v-if="gone" class="status">
-        An ingredient this names has been merged or deleted since, so it can only be dismissed.
+        {{
+          s.kind === "tag"
+            ? "Its recipe or its tag has been deleted since, so it can only be dismissed."
+            : "An ingredient this names has been merged or deleted since, so it can only be dismissed."
+        }}
       </p>
       <p v-else-if="!s.actionable" class="status">This can't be accepted here yet.</p>
       <div class="row-actions">
