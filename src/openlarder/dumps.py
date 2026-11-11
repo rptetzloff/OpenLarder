@@ -73,7 +73,7 @@ COLUMNS = {
     "ingredient_options": [
         "recipe_ingredient_id", "recipe_id", "rank", "name", "ingredient_id", "sub_recipe_id",
     ],
-    "ingredients": ["id", "name", "shopping_term", "parent_id"],
+    "ingredients": ["id", "name", "shopping_term", "parent_id", "fdc_id", "wikidata_id"],
     "ingredient_aliases": ["id", "ingredient_id", "name", "region"],
     "tags": ["id", "kind", "name"],
     "source_tags": ["source_id", "tag_id"],
@@ -108,7 +108,10 @@ ABOUT = {
     "recipe_locations": "Where each recipe is: an edition's page, a web page, an issue, a show.",
     "recipe_ingredients": "Each recipe's ingredient lines as written, in order; no amounts.",
     "ingredient_options": "Each line read into its options, matched to an ingredient or a recipe.",
-    "ingredients": "Canonical ingredients, and the broader one each is under.",
+    "ingredients": (
+        "Canonical ingredients, the broader one each is under, and the same food's"
+        " USDA FoodData Central ID and Wikidata item, where linked."
+    ),
     "ingredient_aliases": "Other names for ingredients.",
     "tags": "Course, cuisine, diet and technique tags.",
     "source_tags": "Tags on whole sources, which their recipes have too.",

@@ -25,6 +25,7 @@ from openlarder.models.catalog import (
 )
 from openlarder.models.dumps import Dump
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
+from openlarder.models.foods import FdcFood
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.history import Revision
 from openlarder.models.imports import ImportRun, ImportRunLine
@@ -49,6 +50,7 @@ __all__ = [
     "Dump",
     "Edition",
     "Episode",
+    "FdcFood",
     "FlagKind",
     "Group",
     "GroupInvite",

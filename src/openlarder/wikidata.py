@@ -12,9 +12,10 @@ import re
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Annotated, Any
 
 import httpx2
+from fastapi import Depends
 
 from openlarder.openlibrary import USER_AGENT
 
@@ -31,6 +32,14 @@ _OL = re.compile(r"^OL[1-9][0-9]*A$")
 _Q = re.compile(r"^Q[1-9][0-9]*$")
 # A year at the start of an xsd:dateTime, BC ones negative.
 _YEAR = re.compile(r"^(-?[0-9]{1,4})-")
+
+
+def wikidata_transport() -> httpx2.AsyncBaseTransport | None:
+    """A dependency: None means the real Wikidata; tests replace this with a fake."""
+    return None
+
+
+WikidataTransport = Annotated[httpx2.AsyncBaseTransport | None, Depends(wikidata_transport)]
 
 
 class Unavailable(RuntimeError):
@@ -176,3 +185,36 @@ async def lookup(
             )
             rows += await _ask(client, _query(selector))
     return _read(rows)
+
+
+@dataclass
+class Label:
+    wikidata_id: str
+    label: str | None
+    description: str | None
+
+
+async def labels(
+    wikidata_ids: Sequence[str], transport: httpx2.AsyncBaseTransport | None = None
+) -> dict[str, Label]:
+    """The English label and description of each item that exists, by ID:
+    what an ingredient is linked to, shown to check it's the right thing."""
+    qs = sorted({i for i in wikidata_ids if _Q.match(i)})
+    if not qs:
+        return {}
+    values = " ".join(f"wd:{i}" for i in qs)
+    query = f"""SELECT ?item ?label ?description WHERE {{
+  VALUES ?item {{ {values} }} ?item schema:version [] .
+  OPTIONAL {{ ?item rdfs:label ?label FILTER(LANG(?label) = "en") }}
+  OPTIONAL {{ ?item schema:description ?description FILTER(LANG(?description) = "en") }}
+}}"""
+    async with httpx2.AsyncClient(
+        transport=transport, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
+    ) as client:
+        rows = await _ask(client, query)
+    found: dict[str, Label] = {}
+    for row in rows:
+        item = (_value(row, "item") or "").rsplit("/", 1)[-1]
+        if _Q.match(item):
+            found.setdefault(item, Label(item, _value(row, "label"), _value(row, "description")))
+    return found

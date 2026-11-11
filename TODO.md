@@ -136,7 +136,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       2026-11-10: 12 months*), `OPENLARDER_DUMPS_KEEP_DAYS` to change it.
       - [ ] Ray: an R2 bucket with public reading, and its API token.
 - [ ] **Ingredient data**: link canonical ingredients to FoodData Central
-      and Wikidata (aliases, hierarchy; allergens are Phase 2).
+      and Wikidata (aliases, hierarchy, then allergens). *Ray, 2026-11-11:
+      "forget phases", this first, then ingredient affiliate links.* In
+      three PRs:
+      - [x] **The links (#133):** FDC's generic foods (Foundation, SR
+        Legacy, the survey foods; 13,694, no branded products) kept in
+        `fdc_foods`, loaded from its bulk download by an administrator
+        (Admin › FoodData Central, or `python -m openlarder.fdc load`; the
+        files are `OPENLARDER_FDC_DATASETS`). An ingredient links to one
+        food and one Wikidata item, set by a moderator on its page with a
+        food search; shown to everyone under "The same food elsewhere",
+        with other ingredients linked to the same record as likely merges.
+        A merge keeps the links. Both IDs are in the dumps (CC0).
+      - [ ] **Matching:** propose links for the most used ingredients
+        first, for a person to confirm; FDC and Wikidata tied by SR
+        Legacy's NDB number (Wikidata's P1978). Measured on the household
+        index locally first.
+      - [ ] **Using them:** Wikidata's other names as suggested aliases,
+        and its "subclass of" as suggested parents, through the
+        Suggestions queue.
+- [ ] **Ingredient affiliate links** (*Ray, 2026-11-11*, after ingredient
+      data): a grocery partner's link on each ingredient. Which partner,
+      and its terms, is still open (Open decisions).
 - [ ] **Roles** *(Ray, 2026-11-10)*: done (#101). User, contributor,
       moderator, administrator, owner (roles.py), in place of the admin
       and enterer flags. Moderators edit the catalog, work flags and

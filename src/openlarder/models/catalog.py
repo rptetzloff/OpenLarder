@@ -488,6 +488,7 @@ class Ingredient(Timestamps, Base):
         CheckConstraint("name <> ''", name="name_not_empty"),
         CheckConstraint("parent_id <> id", name="not_own_parent"),
         CheckConstraint("match_key <> ''", name="match_key_not_empty"),
+        CheckConstraint("wikidata_id ~ '^Q[1-9][0-9]*$'", name="wikidata_id_format"),
         Index("uq_ingredients_name", text("lower(name)"), unique=True),
         Index("ix_ingredients_parent_id", "parent_id"),
         _trgm("ingredients", "name"),
@@ -503,6 +504,15 @@ class Ingredient(Timestamps, Base):
     # Broader ingredient, for search: aged cheddar -> cheddar -> cheese.
     # RESTRICT: a parent is merged away, not deleted out from under children.
     parent_id: Mapped[uuid.UUID | None] = _fk("ingredients.id", ondelete="RESTRICT", nullable=True)
+    # The same food in USDA FoodData Central and in Wikidata, both CC0
+    # (fdc.py, migration 0055). Not unique: two ingredients linked to one
+    # record are likely one ingredient, which is for a person to merge.
+    fdc_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("fdc_foods.fdc_id", ondelete="SET NULL"), index=True
+    )
+    wikidata_id: Mapped[str | None] = mapped_column(Text, index=True)
+    # Its English label, as of linking: shown without asking Wikidata.
+    wikidata_label: Mapped[str | None] = mapped_column(Text)
 
 
 class IngredientAlias(Timestamps, Base):

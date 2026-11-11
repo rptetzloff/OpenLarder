@@ -25,7 +25,8 @@ starts again as a new user, the owner too: make yourself owner again by
 hand (roles.py).
 
 Never emptied: the tag list (the seeded diets, courses, cuisines and
-techniques, and any added since, which the app expects), and the schema's
+techniques, and any added since, which the app expects), FoodData
+Central's foods (reference data, not the catalog's), and the schema's
 version.
 
 One transaction: TRUNCATE, which neither fires the history triggers nor
@@ -98,7 +99,7 @@ PEOPLE = (
 )
 # Never emptied. A new table must be named in one of the three lists
 # (tests/test_reset.py), so the reset never misses one.
-KEPT = ("alembic_version", "tags")
+KEPT = ("alembic_version", "tags", "fdc_foods")
 # A catalog reset's history kept: the tag list's.
 HISTORY_KEPT = ("tags",)
 

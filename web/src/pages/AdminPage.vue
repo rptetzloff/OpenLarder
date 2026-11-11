@@ -44,6 +44,35 @@ watch(
   },
   { immediate: true },
 );
+// FoodData Central's generic foods, to link ingredients to (fdc.py).
+const foods = ref<{ foods: number; loaded_at: string | null } | null>(null);
+const loadingFoods = ref(false);
+const foodsError = ref("");
+async function foodStatus() {
+  const res = await fetch("/api/fdc");
+  if (res.ok) foods.value = await res.json();
+}
+async function loadFoods() {
+  loadingFoods.value = true;
+  foodsError.value = "";
+  try {
+    const res = await fetch("/api/fdc/load", { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+    foods.value = body;
+  } catch (e) {
+    foodsError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    loadingFoods.value = false;
+  }
+}
+watch(
+  () => props.user?.may_run,
+  (yes) => {
+    if (yes) foodStatus();
+  },
+  { immediate: true },
+);
 // A data dump now, rather than waiting for the week's (dumps.py).
 const dumping = ref(false);
 const dumped = ref("");
@@ -273,6 +302,25 @@ async function archiveAll() {
               </li>
             </ul>
           </template>
+        </section>
+        <section v-if="user.may_run" class="tool-panel" aria-labelledby="fdc-title">
+          <h3 id="fdc-title">FoodData Central</h3>
+          <p class="muted">
+            USDA's generic foods (public domain), for linking ingredients to on their pages: Foundation
+            Foods, SR Legacy and the survey foods, without branded products. Load again when USDA
+            publishes a new release.
+          </p>
+          <p v-if="foods" class="status">
+            <template v-if="foods.foods"
+              >{{ foods.foods.toLocaleString() }} foods, loaded
+              {{ new Date(foods.loaded_at!).toLocaleDateString() }}.</template
+            >
+            <template v-else>None loaded yet.</template>
+          </p>
+          <button type="button" class="primary" :disabled="loadingFoods" @click="loadFoods">
+            {{ loadingFoods ? "Loading…" : foods?.foods ? "Load again" : "Load FoodData Central" }}
+          </button>
+          <p v-if="foodsError" class="error" role="alert">{{ foodsError }}</p>
         </section>
         <section v-if="user.may_run" class="tool-panel" aria-labelledby="dump-title">
           <h3 id="dump-title">Data dump</h3>
