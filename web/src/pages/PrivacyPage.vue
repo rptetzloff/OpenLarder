@@ -105,6 +105,11 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>when you accepted the contributor agreement, and which version of it, if you have;</li>
       <li>
+        the problems you report: what about, why, your note, and your account, or, signed out,
+        the same name made from your IP address as for requests, never the address itself. Only
+        moderators see them;
+      </li>
+      <li>
         your larder, if you keep one: your lists' names, and each thing's name, the ingredient
         it's matched to, and whether you have it, are low or are out of it. Only you see it, and
         the members of the groups you share a list with (their editors change what's on it); it

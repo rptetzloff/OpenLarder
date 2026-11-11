@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
+import ReportButton from "../components/ReportButton.vue";
 import SwapForm from "../components/SwapForm.vue";
 import SwapList from "../components/SwapList.vue";
 import {
@@ -383,6 +384,7 @@ onMounted(() => load());
           </button>
         </p>
       </section>
+      <ReportButton kind="ingredient" :id="id" />
       <HistoryPanel kind="ingredients" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>

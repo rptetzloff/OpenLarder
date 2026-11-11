@@ -185,11 +185,12 @@ AS_THE_SITE = {"Sec-Fetch-Site": "same-origin"}
 @pytest.fixture(autouse=True)
 def _fresh_rate_limits():
     from openlarder import crawlers, ratelimit, usage
-    from openlarder.routers import book_requests
+    from openlarder.routers import book_requests, reports
 
     ratelimit.reset()
     usage.reset()
     book_requests.reset()
+    reports.reset()
     crawlers.reset()
     # Known and empty, so nothing fetches the engines' lists; tests that
     # need them set them.
