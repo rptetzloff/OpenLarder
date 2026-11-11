@@ -2,6 +2,7 @@
 import { arrange } from "../shops";
 import GrocerChooser from "../components/GrocerChooser.vue";
 import { grocerHref, grocerNow } from "../grocery";
+import { loadAllergens, notice as allergenNotice } from "../allergens";
 import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
@@ -32,6 +33,7 @@ const error = ref("");
 const flags = ref<Flag[]>([]);
 const openFlags = computed(() => flags.value.filter((f) => !f.resolution));
 
+onMounted(loadAllergens);
 onMounted(async () => {
   try {
     const res = await fetch(`/api/recipes/${props.id}`);
@@ -332,6 +334,32 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               </li>
             </ul>
             <p v-else class="status">No ingredients recorded yet.</p>
+          </section>
+
+          <section
+            v-if="recipe.allergens.length"
+            class="recipe-section"
+            aria-labelledby="recipe-allergens"
+          >
+            <h2 id="recipe-allergens">Allergens recorded</h2>
+            <ul class="ingredient-lines recipe-allergens">
+              <li v-for="a in recipe.allergens" :key="a.key">
+                <strong
+                  >{{ a.status === "contains" ? "Contains" : "May contain" }}
+                  {{ a.label.toLowerCase() }}:</strong
+                >{{ " " }}<template v-for="(x, i) in a.ingredients" :key="x.id"
+                  ><template v-if="i > 0">, </template
+                  ><a :href="`/ingredients/${x.id}`">{{ x.name }}</a
+                  ><template v-if="a.status === 'contains' && x.status === 'may_contain'">
+                    (may)</template
+                  ></template
+                >
+              </li>
+            </ul>
+            <p class="allergen-notice">
+              Only what the catalog records about these ingredients: one with nothing recorded may
+              still contain any allergen. {{ allergenNotice }}
+            </p>
           </section>
 
           <section v-if="recipe.used_in.length" class="recipe-section">

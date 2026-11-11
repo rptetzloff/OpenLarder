@@ -33,6 +33,7 @@ ORDER = [
     "sources",
     "author_links",
     "ingredient_aliases",
+    "ingredient_allergens",
     "editions",
     "issues",
     "episodes",

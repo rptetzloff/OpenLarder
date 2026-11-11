@@ -1,4 +1,5 @@
 from openlarder.models.accounts import ApiKey, User, UserSession
+from openlarder.models.allergens import Allergen, IngredientAllergen
 from openlarder.models.base import Base
 from openlarder.models.catalog import (
     Author,
@@ -40,6 +41,7 @@ from openlarder.models.suggestions import IngredientEmbedding, Suggestion
 from openlarder.models.usage import ApiUsage
 
 __all__ = [
+    "Allergen",
     "ApiUsage",
     "ApiKey",
     "Author",
@@ -62,6 +64,7 @@ __all__ = [
     "IngredientEmbedding",
     "Ingredient",
     "IngredientAlias",
+    "IngredientAllergen",
     "IngredientOption",
     "LarderItem",
     "LinkSuggestion",

@@ -35,6 +35,7 @@ from openlarder.models import (
     Substitution,
     WebPage,
 )
+from openlarder.routers.allergens import IngredientAllergenOut, for_ingredient
 from openlarder.routers.substitutions import SwapOut, swap_out
 from openlarder.wikidata import WikidataTransport
 
@@ -131,6 +132,9 @@ class IngredientOut(BaseModel):
     # Other ingredients linked to the same record: likely the same
     # ingredient, to merge.
     same_records: list[Related] = []
+    # What it records about allergens, or inherits from a broader one
+    # (allergens.py); shown with allergens.NOTICE.
+    allergens: list[IngredientAllergenOut] = []
 
 
 def contains_pattern(q: str) -> str:
@@ -426,6 +430,7 @@ async def get_ingredient(
             else None
         ),
         same_records=same,
+        allergens=await for_ingredient(session, ingredient.id, viewer),
         aliases=[AliasOut(id=a, name=n) for a, n in aliases],
         parent=Related(id=parent.id, name=parent.name) if parent else None,
         children=children,

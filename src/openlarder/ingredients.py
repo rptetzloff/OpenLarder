@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from openlarder import lines
+from openlarder import allergens, lines
 from openlarder.models import (
     Ingredient,
     IngredientAlias,
@@ -232,6 +232,7 @@ async def merge(session: AsyncSession, source: Ingredient, target: Ingredient) -
         update(LarderItem).where(LarderItem.ingredient_id == s).values(ingredient_id=t)
     )
     await _merge_substitutions(session, s, t)
+    await allergens.merge(session, s, t)
     await session.execute(
         update(Ingredient).where(Ingredient.parent_id == s, Ingredient.id != t).values(parent_id=t)
     )

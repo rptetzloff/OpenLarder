@@ -44,6 +44,7 @@ from openlarder.models import (
     User,
     WebPage,
 )
+from openlarder.routers.allergens import RecipeAllergenOut, for_recipe
 from openlarder.routers.substitutions import SwapOut, swap_out
 from openlarder.tagging import RecipeTagOut, recipe_tags
 
@@ -309,6 +310,9 @@ class RecipeOut(BaseModel):
     used_in: list[UsedIn]
     # What can stand in for its ingredients, the recipes it cites, or itself.
     swaps: list[SwapOut]
+    # What its ingredients record as containing or maybe containing
+    # (allergens.py), never what they don't; shown with allergens.NOTICE.
+    allergens: list[RecipeAllergenOut] = []
     # Whether the viewer may change or remove it.
     editable: bool
     # Who added it (their display name, public as on everything they add),
@@ -564,6 +568,15 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             for line_id, text in lines
         ],
         used_in=[UsedIn(id=i, title=t, page=used_pages.get(i)) for i, t in used_in],
+        allergens=await for_recipe(
+            session,
+            # In the order the lines are, each line's options in theirs.
+            {
+                m.id: m.name
+                for line_id, _ in lines
+                for _, m in sorted(matched.get(line_id, {}).items())
+            },
+        ),
         added_by=adder.display_name if adder else None,
         added_on=recipe.created_at.date() if recipe.created_at else None,
         swaps=[

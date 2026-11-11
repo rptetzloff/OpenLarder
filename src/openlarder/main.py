@@ -27,6 +27,7 @@ from openlarder.db import dispose_engine, session_factory
 from openlarder.ratelimit import rate_limit
 from openlarder.routers import (
     account,
+    allergens,
     auth,
     authors,
     book_requests,
@@ -181,6 +182,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(account.router)
+app.include_router(allergens.router)
 app.include_router(sources.router)
 app.include_router(authors.router)
 app.include_router(book_requests.router)
