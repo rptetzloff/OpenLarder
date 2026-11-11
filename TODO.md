@@ -162,7 +162,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         everyone but them and moderators (site, API, n8n's views, history),
         until a moderator approves it at `/admin/review`, one at a time or
         "approve all". Sent back with a reason, it waits again once changed.
-        Approving a book closes its requests. Contributors change only their
+        Approving a book links its requests, which stay open until marked
+        done (#124). Contributors change only their
         own waiting items, tags included.
       - [ ] A lawyer's read of the agreement's wording, with the terms.
       - [x] Proposed changes to published recipes (#110): a contributor's

@@ -208,14 +208,18 @@ async def test_approve_all_leaves_whats_sent_back(people, adb) -> None:
     )
 
 
-async def test_approving_a_book_closes_its_request(people, client, openlib, adb) -> None:
+async def test_approving_a_book_links_its_request_and_leaves_it_open(
+    people, client, openlib, adb
+) -> None:
+    """Ray, 2026-11-10: a request is open "until marked finished"."""
     await client.post("/api/requests", json={"isbn": "9780393541113"})
     con, mo = await people("con", role="contributor"), await people("mo", role="moderator")
     book = (await con.post("/api/sources", json={"isbn": "9780393541113"})).json()["id"]
-    assert (await client.get("/api/requests")).json()["counts"] == {"open": 1}
+    [waiting] = (await client.get("/api/requests")).json()["requests"]
+    assert waiting["source_id"] is None
     await mo.post(f"/api/review/sources/{book}", json={"action": "approve"})
-    [done] = (await client.get("/api/requests?state=done")).json()["requests"]
-    assert done["source_id"] == book
+    [linked] = (await client.get("/api/requests")).json()["requests"]
+    assert (linked["status"], linked["source_id"]) == ("open", book)
 
 
 # Nothing waiting leaks
