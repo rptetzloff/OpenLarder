@@ -1,6 +1,7 @@
 import type { Review } from "./review";
 // What /api/recipes returns, and saving one.
 
+import type { RecipeAllergen } from "./allergens";
 import type { BuyLink } from "./buying";
 import type { Swap } from "./substitutions";
 import type { RecipeTag } from "./tags";
@@ -74,6 +75,8 @@ export interface Recipe {
   used_in: { id: string; title: string; page: string | null }[];
   // What can stand in for its ingredients, the recipes it cites, or itself.
   swaps: Swap[];
+  // What its ingredients contain or may contain; never what they don't.
+  allergens: RecipeAllergen[];
   // Whether you may change or remove it.
   editable: boolean;
   // published, or (for its maker and moderators) pending or returned.

@@ -1222,6 +1222,13 @@ button.secondary[aria-current="page"] {
   gap: 1rem;
 }
 .used-in /* An ingredient line's grocery links (grocery.ts): quiet beside the line. */
+/* Beside allergen information, wherever it is (allergens.ts). */
+.allergen-notice {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0.75rem;
+  max-width: 48rem;
+}
 .shop-links {
   color: var(--muted);
   font-size: 0.875rem;

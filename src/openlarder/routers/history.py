@@ -44,10 +44,21 @@ WHAT = {
     "author_links": "author link",
     "ingredients": "ingredient",
     "ingredient_aliases": "ingredient name",
+    "ingredient_allergens": "allergen",
     "tags": "tag",
 }
 # The column that names a row, first found wins.
-NAMED_BY = ("title", "name", "original_text", "label", "url", "isbn13", "credited_as", "page")
+NAMED_BY = (
+    "title",
+    "name",
+    "original_text",
+    "label",
+    "url",
+    "isbn13",
+    "credited_as",
+    "page",
+    "allergen",
+)
 # Not worth showing: keys, and what the database keeps for itself.
 HIDDEN_FIELDS = {"id", "source_id", "recipe_id", "recipe_ingredient_id", "owner_id", "created_by"}
 # Names for ids, looked up as the reader may see them.
@@ -316,7 +327,7 @@ async def ingredient_history(
             or_(
                 and_(Revision.table_name == "ingredients", Revision.record_id == ingredient_id),
                 and_(
-                    Revision.table_name == "ingredient_aliases",
+                    Revision.table_name.in_(("ingredient_aliases", "ingredient_allergens")),
                     Revision.parent_id == ingredient_id,
                 ),
             )
@@ -357,11 +368,20 @@ async def recent_changes(
         ~_hidden(moderator),
         or_(
             Revision.table_name.not_in(
-                ("ingredients", "ingredient_aliases", "authors", "author_links", "substitutions")
+                (
+                    "ingredients",
+                    "ingredient_aliases",
+                    "ingredient_allergens",
+                    "authors",
+                    "author_links",
+                    "substitutions",
+                )
             ),
             and_(Revision.table_name == "ingredients", Revision.record_id.in_(seen_ingredients)),
             and_(
-                Revision.table_name.in_(("ingredient_aliases", "substitutions")),
+                Revision.table_name.in_(
+                    ("ingredient_aliases", "ingredient_allergens", "substitutions")
+                ),
                 Revision.parent_id.in_(seen_ingredients),
             ),
             and_(Revision.table_name == "authors", Revision.record_id.in_(seen_authors)),

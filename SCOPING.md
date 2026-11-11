@@ -142,6 +142,8 @@ Ingredients carry allergen data (contains dairy, gluten, egg). This lets the sit
 - Allergen data describes an ingredient in general, not any product. Oats may or may not be processed alongside wheat, and one brand's stock may contain milk when another's doesn't. The notice says so.
 - The wording of the notice is written with the feature and reviewed by a lawyer along with the content rules.
 
+*Built (migration 0059, #137):* the allergens are the US's nine major allergens and the EU's fourteen together (milk, egg, fish, crustacean shellfish, molluscs, tree nuts, peanuts, wheat, gluten, soy, sesame, celery, mustard, lupin, sulphites). An ingredient records, for any of them, contains, may contain, or doesn't contain; narrower ingredients inherit from the nearest broader one that records it, and "doesn't contain" is how a narrower one says otherwise (Vegan Butter under Butter). Moderators record them on the ingredient's page. A recipe lists only what its ingredients contain or may contain, and says that an ingredient with nothing recorded may still contain any allergen. The notice is `allergens.NOTICE`, served by `/api/allergens` and in the dumps' description. *List and inheritance chosen by Claude under the 2026-11-06 decision; tell Claude to change either.*
+
 ## Author pages
 
 Every author gets a page: a bio, links, their books, the people they've written with, and their top-ranked recipes. Once verified, an author can curate their own page. *Decided by Ray, 2026-11-06.*
@@ -465,7 +467,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Personal shelf: mark books you own, filter search to your shelf
 - Personal larder: a person's own inventory lists (pantry, spice drawer, fridge, freezer, named as they like), each item their own name matched to a canonical ingredient, feeding "what can I make with what I have". Private by default, shareable with friends and family, public by choice. *Ray, 2026-11-08; open questions in TODO.md. Placed in Phase 2 by Claude, beside the shelf; move it up if it should come sooner.*
 - Amazon Associates links, once traffic supports it
-- Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.*
+- Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.* *Allergen data built (#137, Ray, 2026-11-11: "forget phases"); suggesting them, and swaps for a diet, are next in TODO.md.*
 
 **Phase 3**
 

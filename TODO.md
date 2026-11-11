@@ -164,6 +164,23 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         and a "subclass of" another linked ingredient's item a parent,
         both in the Suggestions queue. Lower-case names only, none naming
         the plant: Wikidata's aliases include "Allium cepa L." and "Mel".
+      - [x] **Allergens (#137):** the US's nine major allergens and the
+        EU's fourteen together (15; migration 0059). A moderator records,
+        on an ingredient's page, that it contains, may contain or doesn't
+        contain each; narrower ingredients inherit from the nearest broader
+        one recording it, and "doesn't" overrides (Vegan Butter under
+        Butter). A recipe's page lists what its ingredients contain or may
+        contain, never what they don't, with the crowdsourced notice
+        (SCOPING.md, Allergen data) on both pages. In the edit history,
+        revert and the dumps; a merge keeps them, the kept ingredient's
+        first.
+      - [ ] Suggesting allergens: a first pass per ingredient for a
+        moderator to accept, from FDC's categories, Wikidata, and n8n
+        (SCOPING.md, Allergen seeding).
+      - [ ] Swaps suggested for a diet: link each diet to the allergens it
+        avoids (Dairy-Free: milk), and offer, on a recipe, the swaps
+        recorded for what it contains.
+      - [ ] The notice's wording is in the lawyer review below.
 - [x] **Ingredient affiliate links** (#136; *Ray, 2026-11-11*): a "Shop"
       link on each recipe line's ingredients and on each ingredient's page,
       to a search at a grocer: Instacart first, and each person may choose

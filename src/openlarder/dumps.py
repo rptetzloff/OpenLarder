@@ -75,6 +75,8 @@ COLUMNS = {
     ],
     "ingredients": ["id", "name", "shopping_term", "parent_id", "fdc_id", "wikidata_id"],
     "ingredient_aliases": ["id", "ingredient_id", "name", "region"],
+    "allergens": ["key", "label"],
+    "ingredient_allergens": ["id", "ingredient_id", "allergen", "status"],
     "tags": ["id", "kind", "name"],
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
@@ -93,6 +95,7 @@ ORDER = {
     "ingredient_options": ["recipe_ingredient_id", "rank"],
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
+    "allergens": ["position"],
 }
 
 ABOUT = {
@@ -113,6 +116,13 @@ ABOUT = {
         " USDA FoodData Central ID and Wikidata item, where linked."
     ),
     "ingredient_aliases": "Other names for ingredients.",
+    "allergens": "The allergens ingredients record.",
+    "ingredient_allergens": (
+        "What each ingredient records about an allergen: contains, may_contain, or free"
+        " (doesn't, overriding a broader ingredient's). Narrower ingredients inherit from"
+        " the nearest broader one. Crowdsourced and unverified: about ingredients in general,"
+        " not any product, and no guarantee a recipe is safe for anyone."
+    ),
     "tags": "Course, cuisine, diet and technique tags.",
     "source_tags": "Tags on whole sources, which their recipes have too.",
     "recipe_tags": "Tags on recipes.",
@@ -150,6 +160,8 @@ def _seen() -> dict:
         "ingredient_options": by("ingredient_options", "recipe_id", recipes),
         "ingredients": by("ingredients", "id", ingredients),
         "ingredient_aliases": by("ingredient_aliases", "ingredient_id", ingredients),
+        "allergens": text("true"),
+        "ingredient_allergens": by("ingredient_allergens", "ingredient_id", ingredients),
         "tags": text("true"),
         "source_tags": by("source_tags", "source_id", sources),
         "recipe_tags": by("recipe_tags", "recipe_id", recipes),
@@ -227,7 +239,8 @@ def readme(day: str, rows: dict[str, list[dict]], kind: str) -> str:
         lines.append(
             "JSON Lines, one record a line: sources.jsonl (with their credits and"
             " editions), recipes.jsonl (with their places, ingredient lines and tags),"
-            " ingredients.jsonl (with other names), authors.jsonl, tags.jsonl."
+            " ingredients.jsonl (with other names and allergens), authors.jsonl, tags.jsonl,"
+            " substitutions.jsonl, allergens.jsonl."
         )
     lines.append("")
     for name in COLUMNS:
@@ -274,6 +287,7 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
     options = _group(rows["ingredient_options"], "recipe_ingredient_id")
     tags_of_recipe = _group(rows["recipe_tags"], "recipe_id")
     aliases = _group(rows["ingredient_aliases"], "ingredient_id")
+    recorded = _group(rows["ingredient_allergens"], "ingredient_id")
     links = _group(rows["author_links"], "author_id")
     sources = [
         {
@@ -304,7 +318,10 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
         }
         for r in rows["recipes"]
     ]
-    ingredients = [{**i, "aliases": aliases.get(i["id"], [])} for i in rows["ingredients"]]
+    ingredients = [
+        {**i, "aliases": aliases.get(i["id"], []), "allergens": recorded.get(i["id"], [])}
+        for i in rows["ingredients"]
+    ]
     authors = [{**a, "links": links.get(a["id"], [])} for a in rows["authors"]]
     return _zip(
         {
@@ -314,6 +331,7 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
             "ingredients.jsonl": _jsonl(ingredients),
             "authors.jsonl": _jsonl(authors),
             "tags.jsonl": _jsonl(rows["tags"]),
+            "allergens.jsonl": _jsonl(rows["allergens"]),
             "substitutions.jsonl": _jsonl(rows["substitutions"]),
         }
     )

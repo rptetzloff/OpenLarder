@@ -70,6 +70,7 @@ CATALOG = (
     "recipe_flags",
     "ingredients",
     "ingredient_aliases",
+    "ingredient_allergens",
     "ingredient_embeddings",
     "substitutions",
     "larder_items",
@@ -101,7 +102,7 @@ PEOPLE = (
 )
 # Never emptied. A new table must be named in one of the three lists
 # (tests/test_reset.py), so the reset never misses one.
-KEPT = ("alembic_version", "tags", "fdc_foods")
+KEPT = ("alembic_version", "tags", "fdc_foods", "allergens")
 # A catalog reset's history kept: the tag list's.
 HISTORY_KEPT = ("tags",)
 

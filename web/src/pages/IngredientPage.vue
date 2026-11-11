@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import IngredientAllergens from "../components/IngredientAllergens.vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import IngredientRecords from "../components/IngredientRecords.vue";
 import { grocerHref, grocerNow, loadGrocers } from "../grocery";
@@ -240,6 +241,8 @@ onMounted(() => {
           <p v-else class="status">No other names yet.</p>
         </div>
       </div>
+
+      <IngredientAllergens :ingredient="ingredient" :can-edit="!!user?.may_edit" @changed="load()" />
 
       <section class="source-section">
         <div class="table-head">

@@ -1,5 +1,6 @@
 // Canonical ingredients: what /api/ingredients returns.
 
+import type { IngredientAllergen } from "./allergens";
 import { issueName } from "./books";
 import type { Swap } from "./substitutions";
 
@@ -39,6 +40,8 @@ export interface Ingredient {
   fdc: Food | null;
   wikidata: { id: string; label: string | null; url: string } | null;
   same_records: { id: string; name: string }[];
+  // What it records about allergens, or inherits (allergens.ts).
+  allergens: IngredientAllergen[];
 }
 
 // A generic food in USDA FoodData Central (fdc.py).
