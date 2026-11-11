@@ -12,6 +12,11 @@ A claim doesn't stop anyone entering the book sooner, and lapses after
 CLAIM_LAPSES with nothing done: it reads as open again, and anyone may
 claim it. A contributor releases a claim, or marks it done; a moderator
 declines a request, saying why.
+
+The database follows a request's book in (migration 0050): it's linked to
+the source once that has its ISBN (or, with none, its title), and closed
+once the source has a published recipe, unless it's claimed: then each
+recipe keeps the claim alive, and its claimer marks it done.
 """
 
 import uuid
@@ -232,16 +237,19 @@ async def ask(
         )
 
     # Already in the catalog?
-    source_id = None
+    # By ISBN, or with none by title, as the database matches them later
+    # (migration 0050).
+    public = (Source.private.is_(False), Source.review == "published")
     if isbn13:
         source_id = await session.scalar(
             select(Edition.source_id)
             .join(Source, Source.id == Edition.source_id)
-            .where(
-                Edition.isbn13 == isbn13,
-                Source.private.is_(False),
-                Source.review == "published",
-            )
+            .where(Edition.isbn13 == isbn13, *public)
+            .limit(1)
+        )
+    else:
+        source_id = await session.scalar(
+            select(Source.id).where(func.lower(Source.title) == title.lower(), *public).limit(1)
         )
     if source_id and await session.scalar(
         select(exists().where(Recipe.source_id == source_id, Recipe.review == "published"))

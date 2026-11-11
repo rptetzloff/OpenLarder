@@ -243,10 +243,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       a claim with nothing done for 30 days reads as open again (Ray:
       "lapse after 30 days idle"). Tabs by state with counts, most wanted
       or newest, and "Yours".
-      - [ ] Step 2: close a request when its book is entered by anyone
-        (adding an edition with its ISBN), link a claim to the book as
-        it's entered, and count work on it (a recipe added) as activity
-        that keeps the claim alive.
+      - [x] Step 2 (#123): a request follows its book in, however it's
+        entered (forms, import, a moderator approving it), by database
+        triggers (migration 0050). Linked to a public, published source
+        once that has its ISBN, or for a request with no ISBN the same
+        title; shown as "it's here, being indexed". With a published
+        recipe it closes as done, unless it's claimed: then each recipe
+        keeps the claim alive, and the claimer marks it done (or it
+        closes with the next recipe after 30 quiet days). A private
+        collection never links.
       - [ ] The anonymous daily count is in memory, per process; move it
         to the database if there's ever more than one app process.
 
