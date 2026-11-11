@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { arrange } from "../shops";
 import GrocerChooser from "../components/GrocerChooser.vue";
+import DietCheck from "../components/DietCheck.vue";
 import { grocerHref, grocerNow } from "../grocery";
 import { loadAllergens, notice as allergenNotice } from "../allergens";
 import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
@@ -361,6 +362,8 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               still contain any allergen. {{ allergenNotice }}
             </p>
           </section>
+
+          <DietCheck v-if="recipe.lines.some((l) => l.options.some((o) => o.ingredient))" :recipe-id="recipe.id" :notice-above="recipe.allergens.length > 0" />
 
           <section v-if="recipe.used_in.length" class="recipe-section">
             <h2>Used in</h2>

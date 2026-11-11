@@ -432,6 +432,9 @@ def _fill(path: str, names: list[str], secret: dict) -> str:
         # group's name. The sweep asks without one.
         "code": "not-a-real-invite",
         "run_id": uuid.uuid4(),
+        # The recipe is checked before the diet, so a private one is hidden
+        # whichever diet is asked for.
+        "diet_id": uuid.uuid4(),
     }
     for name in names:
         assert name in values, f"{path}: tell the privacy sweep what {name} to ask for"

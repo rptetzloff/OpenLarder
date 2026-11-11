@@ -9,13 +9,27 @@ export interface Thing {
 export interface Diet {
   id: string;
   name: string;
+  // The allergens it avoids (diets.py); absent where a swap names it.
+  avoids: string[];
+}
+
+// A recipe checked for a diet: its ingredients that record an allergen the
+// diet avoids, with the swaps recorded for them.
+export interface DietCheck {
+  diet: Diet;
+  lines: {
+    ingredient: Thing;
+    found: { key: string; label: string; status: "contains" | "may_contain" }[];
+    swaps: Swap[];
+  }[];
+  notice: string;
 }
 
 export interface Swap {
   id: string;
   instead_of: Thing;
   use: Thing;
-  diet: Diet | null;
+  diet: Pick<Diet, "id" | "name"> | null;
   // null: contributed rather than printed in a book.
   source: { source_id: string; source_title: string; edition_id: string; page: string | null } | null;
   note: string | null;
@@ -54,6 +68,14 @@ export async function listDiets(): Promise<Diet[]> {
 // The diet by this name: a new one, or the one already called that.
 export async function addDiet(name: string): Promise<Diet> {
   return send("/api/diets", "POST", { name });
+}
+
+export async function setDietAllergens(id: string, allergens: string[]): Promise<Diet> {
+  return send(`/api/diets/${id}/allergens`, "PUT", { allergens });
+}
+
+export async function checkDiet(recipeId: string, dietId: string): Promise<DietCheck> {
+  return send(`/api/recipes/${recipeId}/diets/${dietId}`, "GET");
 }
 
 export async function addSwap(body: SwapIn): Promise<Swap> {

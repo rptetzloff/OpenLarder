@@ -34,6 +34,7 @@ ORDER = [
     "author_links",
     "ingredient_aliases",
     "ingredient_allergens",
+    "diet_allergens",
     "editions",
     "issues",
     "episodes",

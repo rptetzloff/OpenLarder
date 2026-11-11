@@ -77,6 +77,7 @@ COLUMNS = {
     "ingredient_aliases": ["id", "ingredient_id", "name", "region"],
     "allergens": ["key", "label"],
     "ingredient_allergens": ["id", "ingredient_id", "allergen", "status"],
+    "diet_allergens": ["diet_tag_id", "allergen"],
     "tags": ["id", "kind", "name"],
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
@@ -96,6 +97,7 @@ ORDER = {
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
     "allergens": ["position"],
+    "diet_allergens": ["diet_tag_id", "allergen"],
 }
 
 ABOUT = {
@@ -124,6 +126,7 @@ ABOUT = {
         " not any product, and no guarantee a recipe is safe for anyone."
     ),
     "tags": "Course, cuisine, diet and technique tags.",
+    "diet_allergens": "The allergens each diet avoids (Dairy-Free: milk).",
     "source_tags": "Tags on whole sources, which their recipes have too.",
     "recipe_tags": "Tags on recipes.",
     "substitutions": "What can stand in for what, and for which diet.",
@@ -161,6 +164,7 @@ def _seen() -> dict:
         "ingredients": by("ingredients", "id", ingredients),
         "ingredient_aliases": by("ingredient_aliases", "ingredient_id", ingredients),
         "allergens": text("true"),
+        "diet_allergens": text("true"),
         "ingredient_allergens": by("ingredient_allergens", "ingredient_id", ingredients),
         "tags": text("true"),
         "source_tags": by("source_tags", "source_id", sources),
@@ -288,6 +292,7 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
     tags_of_recipe = _group(rows["recipe_tags"], "recipe_id")
     aliases = _group(rows["ingredient_aliases"], "ingredient_id")
     recorded = _group(rows["ingredient_allergens"], "ingredient_id")
+    avoids = _group(rows["diet_allergens"], "diet_tag_id")
     links = _group(rows["author_links"], "author_id")
     sources = [
         {
@@ -330,7 +335,14 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
             "recipes.jsonl": _jsonl(recipes),
             "ingredients.jsonl": _jsonl(ingredients),
             "authors.jsonl": _jsonl(authors),
-            "tags.jsonl": _jsonl(rows["tags"]),
+            "tags.jsonl": _jsonl(
+                [
+                    {**t, "avoids": [a["allergen"] for a in avoids.get(t["id"], [])]}
+                    if t["kind"] == "diet"
+                    else t
+                    for t in rows["tags"]
+                ]
+            ),
             "allergens.jsonl": _jsonl(rows["allergens"]),
             "substitutions.jsonl": _jsonl(rows["substitutions"]),
         }

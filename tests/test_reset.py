@@ -34,6 +34,7 @@ async def test_nothing_kept_points_into_the_catalog_but_a_requests_book(adb) -> 
         text(
             "SELECT conrelid::regclass::text FROM pg_constraint"
             " WHERE contype = 'f' AND conrelid::regclass::text = ANY(:kept)"
+            " AND NOT confrelid::regclass::text = ANY(:kept)"
         ),
         {"kept": list(reset.KEPT)},
     )
