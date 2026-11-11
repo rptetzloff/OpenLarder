@@ -450,6 +450,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       history, flags, reports, proposals and import runs; accounts, groups,
       larder lists, requests (unlinked) and the tag list stay. A test fails
       when a new table isn't named as emptied or kept.
+- [x] **Backups** (*Ray, 2026-11-10*): Coolify's scheduled backups of the
+      OpenLarder Postgres, daily, to a private R2 bucket of their own (never
+      the public dump bucket: they hold accounts and private recipes), with
+      an R2 token for that bucket only. The data dumps are no backup: public
+      catalog only, and nothing restores from them.
+      - [ ] A restore tested from the latest backup, before the reset.
 - [x] **Typo fixing in the importer** (#127): nothing is changed unasked
       (*Ray, 2026-11-10: "flag everything"*). At the end of each import
       run, a rare name close to a much commoner one ("Lemon Jucie", "Lemon Juice") is

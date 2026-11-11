@@ -140,7 +140,8 @@ nothing. Everything in the catalog goes, family collections included, with
 people's larder items, the catalog's edit history, flags, reports, suggested
 changes and import history. Accounts, groups, larder lists, requests
 (unlinked, to link again as their books come back) and the tag list stay.
-There's no undo: take a backup first.
+There's no undo: run a backup first (Coolify's backups of the database, to their private
+R2 bucket; the data dumps are no backup).
 
 ## Tests
 
