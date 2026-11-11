@@ -92,6 +92,7 @@ PEOPLE = (
     "book_requests",
     "request_votes",
     "dumps",
+    "daily_counts",
     "revisions",
 )
 # Never emptied. A new table must be named in one of the three lists

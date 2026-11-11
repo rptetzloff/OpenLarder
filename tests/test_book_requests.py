@@ -318,3 +318,16 @@ async def test_a_book_that_stops_being_public_lets_go(client, adb, openlib) -> N
     assert (await _request(adb, rid))["source_id"] is None
     await adb.execute(text("UPDATE sources SET review = 'published' WHERE id = :w"), {"w": work})
     assert (await _request(adb, rid))["source_id"] == work
+
+
+async def test_the_days_count_is_kept_in_the_database(client, adb) -> None:
+    """So a deploy, or a second app process, doesn't start it again."""
+    for n in range(book_requests.ANONYMOUS_PER_DAY):
+        await client.post("/api/requests", json={"title": f"Book {n}"})
+    row = (await adb.execute(text("SELECT what, caller, n FROM daily_counts"))).one()
+    assert row[0] == "request" and row[1].startswith("ip:") and "127.0.0.1" not in row[1]
+    assert row[2] == book_requests.ANONYMOUS_PER_DAY
+    # Tomorrow: a new allowance, and yesterday's count let go.
+    await adb.execute(text("UPDATE daily_counts SET day = day - 1"))
+    assert (await client.post("/api/requests", json={"title": "Next day"})).status_code == 200
+    assert (await adb.execute(text("SELECT n FROM daily_counts"))).scalars().all() == [1]
