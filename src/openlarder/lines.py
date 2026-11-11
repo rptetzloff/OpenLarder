@@ -6,8 +6,9 @@ that cites a page to the recipe it means in the same book. Nothing here
 touches the database; references.py stores what this works out.
 
 Options are split only on "or". Commas split too, but only in a list that
-ends ", or" ("A, B, or C"): names carry commas of their own ("Lemon, Orange,
-and Grapefruit Marmalade"). Nothing inside brackets is split.
+ends ", or" ("A, B, or C", and each such list in "A or B, or C, D, or E"):
+names carry commas of their own ("Lemon, Orange, and Grapefruit
+Marmalade"). Nothing inside brackets is split.
 
 A reference resolves, in order, to:
 1. the recipe of that name on that page;
@@ -36,6 +37,7 @@ _REF = re.compile(
     r"\s*\((?:pp?|pg)\.?\s*([\dixvlc]+)(?:\s*[-–]\s*[\dixvlc]+)?\s*\)?\s*$", re.IGNORECASE
 )
 _OR = re.compile(r"\s+or\s+", re.IGNORECASE)
+_COMMA = re.compile(r",\s*")
 
 
 @dataclass(frozen=True)
@@ -73,11 +75,16 @@ def _option(text: str) -> Option:
 def options(line: str) -> list[Option]:
     """The line's options in the book's order; one for most lines."""
     parts = _top_level_split(line, _OR)
-    if len(parts) > 1 and parts[0].rstrip().endswith(","):
-        # "A, B, or C": the commas before the "or" separate options too.
-        head = _top_level_split(parts[0].rstrip()[:-1], re.compile(r",\s*"))
-        parts = head + parts[1:]
-    return [_option(p) for p in parts if p.strip()]
+    split: list[str] = []
+    for i, part in enumerate(parts):
+        if i < len(parts) - 1 and part.rstrip().endswith(","):
+            # "A, B, or C": the commas before an "or" separate options too,
+            # before each "or" of a line with several: "Lamb Shank or
+            # Shoulder, or Beef Shank, Shin, Cheek, or Chuck".
+            split += _top_level_split(part.rstrip()[:-1], _COMMA)
+        else:
+            split.append(part)
+    return [_option(p) for p in split if p.strip()]
 
 
 @dataclass(frozen=True)
