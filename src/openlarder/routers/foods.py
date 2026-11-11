@@ -9,13 +9,13 @@ from typing import Annotated, Literal
 import httpx2
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, exists, func, or_, select
 
-from openlarder import fdc, fdc_match, history, visibility, wikidata
+from openlarder import fdc, fdc_match, history, ingredients, visibility, wikidata, wikidata_names
 from openlarder.auth import AdminUser, ModeratorUser, SameOrigin
 from openlarder.config import get_settings
 from openlarder.db import Session
-from openlarder.models import FdcFood, Ingredient, LinkSuggestion
+from openlarder.models import FdcFood, Ingredient, IngredientAlias, LinkSuggestion
 from openlarder.wikidata import WikidataTransport
 
 router = APIRouter(prefix="/api/fdc", tags=["foods"])
@@ -121,6 +121,11 @@ def _escaped(word: str) -> str:
 class Suggested(BaseModel):
     fdc: int
     wikidata: int
+    # From linked items (wikidata_names.py): other names here, and merges
+    # and broader ingredients in the Suggestions queue.
+    names: int = 0
+    merges: int = 0
+    parents: int = 0
 
 
 @router.post("/suggest", response_model=Suggested, dependencies=[SameOrigin])
@@ -133,13 +138,21 @@ async def suggest(admin: AdminUser, session: Session, transport: WikidataTranspo
         )
     try:
         found = await fdc_match.suggest(session, transport)
+        await session.flush()
+        more = await wikidata_names.suggest(session, transport)
     except wikidata.Unavailable:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, "Wikidata didn't answer. Try again in a minute."
         ) from None
     await session.commit()
     log.info("%s suggested %s FDC and %s Wikidata links", admin.id, found.fdc, found.wikidata)
-    return Suggested(fdc=found.fdc, wikidata=found.wikidata)
+    return Suggested(
+        fdc=found.fdc,
+        wikidata=found.wikidata,
+        names=more.names,
+        merges=more.merges,
+        parents=more.parents,
+    )
 
 
 class Named(BaseModel):
@@ -162,10 +175,22 @@ class ItemSuggestion(BaseModel):
     url: str
 
 
+class AliasSuggestion(BaseModel):
+    id: uuid.UUID
+    name: str
+    # Where it's said; None, everywhere.
+    region: str | None
+    # The item it's from.
+    wikidata_id: str
+    label: str | None
+    url: str
+
+
 class LinkRow(BaseModel):
     ingredient: Named
     fdc: FoodSuggestion | None
     wikidata: ItemSuggestion | None
+    alias: AliasSuggestion | None = None
 
 
 class LinkPage(BaseModel):
@@ -189,11 +214,12 @@ def _food_out(f: FdcFood) -> FoodOut:
 async def suggestions(
     moderator: ModeratorUser,
     session: Session,
-    show: Literal["likely", "unsure", "wikidata"] = "likely",
+    show: Literal["likely", "unsure", "wikidata", "names"] = "likely",
     offset: int = Query(0, ge=0),
 ) -> LinkPage:
-    """Open suggestions, an ingredient a row, the most used first: those
-    with a likely food, those with an unsure one, or those with an item."""
+    """Open suggestions, the most used ingredients first: an ingredient a
+    row with a likely food, an unsure one, or an item; or another name a
+    row."""
     rows = list(
         await session.scalars(
             select(LinkSuggestion)
@@ -205,15 +231,23 @@ async def suggestions(
                 or_(
                     and_(LinkSuggestion.source == "fdc", Ingredient.fdc_id.is_(None)),
                     and_(LinkSuggestion.source == "wikidata", Ingredient.wikidata_id.is_(None)),
+                    LinkSuggestion.source == "alias",
                 ),
             )
         )
     )
-    counts = {"likely": 0, "unsure": 0, "wikidata": 0}
+    counts = {"likely": 0, "unsure": 0, "wikidata": 0, "names": 0}
     by_ingredient: dict[uuid.UUID, dict[str, LinkSuggestion]] = {}
+    aliases: list[LinkSuggestion] = []
     for r in rows:
+        if r.source == "alias":
+            counts["names"] += 1
+            aliases.append(r)
+            continue
         counts[r.certainty if r.source == "fdc" else "wikidata"] += 1
         by_ingredient.setdefault(r.ingredient_id, {})[r.source] = r
+    if show == "names":
+        return await _names_page(session, aliases, counts, offset)
 
     def shown(found: dict[str, LinkSuggestion]) -> bool:
         if show == "wikidata":
@@ -263,6 +297,46 @@ async def suggestions(
     return LinkPage(rows=out, counts=counts, total=len(wanted))
 
 
+async def _names_page(session, aliases: list[LinkSuggestion], counts, offset: int) -> LinkPage:
+    """Other names, a row each, the most used ingredients first."""
+    used = await fdc_match.uses(session, {a.ingredient_id for a in aliases})
+    aliases.sort(key=lambda a: (-used.get(a.ingredient_id, 0), a.ingredient_id, a.alias.lower()))
+    page = aliases[offset : offset + PAGE]
+    names = dict(
+        (
+            await session.execute(
+                select(Ingredient.id, Ingredient.name).where(
+                    Ingredient.id.in_({a.ingredient_id for a in page})
+                )
+            )
+        ).all()
+    )
+    return LinkPage(
+        rows=[
+            LinkRow(
+                ingredient=Named(
+                    id=a.ingredient_id,
+                    name=names[a.ingredient_id],
+                    recipes=used.get(a.ingredient_id, 0),
+                ),
+                fdc=None,
+                wikidata=None,
+                alias=AliasSuggestion(
+                    id=a.id,
+                    name=a.alias,
+                    region=a.region,
+                    wikidata_id=a.wikidata_id,
+                    label=a.label,
+                    url=wikidata.item_url(a.wikidata_id),
+                ),
+            )
+            for a in page
+        ],
+        counts=counts,
+        total=len(aliases),
+    )
+
+
 class Decide(BaseModel):
     ids: list[uuid.UUID] = Field(min_length=1, max_length=PAGE * 2)
 
@@ -276,11 +350,17 @@ class Decided(BaseModel):
 
 @router.post("/suggestions/accept", response_model=Decided, dependencies=[SameOrigin])
 async def accept(body: Decide, moderator: ModeratorUser, session: Session) -> Decided:
-    """Link each suggestion's ingredient to its food or item."""
+    """Link each suggestion's ingredient to its food or item, or give it
+    the other name."""
     await history.via(session, "link-suggestion")
     done = 0
     for s in await _open(session, moderator, body.ids):
         ingredient = await session.get(Ingredient, s.ingredient_id)
+        if s.source == "alias":
+            if await _add_alias(session, ingredient, s.alias, s.region):
+                _close(s, moderator, "accepted")
+                done += 1
+            continue
         current = ingredient.fdc_id if s.source == "fdc" else ingredient.wikidata_id
         if current is not None:
             continue
@@ -302,6 +382,30 @@ async def dismiss(body: Decide, moderator: ModeratorUser, session: Session) -> D
         _close(s, moderator, "dismissed")
     await session.commit()
     return Decided(done=len(found), skipped=len(body.ids) - len(found))
+
+
+async def _add_alias(session, ingredient: Ingredient, name: str, region: str | None) -> bool:
+    """The other name, unless an ingredient has it already (unmarked: as its
+    name or another name; for a region: any ingredient's there)."""
+    key = ingredients.match_key(name)
+    if not key:
+        return False
+    if region is None:
+        if (await ingredients.known_ids(session, {key})).get(key) is not None:
+            return False
+    elif await session.scalar(
+        select(
+            exists().where(
+                func.lower(IngredientAlias.name) == name.lower(), IngredientAlias.region == region
+            )
+        )
+    ):
+        return False
+    session.add(
+        IngredientAlias(ingredient_id=ingredient.id, name=name, match_key=key, region=region)
+    )
+    await session.flush()
+    return True
 
 
 async def _open(session, moderator, ids: list[uuid.UUID]) -> list[LinkSuggestion]:

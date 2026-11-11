@@ -38,6 +38,9 @@ class FakeWikidata:
         self.fail_with: int | None = None
         # Items citing a USDA NDB number (P1978): row("Q1", ndb="11282", label="onion").
         self.by_ndb: list[dict] = []
+        # Other names and broader items: row("Q1", alias="scallion"),
+        # row("Q1", uk="spring onion"), row("Q1", parent="http://www.wikidata.org/entity/Q2").
+        self.names: list[dict] = []
 
     def handle(self, request: httpx2.Request) -> httpx2.Response:
         query = parse_qs(request.content.decode())["query"][0]
@@ -47,6 +50,9 @@ class FakeWikidata:
             return httpx2.Response(self.fail_with)
         if "P1978" in query:
             rows = self.by_ndb
+        elif "skos:altLabel" in query:
+            asked = set(re.findall(r"wd:(Q[0-9]+)", query))
+            rows = [r for r in self.names if r["item"]["value"].rsplit("/", 1)[-1] in asked]
         elif "VALUES ?ol" in query:
             asked = set(re.findall(r'"(OL[0-9]+A)"', query))
             rows = [r for r in self.by_ol if r.get("ol", {}).get("value") in asked]
