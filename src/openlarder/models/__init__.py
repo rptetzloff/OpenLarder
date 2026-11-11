@@ -30,6 +30,7 @@ from openlarder.models.history import Revision
 from openlarder.models.imports import ImportRun, ImportRunLine
 from openlarder.models.larder import LarderItem, LarderList, LarderListGroup
 from openlarder.models.limits import DailyCount
+from openlarder.models.merges import BookMerge
 from openlarder.models.proposals import Proposal
 from openlarder.models.reports import Report
 from openlarder.models.requests import BookRequest, RequestVote
@@ -42,6 +43,7 @@ __all__ = [
     "Author",
     "AuthorLink",
     "Base",
+    "BookMerge",
     "BookRequest",
     "DailyCount",
     "Dump",

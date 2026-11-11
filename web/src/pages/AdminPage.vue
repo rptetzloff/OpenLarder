@@ -205,6 +205,12 @@ async function archiveAll() {
             <p>Everything added, changed or removed in the catalog, by whom.</p>
           </a>
         </li>
+        <li v-if="user.may_run">
+          <a href="/admin/merges">
+            <h2>Merged books</h2>
+            <p>Every merge of two books, by whom; one made in error can be unmerged.</p>
+          </a>
+        </li>
         <li>
           <a href="/admin/people">
             <h2>People and roles</h2>

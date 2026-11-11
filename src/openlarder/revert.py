@@ -115,6 +115,14 @@ async def revert(session: AsyncSession, change_id: uuid.UUID) -> int:
     )
     if not revisions:
         raise CantRevert("There's no such change.")
+    via = revisions[0].via or ""
+    if via.startswith("merge:"):
+        raise CantRevert(
+            "A merge of two books is taken apart by unmerging it, which an administrator"
+            " can do from Merged books."
+        )
+    if via.startswith("unmerge:"):
+        raise CantRevert("An unmerge is undone by merging the two books again.")
     if n := await later_changes(session, revisions):
         raise CantRevert(
             f"{n} later {'change touches' if n == 1 else 'changes touch'} the same records."

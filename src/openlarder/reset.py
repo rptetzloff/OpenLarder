@@ -76,6 +76,7 @@ CATALOG = (
     "suggestions",
     "import_runs",
     "import_run_lines",
+    "book_merges",
 )
 # Emptied too with --everything. (revisions: a catalog reset deletes the
 # catalog's history from it, and this all of it.)

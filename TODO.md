@@ -439,9 +439,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       person and role), tags, requests and proposals to the book kept, with
       the subtitle and Open Library work it lacks, and removes the other.
       It warns of recipe titles both have. Recorded as `merge:<book>`.
-      - [ ] Undo can't reverse a merge (a recipe's places move with it, by
-        composite keys a row-by-row undo can't put back); it says so and
-        changes nothing. A dedicated "unmerge" if it's ever needed.
+      - [x] **Unmerge** (#132), for administrators, as a check on
+        moderators (*Ray, 2026-11-11*). Each merge keeps a record of what
+        it moved (requests, proposals and which tags aren't in the edit
+        history); Admin › Merged books lists them, and Unmerge puts the
+        book back under its own id with what's still with the other,
+        reopening the proposals the merge declined. Anything added to the
+        kept book since stays there. Refused while a recipe page joins the
+        two books. Undo on a merge's change points here. Merges before
+        migration 0054 have no record.
 - [x] **Long-lived caching for the build's hashed files** (#130): a file
       under `/assets` with a build hash in its name is kept a year,
       immutable; its 404 is still never kept (#42), and index.html is still

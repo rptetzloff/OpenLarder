@@ -1272,7 +1272,7 @@ async def merge_book(
     gone, kept = await _two_books(session, admin, source_id, body.into)
     await history.via(session, f"merge:{gone.id}")
     try:
-        await book_merge.merge(session, gone, kept)
+        await book_merge.merge(session, gone, kept, admin)
     except book_merge.CantMerge as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     await session.commit()

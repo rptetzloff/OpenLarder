@@ -14,6 +14,7 @@ import AdminReportsPage from "./pages/AdminReportsPage.vue";
 import AdminReviewPage from "./pages/AdminReviewPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
+import AdminMergesPage from "./pages/AdminMergesPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import AuthorPage from "./pages/AuthorPage.vue";
 import AuthorsPage from "./pages/AuthorsPage.vue";
@@ -68,6 +69,7 @@ const onApiUsage = path === "/admin/api";
 const onClicks = path === "/admin/clicks";
 const onPeople = path === "/admin/people";
 const onChanges = path === "/admin/changes";
+const onMerges = path === "/admin/merges";
 const onReview = path === "/admin/review";
 const onReports = path === "/admin/reports";
 const onRequests = path === "/requests";
@@ -199,6 +201,7 @@ onMounted(async () => {
     <AdminClicksPage v-else-if="onClicks" :user="user" />
     <AdminPeoplePage v-else-if="onPeople" :user="user" />
     <AdminChangesPage v-else-if="onChanges" :user="user" />
+    <AdminMergesPage v-else-if="onMerges" :user="user" />
     <AdminReviewPage v-else-if="onReview" :user="user" />
     <AdminReportsPage v-else-if="onReports" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
