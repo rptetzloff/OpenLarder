@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import IngredientRecords from "../components/IngredientRecords.vue";
+import { grocerHref, grocerNow, loadGrocers } from "../grocery";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
 import SwapForm from "../components/SwapForm.vue";
@@ -145,7 +146,10 @@ async function removeAlias(alias: Ingredient["aliases"][number]) {
   }
 }
 
-onMounted(() => load());
+onMounted(() => {
+  load();
+  loadGrocers();
+});
 </script>
 
 <template>
@@ -184,9 +188,18 @@ onMounted(() => load());
             }}{{ hasChildren ? ", counting what's under it" : "" }}
           </p>
         </div>
-        <a :href="`/search?i=${ingredient.id}`" class="button-primary"
-          >Search with {{ ingredient.name.toLowerCase() }}</a
-        >
+        <div class="ingredient-actions">
+          <a :href="`/search?i=${ingredient.id}`" class="button-primary"
+            >Search with {{ ingredient.name.toLowerCase() }}</a
+          >
+          <a
+            v-if="grocerNow()"
+            :href="grocerHref(grocerNow()!, ingredient.id)"
+            class="button-outline"
+            rel="sponsored noopener"
+            >Shop at {{ grocerNow()!.label }}</a
+          >
+        </div>
       </div>
 
       <div class="ingredient-cards">

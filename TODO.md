@@ -164,9 +164,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         and a "subclass of" another linked ingredient's item a parent,
         both in the Suggestions queue. Lower-case names only, none naming
         the plant: Wikidata's aliases include "Allium cepa L." and "Mel".
-- [ ] **Ingredient affiliate links** (*Ray, 2026-11-11*, after ingredient
-      data): a grocer's link on each ingredient; Instacart first, and each
-      person may choose another, as Instacart may have nothing near them.
+- [x] **Ingredient affiliate links** (#136; *Ray, 2026-11-11*): a "Shop"
+      link on each recipe line's ingredients and on each ingredient's page,
+      to a search at a grocer: Instacart first, and each person may choose
+      Amazon Fresh or Walmart instead (kept with the account, or in the
+      browser), as Instacart may have nothing near them. Through
+      `/go/grocer/`, counted like the book links; clicks by grocer and
+      ingredient on Buy-link clicks. Each grocer shows once its setting is
+      in Coolify: `OPENLARDER_INSTACART_LINK`, `OPENLARDER_WALMART_LINK`
+      (deep-link templates), Amazon's existing tag.
+      - [ ] Ray: join Instacart's affiliate programme (Impact), and ask
+        whether a deep link to a search page earns commission.
+      - [ ] Instacart's Developer Platform fills a cart with a whole
+        recipe's ingredients ("Shop ingredients"), but takes no new
+        applications (November 2026): apply when it reopens.
 - [ ] **Roles** *(Ray, 2026-11-10)*: done (#101). User, contributor,
       moderator, administrator, owner (roles.py), in place of the admin
       and enterer flags. Moderators edit the catalog, work flags and

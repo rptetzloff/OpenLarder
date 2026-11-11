@@ -65,6 +65,8 @@ class Me(BaseModel):
     trusted: bool = False
     # Their buy-link shops: {"order": [...], "hidden": [...]}, or None.
     shops: dict | None = None
+    # The grocer they chose for ingredients' links (grocery.py), or None.
+    grocer: str | None = None
 
 
 def me_for(user: User, settings: Settings) -> Me:
@@ -81,7 +83,12 @@ def me_for(user: User, settings: Settings) -> Me:
         grants=roles.grantable(user.role),
         agreed=agreement.has_agreed(user),
         trusted=user.trusted,
-        shops=user.shop_preferences,
+        shops=(
+            {k: prefs[k] for k in ("order", "hidden")}
+            if (prefs := user.shop_preferences or {}).get("order") is not None
+            else None
+        ),
+        grocer=prefs.get("grocer"),
     )
 
 

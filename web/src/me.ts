@@ -30,6 +30,8 @@ export interface Me {
   trusted: boolean;
   // Their buy-link shops (shops.ts); null until chosen.
   shops: { order: string[]; hidden: string[] } | null;
+  // The grocer for ingredients' links (grocery.ts); null until chosen.
+  grocer: string | null;
 }
 
 // Sends the chosen name; resolves to the updated account, or rejects with

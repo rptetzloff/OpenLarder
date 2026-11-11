@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { arrange } from "../shops";
+import GrocerChooser from "../components/GrocerChooser.vue";
+import { grocerHref, grocerNow } from "../grocery";
 import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
@@ -298,6 +300,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                 <button type="button" class="secondary" @click="copyList">Copy list</button>
               </span>
             </div>
+            <GrocerChooser v-if="recipe.lines.length" :signed-in="!!user" />
             <ul v-if="recipe.lines.length" class="ingredient-lines">
               <li v-for="(line, i) in recipe.lines" :key="i">
                 <template v-for="(o, j) in line.options" :key="j">
@@ -311,6 +314,21 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                   <template v-else>{{ o.name }}</template>
                   <span v-if="o.page" class="page-ref">p. {{ o.page }}</span>
                 </template>
+                <span v-if="grocerNow() && line.options.some((o) => o.ingredient)" class="shop-links">
+                  ·
+                  <template v-for="(o, j) in line.options.filter((o) => o.ingredient)" :key="j"
+                    ><template v-if="j > 0"> · </template
+                    ><a :href="grocerHref(grocerNow()!, o.ingredient!.id)" rel="sponsored noopener"
+                      >{{
+                        line.options.filter((x) => x.ingredient).length > 1
+                          ? `Shop ${o.name.toLowerCase()}`
+                          : "Shop"
+                      }}<span class="visually-hidden">{{
+                        ` for ${o.name} at ${grocerNow()!.label}`
+                      }}</span></a
+                    ></template
+                  >
+                </span>
               </li>
             </ul>
             <p v-else class="status">No ingredients recorded yet.</p>
