@@ -13,16 +13,22 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import exists, func, or_, select, update
+from sqlalchemy.orm import aliased
 
 from openlarder import agreement, trust
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Proposal, Recipe, Source, User
+from openlarder.models import Ingredient, IngredientOption, Proposal, Recipe, Source, User
 from openlarder.routers.auth import Config
 
 router = APIRouter(tags=["review"])
 WAITING = ("pending", "returned")
+
+
+class Named(BaseModel):
+    id: uuid.UUID
+    name: str
 
 
 class Item(BaseModel):
@@ -32,6 +38,9 @@ class Item(BaseModel):
     review_note: str | None
     by: str | None
     created_at: datetime
+    # A recipe's ingredients no published recipe uses yet: new to the
+    # catalog with it, for a moderator to keep or merge into another.
+    new_ingredients: list[Named] = []
 
 
 class Group(BaseModel):
@@ -69,6 +78,38 @@ def _item(row: Source | Recipe, names) -> Item:
     )
 
 
+async def _new_ingredients(session, recipe_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[Named]]:
+    """Each recipe's ingredients that no published recipe of a public,
+    published source uses: the ones it brings into the catalog. The matching
+    flow's last step (SCOPING.md): a moderator keeps each, or merges it into
+    the ingredient it's another name for."""
+    if not recipe_ids:
+        return {}
+    used = aliased(IngredientOption)
+    public = (
+        select(used.id)
+        .join(Recipe, Recipe.id == used.recipe_id)
+        .join(Source, Source.id == Recipe.source_id)
+        .where(
+            used.ingredient_id == Ingredient.id,
+            Recipe.review == "published",
+            Source.review == "published",
+            Source.private.is_(False),
+        )
+    )
+    rows = await session.execute(
+        select(IngredientOption.recipe_id, Ingredient.id, Ingredient.name)
+        .distinct()
+        .join(Ingredient, Ingredient.id == IngredientOption.ingredient_id)
+        .where(IngredientOption.recipe_id.in_(recipe_ids), ~exists(public))
+        .order_by(IngredientOption.recipe_id, Ingredient.name)
+    )
+    found: dict[uuid.UUID, list[Named]] = {}
+    for recipe_id, ingredient_id, name in rows:
+        found.setdefault(recipe_id, []).append(Named(id=ingredient_id, name=name))
+    return found
+
+
 async def _groups(session, source_filter, recipe_filter) -> list[Group]:
     recipes = list(
         await session.scalars(
@@ -84,9 +125,12 @@ async def _groups(session, source_filter, recipe_filter) -> list[Group]:
         )
     )
     names = await _names(session, [r.created_by for r in recipes] + [s.created_by for s in sources])
+    new = await _new_ingredients(session, [r.id for r in recipes])
     by_source: dict[uuid.UUID, list[Item]] = {}
     for r in recipes:
-        by_source.setdefault(r.source_id, []).append(_item(r, names))
+        item = _item(r, names)
+        item.new_ingredients = new.get(r.id, [])
+        by_source.setdefault(r.source_id, []).append(item)
     return [
         Group(source=_item(s, names), kind=s.kind, recipes=by_source.get(s.id, [])) for s in sources
     ]

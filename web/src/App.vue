@@ -2320,6 +2320,20 @@ button.primary.small {
 .source-buy .buy-button .buy-shop {
   text-align: right;
 }
+.review-new {
+  margin-top: 0.5rem;
+}
+.review-new p {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+}
+.review-new ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.review-new li > button {
+  margin-left: 0.5rem;
+}
 .report-problem {
   margin-top: 1.5rem;
 }

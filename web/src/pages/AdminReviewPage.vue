@@ -2,7 +2,9 @@
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import type { Me } from "../me";
+import IngredientPicker from "../components/IngredientPicker.vue";
 import ProposalDiff from "../components/ProposalDiff.vue";
+import { mergeIngredient, type Named } from "../ingredients";
 import {
   type Group,
   type Item,
@@ -68,6 +70,18 @@ function apply(p: Proposal) {
 function declineProposal(p: Proposal) {
   const note = prompt(`Why not apply the change to “${p.title}”? The contributor reads this.`)?.trim();
   if (note) act(() => decideProposal(p.id, "decline", note));
+}
+
+// The new ingredient being merged: "recipe:ingredient", one at a time.
+const merging = ref("");
+
+function mergeInto(from: Named, into: Named) {
+  const asked =
+    `Merge “${from.name}” into “${into.name}”? Every recipe using “${from.name}” will use ` +
+    `“${into.name}”, and “${from.name}” becomes another name for it.`;
+  if (!confirm(asked)) return;
+  merging.value = "";
+  act(() => mergeIngredient(from.id, into.id));
 }
 
 const waitingIn = (g: Group) =>
@@ -174,6 +188,36 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
                   · {{ REVIEW_LABELS[r.review] }} · {{ r.by ?? "someone" }}, {{ day(r.created_at) }}
                 </span>
                 <p v-if="r.review === 'returned'" class="review-reason">“{{ r.review_note }}”</p>
+                <div v-if="r.new_ingredients.length" class="review-new">
+                  <p>
+                    New {{ r.new_ingredients.length === 1 ? "ingredient" : "ingredients" }}:
+                    approving keeps {{ r.new_ingredients.length === 1 ? "it" : "them" }}, or merge
+                    {{ r.new_ingredients.length === 1 ? "it" : "one" }} into the ingredient it's
+                    another name for.
+                  </p>
+                  <ul>
+                    <li v-for="i in r.new_ingredients" :key="i.id">
+                      <a :href="`/ingredients/${i.id}`">{{ i.name }}</a>
+                      <button
+                        type="button"
+                        class="link"
+                        :aria-expanded="merging === `${r.id}:${i.id}`"
+                        @click="merging = merging === `${r.id}:${i.id}` ? '' : `${r.id}:${i.id}`"
+                      >
+                        Merge into…
+                      </button>
+                      <IngredientPicker
+                        v-if="merging === `${r.id}:${i.id}`"
+                        :input-id="`merge-${r.id}-${i.id}`"
+                        :label="`Merge “${i.name}” into`"
+                        placeholder="Find the ingredient"
+                        :exclude="[i.id]"
+                        :disabled="busy"
+                        @pick="(into) => mergeInto(i, into)"
+                      />
+                    </li>
+                  </ul>
+                </div>
               </div>
               <div v-if="r.review === 'pending'" class="row-actions">
                 <button

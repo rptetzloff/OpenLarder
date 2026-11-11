@@ -10,6 +10,8 @@ export interface Item {
   review_note: string | null;
   by: string | null;
   created_at: string;
+  // A recipe's ingredients no published recipe uses yet.
+  new_ingredients: { id: string; name: string }[];
 }
 
 export interface Group {

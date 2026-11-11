@@ -222,6 +222,40 @@ async def test_approving_a_book_links_its_request_and_leaves_it_open(
     assert (linked["status"], linked["source_id"]) == ("open", book)
 
 
+async def test_a_waiting_recipe_shows_its_new_ingredients(people, adb) -> None:
+    """The matching flow's last step: what a recipe brings into the catalog,
+    for a moderator to keep or merge into what it's another name for."""
+    mo = await people("mo", role="moderator")
+    published = await _book(mo, "Pantry")
+    await _recipe(mo, adb, published, "Toast", ("Butter",))
+    con = await people("con", role="contributor")
+    book = await _book(con)
+    pie = await _recipe(con, adb, book, "Pie", ("Moonberry Dust", "Butter", "Moonberry Dust"))
+    tart = await _recipe(con, adb, book, "Tart", ("Moonberry dust",))
+    [group] = [
+        g for g in (await mo.get("/api/review")).json()["groups"] if g["source"]["id"] == book
+    ]
+    new = {r["title"]: [i["name"] for i in r["new_ingredients"]] for r in group["recipes"]}
+    # Butter is in a published recipe; Moonberry Dust only in waiting ones.
+    assert new == {"Pie": ["Moonberry Dust"], "Tart": ["Moonberry Dust"]}
+    # Merged into one that's here: it's that one's other name, and no longer new.
+    dust = group["recipes"][0]["new_ingredients"][0]["id"]
+    butter = await adb.scalar(text("SELECT id FROM ingredients WHERE name = 'Butter'"))
+    r = await mo.post(f"/api/ingredients/{dust}/merge", json={"into": str(butter)})
+    assert r.status_code == 200, r.text
+    [group] = [
+        g for g in (await mo.get("/api/review")).json()["groups"] if g["source"]["id"] == book
+    ]
+    assert [r["new_ingredients"] for r in group["recipes"]] == [[], []]
+    assert (
+        await adb.scalar(
+            text("SELECT count(*) FROM ingredient_aliases WHERE name = 'Moonberry Dust'")
+        )
+        == 1
+    )
+    assert pie and tart
+
+
 # Nothing waiting leaks
 
 
