@@ -41,6 +41,27 @@ E = uuid.uuid4()
             "Mashed Potato (p. 266) or Basic Cauli-Rice (p. 269)",
             [Option("Mashed Potato", "266"), Option("Basic Cauli-Rice", "269")],
         ),
+        # Several lists, each ending ", or" (The Heritage Cookbook).
+        (
+            "Lamb Shank or Shoulder, or Beef Shank, Shin, Cheek, or Chuck",
+            [
+                Option("Lamb Shank", None),
+                Option("Shoulder", None),
+                Option("Beef Shank", None),
+                Option("Shin", None),
+                Option("Cheek", None),
+                Option("Chuck", None),
+            ],
+        ),
+        (
+            "Chicken Stock (p. 475), or Vegetable Stock (p. 476), Water, or Wine",
+            [
+                Option("Chicken Stock", "475"),
+                Option("Vegetable Stock", "476"),
+                Option("Water", None),
+                Option("Wine", None),
+            ],
+        ),
         # Commas in a name, with no ", or" list: one option.
         (
             "Lemon, Orange, and Grapefruit Marmalade",

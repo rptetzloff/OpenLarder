@@ -423,10 +423,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 - [x] **A line saving refuses was offered "Keep as typed"** (#78): fixed in
       #80; the check now says which lines saving refuses.
-- [ ] **Splitting "A or B, or C, D, or E"**: "Lamb Shank or Shoulder, or
-      Beef Shank, Shin, Cheek, or Chuck" gives an option "Beef Shank, Shin,
-      Cheek," with its comma (The Heritage Cookbook). lines.py's comma rule
-      only expects one "or".
+- [x] **Splitting "A or B, or C, D, or E"** (#126): "Lamb Shank or
+      Shoulder, or Beef Shank, Shin, Cheek, or Chuck" read "Beef Shank,
+      Shin, Cheek," as one option (The Heritage Cookbook). The commas before
+      each ", or" now split, not only the first; 4 lines of the household
+      index read differently, all of them this shape. Existing recipes
+      change when re-imported or re-saved.
 - [x] **Merge two books** (#116): a moderator's "Merge into another book"
       on a book's page shows what would move, then moves its editions (buy
       links and clicks with them), recipes and their pages, credits (one per
