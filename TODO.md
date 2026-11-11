@@ -174,9 +174,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         (SCOPING.md, Allergen data) on both pages. In the edit history,
         revert and the dumps; a merge keeps them, the kept ingredient's
         first.
-      - [ ] Suggesting allergens: a first pass per ingredient for a
-        moderator to accept, from FDC's categories, Wikidata, and n8n
-        (SCOPING.md, Allergen seeding).
+      - [x] Suggesting allergens (#138): word rules over each public
+        ingredient's name and its FoodData Central food's description
+        ("butter": milk; "peanut butter", "cocoa butter", "butter beans"
+        not), run by an administrator from Suggestions ("Suggest
+        allergens"); each an `allergen` suggestion (migration 0060) that a
+        moderator accepts or dismisses, or the likely ones shown at once.
+        None for what records or inherits it already, nor below a broader
+        ingredient given the same, nor again once decided. On the household
+        index: 200 of the 1,000 most used names, 24% of uses.
+      - [ ] Ray: build Workflow 5 in n8n (SCOPING.md) for what names
+        don't say; `scripts/n8n_role.sql` now grants
+        `public_allergens` and `public_ingredient_allergens`.
+      - [ ] Wikidata's allergen statements: check whether its items record
+        enough to be worth suggesting from.
       - [ ] Swaps suggested for a diet: link each diet to the allergens it
         avoids (Dairy-Free: milk), and offer, on a recipe, the swaps
         recorded for what it contains.

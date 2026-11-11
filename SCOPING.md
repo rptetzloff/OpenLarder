@@ -382,6 +382,13 @@ A reply that doesn't parse, or says "different", is dropped. "Same" becomes a `m
 
 Unsure answers and tag IDs not on the list are dropped. Each answer that's left becomes a `tag` suggestion: `target` is `[recipe_id, tag_id]`, and `proposal` holds `recipe_id`, `tag_id`, `recipe_title`, `tag_name` and `certainty`. `confidence` is 0.9 for certain and 0.6 for likely, and `prompt_version` is `tag-v1`. Accepting tags the recipe as "Edit tags" would; one the recipe has already, its own or its source's, adds nothing.
 
+*Workflow 5: allergens for ingredients (after the site's own word rules, #138).* The site suggests allergens from ingredients' names first (allergen_rules.py: "butter" contains milk, "peanut butter" peanuts, "vegan butter" nothing), run by an administrator from Suggestions. This workflow is for what names don't say ("Hoisin Sauce", "Pesto"). It reads `public_ingredients` (with `parent_id`), `public_ingredient_aliases`, `public_allergens`, and what each records already from `public_ingredient_allergens`. It takes ingredients that record nothing and whose broader ingredients record nothing, the most used first (by `public_ingredient_lines`), up to 500 a run, and skips any ingredient and allergen already suggested, whatever the status. Each goes to `/api/chat` (`gemma4:12b`, `temperature: 0`) with its name, other names and broader ingredient, and the allergens as a numbered list. The schema is `reason` first, then `allergens`: a list of `{ "allergen", "status", "certainty" }`, where `allergen` is a key from the list, `status` is `contains` or `may_contain`, and `certainty` is `certain`, `likely` or `unsure`. The system prompt is conservative:
+- the ingredient in general, as usually sold, not any product or brand;
+- `contains` only when nearly every kind of it does (pesto: milk, tree nuts); `may_contain` when many do (Worcestershire: fish);
+- nothing rather than a guess, and never that something is free of an allergen.
+
+Unsure answers and keys not on the list are dropped. Each answer that's left becomes an `allergen` suggestion: `target` is `{"ingredient_id", "allergen"}`, and `proposal` holds `ingredient_id`, `ingredient_name`, `allergen`, `status` and `certainty`. `confidence` is 0.9 for certain and 0.6 for likely, and `prompt_version` is `allergen-v1`. Accepting records it on the ingredient beside what it records, as its page would, and the likely ones shown can be accepted at once.
+
 *On the site*
 
 - **Admin → Suggestions:** filtered by kind and sorted by confidence, with Accept and Dismiss. Accept calls the existing rename, merge or set-parent code as the admin, so history and rules apply as if it were done by hand.
@@ -467,7 +474,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 - Personal shelf: mark books you own, filter search to your shelf
 - Personal larder: a person's own inventory lists (pantry, spice drawer, fridge, freezer, named as they like), each item their own name matched to a canonical ingredient, feeding "what can I make with what I have". Private by default, shareable with friends and family, public by choice. *Ray, 2026-11-08; open questions in TODO.md. Placed in Phase 2 by Claude, beside the shelf; move it up if it should come sooner.*
 - Amazon Associates links, once traffic supports it
-- Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.* *Allergen data built (#137, Ray, 2026-11-11: "forget phases"); suggesting them, and swaps for a diet, are next in TODO.md.*
+- Allergen data on ingredients, and substitutions suggested for a diet. *Phase 2 rather than MVP: the MVP's substitutions are entered by hand, and allergen data needs its own seeding and review before anything is suggested from it. Phase chosen by Claude, on the same delegation as substitutions.* *Allergen data built (#137, Ray, 2026-11-11: "forget phases"); suggested from names, with n8n's Workflow 5 specified (#138); swaps for a diet are next in TODO.md.*
 
 **Phase 3**
 

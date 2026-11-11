@@ -2,7 +2,14 @@
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import SuggestionItem from "../components/SuggestionItem.vue";
-import { KIND_LABELS, type Suggestion, type SuggestionPage, fetchSuggestions } from "../suggestions";
+import {
+  acceptAllergens,
+  fetchSuggestions,
+  KIND_LABELS,
+  type Suggestion,
+  type SuggestionPage,
+  suggestAllergens,
+} from "../suggestions";
 import type { Me } from "../me";
 
 // What local models suggest, for an admin to accept or dismiss.
@@ -44,6 +51,54 @@ async function load(more = false) {
   }
 }
 
+// Allergens: suggested from names by an administrator, and the likely
+// ones shown accepted at once.
+const busy = ref(false);
+const note = ref("");
+const actionError = ref("");
+const likelyShown = computed(() =>
+  items.value.filter(
+    (s) =>
+      s.kind === "allergen" && s.status === "open" && s.actionable && s.certainty === "likely",
+  ),
+);
+
+async function runAllergens() {
+  busy.value = true;
+  note.value = actionError.value = "";
+  try {
+    const n = await suggestAllergens();
+    note.value =
+      n === 0
+        ? "Nothing new to suggest."
+        : `${n.toLocaleString()} new allergen ${n === 1 ? "suggestion" : "suggestions"}.`;
+    kind.value = "allergen";
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function acceptLikely() {
+  const shown = likelyShown.value;
+  if (!shown.length) return;
+  const what = shown.length === 1 ? "the likely allergen suggestion" : `the ${shown.length} likely allergen suggestions`;
+  if (!confirm(`Accept ${what} shown?`)) return;
+  busy.value = true;
+  note.value = actionError.value = "";
+  try {
+    const { done, skipped } = await acceptAllergens(shown.map((s) => s.id));
+    note.value = `Accepted ${done.toLocaleString()}${skipped ? `; ${skipped} couldn't be` : ""}.`;
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 function decided(updated: Suggestion) {
   // Stays in place, marked, until the next load; the counts follow now.
   items.value = items.value.map((s) => (s.id === updated.id ? updated : s));
@@ -73,6 +128,11 @@ watch(allowed, (yes) => {
         merged name stays as another name for the one kept, so lines written that way still find
         it. Those the model is certain of come first, then those it thinks likely, each with the
         closest pairs first.
+      </p>
+      <p class="muted">
+        Allergens are suggested from ingredients' names (“butter”: contains milk), and accepting
+        one records it on the ingredient, under the crowdsourced notice. Check each: a name can
+        mislead.
       </p>
     </div>
     <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see suggestions.</p>
@@ -111,6 +171,32 @@ watch(allowed, (yes) => {
           </button>
         </div>
       </div>
+      <div v-if="user.may_run || (kind === 'allergen' && likelyShown.length)" class="row-actions">
+        <button
+          v-if="user.may_run"
+          type="button"
+          class="secondary small"
+          :disabled="busy"
+          @click="runAllergens"
+        >
+          Suggest allergens
+        </button>
+        <button
+          v-if="kind === 'allergen' && state === 'open' && likelyShown.length"
+          type="button"
+          class="primary small"
+          :disabled="busy"
+          @click="acceptLikely"
+        >
+          {{
+            likelyShown.length === 1
+              ? "Accept the likely one shown"
+              : `Accept the ${likelyShown.length} likely ones shown`
+          }}
+        </button>
+      </div>
+      <p v-if="note" class="status" role="status">{{ note }}</p>
+      <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
       <p v-if="failed" role="alert">The suggestions couldn't be loaded. Try reloading the page.</p>
       <p v-else-if="!page" class="status">Loading…</p>
       <p v-else-if="items.length === 0" class="status">

@@ -19,7 +19,8 @@ const parent = computed(() => (s.value.decision === "b_under_a" ? s.value.a : s.
 const gone = computed(
   () =>
     [s.value.a, s.value.b].some((side) => side && !side.exists) ||
-    (s.value.kind === "tag" && !(s.value.recipe?.exists && s.value.tag?.exists)),
+    (s.value.kind === "tag" && !(s.value.recipe?.exists && s.value.tag?.exists)) ||
+    (s.value.kind === "allergen" && !s.value.allergen?.exists),
 );
 
 function uses(side: Side) {
@@ -86,6 +87,20 @@ async function act(action: "accept" | "dismiss") {
         <span v-if="!s.tag.exists" class="muted"> (gone)</span>
       </p>
     </template>
+    <template v-else-if="s.kind === 'allergen' && s.a && s.allergen">
+      <h2>
+        {{ s.allergen.status === "contains" ? "Contains" : "May contain" }}
+        {{ s.allergen.label.toLowerCase() }}?
+      </h2>
+      <p>
+        <a v-if="s.a.exists" :href="`/ingredients/${s.a.id}`">{{ s.a.name }}</a>
+        <span v-else>{{ s.a.name }} (gone)</span>
+        <span class="status"> · {{ uses(s.a) }}</span>
+        <span v-if="s.allergen.already" class="muted">
+          · it records something about {{ s.allergen.label.toLowerCase() }} already</span
+        >
+      </p>
+    </template>
     <h2 v-else>{{ s.kind }}</h2>
     <p v-if="s.reason" class="suggestion-reason">{{ s.reason }}</p>
     <p class="byline">
@@ -103,7 +118,9 @@ async function act(action: "accept" | "dismiss") {
         {{
           s.kind === "tag"
             ? "Its recipe or its tag has been deleted since, so it can only be dismissed."
-            : "An ingredient this names has been merged or deleted since, so it can only be dismissed."
+            : s.kind === "allergen" && s.a?.exists
+              ? "That allergen isn't on the list any more, so it can only be dismissed."
+              : "An ingredient this names has been merged or deleted since, so it can only be dismissed."
         }}
       </p>
       <p v-else-if="!s.actionable" class="status">This can't be accepted here yet.</p>
