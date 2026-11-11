@@ -15,6 +15,14 @@ def test_names_say_what_they_contain() -> None:
     assert _said("Peanut Butter") == {"peanuts": ("contains", True)}
     assert _said("Free-range Eggs") == {"egg": ("contains", True)}
     assert _said("Oats") == {"gluten": ("may_contain", False)}
+    # Every gluten grain is gluten; only wheat and its kin are wheat.
+    assert _said("Rye Flour") == {"gluten": ("contains", True)}
+    assert _said("Pearl Barley") == {"gluten": ("contains", True)}
+    for wheat in ("Couscous", "Spelt Flour", "Freekeh", "Farina", "Matzo Meal", "Triticale"):
+        assert _said(wheat) == {
+            "wheat": ("contains", True),
+            "gluten": ("contains", True),
+        }, wheat
     assert _said("Soy Sauce") == {
         "soy": ("contains", True),
         "wheat": ("contains", False),

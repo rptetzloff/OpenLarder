@@ -71,7 +71,8 @@ async def test_recorded_inherited_and_overridden(people, adb) -> None:
             {"id": cheese, "name": "Cheese", "status": "contains"},
             {"id": cheddar, "name": "Cheddar", "status": "contains"},
         ]},
-        {"key": "gluten", "label": "Gluten", "status": "may_contain", "ingredients": [
+        {"key": "gluten", "label": "Gluten (wheat, barley, rye)", "status": "may_contain",
+         "ingredients": [
             {"id": oats, "name": "Oats", "status": "may_contain"},
         ]},
     ]  # fmt: skip

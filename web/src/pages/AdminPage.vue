@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
+import DietAvoids from "../components/DietAvoids.vue";
 import { type WikidataRun, checkWikidata } from "../authors";
 import { type BookSummary, listSources } from "../books";
 import { buildDump, size } from "../dumps";
@@ -281,6 +282,7 @@ async function archiveAll() {
           <p v-if="progress" class="status" aria-live="polite">{{ progress }}</p>
           <p v-if="linkError" class="error" role="alert">{{ linkError }}</p>
         </section>
+        <DietAvoids />
         <section class="tool-panel" aria-labelledby="archive-title">
           <h3 id="archive-title">Internet Archive</h3>
           <p class="muted">

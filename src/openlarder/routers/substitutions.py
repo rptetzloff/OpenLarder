@@ -9,10 +9,10 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import substitutions
-from openlarder.auth import ModeratorUser, SameOrigin
+from openlarder import allergens, diets, substitutions, visibility
+from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Substitution, Tag, TagKind
+from openlarder.models import Recipe, Substitution, Tag, TagKind
 
 router = APIRouter(tags=["substitutions"])
 
@@ -20,6 +20,8 @@ router = APIRouter(tags=["substitutions"])
 class Diet(BaseModel):
     id: uuid.UUID
     name: str
+    # The allergens it avoids (diets.py), for a recipe's page to check.
+    avoids: list[str] = []
 
 
 class ThingOut(BaseModel):
@@ -68,7 +70,91 @@ async def list_diets(session: Session) -> list[Diet]:
     rows = await session.execute(
         select(Tag.id, Tag.name).where(Tag.kind == TagKind.DIET).order_by(func.lower(Tag.name))
     )
-    return [Diet(id=i, name=n) for i, n in rows]
+    avoids = await diets.avoided(session)
+    order = {a.key: a.position for a in await allergens.listed(session)}
+    return [
+        Diet(id=i, name=n, avoids=sorted(avoids.get(i, ()), key=lambda k: order.get(k, 99)))
+        for i, n in rows
+    ]
+
+
+class AvoidsIn(BaseModel):
+    allergens: list[str] = Field(max_length=50)
+
+
+@router.put("/api/diets/{diet_id}/allergens", response_model=Diet, dependencies=[SameOrigin])
+async def set_diet_allergens(
+    diet_id: uuid.UUID, body: AvoidsIn, moderator: ModeratorUser, session: Session
+) -> Diet:
+    """Which allergens a diet avoids; answers with the diet."""
+    diet = await session.get(Tag, diet_id)
+    if diet is None or diet.kind != TagKind.DIET:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such diet.")
+    known = {a.key for a in await allergens.listed(session)}
+    unknown = sorted(set(body.allergens) - known)
+    if unknown:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"There's no allergen “{unknown[0]}” here."
+        )
+    await diets.set_avoided(session, diet.id, set(body.allergens))
+    await session.commit()
+    return next(d for d in await list_diets(session) if d.id == diet.id)
+
+
+class Found(BaseModel):
+    key: str
+    label: str
+    status: Literal["contains", "may_contain"]
+
+
+class DietLine(BaseModel):
+    ingredient: ThingOut
+    # The allergens it records that the diet avoids.
+    found: list[Found]
+    # Swaps recorded for it, or for a broader ingredient, for a diet that
+    # avoids those too.
+    swaps: list[SwapOut]
+
+
+class DietCheck(BaseModel):
+    diet: Diet
+    lines: list[DietLine]
+    notice: str
+
+
+@router.get("/api/recipes/{recipe_id}/diets/{diet_id}", response_model=DietCheck)
+async def check_recipe(
+    recipe_id: uuid.UUID, diet_id: uuid.UUID, session: Session, viewer: Viewer
+) -> DietCheck:
+    """The recipe's ingredients that record an allergen the diet avoids,
+    with the swaps recorded for them (diets.py). Never says that the
+    recipe suits the diet."""
+    seen = await session.scalar(
+        select(Recipe.id).where(Recipe.id == recipe_id, visibility.recipes_seen_by(viewer))
+    )
+    if seen is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipe.")
+    diet = next((d for d in await list_diets(session) if d.id == diet_id), None)
+    if diet is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such diet.")
+    labels = {a.key: a.label for a in await allergens.listed(session)}
+    lines = await diets.check(session, recipe_id, diet_id, viewer)
+    return DietCheck(
+        diet=diet,
+        lines=[
+            DietLine(
+                ingredient=ThingOut(kind="ingredient", id=line.ingredient_id, name=line.name),
+                found=[
+                    Found(key=k, label=labels.get(k, k), status=line.found[k])
+                    for k in diet.avoids
+                    if k in line.found
+                ],
+                swaps=[swap_out(x) for x in line.swaps],
+            )
+            for line in lines
+        ],
+        notice=allergens.NOTICE,
+    )
 
 
 class DietIn(BaseModel):

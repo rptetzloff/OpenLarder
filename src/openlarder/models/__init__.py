@@ -1,5 +1,5 @@
 from openlarder.models.accounts import ApiKey, User, UserSession
-from openlarder.models.allergens import Allergen, IngredientAllergen
+from openlarder.models.allergens import Allergen, DietAllergen, IngredientAllergen
 from openlarder.models.base import Base
 from openlarder.models.catalog import (
     Author,
@@ -50,6 +50,7 @@ __all__ = [
     "BookMerge",
     "BookRequest",
     "DailyCount",
+    "DietAllergen",
     "Dump",
     "Edition",
     "Episode",

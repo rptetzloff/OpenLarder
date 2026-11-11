@@ -102,9 +102,9 @@ PEOPLE = (
 )
 # Never emptied. A new table must be named in one of the three lists
 # (tests/test_reset.py), so the reset never misses one.
-KEPT = ("alembic_version", "tags", "fdc_foods", "allergens")
-# A catalog reset's history kept: the tag list's.
-HISTORY_KEPT = ("tags",)
+KEPT = ("alembic_version", "tags", "fdc_foods", "allergens", "diet_allergens")
+# A catalog reset's history kept: the tag list's, and what diets avoid.
+HISTORY_KEPT = ("tags", "diet_allergens")
 
 _REQUEST_LINK = "fk_book_requests_source_id_sources"
 

@@ -45,6 +45,7 @@ WHAT = {
     "ingredients": "ingredient",
     "ingredient_aliases": "ingredient name",
     "ingredient_allergens": "allergen",
+    "diet_allergens": "allergen a diet avoids",
     "tags": "tag",
 }
 # The column that names a row, first found wins.

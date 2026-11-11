@@ -2,7 +2,14 @@
 
 import uuid
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    PrimaryKeyConstraint,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,3 +52,18 @@ class IngredientAllergen(Timestamps, Base):
         Text, ForeignKey("allergens.key", ondelete="RESTRICT"), nullable=False
     )
     status: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class DietAllergen(Base):
+    """An allergen a diet avoids (Dairy-Free: milk), for a recipe's page to
+    check its lines against (diets.py)."""
+
+    __tablename__ = "diet_allergens"
+    __table_args__ = (PrimaryKeyConstraint("diet_tag_id", "allergen"),)
+
+    diet_tag_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tags.id", ondelete="CASCADE")
+    )
+    allergen: Mapped[str] = mapped_column(
+        Text, ForeignKey("allergens.key", ondelete="CASCADE"), index=True
+    )
