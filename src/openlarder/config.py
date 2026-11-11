@@ -33,6 +33,15 @@ class Settings(BaseSettings):
                 raise ValueError(f"OPENLARDER_META_TAGS: {name}'s value is empty or too long")
         return tags
 
+    # USDA FoodData Central's CSV downloads to load generic foods from
+    # (fdc.py), as JSON: a new release is a new file name, from
+    # fdc.nal.usda.gov/download-datasets. SR Legacy is final.
+    fdc_datasets: list[str] = [
+        "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2026-04-30.zip",
+        "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip",
+        "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_survey_food_csv_2024-10-31.zip",
+    ]
+
     # Sign-in through the identity broker (Authgear). All three or none:
     # with none, the site runs without sign-in and /api/auth/login says so.
     oidc_issuer: str | None = None

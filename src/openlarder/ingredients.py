@@ -238,6 +238,11 @@ async def merge(session: AsyncSession, source: Ingredient, target: Ingredient) -
     if target.parent_id == s:
         target.parent_id = source.parent_id if source.parent_id != t else None
     session.add(IngredientAlias(ingredient_id=t, name=source.name, match_key=source.match_key))
+    # Its links to FoodData Central and Wikidata, where the other has none.
+    if target.fdc_id is None:
+        target.fdc_id = source.fdc_id
+    if target.wikidata_id is None:
+        target.wikidata_id, target.wikidata_label = source.wikidata_id, source.wikidata_label
     await session.delete(source)
     await session.flush()
 

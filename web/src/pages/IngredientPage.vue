@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
+import IngredientRecords from "../components/IngredientRecords.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
 import SwapForm from "../components/SwapForm.vue";
@@ -291,6 +292,8 @@ onMounted(() => load());
           @added="(s) => ingredient!.swaps.push(s)"
         />
       </section>
+
+      <IngredientRecords :ingredient="ingredient" :can-edit="!!user?.may_edit" @changed="load()" />
 
       <section v-if="user?.may_edit" class="fix-ingredient source-section">
         <h2>Fix this ingredient</h2>

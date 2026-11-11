@@ -125,6 +125,20 @@ instead.
 `/healthz` answers when the process is up; `/readyz` when it can reach the
 database, with the schema revision it is on. The API docs are at `/api/docs`.
 
+### FoodData Central
+
+Ingredients link to USDA FoodData Central's generic foods, kept in the
+database. An administrator loads them from Admin › FoodData Central, or in
+the app's container:
+
+    python -m openlarder.fdc load
+
+That downloads the files in `OPENLARDER_FDC_DATASETS` (JSON list; the
+defaults are the Foundation, SR Legacy and survey CSV zips current in
+November 2026). USDA publishes new Foundation and survey releases under new
+file names, from https://fdc.nal.usda.gov/download-datasets; set the new
+names and load again. Foods are updated in place and never removed.
+
 ### Emptying the catalog
 
 To import the household index again from scratch, in the app's container

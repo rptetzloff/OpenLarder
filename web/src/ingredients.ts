@@ -34,7 +34,27 @@ export interface Ingredient {
   family_total: number;
   // What can stand in for it.
   swaps: Swap[];
+  // The same food in USDA FoodData Central and Wikidata, and other
+  // ingredients linked to the same record (likely one to merge).
+  fdc: Food | null;
+  wikidata: { id: string; label: string | null; url: string } | null;
+  same_records: { id: string; name: string }[];
 }
+
+// A generic food in USDA FoodData Central (fdc.py).
+export interface Food {
+  fdc_id: number;
+  description: string;
+  data_type: "foundation_food" | "sr_legacy_food" | "survey_fndds_food";
+  category: string | null;
+  url: string;
+}
+
+export const DATA_TYPES: Record<Food["data_type"], string> = {
+  foundation_food: "Foundation",
+  sr_legacy_food: "SR Legacy",
+  survey_fndds_food: "Survey",
+};
 
 // A recipe in a listing, and where it is: its source's kind, cover and
 // credits, and a magazine's issue, a show's episode and time, or a site.
@@ -227,4 +247,17 @@ export async function searchRecipes(
 // Puts an ingredient under another, or (parent null) under nothing.
 export async function setParent(id: string, parent: string | null): Promise<void> {
   await send(`/api/ingredients/${id}/parent`, "PUT", { parent });
+}
+
+// FoodData Central foods to link an ingredient to: an ID, or words.
+export async function findFoods(q: string): Promise<Food[]> {
+  const res = await fetch(`/api/fdc/foods?${new URLSearchParams({ q })}`);
+  if (!res.ok) throw new Error("FoodData Central's foods couldn't be searched. Try again.");
+  return res.json();
+}
+
+// Links an ingredient to a food and a Wikidata item (an ID or a link), or
+// unlinks it (null, or an empty string).
+export async function setLinks(id: string, fdcId: number | null, wikidata: string): Promise<void> {
+  await send(`/api/ingredients/${id}/links`, "PUT", { fdc_id: fdcId, wikidata });
 }

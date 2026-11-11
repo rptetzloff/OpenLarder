@@ -12,16 +12,17 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import ColumnElement, Row, exists, func, select
+from sqlalchemy import ColumnElement, Row, exists, func, or_, select
 from sqlalchemy.orm import aliased
 
-from openlarder import ingredients, openlibrary, substitutions, visibility, web
+from openlarder import fdc, ingredients, openlibrary, substitutions, visibility, web, wikidata
 from openlarder import recipes as recipe_entries
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import (
     Edition,
     Episode,
+    FdcFood,
     Ingredient,
     IngredientAlias,
     IngredientOption,
@@ -35,6 +36,7 @@ from openlarder.models import (
     WebPage,
 )
 from openlarder.routers.substitutions import SwapOut, swap_out
+from openlarder.wikidata import WikidataTransport
 
 router = APIRouter(prefix="/api/ingredients", tags=["ingredients"])
 
@@ -91,6 +93,20 @@ class Related(BaseModel):
     name: str
 
 
+class FdcLink(BaseModel):
+    fdc_id: int
+    description: str
+    data_type: str
+    category: str | None
+    url: str
+
+
+class WikidataLink(BaseModel):
+    id: str
+    label: str | None
+    url: str
+
+
 class IngredientOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -109,6 +125,12 @@ class IngredientOut(BaseModel):
     family_total: int
     # What can stand in for it.
     swaps: list[SwapOut]
+    # The same food in USDA FoodData Central and Wikidata (fdc.py).
+    fdc: FdcLink | None = None
+    wikidata: WikidataLink | None = None
+    # Other ingredients linked to the same record: likely the same
+    # ingredient, to merge.
+    same_records: list[Related] = []
 
 
 def contains_pattern(q: str) -> str:
@@ -366,9 +388,44 @@ async def get_ingredient(
                 visibility.options_seen_by(viewer),
             )
         )
+    food = await session.get(FdcFood, ingredient.fdc_id) if ingredient.fdc_id else None
+    same = []
+    linked = [
+        column == value
+        for column, value in (
+            (Ingredient.fdc_id, ingredient.fdc_id),
+            (Ingredient.wikidata_id, ingredient.wikidata_id),
+        )
+        if value is not None
+    ]
+    if linked:
+        same = [
+            Related(id=i, name=n)
+            for i, n in await session.execute(
+                select(Ingredient.id, Ingredient.name)
+                .where(
+                    Ingredient.id != ingredient.id,
+                    or_(*linked),
+                    visibility.ingredients_seen_by(viewer),
+                )
+                .order_by(func.lower(Ingredient.name))
+                .limit(20)
+            )
+        ]
     return IngredientOut(
         id=ingredient.id,
         name=ingredient.name,
+        fdc=_fdc_link(food) if food else None,
+        wikidata=(
+            WikidataLink(
+                id=ingredient.wikidata_id,
+                label=ingredient.wikidata_label,
+                url=wikidata.item_url(ingredient.wikidata_id),
+            )
+            if ingredient.wikidata_id
+            else None
+        ),
+        same_records=same,
         aliases=[AliasOut(id=a, name=n) for a, n in aliases],
         parent=Related(id=parent.id, name=parent.name) if parent else None,
         children=children,
@@ -484,6 +541,71 @@ async def delete_alias(
     await session.delete(alias)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _fdc_link(food: FdcFood) -> FdcLink:
+    return FdcLink(
+        fdc_id=food.fdc_id,
+        description=food.description,
+        data_type=food.data_type,
+        category=food.category,
+        url=fdc.food_url(food.fdc_id),
+    )
+
+
+class LinksIn(BaseModel):
+    # Both, each time; None unlinks.
+    fdc_id: int | None = None
+    # A Wikidata ID, or a link to the item.
+    wikidata: str | None = Field(None, max_length=300)
+
+
+@router.put("/{ingredient_id}/links", response_model=Named, dependencies=[SameOrigin])
+async def set_links(
+    ingredient_id: uuid.UUID,
+    body: LinksIn,
+    admin: ModeratorUser,
+    session: Session,
+    transport: WikidataTransport,
+) -> Named:
+    """Link the ingredient to a FoodData Central food and a Wikidata item,
+    or unlink it; answers with the ingredient."""
+    ingredient = await session.scalar(
+        select(Ingredient).where(
+            Ingredient.id == ingredient_id, visibility.ingredients_seen_by(admin)
+        )
+    )
+    if ingredient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingredient.")
+    if body.fdc_id is not None and await session.get(FdcFood, body.fdc_id) is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "No FoodData Central food has that ID here. Its generic foods are loaded from Admin.",
+        )
+    ingredient.fdc_id = body.fdc_id
+    raw = (body.wikidata or "").strip()
+    if not raw:
+        ingredient.wikidata_id = ingredient.wikidata_label = None
+    else:
+        try:
+            item = wikidata.parse_reference(raw)
+        except wikidata.BadReference as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+        if item != ingredient.wikidata_id:
+            try:
+                found = await wikidata.labels([item], transport)
+            except wikidata.Unavailable:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "Wikidata didn't answer. Try again in a minute.",
+                ) from None
+            if item not in found:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT, f"Wikidata has no item {item}."
+                )
+            ingredient.wikidata_id, ingredient.wikidata_label = item, found[item].label
+    await session.commit()
+    return Named(id=ingredient.id, name=ingredient.name)
 
 
 class ParentIn(BaseModel):

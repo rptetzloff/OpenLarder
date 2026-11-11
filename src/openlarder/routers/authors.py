@@ -14,11 +14,10 @@ itself is fixed. Editing a book changes only how that book prints the name.
 """
 
 import uuid
-from typing import Annotated, Literal
+from typing import Literal
 from urllib.parse import urlsplit
 
-import httpx2
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import aliased
@@ -29,18 +28,11 @@ from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
 from openlarder.routers.ingredients import contains_pattern
 from openlarder.routers.sources import BookSummary, summaries
+from openlarder.wikidata import WikidataTransport, wikidata_transport  # noqa: F401
 
 router = APIRouter(prefix="/api/authors", tags=["authors"])
 
 PAGE = 100
-
-
-def wikidata_transport() -> httpx2.AsyncBaseTransport | None:
-    """None means the real Wikidata; tests replace this with a fake."""
-    return None
-
-
-WikidataTransport = Annotated[httpx2.AsyncBaseTransport | None, Depends(wikidata_transport)]
 
 
 class KnownFor(BaseModel):
