@@ -448,8 +448,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       site's host name. Everything in the catalog goes, family collections
       and larder items included (*Ray, 2026-11-10*), with the catalog's
       history, flags, reports, proposals and import runs; accounts, groups,
-      larder lists, requests (unlinked) and the tag list stay. A test fails
-      when a new table isn't named as emptied or kept.
+      larder lists, requests (unlinked) and the tag list stay.
+      `--everything` empties those too (*Ray, 2026-11-10*): only the tag
+      list and the schema version are left, and the owner is set again by
+      hand. A test fails when a new table isn't named in one of the lists.
 - [x] **Backups** (*Ray, 2026-11-10*): Coolify's scheduled backups of the
       OpenLarder Postgres, daily, to a private R2 bucket of their own (never
       the public dump bucket: they hold accounts and private recipes), with

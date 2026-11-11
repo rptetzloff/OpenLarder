@@ -131,17 +131,22 @@ To import the household index again from scratch, in the app's container
 (Coolify's terminal for it):
 
 ```sh
-python -m openlarder.reset
+python -m openlarder.reset                # the catalog
+python -m openlarder.reset --everything   # and every account, group and request
 ```
 
 It lists what it would delete and asks for the site's host name
 (`OPENLARDER_PUBLIC_URL`'s, so `openlarder.com`); anything else deletes
-nothing. Everything in the catalog goes, family collections included, with
-people's larder items, the catalog's edit history, flags, reports, suggested
-changes and import history. Accounts, groups, larder lists, requests
-(unlinked, to link again as their books come back) and the tag list stay.
-There's no undo: run a backup first (Coolify's backups of the database, to their private
-R2 bucket; the data dumps are no backup).
+nothing. The catalog reset deletes everything in the catalog, family
+collections included, with people's larder items, the catalog's edit
+history, flags, reports, suggested changes and import history; accounts,
+groups, larder lists and requests (unlinked, to link again as their books
+come back) stay. `--everything` deletes those too, with all edit history and
+the list of published data dumps: only the tag list and the schema's version
+are left. After it you sign in as a new user, so make yourself owner again
+by hand (`roles.py` has the statement). There's no undo: run a backup first
+(Coolify's backups of the database, to their private R2 bucket; the data
+dumps are no backup).
 
 ## Tests
 
