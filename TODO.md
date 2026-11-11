@@ -443,9 +443,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Before launch
 
-- [ ] **Catalog reset script**: empties the catalog tables, keeps the
-      schema, accounts and the seeded diets, so the household index can be
-      imported again.
+- [x] **Catalog reset script** (#128): `python -m openlarder.reset` in the
+      app's container (README). Shows what it would delete and asks for the
+      site's host name. Everything in the catalog goes, family collections
+      and larder items included (*Ray, 2026-11-10*), with the catalog's
+      history, flags, reports, proposals and import runs; accounts, groups,
+      larder lists, requests (unlinked) and the tag list stay. A test fails
+      when a new table isn't named as emptied or kept.
 - [x] **Typo fixing in the importer** (#127): nothing is changed unasked
       (*Ray, 2026-11-10: "flag everything"*). At the end of each import
       run, a rare name close to a much commoner one ("Lemon Jucie", "Lemon Juice") is

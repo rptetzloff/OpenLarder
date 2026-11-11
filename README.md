@@ -125,6 +125,23 @@ instead.
 `/healthz` answers when the process is up; `/readyz` when it can reach the
 database, with the schema revision it is on. The API docs are at `/api/docs`.
 
+### Emptying the catalog
+
+To import the household index again from scratch, in the app's container
+(Coolify's terminal for it):
+
+```sh
+python -m openlarder.reset
+```
+
+It lists what it would delete and asks for the site's host name
+(`OPENLARDER_PUBLIC_URL`'s, so `openlarder.com`); anything else deletes
+nothing. Everything in the catalog goes, family collections included, with
+people's larder items, the catalog's edit history, flags, reports, suggested
+changes and import history. Accounts, groups, larder lists, requests
+(unlinked, to link again as their books come back) and the tag list stay.
+There's no undo: take a backup first.
+
 ## Tests
 
 ```sh
