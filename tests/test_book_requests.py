@@ -308,3 +308,13 @@ async def test_asking_by_title_for_a_book_here_points_to_it(client, adb) -> None
     # Still asked for, so asking again is a vote.
     again = (await client.post("/api/requests", json={"title": "jerusalem"})).json()
     assert again["outcome"] in ("voted", "already")
+
+
+async def test_a_book_that_stops_being_public_lets_go(client, adb, openlib) -> None:
+    rid = (await client.post("/api/requests", json={"isbn": PINK_CAKE})).json()["request"]["id"]
+    work = await _book(adb, "Pink Cake", PINK_CAKE)
+    assert (await _request(adb, rid))["source_id"] == work
+    await adb.execute(text("UPDATE sources SET review = 'returned' WHERE id = :w"), {"w": work})
+    assert (await _request(adb, rid))["source_id"] is None
+    await adb.execute(text("UPDATE sources SET review = 'published' WHERE id = :w"), {"w": work})
+    assert (await _request(adb, rid))["source_id"] == work

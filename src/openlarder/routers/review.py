@@ -18,7 +18,7 @@ from sqlalchemy import func, or_, select, update
 from openlarder import agreement, trust
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import BookRequest, Edition, Proposal, Recipe, Source, User
+from openlarder.models import Proposal, Recipe, Source, User
 from openlarder.routers.auth import Config
 
 router = APIRouter(tags=["review"])
@@ -129,18 +129,6 @@ def _decide(row: Source | Recipe, body: Decision, moderator: User) -> None:
     row.reviewed_by, row.reviewed_at = moderator.id, func.now()
 
 
-async def _close_requests(session, source: Source) -> None:
-    """A book now published closes the requests for it (routers/book_requests.py)."""
-    isbns = select(Edition.isbn13).where(
-        Edition.source_id == source.id, Edition.isbn13.is_not(None)
-    )
-    await session.execute(
-        update(BookRequest)
-        .where(BookRequest.isbn13.in_(isbns), BookRequest.status.in_(("open", "claimed")))
-        .values(status="done", source_id=source.id, claimed_by=None, closed_at=func.now())
-    )
-
-
 async def _source(session, source_id: uuid.UUID) -> Source:
     source = await session.get(Source, source_id, with_for_update=True)
     if source is None or source.kind == "family":
@@ -154,9 +142,8 @@ async def decide_source(
 ) -> Item:
     source = await _source(session, source_id)
     _decide(source, body, moderator)
-    await session.flush()
-    if source.review == "published":
-        await _close_requests(session, source)
+    # Publishing it links the requests for it (migration 0050); they stay
+    # open until someone marks them done (Ray, 2026-11-10).
     await session.commit()
     await session.refresh(source)
     return _item(source, await _names(session, [source.created_by]))
@@ -217,8 +204,6 @@ async def approve_all(
         )
     )
     await session.flush()
-    if published_source:
-        await _close_requests(session, source)
     for maker in makers:
         await trust.consider(session, maker, settings)
     await session.commit()
