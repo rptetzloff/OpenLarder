@@ -443,9 +443,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Before launch
 
-- [ ] **Catalog reset script**: empties the catalog tables, keeps the
-      schema, accounts and the seeded diets, so the household index can be
-      imported again.
+- [x] **Catalog reset script** (#128): `python -m openlarder.reset` in the
+      app's container (README). Shows what it would delete and asks for the
+      site's host name. Everything in the catalog goes, family collections
+      and larder items included (*Ray, 2026-11-10*), with the catalog's
+      history, flags, reports, proposals and import runs; accounts, groups,
+      larder lists, requests (unlinked) and the tag list stay.
+      `--everything` empties those too (*Ray, 2026-11-10*): only the tag
+      list and the schema version are left, and the owner is set again by
+      hand. A test fails when a new table isn't named in one of the lists.
+- [x] **Backups** (*Ray, 2026-11-10*): Coolify's scheduled backups of the
+      OpenLarder Postgres, daily, to a private R2 bucket of their own (never
+      the public dump bucket: they hold accounts and private recipes), with
+      an R2 token for that bucket only. The data dumps are no backup: public
+      catalog only, and nothing restores from them.
+      - [ ] A restore tested from the latest backup, before launch (not
+        before the dev reset: "it's still dev data", Ray, 2026-11-10).
 - [x] **Typo fixing in the importer** (#127): nothing is changed unasked
       (*Ray, 2026-11-10: "flag everything"*). At the end of each import
       run, a rare name close to a much commoner one ("Lemon Jucie", "Lemon Juice") is
