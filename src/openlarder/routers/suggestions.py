@@ -10,7 +10,9 @@ come to be used only by a private collection since. One naming an
 ingredient that has gone (merged or deleted since) can only be dismissed.
 A tag suggestion is the same for its recipe: hidden if the recipe has come
 to be private, dismissable only if the recipe or the tag has gone; accepting
-tags the recipe, as "Edit tags" would.
+tags the recipe, as "Edit tags" would. An allergen suggestion (allergen_rules.py,
+or n8n) is the same for its ingredient; accepting records the allergen on it,
+as its page would, and likely ones can be accepted a page at a time.
 """
 
 import uuid
@@ -21,11 +23,12 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import Float, case, func, select
 
-from openlarder import history, ingredients, visibility
-from openlarder.auth import ModeratorUser, SameOrigin
+from openlarder import allergen_rules, allergens, history, ingredients, visibility
+from openlarder.auth import AdminUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
     Ingredient,
+    IngredientAllergen,
     IngredientOption,
     Recipe,
     RecipeTag,
@@ -39,7 +42,8 @@ from openlarder.models import (
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 PAGE = 50
 # What accepting can do; line fixes wait for Workflow 3 and a page of their own.
-ACTIONABLE = {"merge", "parent", "tag"}
+ACTIONABLE = {"merge", "parent", "tag", "allergen"}
+Kind = Literal["merge", "parent", "line_fix", "tag", "allergen"]
 
 
 class Side(BaseModel):
@@ -69,6 +73,16 @@ class TagRef(BaseModel):
     already: bool = False
 
 
+class AllergenRef(BaseModel):
+    key: str
+    label: str
+    # What's suggested: contains or may_contain.
+    status: str
+    # The ingredient records something about it already, or inherits it.
+    already: bool = False
+    exists: bool = True
+
+
 class SuggestionOut(BaseModel):
     id: uuid.UUID
     kind: str
@@ -81,6 +95,8 @@ class SuggestionOut(BaseModel):
     # tag: the recipe, and the tag for it.
     recipe: RecipeRef | None = None
     tag: TagRef | None = None
+    # allergen: the ingredient (as a), and the allergen for it.
+    allergen: AllergenRef | None = None
     reason: str | None
     similarity: float | None
     # merge-v2 on: the model's word for how sure it is. A 12B model asked
@@ -129,6 +145,30 @@ def _tag_target(row: Suggestion) -> tuple[uuid.UUID, uuid.UUID] | None:
         return None
 
 
+def _allergen_target(row: Suggestion) -> tuple[uuid.UUID, str, str] | None:
+    """An allergen suggestion's ingredient, allergen and status; None if it
+    doesn't name them."""
+    p = row.proposal if isinstance(row.proposal, dict) else {}
+    if row.kind != "allergen":
+        return None
+    try:
+        wanted = str(p["status"])
+        if wanted not in ("contains", "may_contain"):
+            return None
+        return uuid.UUID(str(p["ingredient_id"])), str(p["allergen"]), wanted
+    except (KeyError, ValueError):
+        return None
+
+
+def _named(row: Suggestion) -> list[uuid.UUID]:
+    """The ingredients a suggestion names."""
+    if ids := _ids(row):
+        return list(ids)
+    if t := _allergen_target(row):
+        return [t[0]]
+    return []
+
+
 def _similarity():
     # n8n writes it as a string ("0.9888"); anything else sorts last.
     raw = Suggestion.proposal["similarity"].astext
@@ -150,7 +190,7 @@ def _hidden_ingredient_ids(viewer: User):
 
 
 async def _visible(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion]:
-    named = {i for r in rows if (ids := _ids(r)) for i in ids}
+    named = {i for r in rows for i in _named(r)}
     hidden = (
         set(await session.scalars(_hidden_ingredient_ids(viewer).where(Ingredient.id.in_(named))))
         if named
@@ -169,13 +209,12 @@ async def _visible(session, viewer: User, rows: list[Suggestion]) -> list[Sugges
     return [
         r
         for r in rows
-        if not ((ids := _ids(r)) and hidden & set(ids))
-        and not ((t := _tag_target(r)) and t[0] in hidden_recipes)
+        if not (hidden & set(_named(r))) and not ((t := _tag_target(r)) and t[0] in hidden_recipes)
     ]
 
 
 async def _out(session, viewer: User, rows: list[Suggestion]) -> list[SuggestionOut]:
-    named = {i for r in rows if (ids := _ids(r)) for i in ids}
+    named = {i for r in rows for i in _named(r)}
     names = dict(
         (
             await session.execute(
@@ -213,10 +252,17 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
             select(Tag).where(Tag.id.in_([t[1] for t in targets.values()]))
         )
     }
+    labels = {a.key: a.label for a in await allergens.listed(session)}
+    on_ingredients = {r.id: t for r in rows if (t := _allergen_target(r))}
+    recorded = await allergens.recorded(
+        session, list({t[0] for t in on_ingredients.values() if t[0] in names})
+    )
     out = []
     for r in rows:
         p = r.proposal if isinstance(r.proposal, dict) else {}
         ids = _ids(r)
+        if r.id in on_ingredients:
+            ids = (on_ingredients[r.id][0],)
         sides = []
         for i, key in zip(ids or (), ("a_name", "b_name"), strict=False):
             sides.append(
@@ -228,6 +274,18 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 )
             )
         a, b = (sides + [None, None])[:2]
+        allergen_ref = None
+        if r.id in on_ingredients:
+            ingredient_id, key, wanted = on_ingredients[r.id]
+            if a is not None and not a.exists:
+                a.name = str(p.get("ingredient_name") or a.name)
+            allergen_ref = AllergenRef(
+                key=key,
+                label=labels.get(key, key),
+                status=wanted,
+                already=key in recorded.get(ingredient_id, {}),
+                exists=key in labels,
+            )
         try:
             similarity = float(p["similarity"])
         except (KeyError, TypeError, ValueError):
@@ -273,10 +331,13 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 decided_at=r.decided_at,
                 recipe=recipe_ref,
                 tag=tag_ref,
+                allergen=allergen_ref,
                 actionable=r.kind in ACTIONABLE
                 and (
                     bool(recipe_ref and tag_ref and recipe_ref.exists and tag_ref.exists)
                     if r.kind == "tag"
+                    else bool(a and a.exists and allergen_ref and allergen_ref.exists)
+                    if r.kind == "allergen"
                     else (a is not None and b is not None and a.exists and b.exists)
                 ),
             )
@@ -289,7 +350,7 @@ async def list_suggestions(
     admin: ModeratorUser,
     session: Session,
     state: Literal["open", "decided"] = "open",
-    kind: Literal["merge", "parent", "line_fix", "tag"] | None = None,
+    kind: Kind | None = None,
     offset: int = Query(0, ge=0),
 ) -> SuggestionPage:
     # The queue is small (hundreds), and which an admin may see depends on
@@ -386,6 +447,9 @@ async def accept(
         if not await _has_tag(session, recipe.id, tag.id):
             session.add(RecipeTag(recipe_id=recipe.id, tag_id=tag.id))
         return await _decide(session, admin, row, "accepted")
+    if row.kind == "allergen":
+        await _record_allergen(session, row)
+        return await _decide(session, admin, row, "accepted")
     ids = _ids(row)
     found = [await session.get(Ingredient, i) for i in ids] if ids else []
     if row.kind not in ACTIONABLE or len(found) != 2 or None in found:
@@ -422,3 +486,73 @@ async def dismiss(
 ) -> SuggestionOut:
     row = await _open_or_404(session, admin, suggestion_id)
     return await _decide(session, admin, row, "dismissed")
+
+
+async def _record_allergen(session, row: Suggestion) -> None:
+    """Record a suggested allergen on its ingredient, beside what it records."""
+    target = _allergen_target(row)
+    ingredient = await session.get(Ingredient, target[0]) if target else None
+    if target is None or ingredient is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This can't be accepted: its ingredient has gone. Dismiss it.",
+        )
+    own = {
+        a.allergen: a.status
+        for a in await session.scalars(
+            select(IngredientAllergen).where(IngredientAllergen.ingredient_id == ingredient.id)
+        )
+    }
+    try:
+        await allergens.record(session, ingredient, {**own, target[1]: target[2]})
+    except allergens.Unknown as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{exc} Dismiss it.") from None
+
+
+class Ids(BaseModel):
+    ids: list[uuid.UUID]
+
+
+class Done(BaseModel):
+    done: int
+    # Decided already, gone, hidden, or not an allergen suggestion.
+    skipped: int
+
+
+@router.post("/accept-allergens", response_model=Done, dependencies=[SameOrigin])
+async def accept_allergens(body: Ids, admin: ModeratorUser, session: Session) -> Done:
+    """Accept many allergen suggestions at once: a page of likely ones."""
+    rows = list(
+        await session.scalars(
+            select(Suggestion)
+            .where(
+                Suggestion.id.in_(body.ids),
+                Suggestion.kind == "allergen",
+                Suggestion.status == "open",
+            )
+            .with_for_update()
+        )
+    )
+    rows = await _visible(session, admin, rows)
+    done = 0
+    for row in rows:
+        await history.via(session, f"suggestion:{row.id}")
+        try:
+            async with session.begin_nested():
+                await _record_allergen(session, row)
+        except HTTPException:
+            continue
+        row.status, row.decided_by, row.decided_at = "accepted", admin.id, func.now()
+        done += 1
+    await session.commit()
+    return Done(done=done, skipped=len(set(body.ids)) - done)
+
+
+class Suggested(BaseModel):
+    suggested: int
+
+
+@router.post("/allergens", response_model=Suggested, dependencies=[SameOrigin])
+async def suggest_allergens(admin: AdminUser, session: Session) -> Suggested:
+    """Suggest allergens from ingredients' names (allergen_rules.py)."""
+    return Suggested(suggested=await allergen_rules.suggest(session))

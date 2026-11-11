@@ -115,9 +115,22 @@ async def n8n(adb):
 async def test_the_role_reads_the_views_and_not_the_tables(n8n, adb) -> None:
     await _ingredient(adb, "rhubarb")
     assert [r.name for r in await n8n("SELECT name FROM public_ingredients")] == ["rhubarb"]
-    for view in ("public_recipes", "public_tags", "public_recipe_tags"):
+    for view in (
+        "public_recipes",
+        "public_tags",
+        "public_recipe_tags",
+        "public_allergens",
+        "public_ingredient_allergens",
+    ):
         await n8n(f"SELECT 1 FROM {view}")
-    for table in ("ingredients", "recipe_ingredients", "sources", "users", "recipe_tags"):
+    for table in (
+        "ingredients",
+        "recipe_ingredients",
+        "sources",
+        "users",
+        "recipe_tags",
+        "ingredient_allergens",
+    ):
         with pytest.raises(DBAPIError, match="permission denied"):
             await n8n(f"SELECT 1 FROM {table}")
 

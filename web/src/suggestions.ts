@@ -9,7 +9,7 @@ export interface Side {
 
 export interface Suggestion {
   id: string;
-  kind: "merge" | "parent" | "line_fix" | "tag";
+  kind: "merge" | "parent" | "line_fix" | "tag" | "allergen";
   decision: string | null;
   keep: "a" | "b" | null;
   a: Side | null;
@@ -24,6 +24,15 @@ export interface Suggestion {
     exists: boolean;
   } | null;
   tag: { id: string; kind: string; name: string; exists: boolean; already: boolean } | null;
+  // allergen: the ingredient (as a), and the allergen for it; already when
+  // the ingredient records or inherits something about it.
+  allergen: {
+    key: string;
+    label: string;
+    status: "contains" | "may_contain";
+    already: boolean;
+    exists: boolean;
+  } | null;
   reason: string | null;
   similarity: number | null;
   // merge-v2 on: the model's word for how sure it is.
@@ -47,6 +56,7 @@ export const KIND_LABELS: Record<string, string> = {
   merge: "Same ingredient",
   parent: "One under another",
   tag: "Tag a recipe",
+  allergen: "Allergen",
   line_fix: "Line fix",
 };
 
@@ -61,6 +71,27 @@ export async function fetchSuggestions(params: {
   const res = await fetch(`/api/suggestions?${query}`);
   if (!res.ok) throw new Error("The suggestions couldn't be loaded.");
   return res.json();
+}
+
+async function post(path: string, body: unknown = {}) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof out.detail === "string" ? out.detail : "That didn't work.");
+  return out;
+}
+
+// Administrators: suggest allergens from ingredients' names; how many are new.
+export async function suggestAllergens(): Promise<number> {
+  return (await post("/api/suggestions/allergens")).suggested;
+}
+
+// Accept many allergen suggestions at once.
+export async function acceptAllergens(ids: string[]): Promise<{ done: number; skipped: number }> {
+  return post("/api/suggestions/accept-allergens", { ids });
 }
 
 // Accepts (with the name to keep, for a merge) or dismisses; resolves to the
