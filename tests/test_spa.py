@@ -1,5 +1,5 @@
 """The built SPA: index.html and a missing file are never reused from a cache;
-other files are."""
+a hashed file is kept a year; other files are cached as usual."""
 
 import httpx2
 from fastapi import FastAPI
@@ -37,17 +37,44 @@ def test_paths_outside_the_build_get_index_html(tmp_path) -> None:
 
 async def test_a_missing_asset_is_a_404_nobody_keeps(tmp_path) -> None:
     """A deploy's old server can be asked for the new build's files."""
-    (tmp_path / "index-abc.css").write_text("body{}")
+    (tmp_path / "index-abc12345.css").write_text("body{}")
     app = FastAPI()
     app.mount("/assets", Assets(directory=tmp_path), name="assets")
     transport = httpx2.ASGITransport(app=app)
     async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
         missing = await client.get("/assets/index-new.css")
-        present = await client.get("/assets/index-abc.css")
+        present = await client.get("/assets/index-abc12345.css")
     assert missing.status_code == 404
     assert missing.headers["cache-control"] == "no-store"
     assert present.status_code == 200
-    assert "cache-control" not in present.headers
+    assert present.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
+async def test_only_a_hashed_name_is_kept_a_year(tmp_path) -> None:
+    """Its name means its content; any other name might be replaced."""
+    for name in ("index-tpFCub3m.js", "index-_l8a2TQy.css", "plain.js", "logo.svg"):
+        (tmp_path / name).write_text("x")
+    app = FastAPI()
+    app.mount("/assets", Assets(directory=tmp_path), name="assets")
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
+        kept = {
+            n: (await client.get(f"/assets/{n}")).headers.get("cache-control")
+            for n in ("index-tpFCub3m.js", "index-_l8a2TQy.css", "plain.js", "logo.svg")
+        }
+        again = await client.get(
+            "/assets/index-tpFCub3m.js",
+            headers={
+                "If-None-Match": (await client.get("/assets/index-tpFCub3m.js")).headers["etag"]
+            },
+        )
+    assert (
+        kept["index-tpFCub3m.js"]
+        == kept["index-_l8a2TQy.css"]
+        == "public, max-age=31536000, immutable"
+    )
+    assert kept["plain.js"] is None and kept["logo.svg"] is None
+    assert again.status_code == 304 and "immutable" in again.headers["cache-control"]
 
 
 def test_fonts_go_out_as_fonts() -> None:

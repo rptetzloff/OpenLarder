@@ -441,8 +441,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] Undo can't reverse a merge (a recipe's places move with it, by
         composite keys a row-by-row undo can't put back); it says so and
         changes nothing. A dedicated "unmerge" if it's ever needed.
-- [ ] **Long-lived caching for the build's hashed files**: optional; a 404
-      for a missing one is already never cached (#42).
+- [x] **Long-lived caching for the build's hashed files** (#130): a file
+      under `/assets` with a build hash in its name is kept a year,
+      immutable; its 404 is still never kept (#42), and index.html is still
+      re-checked. Cloudflare respects the app's headers (Ray, 2026-11-10).
 
 ## Before launch
 

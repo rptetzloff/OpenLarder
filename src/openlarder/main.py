@@ -231,8 +231,8 @@ def spa_response(
     index.html is sent with no-cache: it names the build's hashed scripts, and
     a browser that reused an old copy would ask for scripts a new deploy has
     removed and show a blank page, which happened on 2026-11-07. The hashed
-    files under /assets keep ordinary caching, since a new build never reuses
-    their names.
+    files under /assets are kept a year (Assets), since a new build never
+    reuses their names.
     """
     candidate = (web_dir / path).resolve()
     if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
@@ -252,23 +252,38 @@ def spa_response(
     return HTMLResponse(page, headers=headers)
 
 
+# A Vite build's name for a file: its name, a hash of its content, its type
+# ("index-tpFCub3m.js").
+HASHED = re.compile(r"-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$")
+# A year, and never re-checked: the name changes when the content does.
+KEEP = "public, max-age=31536000, immutable"
+
+
 class Assets(StaticFiles):
-    """The build's hashed files, whose 404 must not be cached.
+    """The build's hashed files: kept a year, and their 404 never kept.
 
     During a deploy the old and new servers answer side by side, so a page
     from the new one can ask the old one for a file it doesn't have yet.
     Sent without Cache-Control, that 404 was given Cloudflare's four-hour
     browser default, and the site stayed unstyled for whoever got it, on
     2026-11-08. no-store makes the next load ask again.
+
+    A file a server has is kept a year, immutable, but only under a hashed
+    name: that name always means the same content, whichever server sends
+    it, so no server can mark a file wrongly. Cloudflare respects the
+    app's headers (Browser Cache TTL, set by Ray on 2026-11-10).
     """
 
     async def get_response(self, path: str, scope) -> Response:
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except StarletteHTTPException as exc:
             if exc.status_code != 404:
                 raise
             raise StarletteHTTPException(404, headers={"Cache-Control": "no-store"}) from None
+        if response.status_code in (200, 304) and HASHED.search(path):
+            response.headers["Cache-Control"] = KEEP
+        return response
 
 
 if WEB_DIR.is_dir():
