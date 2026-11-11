@@ -218,3 +218,33 @@ async def labels(
         if _Q.match(item):
             found.setdefault(item, Label(item, _value(row, "label"), _value(row, "description")))
     return found
+
+
+async def by_ndb(transport: httpx2.AsyncBaseTransport | None = None) -> dict[int, Label]:
+    """Every item citing a USDA NDB number (P1978), by the number: some
+    1,500, in one query. Where several cite one, one with an English label,
+    the oldest first."""
+    query = """SELECT ?item ?ndb ?label WHERE {
+  ?item wdt:P1978 ?ndb .
+  OPTIONAL { ?item rdfs:label ?label FILTER(LANG(?label) = "en") }
+}"""
+    async with httpx2.AsyncClient(
+        transport=transport, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
+    ) as client:
+        rows = await _ask(client, query)
+    found: dict[int, Label] = {}
+
+    def preferred(row: dict[str, Any]) -> tuple[bool, int]:
+        # One with an English label, then the oldest (the lowest number).
+        number = re.sub(r"\D", "", (_value(row, "item") or "").rsplit("/", 1)[-1])
+        return (_value(row, "label") is None, int(number or 0))
+
+    for row in sorted(rows, key=preferred):
+        item = (_value(row, "item") or "").rsplit("/", 1)[-1]
+        try:
+            ndb = int(_value(row, "ndb") or "")
+        except ValueError:
+            continue
+        if _Q.match(item):
+            found.setdefault(ndb, Label(item, _value(row, "label"), None))
+    return found
