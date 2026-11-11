@@ -57,3 +57,15 @@ SELECT 'tag', jsonb_build_array(r.id::text, t.id::text),
        'A loaf of bread, in the Yeast Breads chapter.', 0.9, 'gemma4:12b', 'tag-v1'
 FROM r, tags t WHERE t.kind = 'course' AND t.name = 'Bread'
 ON CONFLICT DO NOTHING;
+
+-- A merge of two books, one undone, for Merged books (book_merge.py): into
+-- the source above, by the administrator.
+INSERT INTO book_merges (gone_id, gone_title, kept_id, merged_by, saved, undone_by, undone_at)
+SELECT gen_random_uuid(), t.title, s.id, u.id,
+       jsonb_build_object('editions', jsonb_build_array(gen_random_uuid()::text),
+                          'recipes', '[]'::jsonb),
+       CASE WHEN t.undone THEN u.id END, CASE WHEN t.undone THEN now() END
+FROM sources s, users u,
+     (VALUES ('Tag Suggestion Kitchen (second printing)', false),
+             ('Tag Suggestion Kitchen, revised', true)) AS t (title, undone)
+WHERE s.title = 'Tag Suggestion Kitchen' AND u.subject = 'admin';

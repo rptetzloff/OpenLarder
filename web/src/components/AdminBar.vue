@@ -17,6 +17,7 @@ const LINKS = [
   ["/admin/reports", "Reports", false],
   ["/admin/suggestions", "Suggestions", false],
   ["/admin/changes", "Recent changes", false],
+  ["/admin/merges", "Merged books", true],
   ["/admin/people", "People", false],
   ["/admin/api", "API usage", true],
   ["/admin/clicks", "Buy-link clicks", true],

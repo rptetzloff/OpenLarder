@@ -59,6 +59,8 @@ export function cameThrough(via: string | null): string | null {
   if (via.startsWith("import")) return "a bulk import";
   if (via.startsWith("suggestion")) return "an accepted suggestion";
   if (via.startsWith("revert")) return "an undo";
+  if (via.startsWith("merge:")) return "a merge of two books";
+  if (via.startsWith("unmerge:")) return "an unmerge";
   return via;
 }
 

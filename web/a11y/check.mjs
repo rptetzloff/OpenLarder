@@ -226,6 +226,7 @@ function pages(s) {
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],
     ["/admin/clicks", "admin"],
+    ["/admin/merges", "admin"],
     ["/admin/people", "admin"],
     ["/admin/changes", "admin"],
     ["/admin/review", "admin"],
