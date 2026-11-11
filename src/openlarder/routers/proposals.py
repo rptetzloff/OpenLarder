@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import history, recipes, references, visibility
+from openlarder import history, ingredients, lines, recipes, references, visibility
 from openlarder.agreement import Contributing
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
@@ -37,6 +37,20 @@ class Difference(BaseModel):
     label: str
     now: str
     proposed: str
+
+
+class Similar(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class NewIngredient(BaseModel):
+    """A name in the proposed lines no ingredient has yet: applying the
+    change adds it. With the ingredients named most like it, in case it's
+    one of them written differently."""
+
+    name: str
+    similar: list[Similar]
 
 
 class ProposalOut(BaseModel):
@@ -59,6 +73,8 @@ class ProposalOut(BaseModel):
     changed_since: bool
     # Only what it would change.
     differences: list[Difference]
+    # A recipe change's ingredients that would be new to the catalog.
+    new_ingredients: list[NewIngredient] = []
 
 
 def _squash(text: str | None) -> str | None:
@@ -184,6 +200,31 @@ async def _source_differences(session, source: Source, viewer: User, body: dict)
     )
 
 
+# Names like an unmatched one, for each; one query apiece.
+MAX_NEW = 20
+
+
+async def _new_ingredients(session, viewer: User, body: dict) -> list[NewIngredient]:
+    """The proposed lines' ingredients that no ingredient the viewer can see
+    has the name (or another name) of, as the recipe form works it out."""
+    wanted: dict[str, str] = {}
+    for line in RecipeIn.model_validate(body).ingredients:
+        for option in lines.options(" ".join(line.split())) if line.strip() else []:
+            if option.page is None and (key := ingredients.match_key(option.name)):
+                wanted.setdefault(key, option.name)
+    if not wanted:
+        return []
+    seen = visibility.ingredients_seen_by(viewer)
+    known = await ingredients.known(session, set(wanted), seen)
+    new = []
+    for key, name in list(wanted.items())[:MAX_NEW]:
+        if key in known:
+            continue
+        like = await ingredients.like(session, name, seen)
+        new.append(NewIngredient(name=name, similar=[Similar(id=i, name=n) for i, n in like]))
+    return new
+
+
 async def _out_one(session, p: Proposal, viewer: User) -> ProposalOut:
     by = await session.scalar(select(User.display_name).where(User.id == p.proposed_by))
     common = {
@@ -208,6 +249,9 @@ async def _out_one(session, p: Proposal, viewer: User) -> ProposalOut:
             recipe_id=recipe.id,
             changed_since=(newest or 0) > (p.based_on or 0),
             differences=await _recipe_differences(session, recipe, viewer, p.body),
+            new_ingredients=(
+                await _new_ingredients(session, viewer, p.body) if p.status == "open" else []
+            ),
         )
     source = await session.get_one(Source, p.source_id)
     newest = await _source_newest(session, source.id)

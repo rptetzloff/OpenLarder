@@ -202,7 +202,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         each waiting recipe at `/admin/review` lists the ingredients no
         published recipe uses yet; approving keeps them, or a moderator
         merges one into the ingredient it's another name for (its name
-        becomes an alias).
+        becomes an alias). A suggested change to a published recipe (#129)
+        lists the ingredients applying it would add, each with the names
+        most like it, so a moderator can decline one that's an existing
+        ingredient written differently.
       - [ ] Edit history keeps everything forever: check its size once the
         household index is imported again (~400,000 rows for 19,000 recipes).
 

@@ -234,3 +234,32 @@ async def test_what_book_changes_cant_be_proposed(people, adb) -> None:
         await ann.post("/api/sources/family", json={"title": "Box", "acknowledged": True})
     ).json()["id"]
     assert (await con.post(f"/api/sources/{box}/proposals", json={"title": "X"})).status_code == 404
+
+
+async def test_a_moderator_sees_the_ingredients_a_change_would_add(people, adb) -> None:
+    """The new-ingredient step for suggested changes: before applying, what
+    it adds, with the names like each in case it's one written differently."""
+    mo, con = await people("mo", role="moderator"), await people("con", role="contributor")
+    book, edition, recipe = await _published(mo, adb)
+    herbs = await mo.post(
+        f"/api/sources/{book}/recipes",
+        json={
+            "title": "Herbs",
+            "editions": [{"edition_id": edition, "page": "20"}],
+            "ingredients": ["Fresh Chives"],
+        },
+    )
+    assert herbs.status_code == 201, herbs.text
+    await con.post(
+        f"/api/recipes/{recipe}/proposals",
+        json=_edit(edition, lines=("eggs", "Chives", "Zaatar (p. 9)", "Eggs or Sumac")),
+    )
+    [p] = (await mo.get("/api/review/proposals")).json()
+    new = {n["name"]: [s["name"] for s in n["similar"]] for n in p["new_ingredients"]}
+    # eggs is here; a page reference is a component, not an ingredient.
+    assert set(new) == {"Chives", "Sumac"}
+    assert "Fresh Chives" in new["Chives"]
+    # Once applied, nothing's new any more.
+    r = await mo.post(f"/api/proposals/{p['id']}", json={"action": "apply"})
+    assert r.status_code == 200, r.text
+    assert r.json()["new_ingredients"] == []
