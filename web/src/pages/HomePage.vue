@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CoverBlank from "../components/CoverBlank.vue";
 import { onMounted, ref } from "vue";
 import { type BookSummary, KIND_NAMES, listSources } from "../books";
 import IngredientPicker from "../components/IngredientPicker.vue";
@@ -94,7 +95,7 @@ function byline(s: BookSummary) {
         <li v-for="s in recent" :key="s.id">
           <a :href="`/sources/${s.id}`" class="cover-card">
             <img v-if="s.cover_url" :src="s.cover_url" alt="" loading="lazy" />
-            <span v-else class="cover-blank" aria-hidden="true"></span>
+            <CoverBlank v-else :title="s.title" :byline="s.authors.join(', ') || s.host" :kind="s.kind" />
             <span class="kind">{{ KIND_NAMES[s.kind] }}</span>
             <strong>{{ s.title }}</strong>
             <span class="byline">{{ byline(s) }}</span>

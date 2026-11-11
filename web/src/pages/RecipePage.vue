@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { arrange } from "../shops";
-import { buyHref, DISCLOSURE, notes } from "../buying";
+import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
@@ -274,7 +274,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                       :key="b.retailer"
                       :href="buyHref(b)"
                       rel="sponsored noopener"
-                      >{{ b.label }}</a
+                      >{{ shopName(b) }}</a
                     >
                   </p>
                   <p class="buy-note">{{ DISCLOSURE }}</p>

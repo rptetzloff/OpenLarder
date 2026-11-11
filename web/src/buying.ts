@@ -7,7 +7,14 @@ export interface BuyLink {
   url: string;
   // What the shop's programme asks to be said beside its link (Amazon's).
   note: string | null;
+  format: "print" | "ebook";
 }
+
+// The shop's name, saying so when it's the ebook.
+export const shopName = (link: BuyLink) =>
+  link.format === "ebook" ? `${link.label} (ebook)` : link.label;
+
+export const FORMAT_NAMES = { print: "Print", ebook: "Ebook" } as const;
 
 // Each shop's own words, once each, for the links shown.
 export const notes = (links: BuyLink[]) => [

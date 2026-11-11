@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { BuyLink } from "../buying";
+import { type BuyLink, shopName } from "../buying";
 import { arrange, saveShopPrefs, shopPrefs } from "../shops";
 
 // Choosing the buy-link shops: their order, and which to hide, one always
@@ -8,7 +8,7 @@ import { arrange, saveShopPrefs, shopPrefs } from "../shops";
 const props = defineProps<{ links: BuyLink[]; signedIn: boolean }>();
 
 const error = ref("");
-const labels = computed(() => new Map(props.links.map((l) => [l.retailer, l.label])));
+const labels = computed(() => new Map(props.links.map((l) => [l.retailer, shopName(l)])));
 const hidden = computed(() => new Set(shopPrefs.value?.hidden ?? []));
 // Every shop offered here, hidden ones too, in the order chosen.
 const order = computed(() =>
