@@ -20,6 +20,7 @@ const openSuggestions = ref<number | null>(null);
 const waiting = ref<number | null>(null);
 const reported = ref<number | null>(null);
 const imports = ref<number | null>(null);
+const linksWaiting = ref<number | null>(null);
 const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
 
 async function loadCounts() {
@@ -31,6 +32,9 @@ async function loadCounts() {
       : Promise.reject(),
     reviewQueue().then((q) => (waiting.value = q.pending)),
     reportQueue("open").then((q) => (reported.value = q.counts.open ?? 0)),
+    fetch("/api/fdc/suggestions")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((p) => (linksWaiting.value = p.counts.likely)),
   ]);
   if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
   if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
@@ -208,6 +212,13 @@ async function archiveAll() {
             <h2>Suggestions</h2>
             <p class="count">{{ n(openSuggestions, "open", "open") }}</p>
             <p>Ingredients a local model thinks are the same, or belong under another.</p>
+          </a>
+        </li>
+        <li>
+          <a href="/admin/links">
+            <h2>Ingredient links</h2>
+            <p class="count">{{ n(linksWaiting, "likely", "likely") }}</p>
+            <p>The USDA FoodData Central food and Wikidata item each ingredient is probably the same as.</p>
           </a>
         </li>
         <li v-if="user.may_run">

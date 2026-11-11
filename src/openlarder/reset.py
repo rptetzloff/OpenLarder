@@ -78,6 +78,7 @@ CATALOG = (
     "import_runs",
     "import_run_lines",
     "book_merges",
+    "ingredient_link_suggestions",
 )
 # Emptied too with --everything. (revisions: a catalog reset deletes the
 # catalog's history from it, and this all of it.)

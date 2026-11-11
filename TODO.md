@@ -148,10 +148,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         food search; shown to everyone under "The same food elsewhere",
         with other ingredients linked to the same record as likely merges.
         A merge keeps the links. Both IDs are in the dumps (CC0).
-      - [ ] **Matching:** propose links for the most used ingredients
-        first, for a person to confirm; FDC and Wikidata tied by SR
-        Legacy's NDB number (Wikidata's P1978). Measured on the household
-        index locally first.
+      - [x] **Matching (#134):** Admin › Ingredient links. "Suggest
+        links" (administrators) finds, for each public ingredient without
+        one, the FDC food whose words are its words (likely) or one word
+        more (unsure), and a Wikidata item through SR Legacy's NDB numbers
+        (Wikidata's P1978; always unsure, often the plant). Moderators
+        accept or dismiss each, or accept a page of likely ones at once;
+        a dismissed one isn't suggested again. On the household index:
+        355 likely and 74 unsure of the 1,000 most used names, 58% of
+        ingredient uses likely; 940 suggestions in all.
       - [ ] **Using them:** Wikidata's other names as suggested aliases,
         and its "subclass of" as suggested parents, through the
         Suggestions queue.

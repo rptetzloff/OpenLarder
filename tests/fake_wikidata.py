@@ -36,6 +36,8 @@ class FakeWikidata:
         self.queries: list[str] = []
         self.user_agents: set[str] = set()
         self.fail_with: int | None = None
+        # Items citing a USDA NDB number (P1978): row("Q1", ndb="11282", label="onion").
+        self.by_ndb: list[dict] = []
 
     def handle(self, request: httpx2.Request) -> httpx2.Response:
         query = parse_qs(request.content.decode())["query"][0]
@@ -43,7 +45,9 @@ class FakeWikidata:
         self.user_agents.add(request.headers.get("user-agent", ""))
         if self.fail_with:
             return httpx2.Response(self.fail_with)
-        if "VALUES ?ol" in query:
+        if "P1978" in query:
+            rows = self.by_ndb
+        elif "VALUES ?ol" in query:
             asked = set(re.findall(r'"(OL[0-9]+A)"', query))
             rows = [r for r in self.by_ol if r.get("ol", {}).get("value") in asked]
         else:
