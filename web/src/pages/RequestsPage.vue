@@ -98,8 +98,8 @@ function turnDown(r: BookRequest) {
       <p class="muted">
         Ask for a cookbook, or another source, to be indexed. If someone asked for it already,
         yours counts as a vote. Contributors claim a request to queue it up, though anyone may enter it
-        sooner; a claim with nothing done for 30 days is open again. Once the book is here with
-        a recipe, its request closes by itself; a claimer keeps theirs while they work on it.
+        sooner; a claim with nothing done for 30 days is open again; each recipe added to the book
+        keeps a claim alive. A request is done when someone marks the book finished.
       </p>
     </div>
 

@@ -14,9 +14,9 @@ claim it. A contributor releases a claim, or marks it done; a moderator
 declines a request, saying why.
 
 The database follows a request's book in (migration 0050): it's linked to
-the source once that has its ISBN (or, with none, its title), and closed
-once the source has a published recipe, unless it's claimed: then each
-recipe keeps the claim alive, and its claimer marks it done.
+the source once that has its ISBN (or, with none, its title), and each
+recipe added keeps a claim alive. It stays open until someone marks it
+done: a book with a few recipes isn't indexed yet.
 """
 
 import uuid
@@ -251,11 +251,6 @@ async def ask(
         source_id = await session.scalar(
             select(Source.id).where(func.lower(Source.title) == title.lower(), *public).limit(1)
         )
-    if source_id and await session.scalar(
-        select(exists().where(Recipe.source_id == source_id, Recipe.review == "published"))
-    ):
-        return Asked(outcome="in_catalog", source_id=source_id)
-
     # Asked for already: a vote.
     same = (
         BookRequest.isbn13 == isbn13 if isbn13 else func.lower(BookRequest.title) == title.lower()
@@ -268,6 +263,11 @@ async def ask(
         await session.commit()
         [out] = await _out(session, [existing], voter, viewer)
         return Asked(outcome="voted" if counted else "already", request=out)
+
+    if source_id and await session.scalar(
+        select(exists().where(Recipe.source_id == source_id, Recipe.review == "published"))
+    ):
+        return Asked(outcome="in_catalog", source_id=source_id)
 
     if isbn13 and not title:
         try:

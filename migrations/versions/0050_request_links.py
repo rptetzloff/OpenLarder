@@ -1,18 +1,16 @@
 """Requests follow their book into the catalog.
 
-*Ray, 2026-11-09, step 2 of requests:* a request closes when anyone enters
-its book, the book is linked to it as it's entered, and work on the book
-keeps a claim alive. Done in the database, so every way in counts the same:
-the forms, an import, a moderator approving a contributor's book.
+*Ray, 2026-11-09, step 2 of requests:* the book is linked to its request
+as it's entered, and work on the book keeps a claim alive. A request stays
+open until someone marks it done (*Ray, 2026-11-10: "until marked
+finished"*), since a book with a few recipes isn't indexed yet. Done in the
+database, so every way in counts the same: the forms, an import, a
+moderator approving a contributor's book.
 
 When a public, published source has an edition with a request's ISBN (or,
 for a request with no ISBN, the same title), the request is linked to it.
-Once that source has a published recipe:
-
-- an open request, or a claim gone quiet past 30 days, is done: the book is
-  being indexed and nobody is queueing it;
-- a live claim is kept alive instead (each recipe is work on it), and stays
-  with its claimer until they mark it done.
+Each change to that source, its editions or its recipes then keeps a live
+claim alive; a claim already lapsed stays lapsed, for anyone to take.
 
 A private family collection never links: it says nothing of itself.
 
@@ -56,27 +54,13 @@ def upgrade() -> None:
                OR (r.isbn13 IS NULL AND lower(r.title) = lower(s.title))
              );
 
-          IF EXISTS (
-            SELECT 1 FROM recipes x
-              JOIN sources s ON s.id = x.source_id
-             WHERE x.source_id = p_source
-               AND x.review = 'published'
-               AND s.review = 'published'
-               AND NOT s.private
-          ) THEN
-            UPDATE book_requests r
-               SET status = CASE WHEN live THEN 'claimed' ELSE 'done' END,
-                   claimed_by = CASE WHEN live THEN r.claimed_by END,
-                   active_at = CASE WHEN live THEN now() ELSE r.active_at END,
-                   closed_at = CASE WHEN live THEN NULL ELSE now() END
-              FROM (
-                SELECT q.id,
-                       q.status = 'claimed' AND q.active_at >= now() - {LAPSES} AS live
-                  FROM book_requests q
-                 WHERE q.source_id = p_source AND q.status IN ('open', 'claimed')
-              ) w
-             WHERE r.id = w.id;
-          END IF;
+          -- Work on the book keeps a live claim alive; a lapsed one stays
+          -- lapsed, for anyone to claim again.
+          UPDATE book_requests r
+             SET active_at = now()
+           WHERE r.source_id = p_source
+             AND r.status = 'claimed'
+             AND r.active_at >= now() - {LAPSES};
         END $$;
 
         -- An edition's or a recipe's source.

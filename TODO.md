@@ -247,11 +247,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         entered (forms, import, a moderator approving it), by database
         triggers (migration 0050). Linked to a public, published source
         once that has its ISBN, or for a request with no ISBN the same
-        title; shown as "it's here, being indexed". With a published
-        recipe it closes as done, unless it's claimed: then each recipe
-        keeps the claim alive, and the claimer marks it done (or it
-        closes with the next recipe after 30 quiet days). A private
-        collection never links.
+        title; shown as "it's here, being indexed". Each recipe added
+        keeps a live claim alive. It stays open until someone marks it
+        done (*Ray, 2026-11-10: "until marked finished"*), and asking
+        for it meanwhile is a vote. A private collection never links.
       - [ ] The anonymous daily count is in memory, per process; move it
         to the database if there's ever more than one app process.
 

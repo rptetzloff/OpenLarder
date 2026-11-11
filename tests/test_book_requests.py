@@ -211,20 +211,25 @@ async def _request(adb, rid: str) -> dict:
     return dict(row.mappings().one())
 
 
-async def test_a_request_follows_its_book_in(client, adb, openlib) -> None:
-    """Entered by anyone: linked when its edition arrives, done with its
-    first recipe."""
+async def test_a_request_follows_its_book_in(client, people, adb, openlib) -> None:
+    """Entered by anyone: linked when its edition arrives, and open until
+    someone marks it finished; asking again is a vote."""
     rid = (await client.post("/api/requests", json={"isbn": PINK_CAKE})).json()["request"]["id"]
     work = await _book(adb, "Pink Cake", PINK_CAKE)
-    linked = await _request(adb, rid)
-    assert (linked["status"], linked["source_id"]) == ("open", work)
     await adb.execute(
         text("INSERT INTO recipes (source_id, title) VALUES (:w, 'Rhubarb Cake')"), {"w": work}
     )
-    done = await _request(adb, rid)
-    assert done["status"] == "done" and done["closed_at"] is not None
-    [shown] = (await client.get("/api/requests?state=done")).json()["requests"]
-    assert shown["source_id"] == str(work)
+    linked = await _request(adb, rid)
+    assert (linked["status"], linked["source_id"]) == ("open", work)
+    ann = await people("ann")
+    again = (await ann.post("/api/requests", json={"isbn": PINK_CAKE})).json()
+    assert (again["outcome"], again["request"]["source_id"]) == ("voted", str(work))
+    ada = await people("ada", admin=True)
+    done = (await ada.post(f"/api/requests/{rid}/done", json={})).json()
+    assert (done["status"], done["source_id"]) == ("done", str(work))
+    # Closed, so asking now is answered with the book.
+    after = (await ann.post("/api/requests", json={"isbn": PINK_CAKE})).json()
+    assert after == {"outcome": "in_catalog", "request": None, "source_id": str(work)}
 
 
 async def test_a_request_by_title_follows_a_book_of_that_title(client, adb) -> None:
@@ -250,13 +255,13 @@ async def test_a_claim_is_kept_alive_by_work_on_its_book(people, adb, openlib) -
         text("SELECT active_at > now() - interval '1 minute' FROM book_requests")
     )
     assert fresh
-    # Quiet past the lapse, then more work by anyone: done.
+    # Quiet past the lapse: more work doesn't revive it, and it reads open.
     await adb.execute(text("UPDATE book_requests SET active_at = now() - interval '31 days'"))
     await adb.execute(
         text("INSERT INTO recipes (source_id, title) VALUES (:w, 'Pistachio Cake')"), {"w": work}
     )
-    done = await _request(adb, rid)
-    assert (done["status"], done["claimed"]) == ("done", False)
+    [shown] = (await bo.get("/api/requests")).json()["requests"]
+    assert (shown["status"], shown["claimed_by"]) == ("open", None)
 
 
 async def test_a_book_waiting_for_review_links_once_approved(client, adb, openlib) -> None:
@@ -265,11 +270,10 @@ async def test_a_book_waiting_for_review_links_once_approved(client, adb, openli
     await adb.execute(
         text("INSERT INTO recipes (source_id, title) VALUES (:w, 'Rhubarb Cake')"), {"w": work}
     )
-    assert (await _request(adb, rid))["status"] == "open"
     assert (await _request(adb, rid))["source_id"] is None
     await adb.execute(text("UPDATE sources SET review = 'published' WHERE id = :w"), {"w": work})
     after = await _request(adb, rid)
-    assert (after["status"], after["source_id"]) == ("done", work)
+    assert (after["status"], after["source_id"]) == ("open", work)
 
 
 async def test_a_private_collection_never_closes_a_request(people, adb, openlib) -> None:
@@ -301,5 +305,6 @@ async def test_asking_by_title_for_a_book_here_points_to_it(client, adb) -> None
     await adb.execute(
         text("INSERT INTO recipes (source_id, title) VALUES (:w, 'Shakshuka')"), {"w": work}
     )
+    # Still asked for, so asking again is a vote.
     again = (await client.post("/api/requests", json={"title": "jerusalem"})).json()
-    assert again == {"outcome": "in_catalog", "request": None, "source_id": str(work)}
+    assert again["outcome"] in ("voted", "already")
