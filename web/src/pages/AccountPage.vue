@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import ApiKeys from "../components/ApiKeys.vue";
 import ContributionsPanel from "../components/ContributionsPanel.vue";
+import DeleteAccount from "../components/DeleteAccount.vue";
 import ProposalsPanel from "../components/ProposalsPanel.vue";
 import NameForm from "../components/NameForm.vue";
 import { fetchFlags } from "../flags";
@@ -96,6 +97,9 @@ const n = (v: number | null, one: string, many: string) =>
         <ProposalsPanel v-if="!user.may_edit" />
       </div>
       <ApiKeys />
+      <div class="tool-panels account-panels">
+        <DeleteAccount :user="user" />
+      </div>
     </template>
   </article>
 </template>
