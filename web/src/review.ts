@@ -66,6 +66,11 @@ export interface Difference {
   proposed: string;
 }
 
+export interface NewIngredient {
+  name: string;
+  similar: { id: string; name: string }[];
+}
+
 export interface Proposal {
   id: string;
   kind: "recipe" | "source";
@@ -81,6 +86,8 @@ export interface Proposal {
   created_at: string;
   changed_since: boolean;
   differences: Difference[];
+  // A recipe change's ingredients new to the catalog.
+  new_ingredients: NewIngredient[];
 }
 
 export const openProposals = () => send<Proposal[]>("/api/review/proposals");
