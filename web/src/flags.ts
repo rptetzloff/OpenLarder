@@ -27,7 +27,23 @@ export const KIND_LABELS: Record<string, string> = {
   unknown_reference: "Reference to a missing recipe",
   usually_left_out: "Usually left out",
   line_detail: "Amount or prep in a line",
+  possible_typo: "Possible typo",
 };
+
+// A possible-typo flag's detail, "as written → suggested".
+export function typo(flag: Flag): { written: string; meant: string } | null {
+  if (flag.kind !== "possible_typo" || !flag.detail?.includes(" → ")) return null;
+  const [written, meant] = flag.detail.split(" → ", 2);
+  return written && meant ? { written, meant } : null;
+}
+
+// Changes the line as a possible-typo flag suggests, and marks it fixed.
+export async function applyTypo(flagId: string): Promise<Flag> {
+  const res = await fetch(`/api/flags/${flagId}/apply`, { method: "POST" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+  return body;
+}
 
 export async function fetchFlags(params: {
   scope: "all" | "mine";

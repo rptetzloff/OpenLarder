@@ -100,6 +100,11 @@ async def match_book(session: AsyncSession, source_id: uuid.UUID) -> None:
         await session.execute(update(IngredientOption), matches)
 
 
+async def known_ids(session: AsyncSession, keys: set[str]) -> dict[str, uuid.UUID]:
+    """The ingredient each key is the name or an alias of."""
+    return await _ids(session, keys)
+
+
 async def _ids(session: AsyncSession, keys: set[str]) -> dict[str, uuid.UUID]:
     """The ingredient each key is the name or an alias of."""
     found: dict[str, uuid.UUID] = {}

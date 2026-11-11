@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import detector, isbn, recipes, references
+from openlarder import detector, isbn, recipes, references, typos
 from openlarder.models import (
     Edition,
     FlagKind,
@@ -40,6 +40,7 @@ from openlarder.models import (
     RecipeFlag,
     RecipeIngredient,
     RecipeLocation,
+    Source,
 )
 
 BOOK_COLUMNS = ("Source Title", "Author(s)", "ISBN", "Year Published")
@@ -383,6 +384,47 @@ def record_batch(
                 recipe_id=recipe_id,
             )
         )
+
+
+@dataclass(frozen=True)
+class Typo:
+    recipe_id: uuid.UUID
+    recipe: str
+    book: str
+    detail: str
+
+
+async def flag_typos(session: AsyncSession, run: ImportRun) -> list[Typo]:
+    """At the end of a run, flag names that look like typos (typos.py), once
+    across the catalog, so one early in the file is caught however late
+    its right spelling arrives. Each goes in the run's report, by recipe and
+    book: the run keeps no row for a recipe nothing else flagged."""
+    raised = await typos.sweep(session)
+    if not raised:
+        return []
+    named = {
+        r: (title, book)
+        for r, title, book in await session.execute(
+            select(Recipe.id, Recipe.title, Source.title)
+            .join(Source, Source.id == Recipe.source_id)
+            .where(Recipe.id.in_({r for r, _ in raised}))
+        )
+    }
+    found = []
+    for recipe_id, detail in raised:
+        title, book = named.get(recipe_id, ("", ""))
+        session.add(
+            ImportRunLine(
+                run_id=run.id,
+                recipe=title,
+                kind=FlagKind.POSSIBLE_TYPO.value,
+                detail=detail,
+                recipe_id=recipe_id,
+            )
+        )
+        found.append(Typo(recipe_id, title, book, detail))
+    run.flags_raised += len(found)
+    return found
 
 
 def report_csv(lines: list[ImportRunLine], books: dict[uuid.UUID, str]) -> str:

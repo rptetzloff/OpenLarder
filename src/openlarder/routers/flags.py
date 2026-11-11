@@ -15,10 +15,19 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import visibility
+from openlarder import ingredients, lines, typos, visibility
 from openlarder.auth import CurrentUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import FlagKind, Recipe, RecipeFlag, Source, User
+from openlarder.models import (
+    FlagKind,
+    Ingredient,
+    IngredientOption,
+    Recipe,
+    RecipeFlag,
+    RecipeIngredient,
+    Source,
+    User,
+)
 
 router = APIRouter(tags=["flags"])
 PAGE = 50
@@ -171,6 +180,75 @@ async def resolve(
     flag.note = note
     flag.resolved_by = user.id
     flag.resolved_at = func.now()
+    await session.commit()
+    await session.refresh(flag)
+    return _out(flag, recipe, await session.get(Source, recipe.source_id))
+
+
+@router.post("/api/flags/{flag_id}/apply", response_model=FlagOut, dependencies=[SameOrigin])
+async def apply(flag_id: uuid.UUID, user: CurrentUser, session: Session) -> FlagOut:
+    """Make the change a possible-typo flag suggests: the line is changed to
+    the suggested name and matched to it, the misspelt ingredient goes if
+    nothing else uses it, and the flag is marked fixed (typos.py)."""
+    flag = await session.get(RecipeFlag, flag_id, with_for_update=True)
+    recipe = await session.get(Recipe, flag.recipe_id) if flag else None
+    if recipe is None or not await visibility.can_see(
+        session, user, await session.get_one(Source, recipe.source_id)
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such flag.")
+    if not visibility.may_change_recipe(user, recipe):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only a moderator can change a published recipe."
+        )
+    found = typos.parse(flag.detail) if flag.kind == FlagKind.POSSIBLE_TYPO.value else None
+    if found is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That flag has no change to make.")
+    if flag.resolved_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That flag has already been dealt with.")
+    written, meant = found
+    target = (await ingredients.known_ids(session, {ingredients.match_key(meant)})).get(
+        ingredients.match_key(meant)
+    )
+    if target is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"There's no ingredient “{meant}” any more. Dismiss it."
+        )
+    changed, left = False, set()
+    for line in await session.scalars(
+        select(RecipeIngredient)
+        .where(RecipeIngredient.recipe_id == recipe.id)
+        .order_by(RecipeIngredient.position)
+    ):
+        fixed = typos.corrected(line.original_text, written, meant)
+        if fixed is None:
+            continue
+        rank = 1 + [o.name for o in lines.options(line.original_text)].index(written)
+        option = await session.scalar(
+            select(IngredientOption).where(
+                IngredientOption.recipe_ingredient_id == line.id, IngredientOption.rank == rank
+            )
+        )
+        if option is not None and option.ingredient_id not in (None, target):
+            left.add(option.ingredient_id)
+            option.ingredient_id = target
+        line.original_text = fixed
+        changed = True
+        break
+    if not changed:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"The recipe has no “{written}” now. Mark it fixed, or dismiss it.",
+        )
+    await session.flush()
+    for ingredient_id in left:
+        old = await session.get(Ingredient, ingredient_id)
+        if old is not None:
+            try:
+                await ingredients.remove(session, old)
+            except ingredients.InUse:
+                pass
+    flag.resolution, flag.note = "fixed", f"Changed to “{meant}”."
+    flag.resolved_by, flag.resolved_at = user.id, func.now()
     await session.commit()
     await session.refresh(flag)
     return _out(flag, recipe, await session.get(Source, recipe.source_id))

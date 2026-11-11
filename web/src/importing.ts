@@ -110,11 +110,20 @@ export async function addRunLines(
   }
 }
 
+// Possible typos, flagged once a run's recipes are all in (typos.py).
+export interface TypoFlag {
+  recipe_id: string;
+  recipe: string;
+  book: string;
+  detail: string;
+}
+
 export async function finishRun(
   runId: string,
   books: { books_added: number; books_existing: number; books_failed: number },
-): Promise<void> {
-  await post(`/api/import/runs/${runId}/finish`, books);
+): Promise<TypoFlag[]> {
+  const res = await post(`/api/import/runs/${runId}/finish`, books);
+  return (res.body as { typos?: TypoFlag[] }).typos ?? [];
 }
 
 export async function importBatch(

@@ -135,11 +135,14 @@ async function run() {
     .filter((l) => l.kind === "Not imported" && l.row !== null && !p.untitled_rows.includes(l.row) && l.detail.startsWith("Its book isn't in the book list"))
     .map((l) => ({ row: l.row, book: l.book, recipe: l.recipe, kind: "not_imported" as const, detail: l.detail }));
   if (unplaced.length) await addRunLines(runId.value!, unplaced);
-  await finishRun(runId.value!, {
+  const typos = await finishRun(runId.value!, {
     books_added: totals.value.booksAdded,
     books_existing: totals.value.booksExisting,
     books_failed: totals.value.booksFailed,
   });
+  for (const t of typos) {
+    report.value.push({ row: null, book: t.book, recipe: t.recipe, kind: KINDS.possible_typo, detail: t.detail });
+  }
   stage.value = "done";
 }
 

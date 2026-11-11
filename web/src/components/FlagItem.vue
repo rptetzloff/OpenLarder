@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { type Flag, KIND_LABELS, resolveFlag } from "../flags";
+import { applyTypo, type Flag, KIND_LABELS, resolveFlag, typo } from "../flags";
 
 // One flag, with Fixed and Dismiss for someone who may deal with it.
 const props = defineProps<{ flag: Flag; showRecipe: boolean }>();
@@ -10,6 +10,21 @@ const dismissing = ref(false);
 const reason = ref("");
 const error = ref("");
 const busy = ref(false);
+
+// "Lemon Jucie → Lemon Juice": changed in one click (typos.py).
+const suggested = typo(props.flag);
+
+async function change() {
+  busy.value = true;
+  error.value = "";
+  try {
+    emit("resolved", await applyTypo(props.flag.id));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
 
 async function act(resolution: "fixed" | "dismissed") {
   busy.value = true;
@@ -40,6 +55,9 @@ async function act(resolution: "fixed" | "dismissed") {
     </p>
     <template v-else>
       <div v-if="!dismissing" class="admin-actions">
+        <button v-if="suggested" type="button" class="link" :disabled="busy" @click="change">
+          Change to “{{ suggested.meant }}”
+        </button>
         <button type="button" class="link" :disabled="busy" @click="act('fixed')">Fixed</button>
         <button type="button" class="link" :disabled="busy" @click="dismissing = true">Dismiss…</button>
       </div>
