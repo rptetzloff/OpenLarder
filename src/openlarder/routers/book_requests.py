@@ -12,6 +12,11 @@ A claim doesn't stop anyone entering the book sooner, and lapses after
 CLAIM_LAPSES with nothing done: it reads as open again, and anyone may
 claim it. A contributor releases a claim, or marks it done; a moderator
 declines a request, saying why.
+
+The database follows a request's book in (migration 0050): it's linked to
+the source once that has its ISBN (or, with none, its title), and each
+recipe added keeps a claim alive. It stays open until someone marks it
+done: a book with a few recipes isn't indexed yet.
 """
 
 import uuid
@@ -232,22 +237,20 @@ async def ask(
         )
 
     # Already in the catalog?
-    source_id = None
+    # By ISBN, or with none by title, as the database matches them later
+    # (migration 0050).
+    public = (Source.private.is_(False), Source.review == "published")
     if isbn13:
         source_id = await session.scalar(
             select(Edition.source_id)
             .join(Source, Source.id == Edition.source_id)
-            .where(
-                Edition.isbn13 == isbn13,
-                Source.private.is_(False),
-                Source.review == "published",
-            )
+            .where(Edition.isbn13 == isbn13, *public)
+            .limit(1)
         )
-    if source_id and await session.scalar(
-        select(exists().where(Recipe.source_id == source_id, Recipe.review == "published"))
-    ):
-        return Asked(outcome="in_catalog", source_id=source_id)
-
+    else:
+        source_id = await session.scalar(
+            select(Source.id).where(func.lower(Source.title) == title.lower(), *public).limit(1)
+        )
     # Asked for already: a vote.
     same = (
         BookRequest.isbn13 == isbn13 if isbn13 else func.lower(BookRequest.title) == title.lower()
@@ -260,6 +263,11 @@ async def ask(
         await session.commit()
         [out] = await _out(session, [existing], voter, viewer)
         return Asked(outcome="voted" if counted else "already", request=out)
+
+    if source_id and await session.scalar(
+        select(exists().where(Recipe.source_id == source_id, Recipe.review == "published"))
+    ):
+        return Asked(outcome="in_catalog", source_id=source_id)
 
     if isbn13 and not title:
         try:

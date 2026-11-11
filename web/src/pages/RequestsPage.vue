@@ -98,7 +98,8 @@ function turnDown(r: BookRequest) {
       <p class="muted">
         Ask for a cookbook, or another source, to be indexed. If someone asked for it already,
         yours counts as a vote. Contributors claim a request to queue it up, though anyone may enter it
-        sooner; a claim with nothing done for 30 days is open again.
+        sooner; a claim with nothing done for 30 days is open again; each recipe added to the book
+        keeps a claim alive. A request is done when someone marks the book finished.
       </p>
     </div>
 
@@ -176,7 +177,7 @@ function turnDown(r: BookRequest) {
         </div>
         <div class="request-body">
           <h2 class="request-title">
-            <a v-if="r.source_id && r.status === 'done'" :href="`/sources/${r.source_id}`">{{ r.title }}</a>
+            <a v-if="r.source_id" :href="`/sources/${r.source_id}`">{{ r.title }}</a>
             <template v-else>{{ r.title }}</template>
           </h2>
           <p v-if="r.author || r.isbn13" class="muted">
@@ -185,12 +186,17 @@ function turnDown(r: BookRequest) {
           </p>
           <p v-if="r.note" class="request-note">{{ r.note }}</p>
           <p class="muted request-state">
-            <template v-if="r.status === 'claimed' && r.claimed_by">
-              Claimed by {{ r.claimed_by.name ?? "a contributor" }} on {{ day(r.claimed_at!) }}
-            </template>
-            <template v-else-if="r.status === 'done'">Indexed</template>
+            <template v-if="r.status === 'done'">Indexed</template>
             <template v-else-if="r.status === 'declined'">Declined: {{ r.reason }}</template>
-            <template v-else>Asked for {{ day(r.created_at) }}</template>
+            <template v-else>
+              <template v-if="r.status === 'claimed' && r.claimed_by">
+                Claimed by {{ r.claimed_by.name ?? "a contributor" }} on {{ day(r.claimed_at!) }}
+              </template>
+              <template v-else>Asked for {{ day(r.created_at) }}</template>
+              <template v-if="r.source_id">
+                · <a :href="`/sources/${r.source_id}`">it's here</a>, being indexed
+              </template>
+            </template>
           </p>
         </div>
         <div class="request-actions">
