@@ -196,8 +196,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         ingredient and author page, with a reason and a note; signed out,
         5 a day per address and a field bots fill. Moderators fix or
         dismiss them at `/admin/reports`.
-      - [ ] The ingredient matching flow's suggestions and "new ingredient"
-        step.
+      - [x] The ingredient matching flow (#125): the recipe form already
+        says what each line matches, suggests names like an unmatched
+        one, and keeps one as typed as a new ingredient. The last step:
+        each waiting recipe at `/admin/review` lists the ingredients no
+        published recipe uses yet; approving keeps them, or a moderator
+        merges one into the ingredient it's another name for (its name
+        becomes an alias).
       - [ ] Edit history keeps everything forever: check its size once the
         household index is imported again (~400,000 rows for 19,000 recipes).
 
