@@ -30,7 +30,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import case, exists, func, or_, select
+from sqlalchemy import case, exists, func, or_, select, union
 from sqlalchemy.orm import aliased
 
 from openlarder import visibility
@@ -61,6 +61,8 @@ from openlarder.tagging import MAX_TAGS
 router = APIRouter(prefix="/api/search", tags=["search"])
 
 MAX_INGREDIENTS = 30
+# Larder lists or things named in one search.
+MAX_LARDER_PICKS = 200
 MAX_WORDS = 10
 MAX_SOURCES = 10
 # Results a page holds: the wireframe's short page, numbered (Ray,
@@ -141,17 +143,30 @@ async def search(
     without: Annotated[list[uuid.UUID] | None, Query()] = None,
     # Recipes with all of these tags, their own or their source's.
     tag: Annotated[list[uuid.UUID] | None, Query()] = None,
-    # With what's in your larder instead of ingredients chosen one by one:
-    # each item counts as itself and everything above it (Chipotle Hot Sauce
-    # is hot sauce too). Ray, 2026-11-10.
+    # With what's in your larder, as well as any ingredients chosen: each
+    # thing counts as itself and everything above it (Chipotle Hot Sauce is
+    # hot sauce too). Ray, 2026-11-10. Narrowed to some lists (larder_list),
+    # to some things (larder_item: only these), or less some (larder_without),
+    # for a pantry the size of a restaurant's.
     larder: bool = False,
+    larder_list: Annotated[list[uuid.UUID] | None, Query()] = None,
+    larder_item: Annotated[list[uuid.UUID] | None, Query()] = None,
+    larder_without: Annotated[list[uuid.UUID] | None, Query()] = None,
     offset: int = Query(0, ge=0),
 ) -> Found:
     stocked: list[uuid.UUID] = []
     if larder:
         if viewer is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search with your larder.")
-        stocked = await larder_ingredients(session, viewer)
+        for given, what in (
+            (larder_list, "lists"),
+            (larder_item, "things"),
+            (larder_without, "things to leave out"),
+        ):
+            _too_many(len(given or []), MAX_LARDER_PICKS, f"larder {what}")
+        stocked = await larder_ingredients(
+            session, viewer, larder_list or [], larder_item or [], larder_without or []
+        )
     asked = list(dict.fromkeys(ingredient or []))
     unwanted = list(dict.fromkeys(without or []))
     words = list(dict.fromkeys(q.casefold().split()))
@@ -202,7 +217,7 @@ async def search(
     )
     if larder:
         found.larder_items = len(stocked)
-        if not stocked:
+        if not stocked and not known:
             return found
     # Everything asked for is gone: nothing left to search by.
     if not known and not words and not tags_known and not stocked:
@@ -223,7 +238,7 @@ async def search(
         conditions.append(~_needs_any(left_out))
     if stocked:
         found.recipes, found.total = await _best_match(
-            session, stocked, conditions, offset, upward=True
+            session, known, conditions, offset, upward=stocked
         )
         return found
     if not known:
@@ -234,21 +249,34 @@ async def search(
     return found
 
 
-async def larder_ingredients(session: Session, viewer) -> list[uuid.UUID]:
+async def larder_ingredients(
+    session: Session,
+    viewer,
+    lists: list[uuid.UUID] = (),
+    items: list[uuid.UUID] = (),
+    without: list[uuid.UUID] = (),
+) -> list[uuid.UUID]:
     """The ingredients the viewer's larder has (have or running low): their
-    lists and those shared with them, of the ingredients they may see."""
-    return list(
-        await session.scalars(
-            select(func.distinct(LarderItem.ingredient_id))
-            .join(LarderList, LarderList.id == LarderItem.list_id)
-            .join(Ingredient, Ingredient.id == LarderItem.ingredient_id)
-            .where(
-                LarderList.id.in_(seen_list_ids(viewer)),
-                LarderItem.state.in_(("have", "low")),
-                visibility.ingredients_seen_by(viewer),
-            )
+    lists and those shared with them, of the ingredients they may see; only
+    the things named, if some are, or else only the lists named, if some
+    are; less the things left out."""
+    query = (
+        select(func.distinct(LarderItem.ingredient_id))
+        .join(LarderList, LarderList.id == LarderItem.list_id)
+        .join(Ingredient, Ingredient.id == LarderItem.ingredient_id)
+        .where(
+            LarderList.id.in_(seen_list_ids(viewer)),
+            LarderItem.state.in_(("have", "low")),
+            visibility.ingredients_seen_by(viewer),
         )
     )
+    if items:
+        query = query.where(LarderItem.id.in_(items))
+    elif lists:
+        query = query.where(LarderList.id.in_(lists))
+    if without:
+        query = query.where(LarderItem.id.not_in(without))
+    return list(await session.scalars(query))
 
 
 def _needs_any(unwanted: list[uuid.UUID]):
@@ -272,8 +300,26 @@ def _needs_any(unwanted: list[uuid.UUID]):
     )
 
 
+def _yours(down: list[uuid.UUID], up: list[uuid.UUID], name: str):
+    """(root, id) for what you have: an ingredient chosen and everything
+    under it (cheese finds cheddar), and a larder's thing and everything
+    above it (chipotle hot sauce is hot sauce)."""
+    parts = []
+    if down:
+        tree = rooted_family(*down, name=f"{name}_down")
+        parts.append(select(tree.c.root, tree.c.id))
+    if up:
+        tree = rooted_ancestry(*up, name=f"{name}_up")
+        parts.append(select(tree.c.root, tree.c.id))
+    return (union(*parts) if len(parts) > 1 else parts[0]).subquery(name)
+
+
 async def _best_match(
-    session: Session, have: list[uuid.UUID], conditions, offset: int, upward: bool = False
+    session: Session,
+    chosen: list[uuid.UUID],
+    conditions,
+    offset: int,
+    upward: list[uuid.UUID] = (),
 ):
     """Recipes covering any line with what you have: those using the most of
     your ingredients first, then by the share of their lines you have (so
@@ -282,12 +328,9 @@ async def _best_match(
     both first; ranking by share alone put one-line garlic pastes there."""
     # Which of yours each match is under (or, from a larder, above): to count
     # how many of yours a recipe uses, and to say which.
-    if upward:
-        roots = rooted_ancestry(*have, name="yours_by_root")
-        yours = select(rooted_ancestry(*have, name="yours").c.id)
-    else:
-        roots = rooted_family(*have, name="yours_by_root")
-        yours = family(*have, name="yours")
+    have = list(dict.fromkeys([*chosen, *upward]))
+    roots = _yours(list(chosen), list(upward), "yours_by_root")
+    yours = select(_yours(list(chosen), list(upward), "yours").c.id)
     used = (
         select(
             IngredientOption.recipe_id.label("recipe_id"),

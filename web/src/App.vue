@@ -2204,13 +2204,6 @@ button.primary.small {
   background: var(--bg);
   color: var(--fg);
 }
-.larder-toggle {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
 .larder-lists {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
@@ -2258,6 +2251,46 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+.larder-picker {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.875rem 0.25rem;
+  margin: 0 0 1rem;
+}
+.larder-picker legend {
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+.larder-picker-lists {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+.larder-picker-lists .muted {
+  font-size: 0.875rem;
+}
+.larder-picker-label {
+  display: block;
+  font-weight: 600;
+  margin: 0.75rem 0 0.25rem;
+}
+.larder-ticked {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  padding: 0.5rem 0;
+}
+.larder-ticked .button-outline {
+  margin: 0 0.5rem;
+}
+.larder-search-list {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+.larder-tick {
+  margin-right: 0.375rem;
 }
 .larder-shared {
   margin: 0 0 0.5rem;
