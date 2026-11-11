@@ -157,12 +157,16 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         a dismissed one isn't suggested again. On the household index:
         355 likely and 74 unsure of the 1,000 most used names, 58% of
         ingredient uses likely; 940 suggestions in all.
-      - [ ] **Using them:** Wikidata's other names as suggested aliases,
-        and its "subclass of" as suggested parents, through the
-        Suggestions queue.
+      - [x] **Using them (#135):** from each linked Wikidata item, its
+        plain English aliases and its British label (a UK name:
+        "courgette") as other names, on Ingredient links' "Other names",
+        one at a time; a name another ingredient has already is a merge,
+        and a "subclass of" another linked ingredient's item a parent,
+        both in the Suggestions queue. Lower-case names only, none naming
+        the plant: Wikidata's aliases include "Allium cepa L." and "Mel".
 - [ ] **Ingredient affiliate links** (*Ray, 2026-11-11*, after ingredient
-      data): a grocery partner's link on each ingredient. Which partner,
-      and its terms, is still open (Open decisions).
+      data): a grocer's link on each ingredient; Instacart first, and each
+      person may choose another, as Instacart may have nothing near them.
 - [ ] **Roles** *(Ray, 2026-11-10)*: done (#101). User, contributor,
       moderator, administrator, owner (roles.py), in place of the admin
       and enterer flags. Moderators edit the catalog, work flags and

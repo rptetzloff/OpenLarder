@@ -94,13 +94,19 @@ async def test_suggesting_and_deciding(people, adb, usda, wikidata) -> None:
 
     assert (await mo.post("/api/fdc/suggest")).status_code == 403
     r = await ad.post("/api/fdc/suggest")
-    assert r.json() == {"fdc": 3, "wikidata": 1}, r.text
+    assert r.json() == {"fdc": 3, "wikidata": 1, "names": 0, "merges": 0, "parents": 0}, r.text
     # Nothing new a second time.
-    assert (await ad.post("/api/fdc/suggest")).json() == {"fdc": 0, "wikidata": 0}
+    assert (await ad.post("/api/fdc/suggest")).json() == {
+        "fdc": 0,
+        "wikidata": 0,
+        "names": 0,
+        "merges": 0,
+        "parents": 0,
+    }
 
     assert (await con.get("/api/fdc/suggestions")).status_code == 403
     page = (await mo.get("/api/fdc/suggestions")).json()
-    assert page["counts"] == {"likely": 3, "unsure": 0, "wikidata": 1}
+    assert page["counts"] == {"likely": 3, "unsure": 0, "wikidata": 1, "names": 0}
     names = [(r["ingredient"]["name"], r["fdc"]["food"]["description"]) for r in page["rows"]]
     # The most used first.
     assert names[0] == ("Onion", "Onions, raw")
@@ -133,7 +139,13 @@ async def test_suggesting_and_deciding(people, adb, usda, wikidata) -> None:
     r = await mo.post("/api/fdc/suggestions/dismiss", json={"ids": [yellow["fdc"]["id"]]})
     assert r.json() == {"done": 1, "skipped": 0}
     # Not suggested again.
-    assert (await ad.post("/api/fdc/suggest")).json() == {"fdc": 0, "wikidata": 0}
+    assert (await ad.post("/api/fdc/suggest")).json() == {
+        "fdc": 0,
+        "wikidata": 0,
+        "names": 0,
+        "merges": 0,
+        "parents": 0,
+    }
 
     # Linked by hand meanwhile: accepting skips it.
     cheddar = next(r for r in page["rows"] if r["ingredient"]["name"] == "Cheddar Cheese")

@@ -9,7 +9,7 @@ import type { Me } from "../me";
 const props = defineProps<{ user: Me | null | undefined }>();
 document.title = "Ingredient links · Admin · OpenLarder";
 
-type Show = "likely" | "unsure" | "wikidata";
+type Show = "likely" | "unsure" | "wikidata" | "names";
 interface Row {
   ingredient: { id: string; name: string; recipes: number };
   fdc: { id: string; certainty: "likely" | "unsure"; food: Food } | null;
@@ -20,16 +20,26 @@ interface Row {
     label: string | null;
     url: string;
   } | null;
+  // names: another name from the ingredient's Wikidata item.
+  alias?: {
+    id: string;
+    name: string;
+    region: string | null;
+    wikidata_id: string;
+    label: string | null;
+    url: string;
+  } | null;
 }
 
 const TABS: [Show, string][] = [
   ["likely", "Likely foods"],
   ["unsure", "Unsure foods"],
   ["wikidata", "Wikidata items"],
+  ["names", "Other names"],
 ];
 const show = ref<Show>("likely");
 const rows = ref<Row[] | null>(null);
-const counts = ref<Record<Show, number>>({ likely: 0, unsure: 0, wikidata: 0 });
+const counts = ref<Record<Show, number>>({ likely: 0, unsure: 0, wikidata: 0, names: 0 });
 const total = ref(0);
 const error = ref("");
 const busy = ref(false);
@@ -79,7 +89,8 @@ async function decide(action: "accept" | "dismiss", ids: string[]) {
 }
 
 // The column this tab is about.
-const ofTab = (r: Row) => (show.value === "wikidata" ? r.wikidata : r.fdc);
+const ofTab = (r: Row) =>
+  show.value === "names" ? r.alias : show.value === "wikidata" ? r.wikidata : r.fdc;
 const pageIds = computed(() => (rows.value ?? []).map(ofTab).filter((s) => s).map((s) => s!.id));
 
 async function suggest() {
@@ -88,7 +99,10 @@ async function suggest() {
   note.value = "";
   try {
     const out = await post("/api/fdc/suggest");
-    note.value = `${out.fdc.toLocaleString()} new foods and ${out.wikidata.toLocaleString()} new Wikidata items suggested.`;
+    note.value =
+      `Suggested ${out.fdc.toLocaleString()} foods, ${out.wikidata.toLocaleString()} Wikidata items` +
+      ` and ${out.names.toLocaleString()} other names; and in Suggestions,` +
+      ` ${out.merges.toLocaleString()} merges and ${out.parents.toLocaleString()} broader ingredients.`;
     await load();
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
@@ -123,8 +137,9 @@ watch(show, () => {
         The USDA FoodData Central food and the Wikidata item each ingredient is probably the same
         as, the most used first. Likely: the food's words are the ingredient's. Unsure: one word
         more, which is often a different food. Wikidata items come through USDA's numbers, and are
-        often the plant rather than the food: check each. Nothing is linked until it's accepted, and
-        a dismissed one isn't suggested again.
+        often the plant rather than the food: check each. Other names come from linked Wikidata
+        items; a UK one is shown only as a regional name. Nothing changes until it's accepted, and a
+        dismissed one isn't suggested again.
       </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
@@ -173,7 +188,15 @@ watch(show, () => {
           <thead>
             <tr>
               <th scope="col">Ingredient</th>
-              <th scope="col">{{ show === "wikidata" ? "Wikidata item" : "FoodData Central food" }}</th>
+              <th scope="col">
+                {{
+                  show === "names"
+                    ? "Another name"
+                    : show === "wikidata"
+                      ? "Wikidata item"
+                      : "FoodData Central food"
+                }}
+              </th>
               <th scope="col"><span class="visually-hidden">Decide</span></th>
             </tr>
           </thead>
@@ -186,7 +209,14 @@ watch(show, () => {
                   {{ r.ingredient.recipes === 1 ? "recipe" : "recipes" }}
                 </div>
               </td>
-              <td v-if="show !== 'wikidata' && r.fdc">
+              <td v-if="show === 'names' && r.alias">
+                <span class="strong">{{ r.alias.name }}</span
+                ><template v-if="r.alias.region"> ({{ r.alias.region }})</template>
+                <div class="muted">
+                  From <a :href="r.alias.url" rel="noopener">{{ r.alias.label ?? r.alias.wikidata_id }}</a>
+                </div>
+              </td>
+              <td v-else-if="show !== 'wikidata' && r.fdc">
                 <a :href="r.fdc.food.url" rel="noopener">{{ r.fdc.food.description }}</a>
                 <div class="muted">
                   {{ DATA_TYPES[r.fdc.food.data_type]

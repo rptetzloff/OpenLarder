@@ -60,26 +60,33 @@ class FdcFood(Base):
 
 class LinkSuggestion(Base):
     """A food or Wikidata item an ingredient is probably the same as, found
-    by fdc_match.py, for a moderator to accept or dismiss (Admin ›
+    by fdc_match.py, or another name for it from its Wikidata item
+    (wikidata_names.py), for a moderator to accept or dismiss (Admin ›
     Ingredient links). A dismissed one isn't suggested again."""
 
     __tablename__ = "ingredient_link_suggestions"
     __table_args__ = (
-        CheckConstraint("source IN ('fdc', 'wikidata')", name="source_known"),
+        CheckConstraint("source IN ('fdc', 'wikidata', 'alias')", name="source_known"),
+        CheckConstraint("region IN ('UK', 'AU')", name="region_known"),
         CheckConstraint("certainty IN ('likely', 'unsure')", name="certainty_known"),
         CheckConstraint("status IN ('open', 'accepted', 'dismissed')", name="status_known"),
         CheckConstraint("(status = 'open') = (decided_at IS NULL)", name="decided_when_closed"),
         CheckConstraint(
             "(source = 'fdc' AND fdc_id IS NOT NULL AND wikidata_id IS NULL)"
-            " OR (source = 'wikidata' AND wikidata_id ~ '^Q[1-9][0-9]*$' AND fdc_id IS NULL)",
+            " OR (source = 'wikidata' AND wikidata_id ~ '^Q[1-9][0-9]*$' AND fdc_id IS NULL"
+            " AND alias IS NULL)"
+            " OR (source = 'alias' AND wikidata_id ~ '^Q[1-9][0-9]*$' AND fdc_id IS NULL"
+            " AND alias <> '')",
             name="one_record",
         ),
-        # NULLS NOT DISTINCT: each row has one of the two empty.
+        # NULLS NOT DISTINCT: each row has some of these empty.
         UniqueConstraint(
             "ingredient_id",
             "source",
             "fdc_id",
             "wikidata_id",
+            "alias",
+            "region",
             # The convention's name is past Postgres's 63 characters.
             name="uq_ingredient_link_suggestions_record",
             postgresql_nulls_not_distinct=True,
@@ -102,6 +109,9 @@ class LinkSuggestion(Base):
     wikidata_id: Mapped[str | None] = mapped_column(Text)
     # Wikidata's English label, as found.
     label: Mapped[str | None] = mapped_column(Text)
+    # alias: the other name, and where it's said (None: everywhere).
+    alias: Mapped[str | None] = mapped_column(Text)
+    region: Mapped[str | None] = mapped_column(Text)
     # likely: the food's words are the name's; unsure: one word more, or
     # found through Wikidata's NDB numbers, which are often the plant.
     certainty: Mapped[str] = mapped_column(Text, nullable=False)

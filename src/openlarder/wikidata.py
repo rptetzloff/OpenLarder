@@ -248,3 +248,49 @@ async def by_ndb(transport: httpx2.AsyncBaseTransport | None = None) -> dict[int
         if _Q.match(item):
             found.setdefault(ndb, Label(item, _value(row, "label"), None))
     return found
+
+
+@dataclass
+class Names:
+    wikidata_id: str
+    label: str | None = None
+    # Other English names, as Wikidata has them.
+    aliases: set[str] = field(default_factory=set)
+    # The British English label, where there is one.
+    uk: str | None = None
+    # What it's a subclass of (P279).
+    parents: set[str] = field(default_factory=set)
+
+
+async def names(
+    wikidata_ids: Sequence[str], transport: httpx2.AsyncBaseTransport | None = None
+) -> dict[str, Names]:
+    """Each item's other names and what it's a kind of, 200 to a query."""
+    qs = sorted({i for i in wikidata_ids if _Q.match(i)})
+    found: dict[str, Names] = {}
+    async with httpx2.AsyncClient(
+        transport=transport, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
+    ) as client:
+        for start in range(0, len(qs), 200):
+            values = " ".join(f"wd:{i}" for i in qs[start : start + 200])
+            query = f"""SELECT ?item ?label ?alias ?uk ?parent WHERE {{
+  VALUES ?item {{ {values} }}
+  OPTIONAL {{ ?item rdfs:label ?label FILTER(LANG(?label) = "en") }}
+  {{ ?item skos:altLabel ?alias FILTER(LANG(?alias) = "en") }}
+  UNION {{ ?item rdfs:label ?uk FILTER(LANG(?uk) = "en-gb") }}
+  UNION {{ ?item wdt:P279 ?parent }}
+}}"""
+            for row in await _ask(client, query):
+                item = (_value(row, "item") or "").rsplit("/", 1)[-1]
+                if not _Q.match(item):
+                    continue
+                n = found.setdefault(item, Names(item))
+                n.label = n.label or _value(row, "label")
+                if alias := _value(row, "alias"):
+                    n.aliases.add(alias)
+                if uk := _value(row, "uk"):
+                    n.uk = uk
+                parent = (_value(row, "parent") or "").rsplit("/", 1)[-1]
+                if _Q.match(parent):
+                    n.parents.add(parent)
+    return found
