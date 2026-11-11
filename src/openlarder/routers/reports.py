@@ -13,14 +13,14 @@ dismiss each, saying what they did or why not.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import usage, visibility
+from openlarder import daily, usage, visibility
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import Author, Ingredient, Recipe, Report, Source, User
@@ -32,18 +32,12 @@ Reason = Literal["wrong", "duplicate", "copied", "spam", "other"]
 # Reports a day from one address, signed out; one account, signed in.
 ANONYMOUS_PER_DAY = 5
 SIGNED_IN_PER_DAY = 50
-_sent: dict[str, tuple[str, int]] = {}
 HREF = {
     "recipe": "/recipes/",
     "source": "/sources/",
     "ingredient": "/ingredients/",
     "author": "/authors/",
 }
-
-
-def reset() -> None:
-    """Forget the day's counts (tests)."""
-    _sent.clear()
 
 
 async def _title(session, viewer: User | None, kind: str, target_id: uuid.UUID) -> str | None:
@@ -88,16 +82,12 @@ async def send(body: ReportIn, request: Request, session: Session, viewer: Viewe
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's nothing there to report.")
     reporter = f"user:{viewer.id}" if viewer else f"ip:{usage.pseudonym(_address(request))}"
     limit = SIGNED_IN_PER_DAY if viewer else ANONYMOUS_PER_DAY
-    today = datetime.now(UTC).date().isoformat()
-    day, n = _sent.get(reporter, (today, 0))
-    n = n if day == today else 0
-    if n >= limit:
+    if not await daily.take(session, "report", reporter, limit):
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             f"{limit} reports a day"
             + ("." if viewer else " without signing in. Sign in to send more."),
         )
-    _sent[reporter] = (today, n + 1)
     note = " ".join((body.note or "").split()) or None
     row = await session.scalar(
         select(Report).where(

@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
-from openlarder import isbn, openlibrary, usage
+from openlarder import daily, isbn, openlibrary, usage
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import BookRequest, Edition, Recipe, RequestVote, Source, User
@@ -39,12 +39,6 @@ router = APIRouter(tags=["requests"])
 CLAIM_LAPSES = timedelta(days=30)
 # Requests a day from one address, signed out.
 ANONYMOUS_PER_DAY = 5
-_asked: dict[str, tuple[str, int]] = {}
-
-
-def reset() -> None:
-    """Forget the day's counts (tests)."""
-    _asked.clear()
 
 
 class Person(BaseModel):
@@ -213,16 +207,11 @@ async def ask(
     if body.website:
         # A bot: answer as if all went well, and keep nothing.
         return Asked(outcome="created")
-    if viewer is None:
-        today = datetime.now(UTC).date().isoformat()
-        day, n = _asked.get(voter, (today, 0))
-        n = n if day == today else 0
-        if n >= ANONYMOUS_PER_DAY:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                f"{ANONYMOUS_PER_DAY} requests a day without signing in. Sign in to ask for more.",
-            )
-        _asked[voter] = (today, n + 1)
+    if viewer is None and not await daily.take(session, "request", voter, ANONYMOUS_PER_DAY):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"{ANONYMOUS_PER_DAY} requests a day without signing in. Sign in to ask for more.",
+        )
 
     isbn13 = None
     title, author = _squash(body.title), _squash(body.author)

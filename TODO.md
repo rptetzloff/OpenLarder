@@ -260,8 +260,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         keeps a live claim alive. It stays open until someone marks it
         done (*Ray, 2026-11-10: "until marked finished"*), and asking
         for it meanwhile is a vote. A private collection never links.
-      - [ ] The anonymous daily count is in memory, per process; move it
-        to the database if there's ever more than one app process.
+      - [x] The signed-out daily counts, for requests and reports, are
+        kept in the database, so a deploy or a second app process doesn't
+        start them again (#131).
 
 - [ ] **Sources, not just books.** *Ray, 2026-11-08: "a source could be a
       book or a blog or an instagram post or a tv episode or a magazine
