@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { adoptGrocer } from "./grocery";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
 import NameForm from "./components/NameForm.vue";
@@ -125,6 +126,7 @@ onMounted(async () => {
     const res = await fetch("/api/auth/me");
     user.value = res.ok ? await res.json() : null;
     adoptAccount(user.value);
+    adoptGrocer(user.value);
   } catch {
     user.value = null;
   }
@@ -1219,7 +1221,13 @@ button.secondary[aria-current="page"] {
   justify-content: space-between;
   gap: 1rem;
 }
-.used-in .page-ref {
+.used-in /* An ingredient line's grocery links (grocery.ts): quiet beside the line. */
+.shop-links {
+  color: var(--muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.page-ref {
   white-space: nowrap;
 }
 .recipe-aside {
@@ -1268,6 +1276,13 @@ button.secondary[aria-current="page"] {
 }
 .ingredient-head .status {
   margin: 0;
+}
+/* An ingredient's page: search with it, and shop for it (grocery.ts). */
+.ingredient-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
 }
 a.button-primary {
   display: inline-block;

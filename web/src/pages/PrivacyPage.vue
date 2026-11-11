@@ -18,7 +18,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 10 November 2026</p>
+    <p class="updated">Last updated 11 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -76,9 +76,15 @@ document.title = "Privacy policy · OpenLarder";
       policy.
     </p>
     <p>
-      You can choose which shops show and in what order. Signed in, that choice is kept with your
-      account. Signed out, your browser keeps it in its own storage, not in a cookie, and it is
-      never sent to OpenLarder.
+      Ingredients can have a link to shop for them at a grocer such as Instacart, Amazon Fresh or
+      Walmart, which searches the grocer for that ingredient. These work the same way: OpenLarder
+      earns a commission on what's bought, and counts the click (which ingredient, which grocer,
+      when, and which page), recording nothing about who clicked.
+    </p>
+    <p>
+      You can choose which shops show and in what order, and which grocer to shop at. Signed in,
+      that choice is kept with your account. Signed out, your browser keeps it in its own storage,
+      not in a cookie, and it is never sent to OpenLarder.
     </p>
     <p>
       Anyone can <a href="/requests">ask for a book</a> to be indexed. A request shows the book,

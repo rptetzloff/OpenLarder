@@ -62,9 +62,12 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!page" class="status">Loading…</p>
-      <p v-else-if="!page.clicks" class="status">No clicks in this time.</p>
+      <p v-else-if="!page.clicks && !page.grocery_clicks" class="status">No clicks in this time.</p>
       <template v-else>
-        <p class="status">{{ n(page.clicks) }} clicks in {{ page.days }} days.</p>
+        <p class="status">
+          {{ n(page.clicks) }} clicks on books' links and {{ n(page.grocery_clicks) }} on
+          ingredients' in {{ page.days }} days.
+        </p>
         <div class="tool-panels clicks-panels">
           <section class="tool-panel" aria-labelledby="by-shop">
             <h2 id="by-shop">By shop</h2>
@@ -133,6 +136,44 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
             </tr>
           </tbody>
         </table>
+        <template v-if="page.grocery_clicks">
+          <h2 class="section-title">Grocers</h2>
+          <table class="recipe-table">
+            <thead>
+              <tr>
+                <th scope="col">Grocer</th>
+                <th scope="col" class="numeric">Clicks</th>
+                <th scope="col" class="numeric">Last 7 days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="g in page.grocers" :key="g.retailer">
+                <td>{{ g.label }}</td>
+                <td class="numeric"><span class="cell-label">Clicks </span>{{ n(g.clicks) }}</td>
+                <td class="numeric">
+                  <span class="cell-label">Last 7 days </span>{{ n(g.last_7_days) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <h2 class="section-title">Ingredients clicked most</h2>
+          <table class="recipe-table">
+            <thead>
+              <tr>
+                <th scope="col">Ingredient</th>
+                <th scope="col" class="numeric">Clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="i in page.ingredients" :key="i.ingredient_id">
+                <td>
+                  <a :href="`/ingredients/${i.ingredient_id}`" class="strong">{{ i.name }}</a>
+                </td>
+                <td class="numeric"><span class="cell-label">Clicks </span>{{ n(i.clicks) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
       </template>
     </template>
   </article>

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from openlarder import buying, names, ratelimit
+from openlarder import buying, grocery, names, ratelimit
 from openlarder.auth import CurrentUser, SameOrigin, hash_token, new_token
 from openlarder.db import Session
 from openlarder.models import ApiKey
@@ -63,7 +63,32 @@ async def set_shops(body: Shops, user: CurrentUser, session: Session, settings: 
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Leave at least one shop showing."
         )
-    user.shop_preferences = {"order": order, "hidden": hidden}
+    # The grocer chosen (set_grocer) stays.
+    grocer = (user.shop_preferences or {}).get("grocer")
+    user.shop_preferences = {"order": order, "hidden": hidden} | (
+        {"grocer": grocer} if grocer else {}
+    )
+    await session.commit()
+    return me_for(user, settings)
+
+
+class GrocerIn(BaseModel):
+    # A grocer's key (grocery.GROCERS); None, the first offered.
+    grocer: str | None = None
+
+
+@router.put("/grocer", response_model=Me, dependencies=[SameOrigin])
+async def set_grocer(body: GrocerIn, user: CurrentUser, session: Session, settings: Config) -> Me:
+    """Which grocer ingredients' links go to: Instacart unless another is
+    chosen, as it may have nothing near them. *Ray, 2026-11-11.*"""
+    if body.grocer is not None and body.grocer not in grocery.BY_KEY:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such grocer: {body.grocer}."
+        )
+    prefs = {k: v for k, v in (user.shop_preferences or {}).items() if k != "grocer"}
+    if body.grocer:
+        prefs["grocer"] = body.grocer
+    user.shop_preferences = prefs or None
     await session.commit()
     return me_for(user, settings)
 

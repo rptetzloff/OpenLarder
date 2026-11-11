@@ -53,6 +53,7 @@ CATALOG = (
     "editions",
     "purchase_links",
     "purchase_clicks",
+    "grocery_clicks",
     "issues",
     "episodes",
     "web_pages",

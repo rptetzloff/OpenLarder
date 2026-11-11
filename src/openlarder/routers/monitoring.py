@@ -8,10 +8,19 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import Date, Text, cast, delete, func, select
 
-from openlarder import buying, usage
+from openlarder import buying, grocery, usage, visibility
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import ApiKey, ApiUsage, Edition, PurchaseClick, Source, User
+from openlarder.models import (
+    ApiKey,
+    ApiUsage,
+    Edition,
+    GroceryClick,
+    Ingredient,
+    PurchaseClick,
+    Source,
+    User,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 TOP = 20
@@ -137,6 +146,12 @@ class DayClicks(BaseModel):
     clicks: int
 
 
+class IngredientClicks(BaseModel):
+    ingredient_id: uuid.UUID
+    name: str
+    clicks: int
+
+
 class ClicksPage(BaseModel):
     days: int
     clicks: int
@@ -144,6 +159,11 @@ class ClicksPage(BaseModel):
     books: list[BookClicks]
     pages: list[PageClicks]
     by_day: list[DayClicks]
+    # Ingredients' grocery links (grocery.py): by grocer, and the most
+    # clicked ingredients.
+    grocery_clicks: int = 0
+    grocers: list[ShopClicks] = []
+    ingredients: list[IngredientClicks] = []
 
 
 @router.get("/clicks", response_model=ClicksPage)
@@ -193,7 +213,40 @@ async def clicks(
         await session.execute(select(day, func.count()).where(window).group_by(day).order_by(day))
     ).all()
     labels = {r.key: r.label for r in buying.RETAILERS}
+    in_window = GroceryClick.clicked_at >= since
+    grocers = (
+        await session.execute(
+            select(
+                GroceryClick.grocer,
+                func.count(),
+                func.count().filter(GroceryClick.clicked_at >= week),
+            )
+            .where(in_window)
+            .group_by(GroceryClick.grocer)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    top_ingredients = (
+        await session.execute(
+            select(Ingredient.id, Ingredient.name, func.count())
+            .select_from(GroceryClick)
+            .join(Ingredient, Ingredient.id == GroceryClick.ingredient_id)
+            .where(in_window, visibility.ingredients_seen_by(admin))
+            .group_by(Ingredient.id, Ingredient.name)
+            .order_by(func.count().desc(), Ingredient.name)
+            .limit(TOP)
+        )
+    ).all()
+    grocer_labels = {g.key: g.label for g in grocery.GROCERS}
     return ClicksPage(
+        grocery_clicks=sum(n for _, n, _ in grocers),
+        grocers=[
+            ShopClicks(retailer=g, label=grocer_labels.get(g, g), clicks=n, last_7_days=w)
+            for g, n, w in grocers
+        ],
+        ingredients=[
+            IngredientClicks(ingredient_id=i, name=m, clicks=n) for i, m, n in top_ingredients
+        ],
         days=days,
         clicks=sum(n for _, n, _ in shops),
         shops=[

@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     thriftbooks_link: str | None = None
     bookoutlet_link: str | None = None
     kobo_link: str | None = None
+    # Grocers for ingredients (grocery.py), the same kind of template:
+    # Instacart's and Walmart's affiliate programmes. Amazon Fresh uses
+    # amazon_tag.
+    instacart_link: str | None = None
+    walmart_link: str | None = None
     # Limits on /api from outside the site (ratelimit.py): without a key,
     # per address; with one, per key, about ten times as much. Plain reads
     # and searches a minute, and all requests a day (UTC). *Ray, 2026-11-09:
@@ -136,7 +141,14 @@ class Settings(BaseSettings):
             raise ValueError("OPENLARDER_AMAZON_TAG is an Associates tag, like openlarder-20.")
         return value
 
-    @field_validator("barnes_noble_link", "thriftbooks_link", "bookoutlet_link", "kobo_link")
+    @field_validator(
+        "barnes_noble_link",
+        "thriftbooks_link",
+        "bookoutlet_link",
+        "kobo_link",
+        "instacart_link",
+        "walmart_link",
+    )
     @classmethod
     def _deep_link(cls, value: str | None, info) -> str | None:
         value = (value or "").strip() or None

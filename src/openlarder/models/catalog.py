@@ -313,6 +313,27 @@ class PurchaseClick(Base):
     )
 
 
+class GroceryClick(Base):
+    """A click on an ingredient's grocery link (grocery.py): which
+    ingredient, which grocer, when, and from which OpenLarder page. Nothing
+    about who clicked."""
+
+    __tablename__ = "grocery_clicks"
+    __table_args__ = (
+        CheckConstraint("grocer <> ''", name="grocer_not_empty"),
+        Index("ix_grocery_clicks_clicked_at", "clicked_at"),
+        Index("ix_grocery_clicks_ingredient_id", "ingredient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    ingredient_id: Mapped[uuid.UUID] = _fk("ingredients.id", ondelete="CASCADE")
+    grocer: Mapped[str] = mapped_column(Text, nullable=False)
+    page: Mapped[str | None] = mapped_column(Text)
+    clicked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+
 class Recipe(Reviewed, Timestamps, Base):
     __tablename__ = "recipes"
     __table_args__ = (

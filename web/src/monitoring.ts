@@ -29,6 +29,10 @@ export interface ClicksPage {
   books: { source_id: string; title: string; isbn13: string | null; clicks: number }[];
   pages: { page: string | null; clicks: number }[];
   by_day: { day: string; clicks: number }[];
+  // Ingredients' grocery links (grocery.py).
+  grocery_clicks: number;
+  grocers: { retailer: string; label: string; clicks: number; last_7_days: number }[];
+  ingredients: { ingredient_id: string; name: string; clicks: number }[];
 }
 
 async function get<T>(url: string): Promise<T> {
