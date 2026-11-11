@@ -5,6 +5,7 @@ import { type WikidataRun, checkWikidata } from "../authors";
 import { type BookSummary, listSources } from "../books";
 import { buildDump, size } from "../dumps";
 import { fetchFlags } from "../flags";
+import { reportQueue } from "../reports";
 import { reviewQueue } from "../review";
 import { fetchSuggestions } from "../suggestions";
 import { archiveMissing } from "../recipes";
@@ -17,6 +18,7 @@ document.title = "Admin · OpenLarder";
 const openFlags = ref<number | null>(null);
 const openSuggestions = ref<number | null>(null);
 const waiting = ref<number | null>(null);
+const reported = ref<number | null>(null);
 const imports = ref<number | null>(null);
 const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -28,6 +30,7 @@ async function loadCounts() {
       ? fetch("/api/import/runs").then((r) => (r.ok ? r.json() : Promise.reject()))
       : Promise.reject(),
     reviewQueue().then((q) => (waiting.value = q.pending)),
+    reportQueue("open").then((q) => (reported.value = q.counts.open ?? 0)),
   ]);
   if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
   if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
@@ -150,6 +153,13 @@ async function archiveAll() {
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
       <ul class="link-cards">
+        <li>
+          <a href="/admin/reports">
+            <h2>Reports</h2>
+            <p class="count">{{ n(reported, "open", "open") }}</p>
+            <p>Problems people have reported with recipes, sources, ingredients and authors.</p>
+          </a>
+        </li>
         <li>
           <a href="/admin/review">
             <h2>Review</h2>

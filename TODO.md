@@ -186,9 +186,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         withheld sticks, cleared lets it be earned again. Settings
         `OPENLARDER_TRUST_RECIPES` and `OPENLARDER_TRUST_BOOKS`. The
         contributor agreement says so (version 2026-11-10.2, asked again).
-      - [ ] A report button on every public record, for anyone (*Ray,
-        2026-11-10*), into a moderators' queue. The ingredient matching
-        flow's suggestions and "new ingredient" step wait on this too.
+      - [x] A report button on every public record, for anyone (#121;
+        *Ray, 2026-11-10*): "Report a problem" on each recipe, source,
+        ingredient and author page, with a reason and a note; signed out,
+        5 a day per address and a field bots fill. Moderators fix or
+        dismiss them at `/admin/reports`.
+      - [ ] The ingredient matching flow's suggestions and "new ingredient"
+        step.
       - [ ] Edit history keeps everything forever: check its size once the
         household index is imported again (~400,000 rows for 19,000 recipes).
 

@@ -10,6 +10,7 @@ import AdminApiUsagePage from "./pages/AdminApiUsagePage.vue";
 import AdminChangesPage from "./pages/AdminChangesPage.vue";
 import AdminClicksPage from "./pages/AdminClicksPage.vue";
 import AdminPeoplePage from "./pages/AdminPeoplePage.vue";
+import AdminReportsPage from "./pages/AdminReportsPage.vue";
 import AdminReviewPage from "./pages/AdminReviewPage.vue";
 import AdminImportPage from "./pages/AdminImportPage.vue";
 import AdminImportsPage from "./pages/AdminImportsPage.vue";
@@ -68,6 +69,7 @@ const onClicks = path === "/admin/clicks";
 const onPeople = path === "/admin/people";
 const onChanges = path === "/admin/changes";
 const onReview = path === "/admin/review";
+const onReports = path === "/admin/reports";
 const onRequests = path === "/requests";
 const onLarder = path === "/larder";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
@@ -198,6 +200,7 @@ onMounted(async () => {
     <AdminPeoplePage v-else-if="onPeople" :user="user" />
     <AdminChangesPage v-else-if="onChanges" :user="user" />
     <AdminReviewPage v-else-if="onReview" :user="user" />
+    <AdminReportsPage v-else-if="onReports" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
     <LarderPage v-else-if="onLarder" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
@@ -2251,6 +2254,19 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+.report-problem {
+  margin-top: 1.5rem;
+}
+.report-form {
+  margin-top: 0.5rem;
+}
+.report-form .check {
+  display: block;
+  font-weight: normal;
+}
+.report-reason {
+  margin: 0.25rem 0 0;
 }
 .larder-picker {
   border: 1px solid var(--line);

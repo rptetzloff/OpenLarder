@@ -161,6 +161,8 @@ async function seed() {
   const seat = await api(`/api/groups/${group.id}/invites`, "cook", { role: "view" });
   await api(`/api/invites/${seat.token}/accept`, "admin", {});
   await api(`/api/larder/items/${butter.id}`, "cook", { state: "out" }, "PATCH");
+  // A problem reported with a recipe.
+  await api("/api/reports", "cook", { kind: "recipe", id: biscuits.id, reason: "wrong", note: "Page 23 in mine." });
   // Requests: one asked for twice, one claimed, one declined.
   await api("/api/requests", "cook", { title: "Plenty", author: "Yotam Ottolenghi", note: "The vegetable one." });
   await api("/api/requests", "admin", { title: "plenty" });
@@ -227,6 +229,7 @@ function pages(s) {
     ["/admin/people", "admin"],
     ["/admin/changes", "admin"],
     ["/admin/review", "admin"],
+    ["/admin/reports", "admin"],
     [`/sources/${s.waiting}`, "cook"],
     [`/recipes/${s.biscuits.id}/propose`, "cook"],
     [`/sources/${s.book.id}/propose`, "cook"],

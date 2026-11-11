@@ -30,6 +30,7 @@ from openlarder.models.history import Revision
 from openlarder.models.imports import ImportRun, ImportRunLine
 from openlarder.models.larder import LarderItem, LarderList, LarderListGroup
 from openlarder.models.proposals import Proposal
+from openlarder.models.reports import Report
 from openlarder.models.requests import BookRequest, RequestVote
 from openlarder.models.suggestions import IngredientEmbedding, Suggestion
 from openlarder.models.usage import ApiUsage
@@ -66,6 +67,7 @@ __all__ = [
     "RecipeIngredient",
     "RecipeLocation",
     "RecipeTag",
+    "Report",
     "RequestVote",
     "Resolution",
     "Revision",

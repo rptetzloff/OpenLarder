@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
+import ReportButton from "../components/ReportButton.vue";
 import {
   addLink,
   type Author,
@@ -332,6 +333,7 @@ onMounted(load);
           </ul>
         </div>
       </section>
+      <ReportButton kind="author" :id="id" />
       <HistoryPanel kind="authors" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>

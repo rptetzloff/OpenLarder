@@ -4,6 +4,7 @@ import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
+import ReportButton from "../components/ReportButton.vue";
 import { setRecipeTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
 import { issueName } from "../books";
@@ -408,6 +409,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           </p>
         </aside>
       </div>
+      <ReportButton kind="recipe" :id="id" />
       <HistoryPanel kind="recipes" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>

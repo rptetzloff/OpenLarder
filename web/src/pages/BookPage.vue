@@ -7,6 +7,7 @@ import { REVIEW_LABELS } from "../review";
 // Back from suggesting a change (BookEditPage's propose).
 const proposed = new URLSearchParams(location.search).has("proposed");
 import HistoryPanel from "../components/HistoryPanel.vue";
+import ReportButton from "../components/ReportButton.vue";
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
@@ -520,6 +521,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         Book details and covers from <a href="https://openlibrary.org">Open Library</a>.
       </p>
       <BookMerge v-if="adminTools && isBook" :id="book.id" :title="book.title" />
+      <ReportButton v-if="!book.private" kind="source" :id="id" />
       <HistoryPanel kind="sources" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>
