@@ -69,6 +69,7 @@ async def test_the_diets_start_seeded(client, adb) -> None:
         "Low-FODMAP",
         "Nut-Free",
         "Paleo",
+        "Pescetarian",
         "Soy-Free",
         "Vegan",
         "Vegetarian",

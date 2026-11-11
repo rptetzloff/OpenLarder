@@ -110,8 +110,9 @@ RULES = [
         "wheat",
         "wheat flour semolina spelt farro durum bulgur bulghur couscous seitan panko breadcrumb"
         " bread pasta spaghetti macaroni orzo lasagna lasagne fettuccine linguine penne"
-        " pita naan baguette brioche croissant phyllo filo pastry cracker wonton",
-        _FLOUR_NOT_WHEAT + ["buckwheat", "corn", "rice"],
+        " pita naan baguette brioche croissant phyllo filo pastry cracker wonton kamut emmer"
+        " einkorn freekeh triticale farina matzo matzah",
+        _FLOUR_NOT_WHEAT + ["buckwheat", "corn", "rice", "rye", "barley"],
     ),
     _rule(
         "wheat",
@@ -123,7 +124,8 @@ RULES = [
         "gluten",
         "wheat flour semolina spelt farro durum bulgur bulghur couscous seitan panko breadcrumb"
         " bread pasta spaghetti macaroni orzo lasagna lasagne fettuccine linguine penne"
-        " pita naan baguette brioche croissant phyllo filo pastry cracker wonton barley rye"
+        " pita naan baguette brioche croissant phyllo filo pastry cracker wonton kamut emmer"
+        " einkorn freekeh triticale farina matzo matzah barley rye"
         " malt",
         _FLOUR_NOT_WHEAT + ["buckwheat", "corn", "rice"],
     ),
@@ -151,7 +153,7 @@ def words(name: str) -> set[str]:
     for w in raw:
         if len(w) > 4 and w.endswith("ies"):
             w = w[:-3] + "y"
-        elif len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        elif len(w) > 3 and w.endswith("s") and not w.endswith(("ss", "us")):
             w = w[:-1]
         out.append(w)
     return set(out) | {f"{a}_{b}" for a, b in zip(out, out[1:], strict=False)}

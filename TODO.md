@@ -191,8 +191,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [x] Swaps for a diet (#139): each diet avoids allergens (migration
         0061: Dairy-Free milk; Gluten-Free wheat and gluten; Egg-Free egg;
         Nut-Free tree nuts and peanuts; Soy-Free soy; Vegan milk, egg and
-        seafood; Vegetarian seafood; Paleo, AIP and Low-FODMAP none),
-        changed by moderators on Admin. A recipe's "Cooking for a diet"
+        seafood; Vegetarian seafood; Paleo, AIP, Low-FODMAP and the new
+        Pescetarian none). *Ray, 2026-11-11:* Gluten-Free avoids every gluten
+        grain, so the gluten allergen is labelled "Gluten (wheat, barley,
+        rye)", and rye, barley, couscous, kamut, emmer, freekeh, triticale,
+        farina and matzo are read as they should be. What each
+        avoids is changed by moderators on Admin. A recipe's "Cooking for a diet"
         lists its ingredients recording one, each with the swaps recorded
         for it or a broader ingredient, for a diet avoiding all it was
         found for (a Vegan swap for butter serves Dairy-Free), whose

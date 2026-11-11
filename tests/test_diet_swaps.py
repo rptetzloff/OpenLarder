@@ -42,6 +42,8 @@ async def test_diets_say_what_they_avoid(client) -> None:
     assert diets["Gluten-Free"]["avoids"] == ["wheat", "gluten"]
     assert diets["Vegan"]["avoids"] == ["milk", "egg", "fish", "crustaceans", "molluscs"]
     assert diets["Paleo"]["avoids"] == []
+    # A diet, for tags and swaps; meat isn't an allergen.
+    assert diets["Pescetarian"]["avoids"] == []
 
 
 async def test_a_recipe_for_a_diet(people, client, adb) -> None:

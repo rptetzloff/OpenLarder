@@ -8,6 +8,11 @@ Vegetarian avoid more than allergens; the page says which allergens it
 checks. Paleo, AIP and Low-FODMAP aren't allergen diets and avoid none
 until a moderator says otherwise. Catalog data, in the history and dumps.
 
+*Ray, 2026-11-11:* Gluten-Free avoids every gluten grain, so the gluten
+allergen says so in its label: the EU's "cereals containing gluten",
+wheat, barley, rye and their kin. And Pescetarian is a diet, for tagging
+and swaps; it avoids meat, which isn't an allergen, so it checks nothing.
+
 Revision ID: 0061
 Revises: 0060
 """
@@ -62,6 +67,12 @@ def upgrade() -> None:
                     " SELECT id, :key FROM tags WHERE kind = 'diet' AND lower(name) = lower(:diet)"
                 ).bindparams(key=key, diet=diet)
             )
+    op.execute("UPDATE allergens SET label = 'Gluten (wheat, barley, rye)' WHERE key = 'gluten'")
+    op.execute(
+        "INSERT INTO tags (kind, name) SELECT 'diet', 'Pescetarian'"
+        " WHERE NOT EXISTS (SELECT 1 FROM tags WHERE kind = 'diet'"
+        " AND lower(name) = 'pescetarian')"
+    )
     op.execute(
         "CREATE TRIGGER record_revision AFTER INSERT OR UPDATE OR DELETE ON diet_allergens"
         " FOR EACH ROW EXECUTE FUNCTION record_revision('none')"
@@ -69,4 +80,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("UPDATE allergens SET label = 'Gluten' WHERE key = 'gluten'")
     op.drop_table("diet_allergens")
