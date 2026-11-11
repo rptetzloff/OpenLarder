@@ -54,6 +54,7 @@ async def test_a_book_and_its_recipes_link_to_bookshop(client, book, affiliate) 
         "label": "Bookshop.org",
         "url": f"/go/bookshop/{edition}",
         "note": None,
+        "format": "print",
     }
     shown = (await client.get(f"/api/sources/{book['work']}")).json()
     assert shown["editions"][0]["buy"] == [link]
@@ -152,8 +153,10 @@ async def test_each_shop_set_shows_in_order(client, book, every_shop, adb) -> No
         "ThriftBooks",
         "Book Outlet",
         "Amazon",
-        "Kobo (ebook)",
+        "Kobo",
     ]
+    # Print first, then the ebook.
+    assert [b["format"] for b in buy] == ["print"] * 5 + ["ebook"]
     # Amazon's programme asks for its own words beside its link.
     assert [b["note"] for b in buy if b["note"]] == [
         "As an Amazon Associate, OpenLarder earns from qualifying purchases."

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CoverBlank from "../components/CoverBlank.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
@@ -216,7 +217,7 @@ onMounted(load);
           <li v-for="b in author.sources" :key="b.id">
             <a :href="`/sources/${b.id}`" class="cover-card">
               <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" />
-              <span v-else class="cover-blank" aria-hidden="true"></span>
+              <CoverBlank v-else :title="b.title" :byline="author.name" />
               <strong>{{ b.title }}</strong>
               <span class="byline">
                 {{ b.recipes.toLocaleString() }} {{ b.recipes === 1 ? "recipe" : "recipes"

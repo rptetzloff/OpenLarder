@@ -7,9 +7,10 @@ import { REVIEW_LABELS } from "../review";
 // Back from suggesting a change (BookEditPage's propose).
 const proposed = new URLSearchParams(location.search).has("proposed");
 import HistoryPanel from "../components/HistoryPanel.vue";
+import CoverBlank from "../components/CoverBlank.vue";
 import ReportButton from "../components/ReportButton.vue";
 import { arrange } from "../shops";
-import { buyHref, DISCLOSURE, notes } from "../buying";
+import { buyHref, DISCLOSURE, FORMAT_NAMES, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
 import { computed, onMounted, ref } from "vue";
@@ -227,7 +228,12 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
 
       <div class="source-head">
         <img v-if="cover" :src="cover" :alt="`Cover of ${book.title}`" class="source-cover" />
-        <div v-else class="source-cover" aria-hidden="true"></div>
+        <CoverBlank
+          v-else
+          class="source-cover"
+          :title="book.title"
+          :byline="credits.map((c) => c.credited_as).join(', ')"
+        />
         <div class="source-about">
           <p class="kind">{{ KIND_NAMES[book.kind] }}</p>
           <h1>{{ book.title }}</h1>
@@ -340,15 +346,16 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <!-- The selected edition's shops, beside the cover: the tabs below
                change which edition this is. -->
           <aside v-if="edition && buyLinks.length" class="source-buy" aria-labelledby="buy-title">
-            <h2 id="buy-title">Buy this edition</h2>
+            <h2 id="buy-title">Get this book</h2>
             <p v-if="book.editions.length > 1" class="buy-edition">{{ editionLabel(edition) }}</p>
             <a
               v-for="b in buyLinks"
               :key="b.retailer"
               :href="buyHref(b)"
               rel="sponsored noopener"
-              class="button-outline"
-              >{{ b.label }}</a
+              :class="['buy-button', b.format]"
+              ><span class="buy-format">{{ FORMAT_NAMES[b.format] }}</span
+              ><span class="buy-shop">{{ b.label }}</span></a
             >
             <p class="buy-note">{{ DISCLOSURE }}</p>
             <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CoverBlank from "../components/CoverBlank.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
@@ -414,7 +415,12 @@ async function add() {
       <li v-for="book in books" :key="book.id">
         <a :href="`/sources/${book.id}`" class="cover-card">
           <img v-if="book.cover_url" :src="book.cover_url" alt="" loading="lazy" />
-          <span v-else class="cover-blank" aria-hidden="true">{{ capitalised(book.kind) }}</span>
+          <CoverBlank
+            v-else
+            :title="book.title"
+            :byline="book.authors.join(', ') || book.host"
+            :kind="book.kind"
+          />
           <span class="kind">{{ KIND_NAMES[book.kind] ?? "source" }}</span>
           <strong>{{ book.title }}</strong>
           <span v-if="book.authors.length" class="byline">{{ book.authors.join(", ") }}</span>

@@ -1567,13 +1567,6 @@ button.secondary[aria-pressed="true"] .count {
   box-sizing: border-box;
   margin-bottom: 0.5rem;
 }
-.cover-card .cover-blank {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  font-size: 0.8125rem;
-}
 .cover-card:hover strong {
   text-decoration: underline;
 }
@@ -2254,6 +2247,78 @@ button.primary.small {
   border-radius: 8px;
   background: var(--bg);
   color: var(--fg);
+}
+/* A cover for a source that has none: its title and byline on a colour
+   picked from its title, the same in both themes, like a printed cover. */
+.cover-blank.cover-blank {
+  display: block;
+  container-type: inline-size;
+  overflow: hidden;
+  color: #faf6ec;
+  background: var(--cover, #2e4a3b);
+  border: 0;
+  text-align: left;
+}
+.cover-blank .cover-face {
+  display: flex;
+  flex-direction: column;
+  gap: 6cqi;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10cqi 9cqi 9cqi 13cqi;
+  box-shadow: inset 4cqi 0 0 rgb(0 0 0 / 0.22);
+}
+.cover-blank .cover-kind {
+  font-size: 7cqi;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.cover-blank .cover-title {
+  margin-top: auto;
+  color: #e8b866;
+  font-weight: 700;
+  font-size: 12cqi;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cover-blank .cover-byline {
+  font-size: 7.5cqi;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* The buy box: one button a shop, what it sells on the left. */
+.source-buy .buy-button {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.source-buy .buy-button:hover {
+  background: var(--accent-hover);
+}
+.source-buy .buy-button.ebook {
+  color: var(--notice-fg);
+  background: var(--notice-bg);
+}
+.source-buy .buy-button.ebook:hover {
+  filter: brightness(0.92);
+}
+.source-buy .buy-button .buy-shop {
+  text-align: right;
 }
 .report-problem {
   margin-top: 1.5rem;

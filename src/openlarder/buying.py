@@ -17,6 +17,7 @@ import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import quote, urlsplit
 
 from pydantic import BaseModel
@@ -84,6 +85,8 @@ class Retailer:
     destination: Callable[[Settings, Book], str | None]
     # What the shop's programme asks to be said beside its link, if anything.
     note: str | None = None
+    # What it sells the book as: the buy box labels each button with it.
+    format: Literal["print", "ebook"] = "print"
 
 
 # In the order pages show them: the independent bookshops' first.
@@ -114,7 +117,12 @@ RETAILERS = [
         _amazon,
         note="As an Amazon Associate, OpenLarder earns from qualifying purchases.",
     ),
-    Retailer("kobo", "Kobo (ebook)", lambda s, b: _wrapped(s.kobo_link, _kobo_search(b))),
+    Retailer(
+        "kobo",
+        "Kobo",
+        lambda s, b: _wrapped(s.kobo_link, _kobo_search(b)),
+        format="ebook",
+    ),
 ]
 BY_KEY = {r.key: r for r in RETAILERS}
 
@@ -125,6 +133,7 @@ class BuyLink(BaseModel):
     # OpenLarder's own address, which counts the click.
     url: str
     note: str | None = None
+    format: Literal["print", "ebook"] = "print"
 
 
 def destination(retailer: str, book: Book) -> str | None:
@@ -145,7 +154,13 @@ def links(
     book = Book(isbn13=isbn13, title=title, author=author)
     settings = get_settings()
     return [
-        BuyLink(retailer=r.key, label=r.label, url=f"/go/{r.key}/{edition_id}", note=r.note)
+        BuyLink(
+            retailer=r.key,
+            label=r.label,
+            url=f"/go/{r.key}/{edition_id}",
+            note=r.note,
+            format=r.format,
+        )
         for r in RETAILERS
         if r.destination(settings, book)
     ]

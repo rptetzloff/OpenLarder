@@ -107,7 +107,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       your shops" under them puts them in your order and hides the rest,
       one always left; kept with the account when signed in (migration
       0035), in the browser otherwise. Still to come: a page showing the
-      clicks.
+      clicks. **"Get this book" (#122):** each shop a filled button, the
+      format on the left (print shops first, then Kobo's ebook, unless
+      you've chosen your own order) and the shop on the right. Sources
+      with no cover get one drawn: the title and byline on a colour picked
+      from the title (*Ray, 2026-11-10*).
 - [x] **Read-only public API** (#97): the routes are public and documented
       at `/api/docs`. Without a key, per address: 60 plain reads and 10
       searches a minute, 1,000 requests a day; a free key from Your account
