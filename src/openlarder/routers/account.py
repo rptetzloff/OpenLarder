@@ -1,5 +1,5 @@
 """The signed-in person's own account: their display name, their shops,
-and their API keys."""
+their API keys, and deleting it."""
 
 import uuid
 from datetime import datetime
@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from openlarder import buying, grocery, names, ratelimit
-from openlarder.auth import CurrentUser, SameOrigin, hash_token, new_token
+from openlarder import account_deletion, buying, grocery, names, ratelimit
+from openlarder.auth import SESSION_COOKIE, CurrentUser, SameOrigin, hash_token, new_token
 from openlarder.db import Session
 from openlarder.models import ApiKey
 from openlarder.ratelimit import KEY_PREFIX
@@ -185,3 +185,28 @@ async def api_limits(settings: Config) -> LimitsOut:
         )
 
     return LimitsOut(without_key=named(False), with_key=named(True))
+
+
+class DeleteIn(BaseModel):
+    # Their display name, typed again; "delete" for someone who has none.
+    confirm: str = Field(max_length=64)
+
+
+@router.post("/delete", status_code=status.HTTP_204_NO_CONTENT, dependencies=[SameOrigin])
+async def delete_account(body: DeleteIn, user: CurrentUser, session: Session) -> Response:
+    """Delete the signed-in person's account (account_deletion.py), and
+    sign them out here."""
+    expected = user.display_name or "delete"
+    if body.confirm.strip().casefold() != expected.casefold():
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Type “{expected}” to say you mean it.",
+        )
+    try:
+        await account_deletion.delete_account(session, user)
+    except account_deletion.Refused as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    await session.commit()
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response

@@ -190,12 +190,20 @@ document.title = "Privacy policy · OpenLarder";
     <h2>Your choices</h2>
     <p>
       You can sign out at any time, which ends the session here and at Authgear. To see what
-      OpenLarder holds about you, correct it, or delete your account, email
-      <a href="mailto:privacy@openlarder.com">privacy@openlarder.com</a>. Deleting your account
-      removes your user record, your sessions, your group memberships and your family
-      collections here; your Authgear
-      account can be removed at the same time on request. You can delete a family collection
-      yourself, from its page, at any time.
+      OpenLarder holds about you, or correct it, email
+      <a href="mailto:privacy@openlarder.com">privacy@openlarder.com</a>. You can delete a family
+      collection yourself, from its page, at any time.
+    </p>
+    <p>
+      You can delete your account yourself, from Your account. That removes, at once, your user
+      record, your sessions and API keys, your group memberships, your family collections and the
+      edit history recorded for them, your larder lists, your votes on requests, your suggested
+      changes still open, and what you've added that is still waiting for review. A group you were
+      the last admin of passes to its longest-standing member; one with nobody else in it is
+      deleted. What you added to the catalog that has been published stays, because you licensed
+      it under the ODbL when you added it, but no longer shows your name; so do requests and
+      reports you made, without your account. Your Authgear account isn't removed by this: email
+      <a href="mailto:privacy@openlarder.com">privacy@openlarder.com</a> to have it removed too.
     </p>
 
     <h2>Children</h2>

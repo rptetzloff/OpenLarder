@@ -371,11 +371,16 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       expires after 7 days (Ray). The larder can share the same way. Found while building family collections:
       - **A family recipe has no page**, like packaging; a church or school
         cookbook's page number could be wanted.
-      - **Deleting an account** isn't built: an owner with collections is
-        kept by the database (RESTRICT), and the privacy policy says
-        deletion removes their collections, so the deletion has to. A
-        group's last admin would leave it with none: deletion should hand
-        the group to another member or delete it.
+      - [x] **Deleting an account** (#140): from Your account, typing your
+        display name. Goes: family collections and their history, larder
+        lists, what's still waiting for review, open suggested changes,
+        votes, sessions, API keys, group memberships. A group whose last
+        admin it was passes to its longest-standing member, or is deleted
+        if nobody's left. Stays without the name: published catalog
+        entries (ODbL), requests, reports. Not the owner. The privacy
+        policy says so.
+      - [ ] Removing the Authgear account too, through Authgear's Admin
+        API (needs an Admin API key in Coolify); until then, by email.
       - **Invites are links to pass on by hand**: OpenLarder sends no email,
         and keeps no address to send one to.
       - **Credits on a family collection** can't be added through any
