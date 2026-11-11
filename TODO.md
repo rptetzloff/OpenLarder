@@ -455,7 +455,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       the public dump bucket: they hold accounts and private recipes), with
       an R2 token for that bucket only. The data dumps are no backup: public
       catalog only, and nothing restores from them.
-      - [ ] A restore tested from the latest backup, before the reset.
+      - [ ] A restore tested from the latest backup, before launch (not
+        before the dev reset: "it's still dev data", Ray, 2026-11-10).
 - [x] **Typo fixing in the importer** (#127): nothing is changed unasked
       (*Ray, 2026-11-10: "flag everything"*). At the end of each import
       run, a rare name close to a much commoner one ("Lemon Jucie", "Lemon Juice") is
