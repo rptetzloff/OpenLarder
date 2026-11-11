@@ -35,6 +35,9 @@ class FlagKind(enum.StrEnum):
     USUALLY_LEFT_OUT = "usually_left_out"
     # A line with an amount or prep in it; the detail has the bare suggestion.
     LINE_DETAIL = "line_detail"
+    # A rare ingredient name close to a much commoner one (typos.py); the
+    # detail is "as written → suggested".
+    POSSIBLE_TYPO = "possible_typo"
 
 
 class Resolution(enum.StrEnum):

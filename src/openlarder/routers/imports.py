@@ -237,11 +237,26 @@ async def add_lines(
     return {"added": len(body.lines)}
 
 
-@router.post("/runs/{run_id}/finish", dependencies=[SameOrigin])
+class TypoOut(BaseModel):
+    recipe_id: uuid.UUID
+    recipe: str
+    book: str
+    detail: str
+
+
+class Finished(BaseModel):
+    finished: bool
+    # Names that look like typos, flagged once the run's recipes are in.
+    typos: list[TypoOut] = []
+
+
+@router.post("/runs/{run_id}/finish", response_model=Finished, dependencies=[SameOrigin])
 async def finish_run(
     run_id: uuid.UUID, body: RunFinish, admin: AdminUser, session: Session
-) -> dict[str, bool]:
+) -> Finished:
+    await history.via(session, f"import:{run_id}")
     run = await _open_run(session, run_id)
+    flagged = await importer.flag_typos(session, run)
     run.books_added, run.books_existing, run.books_failed = (
         body.books_added,
         body.books_existing,
@@ -249,7 +264,13 @@ async def finish_run(
     )
     run.finished_at = func.now()
     await session.commit()
-    return {"finished": True}
+    return Finished(
+        finished=True,
+        typos=[
+            TypoOut(recipe_id=t.recipe_id, recipe=t.recipe, book=t.book, detail=t.detail)
+            for t in flagged
+        ],
+    )
 
 
 @router.get("/runs", response_model=list[RunOut])

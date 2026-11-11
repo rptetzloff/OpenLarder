@@ -446,11 +446,24 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 - [ ] **Catalog reset script**: empties the catalog tables, keeps the
       schema, accounts and the seeded diets, so the household index can be
       imported again.
-- [ ] **Typo fixing in the importer** ("Lemon Jucie"): fix when the match is
-      close enough, otherwise suggest and flag, with a measured threshold.
+- [x] **Typo fixing in the importer** (#127): nothing is changed unasked
+      (*Ray, 2026-11-10: "flag everything"*). At the end of each import
+      run, a rare name close to a much commoner one ("Lemon Jucie", "Lemon Juice") is
+      flagged on each public recipe using it, with "Change to “Lemon
+      Juice”" on the flag: the line is changed and matched, the misspelt
+      ingredient goes if nothing else uses it. Measured on the household
+      index (typos.py): 53 names suggested, about 40 of them real typos; no
+      rule was safe to apply alone (swapped letters: 9 in 10, "Crema" is not
+      "Cream"). A dismissed flag stays dismissed (migration 0052). The run's
+      report lists them by recipe and book.
 - [ ] **#17**: sign-in and account screens that look like OpenLarder.
-- [ ] **Ray**: publish the Google sign-in consent screen.
-- [ ] **Ray**: Cloudflare Browser Cache TTL to "Respect Existing Headers".
+      Authgear's branding settings aren't thorough enough (*Ray,
+      2026-11-10*). The other way is its Authentication Flow API with a
+      Custom UI URI: our own pages for every step, which Authgear has to
+      switch on. Next: ask Authgear whether Custom UI is on Ray's plan.
+- [x] **Ray**: publish the Google sign-in consent screen (2026-11-10).
+- [x] **Ray**: Cloudflare Browser Cache TTL to "Respect Existing Headers"
+      (2026-11-10).
 
 ## Open decisions
 
@@ -458,7 +471,7 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       can be reused.
 - [ ] Lawyer review of the privacy policy, terms, content rules, licence and
       allergen notice.
-- [ ] USPTO check on "Open Larder" (Classes 9 and 42).
+- [x] USPTO check on "Open Larder" (Classes 9 and 42): done, Ray, 2026-11-10.
 - [ ] How an author is verified.
 - [ ] Licence for author bios.
 - [ ] Which sources author photos may come from, and under what licence.
