@@ -3,3 +3,6 @@
 # Buy links (/go/) are redirects to shops, counted when followed.
 User-agent: *
 Disallow: /go/
+
+# Every page that's everyone's, for a crawler to start from.
+Sitemap: https://openlarder.com/sitemap.xml

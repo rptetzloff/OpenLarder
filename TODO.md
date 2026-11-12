@@ -227,7 +227,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] The summary shows for a moment before the SPA draws the page
         over it (the spec says leave it visible). If it's noticed, hide
         it as `.visually-hidden` is, once Google is seen to read it still.
-      - [ ] 4. `/sitemap.xml` of public records, and its line in robots.txt.
+      - [x] 4. The sitemap (#162): `/sitemap.xml` is an index of
+        `/sitemaps/<kind>-<n>.xml` for recipes, sources, ingredients and
+        authors, at most 50,000 addresses a file, each with the day its
+        record last changed. Only what someone signed out can see, whoever
+        asks. robots.txt points at it.
       - [ ] 5. Ingredients and authors.
       - [ ] 6. JSON-LD: Book and BreadcrumbList; never Recipe, as the page
         has no method or amounts.
