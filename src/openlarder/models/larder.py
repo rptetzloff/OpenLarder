@@ -98,3 +98,21 @@ class ShelfBook(Timestamps, Base):
     edition_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("editions.id", ondelete="SET NULL"), index=True
     )
+
+
+class ShelfGroup(Base):
+    """Someone's shelf shared with a group, as a larder list is (migration
+    0063): view members see it, edit and admin members change what's on it."""
+
+    __tablename__ = "shelf_groups"
+    __table_args__ = (PrimaryKeyConstraint("user_id", "group_id"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

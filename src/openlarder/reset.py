@@ -95,6 +95,7 @@ PEOPLE = (
     "group_invites",
     "larder_lists",
     "larder_list_groups",
+    "shelf_groups",
     "book_requests",
     "request_votes",
     "dumps",

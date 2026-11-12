@@ -123,7 +123,9 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>
         your shelf, if you keep one: which books you have, and which edition. Only you see it,
-        and it isn't part of the open data, the edit history or the API;
+        and the members of the groups you share it with (their editors change what's on it); it
+        isn't part of the open data, the edit history or the API. Leaving a group stops sharing
+        your shelf, larder lists and family collections with it;
       </li>
       <li>
         what you add to or change in the catalog, with your display name and when: its edit
