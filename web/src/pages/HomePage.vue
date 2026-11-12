@@ -21,11 +21,25 @@ function findRecipes() {
   location.href = `/search?${query}`;
 }
 
+// The row of sources: a row's worth to scroll through, and none that
+// opens on an empty page (Ray's cleanup pass, sections 4 and 9). The newest
+// with a recipe; when fewer than six have one, those by how many instead.
+const ROW = 20;
+const ENOUGH = 6;
 const recent = ref<BookSummary[] | null>(null);
+const rowTitle = ref("Recently added sources");
 onMounted(async () => {
   document.title = "OpenLarder";
-  // A row's worth, to scroll through (Ray's cleanup pass, section 4).
-  recent.value = (await listSources("", 0, 20, "recent").catch(() => null))?.sources ?? [];
+  const newest = await listSources("", 0, ROW, "recent", [], 1).catch(() => null);
+  if (newest && newest.total < ENOUGH) {
+    const most = await listSources("", 0, ROW, "recipes", [], 1).catch(() => null);
+    if (most) {
+      rowTitle.value = "Most indexed sources";
+      recent.value = most.sources;
+      return;
+    }
+  }
+  recent.value = newest?.sources ?? [];
 });
 </script>
 
@@ -81,7 +95,7 @@ onMounted(async () => {
 
     <section class="home-section" aria-labelledby="recent-title">
       <div class="section-head">
-        <h2 id="recent-title">Recently added sources</h2>
+        <h2 id="recent-title">{{ rowTitle }}</h2>
         <a href="/sources">Browse all sources</a>
       </div>
       <p v-if="recent && !recent.length" class="status">Nothing yet.</p>

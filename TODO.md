@@ -167,9 +167,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] 8. Tokens, alongside the rest: the type sizes and corner radii
         are in `:root` now (#150); fold odd sizes in and move page CSS out
         of App.vue as each page is touched.
-      - [ ] 9. Home, no empty sources first: a `min_recipes` filter on the
-        source list; the front page asks for recent sources with at least
-        one recipe, and with fewer than six shows "Most indexed sources".
+      - [x] 9. Home, no empty sources (#157): the source list takes
+        `min_recipes`, counting published recipes as a card does, and the
+        front page's row asks for the newest sources with at least one.
+        When fewer than six have one, the row is those by how many, under
+        "Most indexed sources"; still none that's empty. The Sources page
+        lists everything, as before.
       - [ ] 10. Ingredients list, no columns of dashes: two columns,
         Ingredient and Recipes, with "Under Cheese · Also called scallion"
         beneath a name only when there's something to say.

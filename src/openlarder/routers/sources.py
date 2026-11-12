@@ -263,6 +263,9 @@ async def list_books(
     sort: Literal["title", "recent", "recipes"] = "title",
     # Only these kinds; every kind when none are given.
     kind: Annotated[list[SourceKind] | None, Query()] = None,
+    # Only sources with at least this many published recipes: the front
+    # page asks for one, so a first click doesn't land on an empty source.
+    min_recipes: int = Query(0, ge=0),
 ) -> SourceList:
     """Sources by title, a page at a time; with q, those with every word of
     it in the title, subtitle, a credited name or a website's address,
@@ -281,6 +284,14 @@ async def list_books(
                 SourceCredit.credited_as.ilike(like, escape="\\"),
             )
         )
+    # What a card shows and the "recipes" sort goes by: published recipes.
+    recipe_count = (
+        select(func.count())
+        .where(Recipe.source_id == Source.id, Recipe.review == "published")
+        .scalar_subquery()
+    )
+    if min_recipes:
+        query = query.where(recipe_count >= min_recipes)
     counted = query.subquery()
     kinds = dict(
         (await session.execute(select(counted.c.kind, func.count()).group_by(counted.c.kind))).all()
@@ -288,11 +299,6 @@ async def list_books(
     if kind:
         query = query.where(Source.kind.in_(kind))
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    recipe_count = (
-        select(func.count())
-        .where(Recipe.source_id == Source.id, Recipe.review == "published")
-        .scalar_subquery()
-    )
     order = {
         "recent": (Source.created_at.desc(), Source.id),
         "recipes": (recipe_count.desc(), func.lower(Source.title), Source.id),
