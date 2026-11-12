@@ -17,8 +17,10 @@ from sqlalchemy import select
 
 from openlarder import buying, grocery, visibility
 from openlarder.auth import Viewer
+from openlarder.author_names import shown_name
 from openlarder.db import Session
 from openlarder.models import (
+    Author,
     Edition,
     GroceryClick,
     Ingredient,
@@ -44,14 +46,22 @@ async def go(
     source = await session.get(Source, edition.source_id) if edition else None
     target = None
     if edition and edition.isbn13 and source and source.kind == "book":
-        author = await session.scalar(
-            select(SourceCredit.credited_as)
-            .where(SourceCredit.source_id == source.id)
-            .order_by(SourceCredit.position)
-            .limit(1)
-        )
+        credit = (
+            await session.execute(
+                select(SourceCredit.credited_as, Author.name)
+                .join(Author, Author.id == SourceCredit.author_id)
+                .where(SourceCredit.source_id == source.id)
+                .order_by(SourceCredit.position)
+                .limit(1)
+            )
+        ).first()
         target = buying.destination(
-            retailer, buying.Book(isbn13=edition.isbn13, title=source.title, author=author)
+            retailer,
+            buying.Book(
+                isbn13=edition.isbn13,
+                title=source.title,
+                author=shown_name(*credit) if credit else None,
+            ),
         )
     if target is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such link.", headers=NO_STORE)

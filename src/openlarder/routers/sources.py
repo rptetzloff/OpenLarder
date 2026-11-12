@@ -35,6 +35,7 @@ from openlarder import books as books_module
 from openlarder import recipes as recipes_module
 from openlarder.agreement import Agreed, Contributing, require_agreement
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
+from openlarder.author_names import shown_name
 from openlarder.books import AlreadyIndexed, add_book
 from openlarder.buying import BuyLink
 from openlarder.db import Session
@@ -87,7 +88,9 @@ class BookSummary(BaseModel):
 
 class Credit(BaseModel):
     author_id: uuid.UUID
+    # As stored, for the edit form; and as shown (author_names.shown_name).
     credited_as: str
+    name: str
     role: str
 
 
@@ -307,7 +310,8 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
     ids = [w.id for w in works]
     credits = (
         await session.execute(
-            select(SourceCredit.source_id, SourceCredit.credited_as)
+            select(SourceCredit.source_id, SourceCredit.credited_as, Author.name)
+            .join(Author, Author.id == SourceCredit.author_id)
             .where(SourceCredit.source_id.in_(ids))
             .order_by(SourceCredit.source_id, SourceCredit.position)
         )
@@ -329,8 +333,8 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
         ).all()
     )
     names: dict[uuid.UUID, list[str]] = {}
-    for source_id, name in credits:
-        names.setdefault(source_id, []).append(name)
+    for source_id, printed, name in credits:
+        names.setdefault(source_id, []).append(shown_name(printed, name))
     covers: dict[uuid.UUID, int | None] = {}
     counts: dict[uuid.UUID, int] = {}
     for source_id, cover_id in editions:
@@ -362,7 +366,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
     credits = (
         await session.execute(
-            select(SourceCredit, Author.id)
+            select(SourceCredit, Author.id, Author.name)
             .join(Author, Author.id == SourceCredit.author_id)
             .where(SourceCredit.source_id == source_id)
             .order_by(SourceCredit.position)
@@ -487,8 +491,13 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
             openlibrary.work_url(work.open_library_work_id) if work.open_library_work_id else None
         ),
         credits=[
-            Credit(author_id=author_id, credited_as=credit.credited_as, role=credit.role)
-            for credit, author_id in credits
+            Credit(
+                author_id=author_id,
+                credited_as=credit.credited_as,
+                name=shown_name(credit.credited_as, name),
+                role=credit.role,
+            )
+            for credit, author_id, name in credits
         ],
         editions=[
             EditionOut(
@@ -508,7 +517,7 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
                     e.isbn13,
                     work.kind,
                     work.title,
-                    credits[0][0].credited_as if credits else None,
+                    shown_name(credits[0][0].credited_as, credits[0][2]) if credits else None,
                 ),
             )
             for e in editions

@@ -223,8 +223,8 @@ onMounted(load);
                 {{ b.recipes.toLocaleString() }} {{ b.recipes === 1 ? "recipe" : "recipes"
                 }}{{ roles(b.roles) ? ` · ${roles(b.roles)}` : "" }}
               </span>
-              <span v-if="b.credited_as !== author.name" class="byline"
-                >printed as “{{ b.credited_as }}”</span
+              <span v-if="b.name !== author.name" class="byline"
+                >printed as “{{ b.name }}”</span
               >
             </a>
           </li>

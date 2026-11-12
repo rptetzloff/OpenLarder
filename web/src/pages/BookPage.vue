@@ -233,7 +233,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           v-else
           class="source-cover"
           :title="book.title"
-          :byline="credits.map((c) => c.credited_as).join(', ')"
+          :byline="credits.map((c) => c.name).join(', ')"
         />
         <div class="source-about">
           <p class="kind">{{ KIND_NAMES[book.kind] }}</p>
@@ -246,7 +246,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <p v-if="credits.length" class="credits">
             <template v-for="(c, i) in credits" :key="i"
               ><template v-if="i > 0">, </template
-              ><a :href="`/authors/${c.author_id}`">{{ c.credited_as }}</a>{{ c.role }}</template
+              ><a :href="`/authors/${c.author_id}`">{{ c.name }}</a>{{ c.role }}</template
             >
           </p>
           <p v-if="book.private && book.manageable" class="byline">

@@ -366,7 +366,7 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
           <h1>Enter a whole book</h1>
           <p class="muted">
             {{ book.title }}<template v-for="c in book.credits" :key="c.author_id">
-              · <a :href="`/authors/${c.author_id}`">{{ c.credited_as }}</a></template
+              · <a :href="`/authors/${c.author_id}`">{{ c.name }}</a></template
             >
           </p>
         </div>

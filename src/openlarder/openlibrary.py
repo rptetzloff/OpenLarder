@@ -20,6 +20,9 @@ from typing import Any
 import httpx2
 
 from openlarder import isbn
+from openlarder.author_names import COMPANY as _COMPANY
+from openlarder.author_names import ORGANISATION as _ORGANISATION
+from openlarder.author_names import SUFFIXES as _SUFFIXES
 
 BASE = "https://openlibrary.org"
 COVERS = "https://covers.openlibrary.org/b/id"
@@ -118,23 +121,6 @@ def _year(publish_date: str | None) -> int | None:
     # Open Library dates are free text: "2023", "March 7, 2023", "c1998".
     found = re.search(r"(?<!\d)(1[4-9]\d\d|2[01]\d\d)(?!\d)", publish_date or "")
     return int(found.group(1)) if found else None
-
-
-# A bracketed note that says the name is an organisation's: "(Firm)".
-_ORGANISATION = {
-    "firm",
-    "organization",
-    "organisation",
-    "company",
-    "corporation",
-    "restaurant",
-    "society",
-    "association",
-}
-# A last part that is a suffix, not a first name: "King, Martin, Jr.".
-_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
-# A last part that is a company's, not a first name: "Sunset Books, Inc.".
-_COMPANY = {"inc", "ltd", "llc", "co"}
 
 
 def clean_name(name: str) -> tuple[str, str]:

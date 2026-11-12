@@ -268,7 +268,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               <p v-if="recipe.source.credits.length" class="find-credits">
                 <template v-for="(c, i) in recipe.source.credits" :key="c.author_id"
                   ><template v-if="i > 0">, </template
-                  ><a :href="`/authors/${c.author_id}`">{{ c.credited_as }}</a></template
+                  ><a :href="`/authors/${c.author_id}`">{{ c.name }}</a></template
                 >
               </p>
 

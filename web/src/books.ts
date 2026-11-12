@@ -40,7 +40,8 @@ export interface Book {
   title: string;
   subtitle: string | null;
   open_library_url: string | null;
-  credits: { author_id: string; credited_as: string; role: string }[];
+  // credited_as is what's stored (the edit form's); name is what to show.
+  credits: { author_id: string; credited_as: string; name: string; role: string }[];
   editions: Edition[];
   // pages: one per edition it is in, newest first; null = not recorded.
   // issue: a magazine's or newspaper's recipe's issue; pages then its page.

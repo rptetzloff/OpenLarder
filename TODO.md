@@ -134,8 +134,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         ("896 recipes"), not the whole list. Six diets, then "Show all
         diets". On a phone the filters fold behind "Filters", so the
         results come first there too.
-      - [ ] 6. Author names shown as "Danielle Walker", not "Walker,
-        Danielle (Chef)".
+      - [x] 6. Author names (#155): a credit kept in a catalogue's form
+        ("Walker, Danielle (Chef)", "Reinhart, Peter.", "America's Test
+        Kitchen (Firm)") is shown as a book would print it ("Danielle
+        Walker"), wherever a source's authors are shown; what's stored is
+        unchanged, and the edit form still shows it. When the author's own
+        record is the same name, that's what shows, so an admin's fix on
+        the author's page carries to every credit. A name already as
+        printed is left alone ("Sarah Ballantyne, PhD"). It was five names
+        on thirteen sources, credits from before Open Library's names were
+        cleaned on the way in; authors' own records were already clean.
+      - [ ] An author's own record is shown as stored: one typed in a
+        catalogue's form ("Walker, Danielle") stays that way on the
+        authors list until an admin fixes it on the author's page.
       - [ ] 7. Links and buttons: terracotta underlined for links in
         sentences and a card's title; outline buttons for actions; text
         buttons only for extras; one primary and one secondary style.
