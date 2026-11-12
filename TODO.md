@@ -544,8 +544,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         go with one, so nothing to moderate.
       - [ ] Using ratings: sorting search by them, and top-rated recipes
         on author and source pages (SCOPING.md). Not in the dumps yet.
-      - [ ] Written reviews and your own notes on a recipe: user-written
-        text, so they wait on the content rules and moderation. Ask Ray.
+      - [x] Notes (#148; *Ray, 2026-11-11: "more than reviews... notes....
+        that are kept personal (or shared)"*; migration 0069): one note per
+        person per recipe, written on its page, up to 2,000 characters.
+        Yours alone unless you tick which of your groups read it, as with a
+        larder list; only you change it. Saved has a Notes tab listing the
+        notes you can see. No moderator or administrator role reads a note
+        not shared with it; not in the history, dumps or API's public
+        reads. Leaving a group unshares your notes with it.
+      - [ ] Notes are free text, where the rest of OpenLarder keeps no
+        amounts or method: the form asks people not to copy the recipe
+        into one. Add to the lawyer review, with the terms.
+      - [ ] Public written reviews: not built; Ray preferred notes.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to

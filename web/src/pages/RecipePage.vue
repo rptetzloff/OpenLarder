@@ -21,6 +21,7 @@ import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
 import { onShelf } from "../shelf";
 import SaveButton from "../components/SaveButton.vue";
 import SpoonRating from "../components/SpoonRating.vue";
+import RecipeNotes from "../components/RecipeNotes.vue";
 import type { Thing } from "../substitutions";
 
 // Back from suggesting a change (RecipeFormPage's propose).
@@ -363,6 +364,8 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </ul>
             <p v-else class="status">No ingredients recorded yet.</p>
           </section>
+
+          <RecipeNotes v-if="user" :recipe-id="recipe.id" />
 
           <section
             v-if="recipe.allergens.length"
