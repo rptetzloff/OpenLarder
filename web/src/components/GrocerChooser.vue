@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { chooseGrocer, grocerNow, grocers, loadGrocers } from "../grocery";
 
 // Which grocer ingredients' "Shop" links go to; shown only while a grocer
-// is on offer. The page says the commission once, beside it.
+// is on offer. The page says the commission beside it.
 const props = defineProps<{ signedIn: boolean }>();
 const error = ref("");
 const now = computed(() => grocerNow());

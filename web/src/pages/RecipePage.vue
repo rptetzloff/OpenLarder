@@ -121,20 +121,21 @@ type Line = Recipe["lines"][number];
 const shoppable = (line: Line) => line.options.filter((o) => o.ingredient);
 const between = (line: Line, j: number) =>
   j < line.options.length - 1 ? ", " : line.options.length > 2 ? ", or " : " or ";
-// The page's one line about commissions (Ray's cleanup pass, section 2):
-// shown when it has a buy or a shop link, with the wording a shop's
-// programme requires said once (Amazon's Associates statement).
+// Commissions are said beside the links they're about (Ray, 2026-11-12):
+// a line under the buy buttons, with the wording a shop's programme
+// requires while its button is showing (Amazon's Associates statement),
+// and one under the ingredients for all their Shop links.
 const shopping = computed(
   () => !!grocerNow() && !!recipe.value?.lines.some((l) => shoppable(l).length),
 );
-const programmeNotes = computed(() => [
-  ...new Set([...notes(buyLinks.value), ...(shopping.value && grocerNow()?.note ? [grocerNow()!.note!] : [])]),
-]);
 // History, folded away until asked for from the sidebar's foot.
 const showHistory = ref(false);
 // The reader's first two shops as buttons; the rest behind "More shops".
 const moreShops = ref(false);
 const SHOPS_SHOWN = 2;
+const shopsShown = computed(() =>
+  moreShops.value ? buyLinks.value : buyLinks.value.slice(0, SHOPS_SHOWN),
+);
 
 // The ingredient lines, as typed, to paste into a shopping list.
 const copyNote = ref("");
@@ -332,7 +333,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                   <p class="buy-row">
                     <span class="muted">Buy the book</span>
                     <a
-                      v-for="b in moreShops ? buyLinks : buyLinks.slice(0, SHOPS_SHOWN)"
+                      v-for="b in shopsShown"
                       :key="b.retailer"
                       :href="buyHref(b)"
                       rel="sponsored noopener"
@@ -347,6 +348,11 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                     >
                       More shops
                     </button>
+                  </p>
+                  <p class="buy-note">
+                    OpenLarder may earn a commission if you buy through these links.
+                    <template v-for="n in notes(shopsShown)" :key="n">{{ n }}{{ " " }}</template>
+                    <a href="/terms#commissions">How this works</a>
                   </p>
                 </div>
               </template>
@@ -406,13 +412,13 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               </li>
             </ul>
             <p v-else class="status">No ingredients recorded yet.</p>
-            <div v-if="buyLinks.length || shopping" class="commission">
+            <div v-if="shopping" class="commission">
               <p class="muted">
-                OpenLarder may earn a commission from buy and shop links.
-                <template v-for="n in programmeNotes" :key="n">{{ n }}{{ " " }}</template>
+                OpenLarder may earn a commission from these Shop links.
+                <template v-if="grocerNow()?.note">{{ grocerNow()!.note }}{{ " " }}</template>
                 <a href="/terms#commissions">How this works</a>
               </p>
-              <GrocerChooser v-if="shopping" :signed-in="!!user" />
+              <GrocerChooser :signed-in="!!user" />
             </div>
           </section>
 
@@ -596,6 +602,9 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
 }
 .more-shops {
   min-height: 2.75rem;
+  font-size: var(--text-sm);
+}
+.buy-note {
   font-size: var(--text-sm);
 }
 .ingredient-count {

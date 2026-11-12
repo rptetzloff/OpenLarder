@@ -95,15 +95,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         ("Shop for almond flour" to a screen reader; with a choice, one
         pill per ingredient, named); "Cooking for a diet" a card at the
         top of the sidebar, then "On your shelf"; "Added by", History and
-        Report a problem at its foot. One commission line under the
-        ingredients, linking to "Buy and shop links" in the terms, with
-        the grocer choice beside it.
-      - [ ] The commission line, checked 2026-11-11: Amazon asks for its
+        Report a problem at its foot. The commission is said beside the
+        links it's about (Ray, 2026-11-12): a line under the buy buttons,
+        and one under the ingredients for all their Shop links, with the
+        grocer choice beside it; each links to "Buy and shop links" in
+        the terms.
+      - [ ] The commission wording, checked 2026-11-11: Amazon asks for its
         Associates statement "clearly and conspicuously" on the site, so
-        the line says it whenever the page has an Amazon link, and the
-        terms say it always. The FTC's guidance prefers a disclosure
-        before or beside the links; this one is below the buy buttons.
-        Add its placement to the lawyer review.
+        the line under the buy buttons says it whenever one of the buttons
+        showing is Amazon's, and the terms say it always. The FTC's guidance prefers
+        a disclosure before or beside the links: the buy line is directly
+        under its buttons, the Shop line under the whole list, not each
+        link. Add both placements to the lawyer review.
       - [ ] 3. Header: Requests to the footer, with two links to it where
         someone is looking for a book that isn't there (*Ray, 2026-11-11*):
         under the Sources search box, "Can't find a source? Request it",
