@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { DISCLOSURE } from "../buying";
 import { chooseGrocer, grocerNow, grocers, loadGrocers } from "../grocery";
 
-// Which grocer ingredients' "Shop" links go to, with the disclosure; shown
-// only while a grocer is on offer.
+// Which grocer ingredients' "Shop" links go to; shown only while a grocer
+// is on offer. The page says the commission once, beside it.
 const props = defineProps<{ signedIn: boolean }>();
 const error = ref("");
 const now = computed(() => grocerNow());
@@ -29,8 +28,7 @@ async function change(event: Event) {
         <option v-for="g in grocers" :key="g.key" :value="g.key">{{ g.label }}</option>
       </select>
     </label>
-    <span v-else>Shop links go to {{ now.label }}.</span>
-    <span class="muted">{{ DISCLOSURE }}<template v-if="now.note"> {{ now.note }}</template></span>
+    <span v-else class="muted">Shop links go to {{ now.label }}.</span>
     <span v-if="error" class="error" role="alert">{{ error }}</span>
   </div>
 </template>
@@ -41,12 +39,12 @@ async function change(event: Event) {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.25rem 1rem;
-  margin: 0 0 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 .grocer-chooser select {
   font: inherit;
   margin-left: 0.25rem;
+  min-height: 2.75rem;
   padding: 0.2rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: 6px;

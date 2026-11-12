@@ -11,6 +11,9 @@ document.title = "Terms of service · OpenLarder";
 // what was actually accepted.
 const agreement = ref<Agreement | null>(null);
 onMounted(async () => {
+  // A link to a section ("How this works" goes to #commissions): the page
+  // is drawn after the browser looked for it, so go there now.
+  if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   agreement.value = await readAgreement().catch(() => null);
 });
 </script>
@@ -18,7 +21,7 @@ onMounted(async () => {
 <template>
   <article>
     <h1>Terms of service</h1>
-    <p class="updated">Last updated 10 November 2026</p>
+    <p class="updated">Last updated 11 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks: which book, which page, and
@@ -89,6 +92,17 @@ onMounted(async () => {
       another's doesn't, and oats may be processed alongside wheat. It may be incomplete or wrong.
       OpenLarder never says a recipe is safe for an allergy. Always check the labels of what you
       buy, and ask a doctor about medical needs.
+    </p>
+
+    <h2 id="commissions">Buy and shop links</h2>
+    <p>
+      Links to buy a book, and an ingredient's Shop link, go to shops OpenLarder is an affiliate
+      of: a bookshop, or a grocer you choose. If you buy something after following one,
+      OpenLarder may earn a commission from the shop, at no cost to you. The links are made from
+      the book's ISBN or the ingredient's name: no shop pays to be listed, and nothing in the
+      catalog is there because of a commission. As an Amazon Associate, OpenLarder earns from
+      qualifying purchases. What a link counts is in the
+      <a href="/privacy">privacy policy</a>.
     </p>
 
     <h2>Copyright</h2>

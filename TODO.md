@@ -88,11 +88,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         is the book page's shelf button and the Saved page's row actions.
         The spoons are 44px wide only where a finger taps (`pointer:
         coarse`), and 24px with a mouse, as the mockup draws them.
-      - [ ] 2. Recipe page, less boilerplate: one commission line under the
-        ingredients (check Amazon's rule on its statement first), no
-        "cookbook reference" paragraph, buy links as buttons, Shop as a
-        pill at the row's end, "Cooking for a diet" and the shelf in the
-        sidebar, "Added by" at its foot.
+      - [x] 2. Recipe page, less boilerplate (#151): no "cookbook reference"
+        paragraph; buy links as buttons after "Buy the book", the reader's
+        first two with "More shops" for the rest; each ingredient a row,
+        its name plain until hovered and Shop a pill at the right end
+        ("Shop for almond flour" to a screen reader; with a choice, one
+        pill per ingredient, named); "Cooking for a diet" a card at the
+        top of the sidebar, then "On your shelf"; "Added by", History and
+        Report a problem at its foot. One commission line under the
+        ingredients, linking to "Buy and shop links" in the terms, with
+        the grocer choice beside it.
+      - [ ] The commission line, checked 2026-11-11: Amazon asks for its
+        Associates statement "clearly and conspicuously" on the site, so
+        the line says it whenever the page has an Amazon link, and the
+        terms say it always. The FTC's guidance prefers a disclosure
+        before or beside the links; this one is below the buy buttons.
+        Add its placement to the lawyer review.
       - [ ] 3. Header: Requests to the footer, with two links to it where
         someone is looking for a book that isn't there (*Ray, 2026-11-11*):
         under the Sources search box, "Can't find a source? Request it",
