@@ -31,6 +31,7 @@ from openlarder.models import (
     GroupMember,
     LarderList,
     LarderListGroup,
+    SavedGroup,
     ShelfGroup,
     Source,
     SourceGroup,
@@ -134,8 +135,8 @@ LAST_ADMIN = "A group needs an admin: make someone else one first, or delete the
 
 
 async def _unshare(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    """Stop sharing someone's collections, larder lists and shelf with a
-    group they've left."""
+    """Stop sharing someone's collections, larder lists, shelf and saved
+    recipes with a group they've left."""
     await session.execute(
         delete(SourceGroup).where(
             SourceGroup.group_id == group_id,
@@ -152,6 +153,9 @@ async def _unshare(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) ->
     )
     await session.execute(
         delete(ShelfGroup).where(ShelfGroup.group_id == group_id, ShelfGroup.user_id == user_id)
+    )
+    await session.execute(
+        delete(SavedGroup).where(SavedGroup.group_id == group_id, SavedGroup.user_id == user_id)
     )
 
 

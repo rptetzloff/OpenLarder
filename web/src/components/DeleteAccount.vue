@@ -41,7 +41,7 @@ async function remove() {
     <template v-else>
       <ul class="muted">
         <li>
-          Goes now: your family collections and their history, your larder lists and shelf, what you've added
+          Goes now: your family collections and their history, your larder lists, shelf and saved recipes, what you've added
           that's still waiting for review, your suggested changes still open, your votes, your API
           keys, and you from your groups.
         </li>

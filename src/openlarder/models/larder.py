@@ -116,3 +116,43 @@ class ShelfGroup(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class SavedRecipe(Timestamps, Base):
+    """A recipe someone wants to cook, or has (migration 0067). Private,
+    like the larder and the shelf."""
+
+    __tablename__ = "saved_recipes"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "recipe_id"),
+        CheckConstraint("state IN ('want', 'cooked')", name="state_known"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    recipe_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("recipes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    state: Mapped[str] = mapped_column(Text, nullable=False, server_default="want")
+
+
+class SavedGroup(Base):
+    """Someone's saved recipes shared with a group, as their shelf is
+    (migration 0067)."""
+
+    __tablename__ = "saved_groups"
+    __table_args__ = (PrimaryKeyConstraint("user_id", "group_id"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

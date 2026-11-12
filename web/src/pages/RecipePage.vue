@@ -19,6 +19,7 @@ import { type Flag, recipeFlags } from "../flags";
 import type { Me } from "../me";
 import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
 import { onShelf } from "../shelf";
+import SaveButton from "../components/SaveButton.vue";
 import type { Thing } from "../substitutions";
 
 // Back from suggesting a change (RecipeFormPage's propose).
@@ -220,6 +221,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         :can-add="!!user?.may_edit"
         :save="saveTags"
       />
+      <SaveButton v-if="user" :recipe-id="recipe.id" />
 
       <div class="recipe-layout">
         <div class="recipe-main">

@@ -11,7 +11,7 @@ without it. `--confirm <host>` answers that in advance, for a script.
 and all that hangs off them (editions, buy links and their clicks, issues,
 episodes, web pages, credits), recipes and their lines, ingredients,
 aliases and swaps, authors, and the tags given to sources and recipes. With
-them: people's larder items (the lists stay, empty) and shelves, the catalog's edit
+them: people's larder items (the lists stay, empty), shelves and saved recipes, the catalog's edit
 history, flags, reports, suggested changes, n8n's suggestions and
 embeddings, and import history. Accounts, groups, larder lists and requests
 stay; requests are unlinked from their books, to link again as each comes
@@ -75,6 +75,7 @@ CATALOG = (
     "substitutions",
     "larder_items",
     "shelf_books",
+    "saved_recipes",
     "proposals",
     "reports",
     "suggestions",
@@ -96,6 +97,7 @@ PEOPLE = (
     "larder_lists",
     "larder_list_groups",
     "shelf_groups",
+    "saved_groups",
     "book_requests",
     "request_votes",
     "dumps",

@@ -165,6 +165,10 @@ async function seed() {
   await api(`/api/shelf/${book.id}`, "cook", { edition_id: biscuitPage.pages[0].edition_id }, "PUT");
   // And shares his shelf with the family group: Ada sees it.
   await api("/api/shelf/groups", "cook", { groups: [group.id] }, "PUT");
+  // Cy wants to cook the biscuits, has cooked the blend, and shares the list.
+  await api(`/api/saved/${biscuits.id}`, "cook", { state: "want" }, "PUT");
+  await api(`/api/saved/${blend.id}`, "cook", { state: "cooked" }, "PUT");
+  await api("/api/saved/groups", "cook", { groups: [group.id] }, "PUT");
   // A problem reported with a recipe.
   await api("/api/reports", "cook", { kind: "recipe", id: biscuits.id, reason: "wrong", note: "Page 23 in mine." });
   // Requests: one asked for twice, one claimed, one declined.
@@ -252,6 +256,10 @@ function pages(s) {
     ["/shelf", "cook"],
     ["/shelf", "admin"],
     ["/shelf", null],
+    ["/saved", "cook"],
+    ["/saved", "admin"],
+    ["/saved", null],
+    ["/search?sv=1", "cook"],
     [`/sources/${s.book.id}`, "cook"],
     ["/search?own=1&q=biscuit", "cook"],
     ["/privacy", null],
