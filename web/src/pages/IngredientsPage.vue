@@ -108,8 +108,6 @@ onMounted(() => load());
         <thead>
           <tr>
             <th scope="col">Ingredient</th>
-            <th scope="col">Comes under</th>
-            <th scope="col">Also called</th>
             <th scope="col" class="numeric">Recipes</th>
           </tr>
         </thead>
@@ -117,25 +115,14 @@ onMounted(() => load());
           <tr v-for="i in ingredients" :key="i.id">
             <td>
               <a :href="`/ingredients/${i.id}`" class="strong">{{ i.name }}</a>
-            </td>
-            <!-- On a phone the headings go, so each cell says what it is,
-                 and an empty one goes too. -->
-            <td :class="{ empty: !i.parent }">
-              <template v-if="i.parent">
-                <span class="cell-label">Under </span>
-                <a :href="`/ingredients/${i.parent.id}`">{{ i.parent.name }}</a>
-              </template>
-              <span v-else class="muted"
-                ><span aria-hidden="true">—</span><span class="visually-hidden">None</span></span
-              >
-            </td>
-            <td :class="{ empty: !i.aliases?.length }">
-              <template v-if="i.aliases?.length">
-                <span class="cell-label">Also called </span>{{ i.aliases.join(" · ") }}
-              </template>
-              <span v-else class="muted"
-                ><span aria-hidden="true">—</span><span class="visually-hidden">None</span></span
-              >
+              <!-- One line, only when there's something to say; it keeps
+                   its own words, so it reads without a column's heading. -->
+              <span v-if="i.parent || i.aliases?.length" class="more muted">
+                <template v-if="i.parent"
+                  >Under <a :href="`/ingredients/${i.parent.id}`">{{ i.parent.name }}</a></template
+                ><template v-if="i.parent && i.aliases?.length"> · </template
+                ><template v-if="i.aliases?.length">Also called {{ i.aliases.join(", ") }}</template>
+              </span>
             </td>
             <td class="numeric">
               {{ i.recipes.toLocaleString() }}<span class="cell-label">
@@ -153,3 +140,26 @@ onMounted(() => load());
     </template>
   </article>
 </template>
+
+<style scoped>
+/* Two columns: the name, with what it comes under and is also called on a
+   line beneath; and how many recipes (Ray's cleanup pass, section 10). */
+.ingredient-list td:first-child {
+  white-space: normal;
+}
+.more {
+  display: block;
+  font-size: var(--text-sm);
+}
+.numeric {
+  width: 6rem;
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 40rem) {
+  .numeric {
+    width: auto;
+    text-align: left;
+  }
+}
+</style>
