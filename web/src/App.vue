@@ -313,7 +313,18 @@ onMounted(async () => {
   --notice-fg: #ffffff;
   /* The brand's deep mustard: decorative only on light backgrounds, so
      the rating's number is always beside its spoons. */
-  --spoon: #d49a2a;
+  --rating: #d49a2a;
+  /* Sizes and corners (Ray's cleanup pass, 2026-11-11): used by what
+     that pass touches, the rest as each page is. Phones end at 40rem,
+     tablets at 56rem; media queries can't read variables. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
   --page: 72rem;
   color-scheme: light;
 }
@@ -337,7 +348,7 @@ onMounted(async () => {
   --error: #f2a8a2;
   --notice-bg: #e58b63;
   --notice-fg: #14201a;
-  --spoon: #e8b866;
+  --rating: #e8b866;
 }
 :focus-visible {
   outline: 2px solid var(--focus);

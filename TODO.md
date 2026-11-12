@@ -67,6 +67,76 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       app icons, web manifest and social card. #17's sign-in screens
       should match: Authgear's own theming, with the same colours, logo and
       Outfit.
+- [ ] **Cleanup pass.** *Decided by Ray, 2026-11-11; his spec and mockups
+      are in private/ (not committed).* Eleven sections, in order, a PR
+      each. Rules for all of it: real buttons, links and inputs, reachable
+      and operable by keyboard with the focus ring; every control named;
+      toggles `aria-pressed`, menus `aria-expanded` and `aria-controls`;
+      changes without a page load said in an `aria-live` region; the
+      existing colour variables only; touch targets 44px; no motion when
+      the device asks for none.
+      - [x] 1. Recipe page, one action bar (#149, to the spec in #150):
+        under the tags, on the
+        surface colour. The average as five mustard spoons, part-filled
+        (4.3: four and three-tenths), with its number and count; "Rate it"
+        or "Your rating" as a radio group that arrow keys move through,
+        with Clear; "Want to cook" and "Cooked" as pill toggles, filled in
+        the accent when pressed. Pressing the pressed one takes the recipe
+        off. Under it, the shared lists it's on, and "Add to another list".
+        Signed out: "Sign in to rate or save". Stacked on a phone, the two
+        buttons side by side. The bar keeps its shape. The same pill toggle
+        is the book page's shelf button and the Saved page's row actions.
+        The spoons are 44px wide only where a finger taps (`pointer:
+        coarse`), and 24px with a mouse, as the mockup draws them.
+      - [ ] 2. Recipe page, less boilerplate: one commission line under the
+        ingredients (check Amazon's rule on its statement first), no
+        "cookbook reference" paragraph, buy links as buttons, Shop as a
+        pill at the row's end, "Cooking for a diet" and the shelf in the
+        sidebar, "Added by" at its foot.
+      - [ ] 3. Header: Requests to the footer, with two links to it where
+        someone is looking for a book that isn't there (*Ray, 2026-11-11*):
+        under the Sources search box, "Can't find a source? Request it",
+        and on a search with no results, "Nothing matched. If the book
+        isn't indexed yet, request it". "My kitchen" and the account as two
+        menus; a phone menu; a skip link.
+      - [ ] 4. Home: recent sources as one row that scrolls sideways, 20 of
+        them, with arrows and a "Browse all sources" card.
+      - [ ] 5. Search, results first: the form folded to a summary once
+        there's a query, focus to the results, six diets then "Show all".
+      - [ ] 6. Author names shown as "Danielle Walker", not "Walker,
+        Danielle (Chef)".
+      - [ ] 7. Links and buttons: terracotta underlined for links in
+        sentences and a card's title; outline buttons for actions; text
+        buttons only for extras; one primary and one secondary style.
+      - [ ] 8. Tokens, alongside the rest: the type sizes and corner radii
+        are in `:root` now (#150); fold odd sizes in and move page CSS out
+        of App.vue as each page is touched.
+      - [ ] 9. Home, no empty sources first: a `min_recipes` filter on the
+        source list; the front page asks for recent sources with at least
+        one recipe, and with fewer than six shows "Most indexed sources".
+      - [ ] 10. Ingredients list, no columns of dashes: two columns,
+        Ingredient and Recipes, with "Under Cheese · Also called scallion"
+        beneath a name only when there's something to say.
+      - [ ] 11. Home, example searches: "Try:" chips under "Cook with what
+        you have", each a finished search of well-used ingredients that
+        returns at least ten recipes.
+- [ ] **Pages crawlers and link previews can read.** *Ray's spec,
+      2026-11-11, in private/ (not committed).* Every page is the same
+      empty shell until the browser fills it, so a shared link shows the
+      site's card and most crawlers see nothing. The server fills the
+      shell for public pages instead; the Vue app is unchanged. In order:
+      - [ ] 1. A head for each recipe and source: title, description,
+        canonical address, Open Graph.
+      - [ ] 2. 404 for an id that isn't there; nothing of a record someone
+        signed out can't see, and `noindex`.
+      - [ ] 3. A plain summary in the body for recipes and sources: titles,
+        pages and ingredient names only.
+      - [ ] 4. `/sitemap.xml` of public records, and its line in robots.txt.
+      - [ ] 5. Ingredients and authors.
+      - [ ] 6. JSON-LD: Book and BreadcrumbList; never Recipe, as the page
+        has no method or amounts.
+      - [ ] Ray: submit the sitemap to Google Search Console and Bing
+        Webmaster Tools once live.
 - [x] **Wikidata facts on author pages** (#90): born and died (years
       only), country and website, from Wikidata's query service, found by
       the author's Open Library ID or a Wikidata item an admin gives on the
@@ -542,11 +612,6 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         at will. Everyone sees the average and how many rated it, on the
         page and in listings ("4.5 of 5 spoons"); nobody sees who. No words
         go with one, so nothing to moderate.
-      - [x] One action bar under a recipe's title (#149; Ray's design,
-        2026-11-11, in private/): the average as mustard spoons, part-filled
-        ("4.3"), with its number and count; "Rate it" or "Your rating" with
-        Clear; "Want to cook" and "Cooked" as toggles; under it, the shared
-        lists it's on or could go on. Signed out: "Sign in to rate or save".
       - [ ] Using ratings: sorting search by them, and top-rated recipes
         on author and source pages (SCOPING.md). Not in the dumps yet.
       - [x] Notes (#148; *Ray, 2026-11-11: "more than reviews... notes....
