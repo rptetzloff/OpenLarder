@@ -68,11 +68,14 @@ def upgrade() -> None:
                 ).bindparams(key=key, diet=diet)
             )
     op.execute("UPDATE allergens SET label = 'Gluten (wheat, barley, rye)' WHERE key = 'gluten'")
+    # A seed, not an edit: kept out of the history (as 0065's are).
+    op.execute("ALTER TABLE tags DISABLE TRIGGER record_revision")
     op.execute(
         "INSERT INTO tags (kind, name) SELECT 'diet', 'Pescetarian'"
         " WHERE NOT EXISTS (SELECT 1 FROM tags WHERE kind = 'diet'"
         " AND lower(name) = 'pescetarian')"
     )
+    op.execute("ALTER TABLE tags ENABLE TRIGGER record_revision")
     op.execute(
         "CREATE TRIGGER record_revision AFTER INSERT OR UPDATE OR DELETE ON diet_allergens"
         " FOR EACH ROW EXECUTE FUNCTION record_revision('none')"

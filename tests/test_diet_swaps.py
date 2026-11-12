@@ -46,8 +46,14 @@ async def test_diets_say_what_they_avoid(client) -> None:
     # A diet, for tags and swaps; meat isn't an allergen.
     assert diets["Pescetarian"]["avoids"] == flesh
     # Ray, 2026-11-11: the part of each the catalog records.
-    assert diets["Halal"]["avoids"] == ["pork"]
+    assert diets["Halal"]["avoids"] == ["pork", "alcohol"]
     assert diets["Kosher"]["avoids"] == ["crustaceans", "molluscs", "pork"]
+    # Only together: meat, and poultry, with milk.
+    assert diets["Kosher"]["together"] == [
+        {"allergen": "meat", "other": "milk"},
+        {"allergen": "poultry", "other": "milk"},
+    ]
+    assert diets["Vegan"]["together"] == []
 
 
 async def test_a_recipe_for_a_diet(people, client, adb) -> None:
@@ -142,3 +148,50 @@ async def test_a_private_stand_in_is_never_offered(people, client, adb) -> None:
         [line] = got["lines"]
         assert bool(line["swaps"]) is sees
         assert ("Gran" in str(got)) is sees
+
+
+async def test_a_diet_avoids_two_things_only_together(people, client, adb) -> None:
+    """Ray, 2026-11-11: Kosher keeps meat, and poultry, from milk."""
+    mo = await people("mo", role="moderator")
+    book = (await mo.post("/api/sources/manual", json={"title": "Plenty"})).json()["id"]
+    burger = await _recipe(mo, adb, book, ["Ground Beef", "Aged Cheddar", "Bun"])
+    roast = await _recipe(mo, adb, book, ["Ground Beef", "Onion"])
+    chowder = await _recipe(mo, adb, book, ["Cod", "Cream", "Margarine", "Leek"])
+    for name, statuses in (
+        ("Ground Beef", {"meat": "contains"}),
+        ("Aged Cheddar", {"milk": "contains"}),
+        ("Cod", {"fish": "contains"}),
+        ("Cream", {"milk": "contains"}),
+        ("Margarine", {"milk": "may_contain"}),
+    ):
+        r = await mo.put(
+            f"/api/ingredients/{await _id(adb, name)}/allergens", json={"statuses": statuses}
+        )
+        assert r.status_code == 200, r.text
+    kosher = (await _diets(client))["Kosher"]["id"]
+
+    async def together(recipe: str) -> list[tuple]:
+        got = (await client.get(f"/api/recipes/{recipe}/diets/{kosher}")).json()
+        assert got["lines"] == []
+        return [
+            (
+                t["allergen"]["key"],
+                [h["ingredient"]["name"] for h in t["has"]],
+                t["other"]["key"],
+                [h["ingredient"]["name"] for h in t["has_other"]],
+            )
+            for t in got["together"]
+        ]
+
+    assert await together(burger) == [("meat", ["Ground Beef"], "milk", ["Aged Cheddar"])]
+    # Meat alone, and fish with milk, are left alone.
+    assert await together(roast) == []
+    assert await together(chowder) == []
+
+    # Changing what it avoids outright keeps what it avoids together.
+    r = await mo.put(f"/api/diets/{kosher}/allergens", json={"allergens": ["pork"]})
+    assert r.json()["avoids"] == ["pork"] and len(r.json()["together"]) == 2
+    # Avoided outright now, it's no longer a pair.
+    r = await mo.put(f"/api/diets/{kosher}/allergens", json={"allergens": ["pork", "meat"]})
+    assert r.json()["avoids"] == ["meat", "pork"]
+    assert r.json()["together"] == [{"allergen": "poultry", "other": "milk"}]

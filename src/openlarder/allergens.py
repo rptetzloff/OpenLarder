@@ -10,7 +10,7 @@ maybe containing, never that it's free of anything.
 
 Meat, poultry and pork are recorded the same way, in the same list
 (migration 0064; *Ray, 2026-11-11*): diets avoid them, and poultry is an
-allergy too.
+allergy too. So is alcohol (0066), which Halal avoids.
 
 An ingredient records, for any allergen, that it contains it, may contain
 it (oats, often processed alongside wheat), or doesn't. A narrower
@@ -30,10 +30,10 @@ from openlarder.models import Allergen, Ingredient, IngredientAllergen
 from openlarder.models.allergens import STATUSES
 
 NOTICE = (
-    "Allergen and meat information here is crowdsourced and unverified. It describes ingredients in"
-    " general, not any product: one brand's stock may contain milk when another's doesn't,"
-    " and oats may be processed alongside wheat. It isn't a guarantee that a recipe is safe"
-    " for anyone, so check the labels on what you buy."
+    "Allergen, meat and alcohol information here is crowdsourced and unverified. It describes"
+    " ingredients in general, not any product: one brand's stock may contain milk when"
+    " another's doesn't, and oats may be processed alongside wheat. It isn't a guarantee that"
+    " a recipe is safe for anyone, so check the labels on what you buy."
 )
 
 # How far up the hierarchy to look; set_parent makes no loops, but rows

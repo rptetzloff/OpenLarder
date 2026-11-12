@@ -71,7 +71,7 @@ function inheritedWords(key: string): string {
     aria-labelledby="allergens-title"
   >
     <div class="table-head">
-      <h2 id="allergens-title">Allergens and meat</h2>
+      <h2 id="allergens-title">Allergens, meat and alcohol</h2>
       <button v-if="canEdit && !editing && list?.length" type="button" class="link" @click="start">
         {{ own.length ? "Change" : "+ Record" }}
       </button>
@@ -102,7 +102,7 @@ function inheritedWords(key: string): string {
       <table class="allergen-table">
         <thead>
           <tr>
-            <th scope="col">Allergen or meat</th>
+            <th scope="col">Allergen, meat or alcohol</th>
             <th scope="col">Here</th>
             <th scope="col">Inherited</th>
           </tr>

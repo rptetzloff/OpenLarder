@@ -11,7 +11,12 @@ export interface Diet {
   name: string;
   // The allergens it avoids (diets.py); absent where a swap names it.
   avoids: string[];
+  // Those it avoids only together: Kosher's meat with milk.
+  together: { allergen: string; other: string }[];
 }
+
+type Found = { key: string; label: string; status: "contains" | "may_contain" };
+type Has = { ingredient: Thing; status: "contains" | "may_contain" };
 
 // A recipe checked for a diet: its ingredients that record an allergen the
 // diet avoids, with the swaps recorded for them.
@@ -22,6 +27,8 @@ export interface DietCheck {
     found: { key: string; label: string; status: "contains" | "may_contain" }[];
     swaps: Swap[];
   }[];
+  // Two things the diet avoids together, both recorded in this recipe.
+  together: { allergen: Found; other: Found; has: Has[]; has_other: Has[] }[];
   notice: string;
 }
 

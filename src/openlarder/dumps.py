@@ -77,7 +77,7 @@ COLUMNS = {
     "ingredient_aliases": ["id", "ingredient_id", "name", "region"],
     "allergens": ["key", "label"],
     "ingredient_allergens": ["id", "ingredient_id", "allergen", "status"],
-    "diet_allergens": ["diet_tag_id", "allergen"],
+    "diet_allergens": ["diet_tag_id", "allergen", "with_allergen"],
     "tags": ["id", "kind", "name"],
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
@@ -126,7 +126,10 @@ ABOUT = {
         " not any product, and no guarantee a recipe is safe for anyone."
     ),
     "tags": "Course, cuisine, diet and technique tags.",
-    "diet_allergens": "The allergens each diet avoids (Dairy-Free: milk).",
+    "diet_allergens": (
+        "The allergens each diet avoids (Dairy-Free: milk); with with_allergen, only in a"
+        " recipe that records that one too (Kosher: meat with milk)."
+    ),
     "source_tags": "Tags on whole sources, which their recipes have too.",
     "recipe_tags": "Tags on recipes.",
     "substitutions": "What can stand in for what, and for which diet.",
@@ -337,7 +340,17 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
             "authors.jsonl": _jsonl(authors),
             "tags.jsonl": _jsonl(
                 [
-                    {**t, "avoids": [a["allergen"] for a in avoids.get(t["id"], [])]}
+                    {
+                        **t,
+                        "avoids": [
+                            a["allergen"] for a in avoids.get(t["id"], []) if not a["with_allergen"]
+                        ],
+                        "avoids_together": [
+                            [a["allergen"], a["with_allergen"]]
+                            for a in avoids.get(t["id"], [])
+                            if a["with_allergen"]
+                        ],
+                    }
                     if t["kind"] == "diet"
                     else t
                     for t in rows["tags"]

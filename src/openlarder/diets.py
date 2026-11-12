@@ -8,6 +8,10 @@ one (a swap for Butter serves Unsalted Butter), for a diet that avoids
 everything the line was found for (a Vegan swap for butter serves
 Dairy-Free too), and what it puts in doesn't record one of those itself.
 
+A diet may also avoid two things only together (migration 0066; *Ray,
+2026-11-11*): Kosher keeps meat, and poultry, from milk. Those are found
+across the whole recipe, not line by line, and no swap is offered for them.
+
 Like everything about allergens, it says only what the catalog records,
 never that a recipe suits a diet.
 """
@@ -32,23 +36,44 @@ from openlarder.models import (
 
 
 async def avoided(session: AsyncSession) -> dict[uuid.UUID, set[str]]:
-    """Each diet's allergens, for the diets that avoid any."""
+    """Each diet's allergens avoided outright, for the diets that avoid any."""
     out: dict[uuid.UUID, set[str]] = defaultdict(set)
-    for diet, key in await session.execute(select(DietAllergen.diet_tag_id, DietAllergen.allergen)):
+    for diet, key in await session.execute(
+        select(DietAllergen.diet_tag_id, DietAllergen.allergen).where(
+            DietAllergen.with_allergen.is_(None)
+        )
+    ):
         out[diet].add(key)
     return dict(out)
 
 
+async def avoided_together(session: AsyncSession) -> dict[uuid.UUID, list[tuple[str, str]]]:
+    """Each diet's pairs: an allergen, and the one it's avoided with."""
+    out: dict[uuid.UUID, list[tuple[str, str]]] = defaultdict(list)
+    for diet, key, other in await session.execute(
+        select(DietAllergen.diet_tag_id, DietAllergen.allergen, DietAllergen.with_allergen)
+        .where(DietAllergen.with_allergen.is_not(None))
+        .order_by(DietAllergen.allergen)
+    ):
+        out[diet].append((key, other))
+    return dict(out)
+
+
 async def set_avoided(session: AsyncSession, diet_id: uuid.UUID, keys: set[str]) -> None:
-    have = set(
-        await session.scalars(
-            select(DietAllergen.allergen).where(DietAllergen.diet_tag_id == diet_id)
+    """What a diet avoids outright; what it avoids only with another stays,
+    unless it's now avoided outright."""
+    rows = {
+        row.allergen: row
+        for row in await session.scalars(
+            select(DietAllergen).where(DietAllergen.diet_tag_id == diet_id)
         )
-    )
-    for key in have - keys:
-        row = await session.get(DietAllergen, (diet_id, key))
-        await session.delete(row)
-    for key in keys - have:
+    }
+    for key, row in rows.items():
+        if row.with_allergen is None and key not in keys:
+            await session.delete(row)
+        elif row.with_allergen is not None and key in keys:
+            row.with_allergen = None
+    for key in keys - set(rows):
         session.add(DietAllergen(diet_tag_id=diet_id, allergen=key))
     await session.flush()
 
@@ -62,15 +87,18 @@ class Line:
     swaps: list[substitutions.Listed] = field(default_factory=list)
 
 
-async def check(
-    session: AsyncSession, recipe_id: uuid.UUID, diet_id: uuid.UUID, viewer
-) -> list[Line]:
-    """The recipe's ingredients that record an allergen the diet avoids, in
-    the order of its lines, each with the swaps that serve it."""
-    diets = await avoided(session)
-    avoid = diets.get(diet_id, set())
-    if not avoid:
-        return []
+@dataclass
+class Together:
+    allergen: str
+    other: str
+    # Each side's ingredients, in the recipe's order: id, name, status.
+    has: list[tuple[uuid.UUID, str, str]]
+    has_other: list[tuple[uuid.UUID, str, str]]
+
+
+async def _recorded_in(session: AsyncSession, recipe_id: uuid.UUID):
+    """The recipe's ingredients by id, in the order of its lines, and what
+    each records."""
     used = (
         await session.execute(
             select(Ingredient.id, Ingredient.name)
@@ -81,7 +109,44 @@ async def check(
         )
     ).all()
     names = dict(used)
-    recorded = await allergens.recorded(session, list(names))
+    return names, await allergens.recorded(session, list(names))
+
+
+async def check_together(
+    session: AsyncSession, recipe_id: uuid.UUID, diet_id: uuid.UUID
+) -> list[Together]:
+    """The pairs the diet avoids together that this recipe records both
+    of, each with the ingredients recording either."""
+    pairs = (await avoided_together(session)).get(diet_id, [])
+    if not pairs:
+        return []
+    names, recorded = await _recorded_in(session, recipe_id)
+
+    def having(key: str) -> list[tuple[uuid.UUID, str, str]]:
+        return [
+            (i, names[i], recorded[i][key].status)
+            for i in names
+            if key in recorded[i] and recorded[i][key].status != "free"
+        ]
+
+    found = []
+    for key, other in pairs:
+        has, has_other = having(key), having(other)
+        if has and has_other:
+            found.append(Together(key, other, has, has_other))
+    return found
+
+
+async def check(
+    session: AsyncSession, recipe_id: uuid.UUID, diet_id: uuid.UUID, viewer
+) -> list[Line]:
+    """The recipe's ingredients that record an allergen the diet avoids, in
+    the order of its lines, each with the swaps that serve it."""
+    diets = await avoided(session)
+    avoid = diets.get(diet_id, set())
+    if not avoid:
+        return []
+    names, recorded = await _recorded_in(session, recipe_id)
     lines: list[Line] = []
     for i in names:
         found = {k: r.status for k, r in recorded[i].items() if k in avoid and r.status != "free"}
