@@ -158,7 +158,7 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
                   <button
                     v-if="p.trust !== 'granted' && p.trust !== 'earned'"
                     type="button"
-                    class="link"
+                    class="secondary small"
                     :disabled="busy"
                     @click="trustIt(p, 'granted')"
                   >
@@ -167,7 +167,7 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
                   <button
                     v-if="p.trust !== 'withheld'"
                     type="button"
-                    class="link"
+                    class="secondary small"
                     :disabled="busy"
                     @click="trustIt(p, 'withheld')"
                   >
@@ -176,7 +176,7 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
                   <button
                     v-if="p.trust"
                     type="button"
-                    class="link"
+                    class="secondary small"
                     :disabled="busy"
                     @click="trustIt(p, null)"
                   >

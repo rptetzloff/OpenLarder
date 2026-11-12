@@ -376,15 +376,6 @@ main:focus {
   background: var(--bg);
   color: var(--fg);
 }
-a.button-outline {
-  display: inline-block;
-  padding: 0.375rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--fg);
-  text-decoration: none;
-  font-weight: 600;
-}
 .site-footer {
   margin-top: 3rem;
   border-top: 1px solid var(--line);
@@ -417,17 +408,54 @@ main > article.wide {
   padding: 2rem 1.5rem 0;
   box-sizing: border-box;
 }
-button.secondary {
-  font: inherit;
-  padding: 0.5rem 1rem;
+/* Buttons. One primary and one secondary, on a <button> or on a link that
+   is one; 44px tall, for a thumb. A link in a sentence is terracotta and
+   underlined (main a), and button.link is for a low-stakes extra only. */
+button.primary,
+a.primary,
+button.secondary,
+a.secondary {
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  padding: 0.5625rem 1rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
+  font: inherit;
+  line-height: 1.5;
   cursor: pointer;
 }
-button.secondary:hover {
+a.primary,
+a.secondary {
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+}
+button.primary,
+a.primary {
+  align-self: flex-start;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+button.primary:hover,
+a.primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+button.secondary:hover,
+a.secondary:hover {
   background: var(--surface);
+}
+button.primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+button.primary:disabled:hover {
+  border-color: var(--accent);
+  background: var(--accent);
 }
 button.secondary:disabled {
   opacity: 0.45;
@@ -439,6 +467,36 @@ button.secondary:disabled:hover {
 button.secondary[aria-current="page"] {
   border-color: var(--fg);
   font-weight: 700;
+}
+button.secondary[aria-pressed="true"] {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+button.secondary[aria-pressed="true"] .count {
+  color: inherit;
+}
+/* In a row of a table or a list: drawn smaller, and still 44px to tap. */
+button.primary.small,
+a.primary.small,
+button.secondary.small,
+a.secondary.small {
+  position: relative;
+  min-height: 0;
+  padding: 0.25rem 0.625rem;
+  font-size: var(--text-sm);
+}
+button.primary.small::after,
+a.primary.small::after,
+button.secondary.small::after,
+a.secondary.small::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 2.75rem);
+  height: max(100%, 2.75rem);
+  transform: translate(-50%, -50%);
 }
 .chip-input {
   display: flex;
@@ -590,11 +648,6 @@ button.secondary[aria-current="page"] {
 .filters > button.link {
   margin-top: 0.75rem;
 }
-.filters button.link,
-.results a,
-.search-page .suggestions button.link {
-  color: var(--link);
-}
 .results-head {
   margin: 0 0 0.75rem;
   font-size: 1.125rem;
@@ -693,9 +746,6 @@ button.secondary[aria-current="page"] {
   color: var(--muted);
   font-size: 0.875rem;
 }
-.crumbs a {
-  color: var(--link);
-}
 
 /* A source's page. */
 .source-head {
@@ -735,7 +785,7 @@ button.secondary[aria-current="page"] {
   color: var(--muted);
   font-size: 0.8125rem;
 }
-.source-buy .button-outline {
+.source-buy a.secondary {
   display: block;
   text-align: center;
 }
@@ -800,12 +850,6 @@ button.secondary[aria-current="page"] {
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-.source-about .credits a,
-.source-elsewhere a,
-.source-section a,
-.credit-line a {
-  color: var(--link);
 }
 .tags {
   display: flex;
@@ -970,9 +1014,6 @@ button.secondary[aria-current="page"] {
   gap: 0.375rem 0.75rem;
   margin: 0;
 }
-.buy-row a {
-  color: var(--link);
-}
 .buy-note {
   margin: 0.375rem 0 0;
   color: var(--muted);
@@ -1023,9 +1064,6 @@ button.secondary[aria-current="page"] {
 }
 .table-foot .status {
   margin: 0;
-}
-.table-foot button.link {
-  color: var(--link);
 }
 .credit-line {
   margin-top: 2rem;
@@ -1087,9 +1125,6 @@ button.secondary[aria-current="page"] {
 .find-source {
   font-size: 1.125rem;
   font-weight: 700;
-}
-.find-about a {
-  color: var(--link);
 }
 .find-place {
   margin-top: 0.375rem !important;
@@ -1156,10 +1191,6 @@ button.secondary[aria-current="page"] {
 .ingredient-lines li:last-child {
   border-bottom: none;
 }
-.ingredient-lines a,
-.recipe-section button.link {
-  color: var(--link);
-}
 .used-in {
   display: flex;
   justify-content: space-between;
@@ -1202,9 +1233,6 @@ button.secondary[aria-current="page"] {
   gap: 0.5rem;
   align-items: center;
 }
-.recipe-actions button.link {
-  color: var(--link);
-}
 .added-by {
   margin: 0;
   padding-top: 0.75rem;
@@ -1235,18 +1263,6 @@ button.secondary[aria-current="page"] {
   gap: 0.5rem;
   align-items: center;
 }
-a.button-primary {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-  text-decoration: none;
-}
-a.button-primary:hover {
-  background: var(--accent-hover);
-}
 .ingredient-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
@@ -1267,11 +1283,6 @@ a.button-primary:hover {
 .ingredient-cards p {
   margin: 0;
 }
-.ingredient-cards a,
-.author-head a,
-.cover-card + .byline a {
-  color: var(--link);
-}
 .recipe-table a.strong {
   font-weight: 600;
 }
@@ -1291,9 +1302,6 @@ a.button-primary:hover {
   margin: 0;
   padding-left: 1.25rem;
   font-size: 0.9375rem;
-}
-.clash-list a {
-  color: var(--link);
 }
 .author-head .kind {
   margin: 0;
@@ -1384,16 +1392,9 @@ a.button-primary:hover {
   margin: 0 0 1rem;
   font-size: 1.25rem;
 }
-.section-head a,
-.value-cards a {
-  color: var(--link);
-}
 /* The list pages: Sources, Ingredients, Authors. */
 .list-head h1 {
   margin: 0 0 0.25rem;
-}
-.list-head .muted a {
-  color: var(--link);
 }
 .add-panels {
   display: flex;
@@ -1475,14 +1476,6 @@ a.button-primary:hover {
   margin-left: 0.25rem;
   color: var(--muted);
 }
-button.secondary[aria-pressed="true"] {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--bg);
-}
-button.secondary[aria-pressed="true"] .count {
-  color: inherit;
-}
 .ingredient-list .numeric,
 .author-list .numeric {
   text-align: right;
@@ -1539,7 +1532,8 @@ button.secondary[aria-pressed="true"] .count {
   box-sizing: border-box;
   margin-bottom: 0.5rem;
 }
-.cover-card:hover strong {
+.cover-card strong {
+  color: var(--link);
   text-decoration: underline;
 }
 .cover-card .kind {
@@ -1576,8 +1570,9 @@ button.secondary[aria-pressed="true"] .count {
   color: var(--muted);
   font-size: 0.875rem;
 }
+/* A link: terracotta and underlined, in a sentence or as a card's title. */
 main a {
-  color: var(--fg);
+  color: var(--link);
 }
 main li {
   margin-bottom: 0.5rem;
@@ -1612,24 +1607,6 @@ main h2 {
   margin: 0;
   color: var(--error);
 }
-button.primary {
-  align-self: flex-start;
-  font: inherit;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--on-accent);
-  cursor: pointer;
-}
-button.primary:hover {
-  background: var(--accent-hover);
-}
-button.primary:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
 .isbn-form {
   display: flex;
   flex-direction: column;
@@ -1663,25 +1640,6 @@ button.primary:disabled {
   display: grid;
   gap: 0.75rem;
 }
-.book-card {
-  display: flex;
-  gap: 0.875rem;
-  align-items: center;
-  color: var(--fg);
-  text-decoration: none;
-}
-.book-card:hover strong {
-  text-decoration: underline;
-}
-.book-card img,
-.book-card .no-cover {
-  width: 48px;
-  height: 72px;
-  object-fit: cover;
-  border-radius: 4px;
-  flex: none;
-  background: var(--border);
-}
 .byline,
 .subtitle {
   display: block;
@@ -1708,9 +1666,6 @@ button.primary:disabled {
 .editions li,
 .recipe-list li {
   margin-bottom: 0.5rem;
-}
-.recipe-list a {
-  color: var(--fg);
 }
 .page-ref {
   margin-left: 0.5rem;
@@ -2009,11 +1964,6 @@ button.primary:disabled {
   margin-top: 0.5rem;
   font-size: 0.875rem;
 }
-button.secondary.small,
-button.primary.small {
-  padding: 0.25rem 0.625rem;
-  font-size: 0.875rem;
-}
 
 /* The admin pages: cards to each, filters, tables and panels. */
 .list-filters {
@@ -2161,7 +2111,7 @@ button.primary.small {
     justify-content: flex-start;
   }
 }
-.trust-actions .link {
+.trust-actions button {
   margin-left: 0.5rem;
 }
 .people-table select {
@@ -2183,8 +2133,11 @@ button.primary.small {
   align-items: baseline;
   gap: 0.5rem;
 }
-.larder-list-head .link + .link {
-  margin-left: 0.5rem;
+.larder-list-head > span {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.375rem;
 }
 .larder-items {
   list-style: none;
@@ -2199,7 +2152,7 @@ button.primary.small {
   text-decoration: line-through;
   color: var(--muted);
 }
-.larder-item-name .link {
+.larder-item-name button {
   margin-left: 0.25rem;
 }
 .larder-item-actions {
@@ -2349,7 +2302,7 @@ button.primary.small {
   background: var(--bg);
   padding: 0.5rem 0;
 }
-.larder-ticked .button-outline {
+.larder-ticked a.secondary {
   margin: 0 0.5rem;
 }
 .larder-search-list {
@@ -2380,7 +2333,7 @@ button.primary.small {
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
 }
-.larder-summary .button-outline {
+.larder-summary a.secondary {
   margin-left: 0.5rem;
 }
 .larder-new {
@@ -2574,9 +2527,6 @@ button.primary.small {
 .api-keys {
   margin-top: 1rem;
 }
-.api-keys .muted a {
-  color: var(--link);
-}
 .key-list {
   margin: 0 0 1rem;
   padding: 0;
@@ -2730,6 +2680,7 @@ button.primary.small {
 .invite-list li {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem 0.75rem;
   padding: 0.375rem 0;
   border-bottom: 1px solid var(--line);
@@ -2740,9 +2691,6 @@ button.primary.small {
 }
 .invite-panel p {
   margin: 0 0 0.75rem;
-}
-.account-panels .tool-panel a {
-  color: var(--link);
 }
 .tool-panel > p.muted {
   margin: 0 0 1rem;
@@ -2853,9 +2801,6 @@ button.primary.small {
 }
 .bulk-head h1 {
   margin: 0 0 0.25rem;
-}
-.bulk-head .muted a {
-  color: var(--link);
 }
 .bulk-edition {
   display: flex;
@@ -3009,9 +2954,6 @@ button.primary.small {
   color: var(--muted);
   font-size: 0.875rem;
 }
-.aside-card a:not(.button-primary) {
-  color: var(--link);
-}
 .credit-row {
   display: flex;
   flex-wrap: wrap;
@@ -3020,7 +2962,7 @@ button.primary.small {
   margin-top: 0.5rem;
 }
 .credit-row input {
-  flex: 1 1 12rem;
+  flex: 1 1 10rem;
   min-width: 0;
 }
 .credit-row select,
@@ -3032,7 +2974,7 @@ button.primary.small {
   background: var(--bg);
   color: var(--fg);
 }
-.recipe-form fieldset > button.link {
+.recipe-form fieldset > button {
   margin-top: 0.5rem;
 }
 .edition-edit {
@@ -3052,7 +2994,7 @@ button.primary.small {
   flex: 1;
   min-width: 0;
 }
-.recipe-list li > button.link {
+.recipe-list li > button {
   margin-left: 0.75rem;
 }
 .member-list {
@@ -3158,7 +3100,9 @@ progress {
 }
 .admin-actions {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
   margin-top: 2rem;
 }
 .admin-actions a,
@@ -3209,9 +3153,6 @@ button.link {
 }
 .web-address {
   overflow-wrap: anywhere;
-}
-.byline a {
-  color: inherit;
 }
 .swap-list {
   padding-left: 1.25rem;

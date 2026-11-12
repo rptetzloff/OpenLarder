@@ -72,7 +72,7 @@ function inheritedWords(key: string): string {
   >
     <div class="table-head">
       <h2 id="allergens-title">Allergens, meat and alcohol</h2>
-      <button v-if="canEdit && !editing && list?.length" type="button" class="link" @click="start">
+      <button v-if="canEdit && !editing && list?.length" type="button" class="secondary small" @click="start">
         {{ own.length ? "Change" : "+ Record" }}
       </button>
     </div>

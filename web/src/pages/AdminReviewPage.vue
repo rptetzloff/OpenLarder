@@ -200,7 +200,7 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
                       <a :href="`/ingredients/${i.id}`">{{ i.name }}</a>
                       <button
                         type="button"
-                        class="link"
+                        class="secondary small"
                         :aria-expanded="merging === `${r.id}:${i.id}`"
                         @click="merging = merging === `${r.id}:${i.id}` ? '' : `${r.id}:${i.id}`"
                       >

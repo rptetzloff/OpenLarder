@@ -76,7 +76,7 @@ const name = computed(() => props.user?.display_name ?? "Account");
           </HeaderMenu>
         </template>
         <!-- A full page load, not fetch: the broker's sign-in page is a redirect. -->
-        <a v-else-if="user === null" href="/api/auth/login" class="button-outline">Sign in</a>
+        <a v-else-if="user === null" href="/api/auth/login" class="secondary">Sign in</a>
       </div>
 
       <!-- A phone: Search, and one menu with the rest. -->

@@ -466,7 +466,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               <button
                 v-if="user?.may_edit && !addingSwap"
                 type="button"
-                class="link"
+                class="secondary small"
                 @click="addingSwap = true"
               >
                 + Add a swap
@@ -530,21 +530,21 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <p v-if="proposed" class="status" role="status">
               Thanks: your suggestion is with the moderators.
             </p>
-            <a :href="`/recipes/${recipe.id}/propose`" class="button-outline">Suggest a change</a>
+            <a :href="`/recipes/${recipe.id}/propose`" class="secondary">Suggest a change</a>
           </div>
           <div v-if="recipe.editable" class="recipe-actions">
-            <a :href="`/recipes/${recipe.id}/edit`" class="button-outline">Edit</a>
+            <a :href="`/recipes/${recipe.id}/edit`" class="secondary">Edit</a>
             <button type="button" class="secondary" @click="remove">Remove</button>
             <template v-if="recipe.web_page && user?.may_edit">
               <button
                 v-if="!recipe.web_page.archive_url"
                 type="button"
-                class="link"
+                class="secondary"
                 @click="archiveNow"
               >
                 Archive now
               </button>
-              <button type="button" class="link" @click="setGone(!recipe.web_page.gone)">
+              <button type="button" class="secondary" @click="setGone(!recipe.web_page.gone)">
                 {{ recipe.web_page.gone ? "The page is back" : "The page is gone" }}
               </button>
             </template>
@@ -704,9 +704,6 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
 }
 .shelf-status > span:last-child {
   display: grid;
-}
-.shelf-status a {
-  color: var(--fg);
 }
 .shelf-status .muted {
   font-size: var(--text-sm);

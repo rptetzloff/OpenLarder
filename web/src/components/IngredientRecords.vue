@@ -77,7 +77,7 @@ async function save() {
   >
     <div class="table-head">
       <h2 id="records-title">The same food elsewhere</h2>
-      <button v-if="canEdit && !editing" type="button" class="link" @click="start">
+      <button v-if="canEdit && !editing" type="button" class="secondary small" @click="start">
         {{ ingredient.fdc || ingredient.wikidata ? "Change" : "+ Link" }}
       </button>
     </div>
@@ -119,7 +119,7 @@ async function save() {
         <p v-if="food" class="chosen">
           <a :href="food.url" rel="noopener">{{ food.description }}</a>
           <span class="muted"> · {{ DATA_TYPES[food.data_type] }} · {{ food.fdc_id }}</span>
-          <button type="button" class="link" @click="food = null">Unlink</button>
+          <button type="button" class="secondary small" @click="food = null">Unlink</button>
         </p>
         <label for="fdc-q">Find a food, by words or its FDC ID</label>
         <input id="fdc-q" v-model="q" autocomplete="off" maxlength="200" />

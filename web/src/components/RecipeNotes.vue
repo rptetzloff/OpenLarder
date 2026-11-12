@@ -52,7 +52,7 @@ const when = (at: string) =>
   <section v-if="notes" class="recipe-section recipe-notes" aria-labelledby="notes-title">
     <div class="table-head">
       <h2 id="notes-title">Notes</h2>
-      <button v-if="!editing" type="button" class="link" @click="start">
+      <button v-if="!editing" type="button" class="secondary small" @click="start">
         {{ notes.mine ? "Change my note" : "+ Add a note" }}
       </button>
     </div>
@@ -84,7 +84,7 @@ const when = (at: string) =>
         <button type="button" class="secondary small" :disabled="busy" @click="editing = false">
           Cancel
         </button>
-        <button v-if="notes.mine" type="button" class="link" :disabled="busy" @click="remove">
+        <button v-if="notes.mine" type="button" class="secondary small" :disabled="busy" @click="remove">
           Delete my note
         </button>
       </div>

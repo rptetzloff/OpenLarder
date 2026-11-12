@@ -117,7 +117,7 @@ watch(
               Notes <span class="count">{{ notes.length.toLocaleString() }}</span>
             </button>
           </div>
-          <a v-if="every.length" href="/search?sv=1" class="button-outline">Search my saved recipes</a>
+          <a v-if="every.length" href="/search?sv=1" class="secondary">Search my saved recipes</a>
         </div>
         <section v-if="tab === 'notes'" class="saved-section">
           <p v-if="!notes.length" class="status">
@@ -153,7 +153,7 @@ watch(
               <span v-if="saved.shared_with.length && !sharing" class="muted"
                 >Shared with {{ saved.shared_with.map((g) => g.name).join(", ") }}.</span
               >
-              <button type="button" class="link" :aria-expanded="sharing" @click="sharing = !sharing">
+              <button type="button" class="secondary small" :aria-expanded="sharing" @click="sharing = !sharing">
                 Share
               </button>
             </p>

@@ -67,7 +67,7 @@ async function save(d: Diet) {
           >
           <button
             type="button"
-            class="link change"
+            class="secondary small change"
             :aria-label="`Change what ${d.name} avoids`"
             @click="start(d)"
           >

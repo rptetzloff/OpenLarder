@@ -55,17 +55,17 @@ async function act(resolution: "fixed" | "dismissed") {
     </p>
     <template v-else>
       <div v-if="!dismissing" class="admin-actions">
-        <button v-if="suggested" type="button" class="link" :disabled="busy" @click="change">
+        <button v-if="suggested" type="button" class="secondary small" :disabled="busy" @click="change">
           Change to “{{ suggested.meant }}”
         </button>
-        <button type="button" class="link" :disabled="busy" @click="act('fixed')">Fixed</button>
-        <button type="button" class="link" :disabled="busy" @click="dismissing = true">Dismiss…</button>
+        <button type="button" class="secondary small" :disabled="busy" @click="act('fixed')">Fixed</button>
+        <button type="button" class="secondary small" :disabled="busy" @click="dismissing = true">Dismiss…</button>
       </div>
       <form v-else class="dismiss" @submit.prevent="act('dismissed')">
         <label :for="`why-${flag.id}`">Why is the flag wrong?</label>
         <input :id="`why-${flag.id}`" v-model="reason" maxlength="500" required />
         <div class="admin-actions">
-          <button type="submit" class="link" :disabled="busy">Dismiss</button>
+          <button type="submit" class="secondary small" :disabled="busy">Dismiss</button>
           <button type="button" class="link" @click="dismissing = false">Cancel</button>
         </div>
       </form>
