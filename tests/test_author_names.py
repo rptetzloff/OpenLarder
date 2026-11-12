@@ -23,6 +23,17 @@ from openlarder.author_names import display_name, shown_name
         ("King, Martin Luther, Jr.", "Martin Luther King Jr."),
         ("López-Alt, J. Kenji", "J. Kenji López-Alt"),
         ("  Claire   Ptak ", "Claire Ptak"),
+        # A catalogue's full stop, on a name with no comma to turn round.
+        ("Culinary Institute of America.", "Culinary Institute of America"),
+        ("Izabella Wentz PharmD.", "Izabella Wentz PharmD"),
+        ("Gourmet Magazine. (Firm)", "Gourmet Magazine"),
+        # An abbreviation's own: left alone.
+        ("Time Inc.", "Time Inc."),
+        ("Warner Bros.", "Warner Bros."),
+        ("Martin Luther King Jr.", "Martin Luther King Jr."),
+        ("John A.", "John A."),
+        ("Jane Doe Ph.D.", "Jane Doe Ph.D."),
+        ("Jane Doe Esq.", "Jane Doe Esq."),
         # Already as printed: left alone, comma or not.
         ("Yotam Ottolenghi", "Yotam Ottolenghi"),
         ("Sarah Ballantyne, PhD", "Sarah Ballantyne, PhD"),
@@ -49,6 +60,12 @@ def test_a_catalogue_form_reads_as_printed(stored, shown) -> None:
         ("Walker, Danielle (Chef)", "Danielle Walker Smith", "Danielle Walker"),
         # The author's is in the catalogue's form too: turned round, not copied.
         ("Walker, Danielle (Chef)", "Walker, Danielle (Chef)", "Danielle Walker"),
+        # A catalogue's full stop: the author's own name, which has none.
+        (
+            "Culinary Institute of America.",
+            "Culinary Institute of America",
+            "Culinary Institute of America",
+        ),
         # As the book prints it: untouched, whatever the author is called.
         ("Sarah Ballantyne, PhD", "Sarah Ballantyne", "Sarah Ballantyne, PhD"),
         ("Ottolenghi", "Yotam Ottolenghi", "Ottolenghi"),

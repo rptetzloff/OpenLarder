@@ -144,6 +144,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         printed is left alone ("Sarah Ballantyne, PhD"). It was five names
         on thirteen sources, credits from before Open Library's names were
         cleaned on the way in; authors' own records were already clean.
+      - [x] And the full stop a catalogue ends a name with (#165):
+        "Culinary Institute of America." and "Izabella Wentz PharmD."
+        showed theirs on two sources, since the rule only looked at names
+        with a comma to turn round. Found reading a live page's
+        description. An abbreviation's own stays: "Inc.", "Jr.", "Ph.D.".
       - [ ] An author's own record is shown as stored: one typed in a
         catalogue's form ("Walker, Danielle") stays that way on the
         authors list until an admin fixes it on the author's page.
