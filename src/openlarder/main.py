@@ -64,6 +64,7 @@ from openlarder.routers import (
     search,
     shelf,
     site,
+    sitemaps,
     sources,
     substitutions,
     suggestions,
@@ -224,6 +225,7 @@ app.include_router(saved.router)
 app.include_router(search.router)
 app.include_router(shelf.router)
 app.include_router(site.router)
+app.include_router(sitemaps.router)
 app.include_router(substitutions.router)
 app.include_router(suggestions.router)
 app.include_router(tags.router)
