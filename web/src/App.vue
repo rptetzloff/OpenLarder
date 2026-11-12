@@ -557,7 +557,7 @@ button.secondary[aria-current="page"] {
   gap: 2rem;
   margin-top: 1.5rem;
 }
-@media (max-width: 48rem) {
+@media (max-width: 40rem) {
   .search-body {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;

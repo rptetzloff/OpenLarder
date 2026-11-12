@@ -125,8 +125,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         when everything fits), a fade on the right while more remains, and
         a last "Browse all sources" card. Arrow keys scroll it once it has
         focus; no smooth scrolling when the device asks for none.
-      - [ ] 5. Search, results first: the form folded to a summary once
-        there's a query, focus to the results, six diets then "Show all".
+      - [x] 5. Search, results first (#154): arriving with a search in
+        the address, the form is one line saying what was asked ("Title
+        words: cake · 2 ingredients") with "Edit search"; without one, the
+        form is open. After a search someone asked for (Search, or
+        arriving), focus goes to the results' heading; a search that
+        follows typing or a tick leaves focus alone. The count is said
+        ("896 recipes"), not the whole list. Six diets, then "Show all
+        diets". On a phone the filters fold behind "Filters", so the
+        results come first there too.
       - [ ] 6. Author names shown as "Danielle Walker", not "Walker,
         Danielle (Chef)".
       - [ ] 7. Links and buttons: terracotta underlined for links in

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LarderPicker from "../components/LarderPicker.vue";
 import { KINDS, listTags, type Tag } from "../tags";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { findBooks } from "../books";
 import {
   listIngredients,
@@ -64,16 +64,62 @@ const page = ref(Math.max(1, Number(params.get("page")) || 1));
 const allTags = ref<Tag[]>([]);
 const tags = ref<string[]>(params.getAll("tag"));
 const moreTags = ref(false);
+// Diets: the first six, the rest behind "Show all diets" (Ray's cleanup
+// pass, section 5), unless one of the rest is ticked.
+const DIETS_SHOWN = 6;
+const allDiets = ref(false);
 const tagGroups = computed(() =>
-  KINDS.map((k) => ({ ...k, tags: allTags.value.filter((t) => t.kind === k.kind) })).filter(
-    (k) => k.tags.length && (moreTags.value || k.kind === "diet" || k.kind === "course"),
-  ),
+  KINDS.map((k) => {
+    const all = allTags.value.filter((t) => t.kind === k.kind);
+    const folded =
+      k.kind === "diet" &&
+      !allDiets.value &&
+      all.length > DIETS_SHOWN &&
+      !all.slice(DIETS_SHOWN).some((t) => tags.value.includes(t.id));
+    return { ...k, tags: folded ? all.slice(0, DIETS_SHOWN) : all, more: all.length > DIETS_SHOWN };
+  }).filter((k) => k.tags.length && (moreTags.value || k.kind === "diet" || k.kind === "course")),
 );
 const result = ref<SearchResult | null>(null);
 const missing = ref(0);
 const failed = ref(false);
 const loading = ref(false);
 let latest = 0;
+
+// Results first: arriving with a search in the address, the form is folded
+// to a line saying what was asked, with "Edit search" to open it.
+const formOpen = ref(
+  !["i", "q", "tag", "ll", "li", "larder", "sv"].some((k) => params.has(k)),
+);
+const askedFor = computed(() => {
+  const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  return [
+    title.value.trim() && `Title words: ${title.value.trim()}`,
+    chosen.value.length && count(chosen.value.length, "ingredient"),
+    unwanted.value.length && `${unwanted.value.length} left out`,
+    tags.value.length && count(tags.value.length, "tag"),
+    shelf.value.length && `in ${count(shelf.value.length, "source")}`,
+    useLarder.value && "with your larder",
+    onShelf.value && "only your shelf",
+    onlySaved.value && "only saved",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+});
+// The filters, folded on a phone; how many are narrowing the search.
+const filtersOpen = ref(false);
+const activeFilters = computed(() => tags.value.length + (narrowedKinds.value.length ? 1 : 0));
+// The results' heading takes focus after a search someone asked for, and
+// the count is said; a search that follows typing leaves focus alone.
+const resultsHead = ref<HTMLElement | null>(null);
+const said = ref("");
+async function toResults() {
+  await nextTick();
+  resultsHead.value?.focus();
+}
+async function submit() {
+  await run();
+  toResults();
+}
 
 const narrowedKinds = computed(() =>
   kinds.value.length === ALL_KINDS.length ? [] : kinds.value,
@@ -138,6 +184,7 @@ async function run(toPage = 1) {
     );
     if (mine !== latest) return;
     result.value = found;
+    said.value = summary.value;
   } catch {
     if (mine === latest) failed.value = true;
   } finally {
@@ -339,7 +386,9 @@ onMounted(async () => {
       tags.value = tags.value.filter((t) => !first.missing_tags.includes(t));
     }
     result.value = first;
+    said.value = summary.value;
     if (missing.value || page.value > 1) run(page.value);
+    else toResults();
   } catch {
     failed.value = true;
   }
@@ -350,7 +399,25 @@ onMounted(async () => {
   <article class="wide search-page">
     <h1>Search</h1>
 
-    <form class="search-panel" role="search" @submit.prevent="run()">
+    <p v-if="!formOpen" class="search-asked">
+      <span>{{ askedFor || "Everything" }}</span>
+      <button
+        type="button"
+        class="secondary"
+        aria-expanded="false"
+        aria-controls="search-form"
+        @click="formOpen = true"
+      >
+        Edit search
+      </button>
+    </p>
+    <form
+      v-show="formOpen"
+      id="search-form"
+      class="search-panel"
+      role="search"
+      @submit.prevent="submit"
+    >
       <LarderPicker
         v-if="user"
         v-model:lists="larderLists"
@@ -498,6 +565,17 @@ onMounted(async () => {
 
     <div class="search-body">
       <aside class="filters" aria-label="Filters">
+        <!-- On a phone the filters fold away, so the results come first. -->
+        <button
+          type="button"
+          class="secondary filters-toggle"
+          :aria-expanded="filtersOpen"
+          aria-controls="search-filters"
+          @click="filtersOpen = !filtersOpen"
+        >
+          Filters{{ activeFilters ? ` (${activeFilters})` : "" }}
+        </button>
+        <div id="search-filters" class="filters-body" :class="{ open: filtersOpen }">
         <fieldset>
           <legend>Source kind</legend>
           <template v-for="(g, n) in KIND_GROUPS" :key="g.label">
@@ -529,6 +607,15 @@ onMounted(async () => {
             />
             {{ t.name }}
           </label>
+          <button
+            v-if="g.kind === 'diet' && g.more"
+            type="button"
+            class="link"
+            :aria-expanded="g.tags.length > DIETS_SHOWN"
+            @click="allDiets = !allDiets"
+          >
+            {{ g.tags.length > DIETS_SHOWN ? "Fewer diets" : "Show all diets" }}
+          </button>
         </fieldset>
         <button
           v-if="allTags.length"
@@ -539,16 +626,19 @@ onMounted(async () => {
         >
           {{ moreTags ? "Fewer tags" : "Cuisine and technique" }}
         </button>
+        </div>
       </aside>
 
-      <section id="results" class="results" aria-live="polite" :aria-busy="loading">
+      <section id="results" class="results" :aria-busy="loading">
+        <!-- The count, said once a search has run; not the whole list. -->
+        <p class="visually-hidden" aria-live="polite">{{ said }}</p>
         <p v-if="failed" role="alert">The search didn't work. Try again.</p>
         <p v-else-if="!searching" class="status">
           Add what you have, words of a title or a tag, and the recipes you're closest to making
           come first, with where to find them.
         </p>
         <template v-else-if="result">
-          <h2 class="results-head">
+          <h2 ref="resultsHead" class="results-head" tabindex="-1">
             {{ summary }}
             <span v-if="chosen.length || useLarder" class="muted"> · closest to made first</span>
           </h2>
@@ -602,3 +692,44 @@ onMounted(async () => {
     </div>
   </article>
 </template>
+
+<style scoped>
+/* Ray's cleanup pass, section 5: the search as one line, once it has run. */
+.search-asked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.search-asked button {
+  min-height: 2.75rem;
+}
+.results-head:focus {
+  outline: none;
+}
+.filters-toggle {
+  display: none;
+}
+.filters-body > button.link {
+  margin-top: 0.75rem;
+}
+@media (max-width: 40rem) {
+  .filters-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+  .filters-body {
+    margin-top: 1rem;
+  }
+  .filters-body:not(.open) {
+    display: none;
+  }
+}
+</style>
