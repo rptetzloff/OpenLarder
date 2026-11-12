@@ -42,6 +42,7 @@ import SuggestionsPage from "./pages/SuggestionsPage.vue";
 import DataPage from "./pages/DataPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
+import SiteHeader from "./components/SiteHeader.vue";
 
 // The server returns this app for any path it has no file for, so the page
 // is chosen from the address. A handful of pages, one with an ID in it,
@@ -100,15 +101,6 @@ const inviteCode = match("/invite/([A-Za-z0-9_-]+)");
 
 const theme = ref<ThemeChoice>(savedTheme());
 
-// The main sections, so the header can mark the one you're in.
-const SECTIONS = [
-  { href: "/search", label: "Search" },
-  { href: "/sources", label: "Sources" },
-  { href: "/ingredients", label: "Ingredients" },
-  { href: "/authors", label: "Authors" },
-  { href: "/requests", label: "Requests" },
-];
-const inSection = (href: string) => path === href || path.startsWith(`${href}/`);
 // undefined while asking, null when signed out.
 const user = ref<Me | null | undefined>(undefined);
 // Someone signed in who hasn't chosen a name yet is asked for one before
@@ -120,6 +112,10 @@ const signInFailed = new URLSearchParams(location.search).get("sign-in") === "fa
 
 // The band above the header: this isn't production, or a notice.
 const notice = ref<string | null>(null);
+
+// "Skip to content": focus goes to the page, without the address changing.
+const content = ref<HTMLElement | null>(null);
+const skip = () => content.value?.focus();
 
 onMounted(async () => {
   fetch("/api/site")
@@ -141,48 +137,15 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- The first thing Tab reaches: past the header, to the page. -->
+  <a href="#content" class="skip-link" @click.prevent="skip">Skip to content</a>
   <aside v-if="notice" class="site-notice" aria-label="About this site">
     <p>{{ notice }}</p>
   </aside>
-  <header class="site-header">
-    <div class="bar">
-      <a href="/" class="brand">
-        <!-- The full logo, in the version for the page's light or dark; CSS
-             shows the one that matches data-theme. -->
-        <img class="for-light" src="/logo-light.svg" alt="OpenLarder" width="150" height="44" />
-        <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="150" height="44" />
-      </a>
-      <nav class="primary-nav" aria-label="Main">
-        <a
-          v-for="s in SECTIONS"
-          :key="s.href"
-          :href="s.href"
-          :aria-current="inSection(s.href) ? 'page' : undefined"
-          >{{ s.label }}</a
-        >
-      </nav>
-      <div class="account">
-        <template v-if="user">
-          <a v-if="user.may_edit" href="/admin">Admin</a>
-          <a href="/larder" :aria-current="onLarder ? 'page' : undefined">Larder</a>
-          <a href="/shelf" :aria-current="onShelf ? 'page' : undefined">Shelf</a>
-          <a href="/saved" :aria-current="onSaved ? 'page' : undefined">Saved</a>
-          <a href="/groups">Groups</a>
-          <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
-          <!-- A form, not fetch: signing out ends at the broker, which ends the
-               session there and sends the browser back here. -->
-          <form method="post" action="/api/auth/logout">
-            <button type="submit">Sign out</button>
-          </form>
-        </template>
-        <!-- A full page load, not fetch: the broker's sign-in page is a redirect. -->
-        <a v-else-if="user === null" href="/api/auth/login" class="button-outline">Sign in</a>
-      </div>
-    </div>
-  </header>
+  <SiteHeader :user="user" :path="path" />
   <!-- A page's admin tools go here, under the header (BookPage's Teleport). -->
   <div id="admin-bar"></div>
-  <main>
+  <main id="content" ref="content" tabindex="-1">
     <component :is="page" v-if="page" />
     <section v-else-if="needsName && user">
       <h1>What should we call you?</h1>
@@ -241,6 +204,7 @@ onMounted(async () => {
         >Catalog data under the
         <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a></span
       >
+      <a href="/requests" :aria-current="onRequests ? 'page' : undefined">Requests</a>
       <a href="/api/docs">API</a>
       <a href="/data">Open data</a>
       <a href="/privacy">Privacy</a>
@@ -366,10 +330,24 @@ h2,
 h3 {
   letter-spacing: -0.02em;
 }
-.site-header {
-  border-bottom: 1px solid var(--line);
+/* Hidden until Tab reaches it. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -4rem;
+  z-index: 30;
+  padding: 0.625rem 1rem;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
 }
-.site-header .bar,
+.skip-link:focus {
+  top: 0.5rem;
+}
+main:focus {
+  outline: none;
+}
 .site-footer .bar {
   display: flex;
   flex-wrap: wrap;
@@ -398,49 +376,6 @@ h3 {
   background: var(--bg);
   color: var(--fg);
 }
-.brand img {
-  display: block;
-  height: 2.75rem;
-  width: auto;
-}
-.primary-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-}
-.primary-nav a {
-  color: var(--fg);
-  text-decoration: none;
-  font-weight: 500;
-}
-.primary-nav a:hover {
-  text-decoration: underline;
-}
-.primary-nav a[aria-current="page"] {
-  font-weight: 700;
-}
-.account {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  margin-left: auto;
-  font-size: 0.9375rem;
-}
-.account form {
-  margin: 0;
-}
-.account a,
-.account button {
-  color: var(--fg);
-  text-decoration: underline;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-.account a.button-outline,
 a.button-outline {
   display: inline-block;
   padding: 0.375rem 0.875rem;
@@ -449,20 +384,6 @@ a.button-outline {
   color: var(--fg);
   text-decoration: none;
   font-weight: 600;
-}
-/* On a phone the sections go on their own line, under the logo. */
-@media (max-width: 40rem) {
-  .site-header .bar {
-    gap: 0.5rem 1rem;
-    padding: 0.75rem 1rem;
-  }
-  .primary-nav {
-    order: 3;
-    width: 100%;
-  }
-  .brand img {
-    height: 2.25rem;
-  }
 }
 .site-footer {
   margin-top: 3rem;

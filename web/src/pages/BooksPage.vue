@@ -372,6 +372,10 @@ async function add() {
           autocomplete="off"
           placeholder="Title, author or website"
         />
+        <!-- Requests is in the footer; this is where someone wants it. -->
+        <p class="help request-prompt">
+          Can't find a source? <a href="/requests">Request it</a>
+        </p>
       </div>
       <div class="table-controls">
         <label for="source-sort">Sort</label>
