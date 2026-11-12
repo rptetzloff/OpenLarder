@@ -40,6 +40,7 @@ from openlarder.models import (
     Proposal,
     Recipe,
     RecipeLocation,
+    ShelfBook,
     Source,
     SourceCredit,
     SourceTag,
@@ -230,6 +231,26 @@ async def merge(
         update(Proposal).where(Proposal.source_id == gone.id).values(source_id=kept.id)
     )
 
+    # People's shelves: the book kept, with the edition they said they have.
+    # Not in the record: a shelf is private, and an unmerge moves back the
+    # ones whose edition goes back.
+    kept_shelf = aliased(ShelfBook)
+    both = exists().where(kept_shelf.user_id == ShelfBook.user_id, kept_shelf.source_id == kept.id)
+    gone_shelf = aliased(ShelfBook)
+    await session.execute(
+        update(ShelfBook)
+        .where(ShelfBook.source_id == kept.id, ShelfBook.edition_id.is_(None))
+        .values(
+            edition_id=select(gone_shelf.edition_id)
+            .where(gone_shelf.user_id == ShelfBook.user_id, gone_shelf.source_id == gone.id)
+            .scalar_subquery()
+        )
+    )
+    await session.execute(delete(ShelfBook).where(ShelfBook.source_id == gone.id, both))
+    await session.execute(
+        update(ShelfBook).where(ShelfBook.source_id == gone.id).values(source_id=kept.id)
+    )
+
     # What kept lacks, from gone; its Open Library work is unique, so it's
     # let go of first.
     subtitle, work = gone.subtitle, gone.open_library_work_id
@@ -330,6 +351,12 @@ async def unmerge(session: AsyncSession, record: BookMerge, by: User | None = No
     ]
     await session.execute(delete(RecipeLocation).where(RecipeLocation.recipe_id.in_(recipes)))
     await session.execute(update(Edition).where(Edition.id.in_(editions)).values(source_id=gone_id))
+    # Shelves holding one of its editions go back with it.
+    await session.execute(
+        update(ShelfBook)
+        .where(ShelfBook.source_id == kept.id, ShelfBook.edition_id.in_(editions))
+        .values(source_id=gone_id)
+    )
     await session.execute(update(Recipe).where(Recipe.id.in_(recipes)).values(source_id=gone_id))
     if places:
         for place in places:

@@ -161,6 +161,8 @@ async function seed() {
   const seat = await api(`/api/groups/${group.id}/invites`, "cook", { role: "view" });
   await api(`/api/invites/${seat.token}/accept`, "admin", {});
   await api(`/api/larder/items/${butter.id}`, "cook", { state: "out" }, "PATCH");
+  // Cy owns the book, the edition with the recipe's page.
+  await api(`/api/shelf/${book.id}`, "cook", { edition_id: biscuitPage.pages[0].edition_id }, "PUT");
   // A problem reported with a recipe.
   await api("/api/reports", "cook", { kind: "recipe", id: biscuits.id, reason: "wrong", note: "Page 23 in mine." });
   // Requests: one asked for twice, one claimed, one declined.
@@ -245,6 +247,11 @@ function pages(s) {
     ["/larder", "admin"],
     ["/search?larder=1", "cook"],
     ["/larder", null],
+    ["/shelf", "cook"],
+    ["/shelf", "admin"],
+    ["/shelf", null],
+    [`/sources/${s.book.id}`, "cook"],
+    ["/search?own=1&q=biscuit", "cook"],
     ["/privacy", null],
     ["/terms", null],
   ];

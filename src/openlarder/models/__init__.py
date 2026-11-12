@@ -31,7 +31,7 @@ from openlarder.models.foods import FdcFood, LinkSuggestion
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
 from openlarder.models.history import Revision
 from openlarder.models.imports import ImportRun, ImportRunLine
-from openlarder.models.larder import LarderItem, LarderList, LarderListGroup
+from openlarder.models.larder import LarderItem, LarderList, LarderListGroup, ShelfBook
 from openlarder.models.limits import DailyCount
 from openlarder.models.merges import BookMerge
 from openlarder.models.proposals import Proposal
@@ -71,6 +71,7 @@ __all__ = [
     "LinkSuggestion",
     "LarderList",
     "LarderListGroup",
+    "ShelfBook",
     "Issue",
     "Proposal",
     "PurchaseClick",

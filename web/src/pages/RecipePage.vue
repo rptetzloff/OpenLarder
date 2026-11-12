@@ -18,6 +18,7 @@ import SwapList from "../components/SwapList.vue";
 import { type Flag, recipeFlags } from "../flags";
 import type { Me } from "../me";
 import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
+import { onShelf } from "../shelf";
 import type { Thing } from "../substitutions";
 
 // Back from suggesting a change (RecipeFormPage's propose).
@@ -43,6 +44,7 @@ onMounted(async () => {
     else {
       recipe.value = await res.json();
       editionId.value = recipe.value!.pages[0]?.edition_id ?? null;
+      if (props.user && recipe.value!.source.kind === "book") showYours(recipe.value!);
       if (props.user !== null) flags.value = await recipeFlags(props.id);
       document.title = `${recipe.value!.title} · ${recipe.value!.source.title} · OpenLarder`;
     }
@@ -60,7 +62,22 @@ const cover = computed(
   () => edition.value?.cover_url ?? recipe.value?.pages.find((p) => p.cover_url)?.cover_url ?? null,
 );
 function editionLabel(p: Recipe["pages"][number]) {
-  return [p.published_year, p.isbn13 && `ISBN ${p.isbn13}`].filter(Boolean).join(" · ") || "Edition";
+  const label =
+    [p.published_year, p.isbn13 && `ISBN ${p.isbn13}`].filter(Boolean).join(" · ") || "Edition";
+  return p.edition_id === yours.value ? `${label} (yours)` : label;
+}
+// The edition on your shelf (routers/shelf.py), shown first if the recipe is in it.
+const yours = ref<string | null>(null);
+async function showYours(r: Recipe) {
+  try {
+    const mine = await onShelf(r.source.id);
+    if (mine.edition_id && r.pages.some((p) => p.edition_id === mine.edition_id)) {
+      yours.value = mine.edition_id;
+      editionId.value = mine.edition_id;
+    }
+  } catch {
+    // The newest edition, as for anyone.
+  }
 }
 
 // What the box says it's in, by the kind of source.

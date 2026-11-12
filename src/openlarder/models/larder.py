@@ -76,3 +76,25 @@ class LarderListGroup(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ShelfBook(Timestamps, Base):
+    """A book someone owns, and which edition if they've said (migration
+    0062): their shelf, which search can keep to. Private, like the larder."""
+
+    __tablename__ = "shelf_books"
+    __table_args__ = (PrimaryKeyConstraint("user_id", "source_id"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # The edition they have, for its page numbers; none if not said.
+    edition_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("editions.id", ondelete="SET NULL"), index=True
+    )

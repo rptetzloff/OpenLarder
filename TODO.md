@@ -480,7 +480,16 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         (`larder_list`, `larder_item`, `larder_without`; `ll`, `li`, `lx` in
         the address). The larder page searches with one list, or with the
         things ticked.
-      - [ ] A book shelf ("books I own") alongside, Phase 2.
+      - [x] A book shelf (#141): "I have this book" on a book's page (of
+        several editions, "I have this edition"), listed at `/shelf` (a
+        Shelf link when signed in). A recipe's page opens at your
+        edition's page, marked "(yours)"; search's "Only books on my shelf"
+        (`shelf=true`; `own=1` in the address) keeps to them. Books only.
+        Private like the larder (migration 0062): not history, dumps or
+        the API's public reads; a book merge moves it to the book kept, an
+        unmerge back with its edition; deleting the account deletes it.
+      - [ ] Sharing a shelf with household groups, as larder lists are: ask
+        Ray whether it's wanted.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to
