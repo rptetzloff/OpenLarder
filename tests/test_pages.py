@@ -174,6 +174,25 @@ async def test_where_a_recipe_is_reads_by_its_kind_of_source(admin, client) -> N
     )
 
 
+async def test_a_name_that_ends_in_its_own_full_stop_ends_the_sentence(admin, adb, client) -> None:
+    """ "by Time Inc.", not "by Time Inc.."; and a catalogue's full stop on
+    a name isn't shown at all (author_names.display_name)."""
+    book = await _book(admin, authors=("Culinary Institute of America.", "Time Inc."))
+    recipe = await _recipe(admin, adb, book)
+    page = (await client.get(f"/sources/{book}")).text
+    assert _content(page, "description") == [
+        "Against All Grain, a book by Culinary Institute of America and Time Inc."
+        " 1 recipe indexed, with where to find it and its ingredients."
+    ]
+    assert ">Time Inc.</a></p>" in _body(page) and "Inc.</a>." not in _body(page)
+    page = (await client.get(f"/recipes/{recipe}")).text
+    assert _content(page, "description") == [
+        "Banana Bread is on page 190 of Against All Grain by Culinary Institute of America"
+        " and Time Inc. Ingredients: Egg."
+    ]
+    assert ">Time Inc.</a></p>" in _body(page) and ".." not in _content(page, "description")[0]
+
+
 # A source's page
 
 

@@ -25,7 +25,7 @@ ORGANISATION = {
 # A last part that is a suffix, not a first name: "King, Martin, Jr.".
 SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 # A last part that is a company's, not a first name: "Sunset Books, Inc.".
-COMPANY = {"inc", "ltd", "llc", "co"}
+COMPANY = {"inc", "ltd", "llc", "co", "corp", "bros"}
 # Letters after a name, which a book prints there: "Sarah Ballantyne, PhD".
 CREDENTIALS = {
     "phd",
@@ -92,9 +92,11 @@ def display_name(name: str) -> str:
     "Danielle Walker".
 
     A bracketed note at the end goes (a role, dates, "Firm"), a catalogue's
-    dates go, and "Last, First" turns round. A name that is already as
-    printed is left alone, comma or not: "Sarah Ballantyne, PhD", "Sunset
-    Books, Inc.", and an organisation's. Ray's cleanup pass, section 6.
+    dates go, "Last, First" turns round, and the full stop a catalogue ends
+    a name with goes ("Culinary Institute of America."). A name that is
+    already as printed is left alone, comma or not: "Sarah Ballantyne,
+    PhD", "Sunset Books, Inc.", and an organisation's. Ray's cleanup pass,
+    section 6.
     """
     spaced = " ".join(name.split())
     notes = [n.strip().casefold().rstrip(".") for n in re.findall(r"\(([^)]*)\)", spaced)]
@@ -107,7 +109,7 @@ def display_name(name: str) -> str:
     if not all(parts):
         return shown
     if any(n in ORGANISATION for n in notes) or len(parts) == 1:
-        return ", ".join(parts)
+        return _no_full_stop(", ".join(parts))
     if len(parts) == 2 and not _after_the_name(parts[1]):
         return f"{_no_full_stop(parts[1])} {parts[0]}"
     if len(parts) == 3 and _bare(parts[2]) in SUFFIXES and not _after_the_name(parts[1]):
@@ -117,9 +119,15 @@ def display_name(name: str) -> str:
 
 def _no_full_stop(first: str) -> str:
     """A catalogue ends a name with a full stop ("Reinhart, Peter."), which
-    isn't the name's; an initial's is ("Smith, John A.")."""
+    isn't the name's. An initial's is ("Smith, John A."), and so is an
+    abbreviation's: "Jr.", "Inc.", "Ph.D."."""
     last = first.split()[-1]
-    if last.endswith(".") and last[:-1].isalpha() and len(last) > 3:
+    if (
+        last.endswith(".")
+        and last[:-1].isalpha()
+        and len(last) > 3
+        and _bare(last) not in SUFFIXES | COMPANY | CREDENTIALS
+    ):
         return first[:-1]
     return first
 
