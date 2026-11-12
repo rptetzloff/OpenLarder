@@ -10,6 +10,7 @@ const proposed = new URLSearchParams(location.search).has("proposed");
 import HistoryPanel from "../components/HistoryPanel.vue";
 import CoverBlank from "../components/CoverBlank.vue";
 import ReportButton from "../components/ReportButton.vue";
+import TopRated from "../components/TopRated.vue";
 import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, FORMAT_NAMES, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
@@ -413,6 +414,8 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           </div>
         </dl>
       </section>
+
+      <TopRated :recipes="book.top_rated" />
 
       <section v-if="book.ingredients.length" class="source-section">
         <h2>Most-used ingredients</h2>

@@ -737,8 +737,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         at will. Everyone sees the average and how many rated it, on the
         page and in listings ("4.5 of 5 spoons"); nobody sees who. No words
         go with one, so nothing to moderate.
-      - [ ] Using ratings: sorting search by them, and top-rated recipes
-        on author and source pages (SCOPING.md). Not in the dumps yet.
+      - [x] Using ratings (#166; *Ray, 2026-11-12*). A source's page and
+        an author's show "Top rated": the recipes averaging four spoons or
+        more, the best five, the higher average first and, level, the one
+        more people rated; the section is left off when there are none.
+        Search has a Sort: "Best match", as before, or "Highest rated",
+        the rated recipes first that way and then the rest as they'd come.
+        Sorted by rating, a rated recipe using one of your ingredients
+        comes before an unrated one using them all.
+      - [ ] One person's five spoons tops a list. A least number of
+        ratings would show nothing while the site is new; add one
+        (routers/ratings.py) when there are enough to ask for.
+      - [ ] Ratings aren't in the dumps yet.
       - [x] Notes (#148; *Ray, 2026-11-11: "more than reviews... notes....
         that are kept personal (or shared)"*; migration 0069): one note per
         person per recipe, written on its page, up to 2,000 characters.

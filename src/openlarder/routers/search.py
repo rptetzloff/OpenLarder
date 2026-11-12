@@ -62,6 +62,7 @@ from openlarder.routers.ingredients import (
     with_pages,
 )
 from openlarder.routers.larder import seen_list_ids
+from openlarder.routers.ratings import best_first, rated
 from openlarder.routers.saved import saved_recipe_ids
 from openlarder.routers.shelf import shelf_source_ids
 from openlarder.tagging import MAX_TAGS
@@ -166,6 +167,9 @@ async def search(
     shelf: bool = False,
     # Only the recipes you've saved (routers/saved.py).
     saved: bool = False,
+    # "rating": the rated recipes first, best first, then the rest as they'd
+    # come anyway (routers/ratings.py). Ray, 2026-11-12.
+    sort: Literal["match", "rating"] = "match",
     offset: int = Query(0, ge=0),
 ) -> Found:
     stocked: list[uuid.UUID] = []
@@ -264,16 +268,21 @@ async def search(
     left_out = [i for i in unwanted if i in names]
     if left_out:
         conditions.append(~_needs_any(left_out))
+    by_rating = sort == "rating"
     if stocked:
         found.recipes, found.total = await _best_match(
-            session, known, conditions, offset, upward=stocked
+            session, known, conditions, offset, upward=stocked, by_rating=by_rating
         )
         return found
     if not known:
-        page, found.total = await recipes_where(session, *conditions, offset=offset, limit=PAGE)
+        page, found.total = await recipes_where(
+            session, *conditions, offset=offset, limit=PAGE, by_rating=by_rating
+        )
         found.recipes = [Hit(**r.model_dump()) for r in page]
         return found
-    found.recipes, found.total = await _best_match(session, known, conditions, offset)
+    found.recipes, found.total = await _best_match(
+        session, known, conditions, offset, by_rating=by_rating
+    )
     return found
 
 
@@ -348,12 +357,14 @@ async def _best_match(
     conditions,
     offset: int,
     upward: list[uuid.UUID] = (),
+    by_rating: bool = False,
 ):
     """Recipes covering any line with what you have: those using the most of
     your ingredients first, then by the share of their lines you have (so
     complete ones come first), fewest still needed, then book and title.
     *Ray, 2026-11-08:* frog's legs and garlic should put the recipes using
-    both first; ranking by share alone put one-line garlic pastes there."""
+    both first; ranking by share alone put one-line garlic pastes there.
+    by_rating: the rated ones first, best first, then the rest that way."""
     # Which of yours each match is under (or, from a larder, above): to count
     # how many of yours a recipe uses, and to say which.
     have = list(dict.fromkeys([*chosen, *upward]))
@@ -402,9 +413,15 @@ async def _best_match(
         .where(*conditions)
     )
     total = await session.scalar(select(func.count()).select_from(matching.subquery()))
+    first = ()
+    if by_rating:
+        ratings = rated()
+        matching = matching.outerjoin(ratings, ratings.c.recipe_id == Recipe.id)
+        first = best_first(ratings)
     rows = (
         await session.execute(
             matching.order_by(
+                *first,
                 used.c.used.desc(),
                 # True division: SQLAlchemy makes / between integers a real one.
                 (tally.c.have / tally.c.lines).desc(),

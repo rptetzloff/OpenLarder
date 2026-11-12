@@ -149,21 +149,30 @@ def contains_pattern(q: str) -> str:
 
 
 async def recipes_where(
-    session: Session, *conditions: ColumnElement[bool], offset: int, limit: int | None = None
+    session: Session,
+    *conditions: ColumnElement[bool],
+    offset: int,
+    limit: int | None = None,
+    by_rating: bool = False,
 ) -> tuple[list[UsedBy], int]:
     """A page of the recipes meeting the conditions, by book then title,
-    with their pages, and how many there are in all."""
+    with their pages, and how many there are in all. by_rating: the rated
+    ones first, best first (routers/ratings.py), then the rest that way."""
     total = await session.scalar(select(func.count()).select_from(Recipe).where(*conditions))
-    rows = (
-        await session.execute(
-            select(Recipe.id, Recipe.title, Source.id, Source.title)
-            .join(Source, Source.id == Recipe.source_id)
-            .where(*conditions)
-            .order_by(func.lower(Source.title), func.lower(Recipe.title), Recipe.id)
-            .offset(offset)
-            .limit(limit or PAGE)
-        )
-    ).all()
+    query = (
+        select(Recipe.id, Recipe.title, Source.id, Source.title)
+        .join(Source, Source.id == Recipe.source_id)
+        .where(*conditions)
+    )
+    order = [func.lower(Source.title), func.lower(Recipe.title), Recipe.id]
+    if by_rating:
+        # Here, not at the top: routers/ratings.py loads this module.
+        from openlarder.routers.ratings import best_first, rated
+
+        ratings = rated()
+        query = query.outerjoin(ratings, ratings.c.recipe_id == Recipe.id)
+        order = [*best_first(ratings), *order]
+    rows = (await session.execute(query.order_by(*order).offset(offset).limit(limit or PAGE))).all()
     return await with_pages(session, rows), total or 0
 
 
@@ -229,8 +238,7 @@ async def with_pages(
     ):
         # The newest edition with a cover stands for the book.
         covers.setdefault(source_id, cover_id)
-    # Here, not at the top: routers/ratings.py is nothing this module needs
-    # to load.
+    # Here, not at the top: routers/ratings.py loads this module.
     from openlarder.routers.ratings import averages
 
     rated = await averages(session, recipe_ids)
