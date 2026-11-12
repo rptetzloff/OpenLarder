@@ -187,6 +187,25 @@ async def test_the_list_puts_the_most_used_first(admin, work, client) -> None:
     assert listed["total"] == 2
 
 
+async def test_the_list_finds_ingredients_by_their_exact_names(admin, work, client) -> None:
+    """The front page's example searches find their ingredients in one
+    request (Ray's cleanup pass, section 11)."""
+    await _add(admin, work, "A", "1", ["Olive Oil", "Grapeseed Oil", "Egg", "Eggplant"])
+    await _add(admin, work, "B", "2", ["Egg"])
+    found = (
+        await client.get("/api/ingredients", params={"name": ["eggs", "OLIVE OIL", "unicorn"]})
+    ).json()
+    # As names are matched: whatever the case or the plural, and never a
+    # name that only contains it.
+    assert [(i["name"], i["recipes"]) for i in found["ingredients"]] == [
+        ("Egg", 2),
+        ("Olive Oil", 1),
+    ]
+    assert found["total"] == 2
+    too_many = await client.get("/api/ingredients", params={"name": ["x"] * 21})
+    assert too_many.status_code == 422
+
+
 async def test_the_list_narrows_by_name(admin, work, client) -> None:
     await _add(admin, work, "A", "1", ["Olive Oil", "Grapeseed Oil", "Egg", "100% Rye Flour"])
     names = lambda r: [i["name"] for i in r.json()["ingredients"]]  # noqa: E731

@@ -8,7 +8,7 @@ Renaming, merging and deleting are for admins.
 
 import uuid
 from collections.abc import Sequence
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
@@ -265,8 +265,14 @@ async def list_ingredients(
     sort: Literal["uses", "name"] = "uses",
     # Only those that come under nothing, to browse from the top.
     top: bool = False,
+    # Only the ingredients with exactly these names, as names are matched
+    # (case, plurals and punctuation aside): the front page's example
+    # searches find theirs in one request.
+    name: Annotated[list[str] | None, Query(max_length=20)] = None,
 ) -> IngredientList:
     named: list[ColumnElement[bool]] = [visibility.ingredients_seen_by(viewer)]
+    if name:
+        named.append(Ingredient.match_key.in_({ingredients.match_key(n) for n in name}))
     if top:
         # A parent the viewer can't see counts as none.
         # Not correlated: it asks of every ingredient, not the outer one.
@@ -291,7 +297,7 @@ async def list_ingredients(
         IngredientOption.ingredient_id,
         func.count(func.distinct(IngredientOption.recipe_id)).label("n"),
     ).where(IngredientOption.ingredient_id.is_not(None), visibility.options_seen_by(viewer))
-    if q.strip():
+    if q.strip() or name:
         # Counting only the ingredients that match what's typed: the picker
         # asks at every keystroke, and counting all of them first made each
         # answer as slow as the whole list.

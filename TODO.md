@@ -178,9 +178,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         name only when there's something to say: "Under Cheese · Also
         called scallion, spring onion". The words stay in the line, so it
         reads aloud without a column's heading. Its CSS is the page's own.
-      - [ ] 11. Home, example searches: "Try:" chips under "Cook with what
-        you have", each a finished search of well-used ingredients that
-        returns at least ten recipes.
+      - [x] 11. Home, example searches (#159): "Try:" and four chips
+        under "Cook with what you have", each a link to a finished search:
+        chicken + lemon + garlic, egg + butter + flour, onion + olive oil
+        + tomato, carrot + onion + celery. Measured on the live catalog,
+        2026-11-12: each finds thousands, and at least twenty recipes use
+        all three. A chip's name is "Search for recipes using chicken +
+        lemon + garlic": the spec's wording ("chicken, lemon and garlic")
+        left out the words on the chip, which the a11y check refuses
+        (WCAG 2.5.3). A chip shows only when every ingredient of it is in the
+        catalog, found in one request: the ingredient list takes `name`
+        (exact names, as names are matched), up to twenty.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the

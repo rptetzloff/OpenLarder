@@ -3,7 +3,7 @@ import SourceRow from "../components/SourceRow.vue";
 import { onMounted, ref } from "vue";
 import { type BookSummary, listSources } from "../books";
 import IngredientPicker from "../components/IngredientPicker.vue";
-import type { Named } from "../ingredients";
+import { ingredientsNamed, type Named } from "../ingredients";
 
 // Search starts here: words of a title go to the Search page as q, chosen
 // ingredients as i, as its own links do.
@@ -21,6 +21,26 @@ function findRecipes() {
   location.href = `/search?${query}`;
 }
 
+// Finished searches to try, under "Cook with what you have" (Ray's cleanup
+// pass, section 11): well-used ingredients, so each finds plenty. Checked
+// against the catalog on 2026-11-12: at least twenty recipes use all three
+// of each. One shows only when every ingredient of it is in the catalog.
+const EXAMPLES = [
+  ["chicken", "lemon", "garlic"],
+  ["egg", "butter", "flour"],
+  ["onion", "olive oil", "tomato"],
+  ["carrot", "onion", "celery"],
+];
+const examples = ref<{ label: string; href: string }[]>([]);
+async function findExamples() {
+  const found = await ingredientsNamed([...new Set(EXAMPLES.flat())]).catch(() => []);
+  const ids = new Map(found.map((i) => [i.name.toLowerCase(), i.id]));
+  examples.value = EXAMPLES.filter((names) => names.every((n) => ids.has(n))).map((names) => ({
+    label: names.join(" + "),
+    href: `/search?${new URLSearchParams(names.map((n) => ["i", ids.get(n)!]))}`,
+  }));
+}
+
 // The row of sources: a row's worth to scroll through, and none that
 // opens on an empty page (Ray's cleanup pass, sections 4 and 9). The newest
 // with a recipe; when fewer than six have one, those by how many instead.
@@ -30,6 +50,7 @@ const recent = ref<BookSummary[] | null>(null);
 const rowTitle = ref("Recently added sources");
 onMounted(async () => {
   document.title = "OpenLarder";
+  findExamples();
   const newest = await listSources("", 0, ROW, "recent", [], 1).catch(() => null);
   if (newest && newest.total < ENOUGH) {
     const most = await listSources("", 0, ROW, "recipes", [], 1).catch(() => null);
@@ -89,6 +110,15 @@ onMounted(async () => {
             Find recipes
           </button>
           <p class="help">Up to 30 ingredients. Recipes using more of them rank higher.</p>
+          <p v-if="examples.length" class="try">
+            <span class="muted">Try:</span>
+            <!-- Named by what it does and the words on it: a name that
+                 left the visible words out would fail speech control. -->
+            <a v-for="e in examples" :key="e.href" :href="e.href"
+              ><span class="visually-hidden">Search for recipes using </span
+              ><span class="chip">{{ e.label }}</span></a
+            >
+          </p>
         </div>
       </div>
     </section>
@@ -127,3 +157,31 @@ onMounted(async () => {
     </section>
   </div>
 </template>
+
+<style scoped>
+/* The example searches: chips like a tag's, each 44px to tap. */
+.try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.5rem;
+  margin: 0.25rem 0 0;
+  font-size: var(--text-sm);
+}
+.try a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+.try .chip {
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--chip);
+}
+.try a:hover .chip,
+.try a:focus-visible .chip {
+  text-decoration: underline;
+}
+</style>
