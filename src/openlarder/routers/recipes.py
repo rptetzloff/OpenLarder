@@ -605,6 +605,17 @@ async def get_recipe(recipe_id: uuid.UUID, session: Session, viewer: Viewer) -> 
     return await _out(session, await _recipe_or_404(session, recipe_id, viewer), viewer)
 
 
+async def as_signed_out(session, recipe_id: uuid.UUID) -> RecipeOut | None:
+    """The recipe as someone signed out gets it from the route above, or
+    None when they don't (private, waiting for review, or not there): what
+    the server may write into a page before the browser does (pages.py)."""
+    try:
+        recipe = await _recipe_or_404(session, recipe_id, None)
+    except HTTPException:
+        return None
+    return await _out(session, recipe, None)
+
+
 class RecipeLines(BaseModel):
     id: uuid.UUID
     lines: list[str]

@@ -410,14 +410,23 @@ async def test_the_owner_finds_their_own(secret) -> None:
 # The sweep
 
 
+# The pages the server fills in before the browser does (pages.py): not in
+# the schema, so named here.
+PAGES = [("/recipes/{recipe_id}", ["recipe_id"]), ("/sources/{source_id}", ["source_id"])]
+
+
 def _get_routes() -> list[tuple[str, list[str]]]:
     """Every GET route under /api, with its path parameters' names. Read
-    from the OpenAPI schema, since app.routes nests included routers."""
+    from the OpenAPI schema, since app.routes nests included routers. And
+    the pages the server fills: a new one has to be named above."""
+    paths = [getattr(route, "path", "") for route in app.routes]
+    filled = {path.replace(":uuid}", "}") for path in paths if ":uuid}" in path}
+    assert filled == {path for path, _ in PAGES}, "tell the privacy sweep about the new page"
     return [
         (path, [x["name"] for x in ops["get"].get("parameters", []) if x["in"] == "path"])
         for path, ops in app.openapi()["paths"].items()
         if "get" in ops and path.startswith("/api")
-    ]
+    ] + PAGES
 
 
 def _fill(path: str, names: list[str], secret: dict) -> str:

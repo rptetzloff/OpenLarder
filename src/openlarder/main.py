@@ -11,19 +11,30 @@ import logging
 import mimetypes
 import re
 import secrets
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import Depends, FastAPI
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from openlarder import __version__, analytics, crawlers, dumps, history, ratelimit, usage
+from openlarder import (
+    __version__,
+    analytics,
+    crawlers,
+    dumps,
+    history,
+    pages,
+    ratelimit,
+    usage,
+)
 from openlarder.auth import SIGN_IN_COOKIE
-from openlarder.config import get_settings
-from openlarder.db import dispose_engine, session_factory
+from openlarder.config import Settings, get_settings
+from openlarder.db import Session, dispose_engine, session_factory
 from openlarder.ratelimit import rate_limit
 from openlarder.routers import (
     account,
@@ -235,12 +246,20 @@ def meta_tags(tags: dict[str, str]) -> str:
     return "".join(out)
 
 
+# index.html is never reused without asking: see spa_response.
+RECHECK = {"Cache-Control": "no-cache"}
+
+
 def spa_response(
-    web_dir: Path, path: str, tags: dict[str, str] | None = None, head_end: str = ""
+    web_dir: Path,
+    path: str,
+    tags: dict[str, str] | None = None,
+    head_end: str = "",
+    robots: str | None = None,
 ) -> FileResponse | HTMLResponse:
     """A file from the built SPA, or its index.html for any other path, with
     the configured <meta> tags in its head, where a site checker reading
-    the raw page finds them.
+    the raw page finds them, and what the page says to crawlers (robots).
 
     index.html is sent with no-cache: it names the build's hashed scripts, and
     a browser that reused an old copy would ask for scripts a new deploy has
@@ -252,10 +271,16 @@ def spa_response(
     if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
         if candidate.name != "index.html":
             return FileResponse(candidate)
-    headers = {"Cache-Control": "no-cache"}
-    if not tags and not head_end:
-        return FileResponse(web_dir / "index.html", headers=headers)
+    if not tags and not head_end and not robots:
+        return FileResponse(web_dir / "index.html", headers=RECHECK)
     page = (web_dir / "index.html").read_text(encoding="utf-8")
+    if robots:
+        page = pages.fill(page, pages.Page(robots=robots), "")
+    return HTMLResponse(dressed(page, tags, head_end), headers=RECHECK)
+
+
+def dressed(page: str, tags: dict[str, str] | None, head_end: str) -> str:
+    """index.html with the configured <meta> tags and the analytics loader."""
     if tags:
         # First in the head, before every other tag: Impact's check looks
         # for its tag there and fails it anywhere else.
@@ -263,7 +288,7 @@ def spa_response(
     if head_end:
         # Last in the head: the analytics loader (analytics.py).
         page = page.replace("</head>", head_end + "</head>", 1)
-    return HTMLResponse(page, headers=headers)
+    return page
 
 
 # A Vite build's name for a file: its name, a hash of its content, its type
@@ -300,6 +325,50 @@ class Assets(StaticFiles):
         return response
 
 
+def built_shell() -> str | None:
+    """The built SPA's index.html, or None where there's no build (a
+    development server; tests give the source's)."""
+    index = WEB_DIR / "index.html"
+    return index.read_text(encoding="utf-8") if index.is_file() else None
+
+
+Shell = Annotated[str | None, Depends(built_shell)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
+def page_response(page: pages.Page, shell: str | None, settings: Settings, request: Request):
+    """index.html with a page's own head (pages.py), its status, or the
+    redirect to where it went."""
+    if shell is None:
+        raise StarletteHTTPException(404)
+    if page.moved_to:
+        return RedirectResponse(page.moved_to, status_code=301)
+    site = settings.public_url or str(request.base_url)
+    filled = pages.fill(shell, page, site)
+    return HTMLResponse(
+        dressed(filled, settings.meta_tags, analytics.loader(settings)),
+        status_code=page.status,
+        headers=RECHECK,
+    )
+
+
+# The pages the server knows something of before the browser draws them.
+# The uuid in the path keeps these to a record's own page: /recipes/<id>/edit
+# and the rest fall through to the SPA below, as before.
+@app.get("/recipes/{recipe_id:uuid}", include_in_schema=False)
+async def recipe_page(
+    recipe_id: uuid.UUID, request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return page_response(await pages.recipe(session, recipe_id), shell, settings, request)
+
+
+@app.get("/sources/{source_id:uuid}", include_in_schema=False)
+async def source_page(
+    source_id: uuid.UUID, request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return page_response(await pages.source(session, source_id), shell, settings, request)
+
+
 if WEB_DIR.is_dir():
     app.mount("/assets", Assets(directory=WEB_DIR / "assets"), name="assets")
 
@@ -307,4 +376,10 @@ if WEB_DIR.is_dir():
     # Annotated Response: FastAPI can't make a response model of a union.
     async def spa(path: str) -> Response:
         settings = get_settings()
-        return spa_response(WEB_DIR, path, settings.meta_tags, analytics.loader(settings))
+        return spa_response(
+            WEB_DIR,
+            path,
+            settings.meta_tags,
+            analytics.loader(settings),
+            pages.robots_for(path),
+        )

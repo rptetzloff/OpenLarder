@@ -194,10 +194,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       empty shell until the browser fills it, so a shared link shows the
       site's card and most crawlers see nothing. The server fills the
       shell for public pages instead; the Vue app is unchanged. In order:
-      - [ ] 1. A head for each recipe and source: title, description,
-        canonical address, Open Graph.
-      - [ ] 2. 404 for an id that isn't there; nothing of a record someone
-        signed out can't see, and `noindex`.
+      - [x] 1. A head for each recipe and source (#160): the page's own
+        title, a description under 160 characters ("Banana Bread is on
+        page 190 of Against All Grain by Danielle Walker. Ingredients:
+        Egg, Almond Flour, and 6 more."), its canonical address and Open
+        Graph tags, in place of index.html's. Built from the API's own
+        answer for someone signed out, whoever asks, so it can't say more
+        than the API would to a stranger (pages.py).
+      - [x] 2. What isn't there, and what isn't for everyone (#160): 404
+        for an id that names nothing; for a private record or one waiting
+        for review, the plain page with `noindex` and nothing of it, its
+        owner included (their browser fills it in); 301 from a merged
+        source to the one kept. The search page is `noindex, follow`;
+        saved, shelf, larder, groups, account, admin and requests are
+        `noindex`. The privacy sweep asks the filled pages too.
+      - [ ] The card image is the site's on every page: no cover is
+        OpenLarder's own (they're fetched from Open Library as asked
+        for), and the spec says a cover only when it is.
+      - [ ] Nothing is cached yet: a filled page asks the database what
+        the API then asks again for the browser. The spec's few minutes'
+        cache would also keep showing a record for those minutes after
+        it's made private; measure before adding one, and drop the entry
+        on that change if so.
       - [ ] 3. A plain summary in the body for recipes and sources: titles,
         pages and ingredient names only.
       - [ ] 4. `/sitemap.xml` of public records, and its line in robots.txt.

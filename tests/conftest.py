@@ -14,6 +14,7 @@ import sys
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import httpx2
@@ -33,7 +34,7 @@ from openlarder.archiving import Archiver, get_archiver
 from openlarder.auth import SESSION_COOKIE, build_oidc_client, optional_oidc_client
 from openlarder.config import Settings, get_settings
 from openlarder.db import get_session
-from openlarder.main import app
+from openlarder.main import app, built_shell
 from openlarder.routers.authors import wikidata_transport
 from openlarder.routers.sources import openlibrary_transport
 
@@ -161,6 +162,9 @@ def configure(adb: AsyncSession, broker: FakeBroker, ia: FakeArchive) -> Iterato
         yield adb
 
     app.dependency_overrides[get_session] = session_override
+    # The pages the server fills (pages.py) are the SPA's index.html: the
+    # source's here, where nothing is built.
+    app.dependency_overrides[built_shell] = lambda: SHELL
 
     # Archiving after the response uses the test's session, and the fake.
     @asynccontextmanager
@@ -176,6 +180,8 @@ def configure(adb: AsyncSession, broker: FakeBroker, ia: FakeArchive) -> Iterato
     finally:
         app.dependency_overrides.clear()
 
+
+SHELL = (Path(__file__).parent.parent / "web" / "index.html").read_text(encoding="utf-8")
 
 # The header a browser adds to a page's requests to its own site: tests act
 # as the site, which the API's rate limit leaves alone (ratelimit.py).

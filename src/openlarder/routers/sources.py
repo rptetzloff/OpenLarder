@@ -365,6 +365,18 @@ async def summaries(session: Session, works: Sequence[Source]) -> list[BookSumma
     ]
 
 
+async def as_signed_out(session, source_id: uuid.UUID) -> Book | None:
+    """The source as someone signed out gets it from the route below, or
+    None when they don't (private, waiting for review, or not there): what
+    the server may write into a page before the browser does (pages.py)."""
+    try:
+        return await get_book(source_id, session, None)
+    except HTTPException as refused:
+        if refused.status_code != status.HTTP_404_NOT_FOUND:
+            raise
+        return None
+
+
 @router.get("/{source_id}", response_model=Book)
 async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Book:
     work = await session.get(Source, source_id)
