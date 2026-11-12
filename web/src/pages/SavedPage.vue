@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { whereItIs } from "../ingredients";
 import type { Me } from "../me";
+import PillToggle from "../components/PillToggle.vue";
 import { allNotes, type NotedRecipe } from "../notes";
 import { mySaved, save, type Saved, type SavedRecipe, shareSaved, type State, unsave } from "../saved";
 
@@ -58,9 +59,19 @@ async function act(work: () => Promise<Saved | unknown>) {
   }
 }
 
-const move = (r: SavedRecipe, owner?: string) =>
-  act(() => save(r.id, r.state === "want" ? "cooked" : "want", owner));
-const remove = (r: SavedRecipe, owner?: string) => act(() => unsave(r.id, owner));
+// The two toggles, as on a recipe's page: pressing the one that's on
+// takes the recipe off the list; the other moves it.
+const said = ref("");
+function toggle(r: SavedRecipe, to: State, owner?: string) {
+  const off = r.state === to;
+  said.value = "";
+  act(async () => {
+    await (off ? unsave(r.id, owner) : save(r.id, to, owner));
+    said.value = off
+      ? `${r.title}: removed from the list`
+      : `${r.title}: ${to === "want" ? "saved to want to cook" : "marked as cooked"}`;
+  });
+}
 function toggleGroup(groupId: string, on: boolean) {
   const ids = new Set(saved.value!.shared_with.map((g) => g.id));
   if (on) ids.add(groupId);
@@ -181,29 +192,28 @@ watch(
                   ><template v-if="whereItIs(r)"> · {{ whereItIs(r) }}</template>
                 </p>
                 <p v-if="l.editable" class="saved-actions">
-                  <button
-                    type="button"
-                    class="link"
+                  <PillToggle
+                    :pressed="r.state === 'want'"
+                    icon="bookmark"
                     :disabled="busy"
-                    :aria-label="`${r.state === 'want' ? 'Cooked it' : 'Want to cook again'}: ${r.title}`"
-                    @click="move(r, l.owner)"
+                    :label="`Want to cook: ${r.title}`"
+                    @toggle="toggle(r, 'want', l.owner)"
+                    >Want to cook</PillToggle
                   >
-                    {{ r.state === "want" ? "Cooked it" : "Want to cook again" }}
-                  </button>
-                  <button
-                    type="button"
-                    class="link"
+                  <PillToggle
+                    :pressed="r.state === 'cooked'"
+                    icon="check"
                     :disabled="busy"
-                    :aria-label="`Take off ${r.title}`"
-                    @click="remove(r, l.owner)"
+                    :label="`Cooked: ${r.title}`"
+                    @toggle="toggle(r, 'cooked', l.owner)"
+                    >Cooked</PillToggle
                   >
-                    Take off
-                  </button>
                 </p>
               </div>
             </li>
           </ul>
         </section>
+        <p class="visually-hidden" aria-live="polite">{{ said }}</p>
       </template>
     </template>
   </article>
@@ -233,6 +243,7 @@ watch(
 .saved-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 </style>
