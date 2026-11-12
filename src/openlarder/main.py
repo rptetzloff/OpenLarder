@@ -257,11 +257,13 @@ def spa_response(
     path: str,
     tags: dict[str, str] | None = None,
     head_end: str = "",
-    robots: str | None = None,
+    page: pages.Page | None = None,
+    site_url: str = "",
 ) -> FileResponse | HTMLResponse:
     """A file from the built SPA, or its index.html for any other path, with
     the configured <meta> tags in its head, where a site checker reading
-    the raw page finds them, and what the page says to crawlers (robots).
+    the raw page finds them, and the page's own head if it has one
+    (pages.without_record).
 
     index.html is sent with no-cache: it names the build's hashed scripts, and
     a browser that reused an old copy would ask for scripts a new deploy has
@@ -273,12 +275,12 @@ def spa_response(
     if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
         if candidate.name != "index.html":
             return FileResponse(candidate)
-    if not tags and not head_end and not robots:
+    if not tags and not head_end and page is None:
         return FileResponse(web_dir / "index.html", headers=RECHECK)
-    page = (web_dir / "index.html").read_text(encoding="utf-8")
-    if robots:
-        page = pages.fill(page, pages.Page(robots=robots), "")
-    return HTMLResponse(dressed(page, tags, head_end), headers=RECHECK)
+    shell = (web_dir / "index.html").read_text(encoding="utf-8")
+    if page is not None:
+        shell = pages.fill(shell, page, site_url)
+    return HTMLResponse(dressed(shell, tags, head_end), headers=RECHECK)
 
 
 def dressed(page: str, tags: dict[str, str] | None, head_end: str) -> str:
@@ -371,17 +373,36 @@ async def source_page(
     return page_response(await pages.source(session, source_id), shell, settings, request)
 
 
+@app.get("/ingredients/{ingredient_id:uuid}", include_in_schema=False)
+async def ingredient_page(
+    ingredient_id: uuid.UUID,
+    request: Request,
+    session: Session,
+    shell: Shell,
+    settings: SettingsDep,
+) -> Response:
+    return page_response(await pages.ingredient(session, ingredient_id), shell, settings, request)
+
+
+@app.get("/authors/{author_id:uuid}", include_in_schema=False)
+async def author_page(
+    author_id: uuid.UUID, request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return page_response(await pages.author(session, author_id), shell, settings, request)
+
+
 if WEB_DIR.is_dir():
     app.mount("/assets", Assets(directory=WEB_DIR / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
     # Annotated Response: FastAPI can't make a response model of a union.
-    async def spa(path: str) -> Response:
+    async def spa(path: str, request: Request) -> Response:
         settings = get_settings()
         return spa_response(
             WEB_DIR,
             path,
             settings.meta_tags,
             analytics.loader(settings),
-            pages.robots_for(path),
+            pages.without_record(path),
+            settings.public_url or str(request.base_url),
         )

@@ -189,6 +189,19 @@ async def _author_or_404(session: Session, author_id: uuid.UUID) -> Author:
     return author
 
 
+async def as_signed_out(session, author_id: uuid.UUID) -> AuthorOut | None:
+    """The author as someone signed out gets them from the route below, or
+    None when they don't (only sources that aren't everyone's credit them,
+    or they aren't there): what the server may write into a page before the
+    browser does (pages.py)."""
+    try:
+        return await get_author(author_id, session, None)
+    except HTTPException as refused:
+        if refused.status_code != status.HTTP_404_NOT_FOUND:
+            raise
+        return None
+
+
 @router.get("/{author_id}", response_model=AuthorOut)
 async def get_author(author_id: uuid.UUID, session: Session, viewer: Viewer) -> AuthorOut:
     author = await session.scalar(

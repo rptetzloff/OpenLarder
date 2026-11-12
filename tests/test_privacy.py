@@ -412,7 +412,12 @@ async def test_the_owner_finds_their_own(secret) -> None:
 
 # The pages the server fills in before the browser does (pages.py): not in
 # the schema, so named here.
-PAGES = [("/recipes/{recipe_id}", ["recipe_id"]), ("/sources/{source_id}", ["source_id"])]
+PAGES = [
+    ("/recipes/{recipe_id}", ["recipe_id"]),
+    ("/sources/{source_id}", ["source_id"]),
+    ("/ingredients/{ingredient_id}", ["ingredient_id"]),
+    ("/authors/{author_id}", ["author_id"]),
+]
 
 
 def _get_routes() -> list[tuple[str, list[str]]]:

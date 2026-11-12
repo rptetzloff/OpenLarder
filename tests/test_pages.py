@@ -9,6 +9,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
+from conftest import SHELL
 from fake_broker import _settings, _sign_in, make_admins
 from openlarder import pages
 from openlarder.main import spa_response
@@ -286,6 +287,165 @@ async def test_a_page_with_no_record_to_show_has_no_summary(people, client) -> N
             assert _body((await asking.get(path)).text) == "", path
 
 
+# An ingredient's page and an author's
+
+
+async def test_an_ingredients_page_has_its_own_head_and_summary(admin, adb, client) -> None:
+    book = await _book(admin)
+    bread = await _recipe(admin, adb, book, ingredients=("Aged Cheddar", "Egg"))
+    toast = await _recipe(admin, adb, book, title="Cheese Toast", page="7", ingredients=("Cheese",))
+    named = {
+        n: str(await adb.scalar(text("SELECT id FROM ingredients WHERE name = :n"), {"n": n}))
+        for n in ("Cheese", "Aged Cheddar")
+    }
+    under = await admin.put(
+        f"/api/ingredients/{named['Aged Cheddar']}/parent", json={"parent": named["Cheese"]}
+    )
+    assert under.status_code < 300, under.text
+    await adb.execute(
+        text(
+            "INSERT INTO ingredient_aliases (ingredient_id, name, match_key)"
+            " VALUES (:i, 'Mature Cheddar', 'mature cheddar')"
+        ),
+        {"i": uuid.UUID(named["Aged Cheddar"])},
+    )
+    page = (await client.get(f"/ingredients/{named['Aged Cheddar']}")).text
+    assert _tag(page, r"<title>(.*?)</title>") == ["Aged Cheddar · Ingredients · OpenLarder"]
+    assert _content(page, "description") == [
+        "Aged Cheddar is in 1 recipe indexed on OpenLarder. Also called Mature Cheddar."
+    ]
+    assert _content(page, "og:url") == [f"http://testserver/ingredients/{named['Aged Cheddar']}"]
+    assert _body(page) == (
+        '<main><article class="wide">'
+        '<nav aria-label="Breadcrumb"><a href="/ingredients">Ingredients</a> / Aged Cheddar</nav>'
+        "<h1>Aged Cheddar</h1>"
+        f'<p>Comes under <a href="/ingredients/{named["Cheese"]}">Cheese</a>.</p>'
+        "<p>Also called Mature Cheddar.</p>"
+        "<h2>Recipes using Aged Cheddar</h2><ul>"
+        f'<li><a href="/recipes/{bread}">Banana Bread</a>, '
+        f'<a href="/sources/{book}">Against All Grain</a>, page 190</li>'
+        "</ul></article></main>"
+    )
+    # The broader one: what's under it counted, and named.
+    page = (await client.get(f"/ingredients/{named['Cheese']}")).text
+    assert _content(page, "description") == [
+        "Cheese is in 1 recipe indexed on OpenLarder, 2 counting what comes under it."
+    ]
+    body = _body(page)
+    assert (
+        f'<p>Includes <a href="/ingredients/{named["Aged Cheddar"]}">Aged Cheddar</a>.</p>' in body
+    )
+    assert f'<a href="/recipes/{toast}">Cheese Toast</a>' in body
+
+
+async def test_an_authors_page_has_its_own_head_and_summary(admin, adb, client) -> None:
+    book = await _book(admin, authors=("Danielle Walker", "Simone Miller"))
+    await _recipe(admin, adb, book)
+    other = await _book(admin, title="Meals Made Simple", authors=("Danielle Walker",))
+    credits = (await client.get(f"/api/sources/{book}")).json()["credits"]
+    danielle, simone = (c["author_id"] for c in credits)
+    page = (await client.get(f"/authors/{danielle}")).text
+    assert _tag(page, r"<title>(.*?)</title>") == ["Danielle Walker · OpenLarder"]
+    assert _content(page, "description") == [
+        "Danielle Walker is credited on 2 sources indexed on OpenLarder:"
+        " Against All Grain, Meals Made Simple."
+    ]
+    assert _content(page, "og:type") == ["profile"]
+    assert _body(page) == (
+        '<main><article class="wide">'
+        '<nav aria-label="Breadcrumb"><a href="/authors">Authors</a> / Danielle Walker</nav>'
+        "<h1>Danielle Walker</h1>"
+        "<h2>Sources</h2><ul>"
+        f'<li><a href="/sources/{book}">Against All Grain</a>, a book, 1 recipe</li>'
+        f'<li><a href="/sources/{other}">Meals Made Simple</a>, a book, 0 recipes</li>'
+        "</ul>"
+        f'<p>Credited with <a href="/authors/{simone}">Simone Miller</a>.</p>'
+        "</article></main>"
+    )
+
+
+async def test_an_unknown_ingredient_or_author_is_a_404(client) -> None:
+    for path in (f"/ingredients/{uuid.uuid4()}", f"/authors/{uuid.uuid4()}"):
+        response = await client.get(path)
+        assert response.status_code == 404, path
+        assert GENERIC in response.text and _body(response.text) == ""
+        assert _content(response.text, "robots") == ["noindex"]
+
+
+@pytest.mark.parametrize("who", ["nobody", "bob", "admin", "ann"])
+async def test_what_only_a_private_recipe_names_is_never_written(
+    admin, adb, people, client, who
+) -> None:
+    """An ingredient only a private recipe uses, and an author only a
+    private collection credits, are as hidden as it is; one a public recipe
+    uses too shows only the public recipe."""
+    book = await _book(admin, title="Open Book", authors=())
+    await _recipe(admin, adb, book, title="Open Bread", ingredients=("Butter",))
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Secret Box", "acknowledged": True})
+    ).json()["id"]
+    made = await ann.post(
+        f"/api/sources/{box}/recipes",
+        json={"title": "Secret Stew", "ingredients": ["Zanzibar Moonsalt", "Butter"]},
+    )
+    assert made.status_code == 201, made.text
+    nana = await adb.scalar(
+        text(
+            "INSERT INTO authors (name, name_key) VALUES ('Nana Secretta', 'nana secretta')"
+            " RETURNING id"
+        )
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO source_credits (source_id, author_id, position, credited_as)"
+            " VALUES (:s, :a, 1, 'Nana Secretta')"
+        ),
+        {"s": uuid.UUID(box), "a": nana},
+    )
+    salt, butter = [
+        await adb.scalar(text("SELECT id FROM ingredients WHERE name = :n"), {"n": n})
+        for n in ("Zanzibar Moonsalt", "Butter")
+    ]
+    asking = {"nobody": client, "ann": ann}.get(who) or await people(who, admin=who == "admin")
+    for path in (f"/ingredients/{salt}", f"/authors/{nana}"):
+        response = await asking.get(path)
+        assert response.status_code == 200, path
+        assert not [s for s in SECRETS if s in response.text], path
+        assert GENERIC in response.text and _body(response.text) == ""
+        assert _content(response.text, "robots") == ["noindex"]
+    shared = (await asking.get(f"/ingredients/{butter}")).text
+    assert "Open Bread" in shared
+    assert not [s for s in SECRETS if s in shared]
+    assert _content(shared, "description") == ["Butter is in 1 recipe indexed on OpenLarder."]
+
+
+# The lists
+
+
+def test_the_front_page_and_the_lists_say_which_address_is_theirs(tmp_path) -> None:
+    """One page each for a search engine to keep, whatever is typed or
+    chosen on it: the address without its query."""
+    (tmp_path / "index.html").write_text(SHELL, encoding="utf-8")
+    site = "https://openlarder.com"
+    for path, title in (
+        ("", "OpenLarder"),
+        ("sources", "Sources · OpenLarder"),
+        ("ingredients", "Ingredients · OpenLarder"),
+        ("authors", "Authors · OpenLarder"),
+    ):
+        response = spa_response(tmp_path, path, None, "", pages.without_record(path), site)
+        page = response.body.decode()
+        assert _tag(page, r"<title>(.*?)</title>") == [title], path
+        assert _tag(page, r'<link rel="canonical" href="([^"]*)" />') == [f"{site}/{path}"]
+        assert _content(page, "og:url") == [f"{site}/{path}"]
+        assert len(_content(page, "description")) == 1 and len(_content(page, "og:title")) == 1
+        assert len(_content(page, "description")[0]) < 160
+        assert _content(page, "robots") == []
+    # A page with nothing to say is index.html as it is.
+    assert pages.without_record("data") is None
+
+
 # What isn't there, and what isn't for everyone
 
 
@@ -300,7 +460,7 @@ async def test_an_id_that_names_nothing_is_a_404(client) -> None:
         assert response.headers["cache-control"] == "no-cache"
 
 
-SECRETS = ("Secret Box", "Secret Stew", "Zanzibar Moonsalt")
+SECRETS = ("Secret Box", "Secret Stew", "Zanzibar Moonsalt", "Nana Secretta")
 
 
 @pytest.mark.parametrize("who", ["nobody", "bob", "admin", "ann"])
@@ -419,14 +579,15 @@ async def test_only_a_records_own_page_is_filled(admin, adb, client) -> None:
         ("authors/123", None),
         # Not the admin pages, whatever it starts with.
         ("administer", None),
+        ("recipes/123/edit", None),
     ],
 )
 def test_personal_and_admin_pages_arent_indexed(tmp_path, path, robots) -> None:
     assert pages.robots_for(path) == robots
     (tmp_path / "index.html").write_text("<html><head><title>x</title></head><body></body></html>")
-    response = spa_response(tmp_path, path, None, "", pages.robots_for(path))
+    response = spa_response(tmp_path, path, None, "", pages.without_record(path))
     if robots is None:
-        assert response.path == tmp_path / "index.html"
+        assert "robots" not in getattr(response, "body", b"").decode()
     else:
         assert f'<meta name="robots" content="{robots}" />' in response.body.decode()
         assert response.headers["cache-control"] == "no-cache"

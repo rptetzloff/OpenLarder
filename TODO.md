@@ -232,7 +232,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         authors, at most 50,000 addresses a file, each with the day its
         record last changed. Only what someone signed out can see, whoever
         asks. robots.txt points at it.
-      - [ ] 5. Ingredients and authors.
+      - [x] 5. Ingredients and authors (#163): the same head and summary
+        for an ingredient's page (what it comes under, its other names,
+        what's under it, and the first 100 recipes that use it) and an
+        author's (their sources, and who they're credited with). One only
+        a private recipe or collection names is as hidden as it is. The
+        front page and the Sources, Ingredients and Authors lists say
+        which address is theirs (the one without a query), and the lists
+        have their own title and description.
+      - [ ] An ingredient or author merged into another isn't recorded
+        as such (only books are, book_merges), so its old address is a
+        404, not a 301 to the one kept.
       - [ ] 6. JSON-LD: Book and BreadcrumbList; never Recipe, as the page
         has no method or amounts.
       - [ ] Ray: submit the sitemap to Google Search Console and Bing
