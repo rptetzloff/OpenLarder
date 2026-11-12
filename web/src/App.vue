@@ -311,6 +311,9 @@ onMounted(async () => {
   --error: #a8321e;
   --notice-bg: #b5532c;
   --notice-fg: #ffffff;
+  /* The brand's deep mustard: decorative only on light backgrounds, so
+     the rating's number is always beside its spoons. */
+  --spoon: #d49a2a;
   --page: 72rem;
   color-scheme: light;
 }
@@ -334,6 +337,7 @@ onMounted(async () => {
   --error: #f2a8a2;
   --notice-bg: #e58b63;
   --notice-fg: #14201a;
+  --spoon: #e8b866;
 }
 :focus-visible {
   outline: 2px solid var(--focus);
