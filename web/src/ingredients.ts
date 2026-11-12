@@ -74,10 +74,14 @@ export interface Listed {
   episode: string | null;
   at: string | null;
   site: string | null;
+  // Its rating (routers/ratings.py): the average, and how many gave one.
+  spoons?: number | null;
+  ratings?: number;
 }
 
 // Where a listed recipe is, after its source's name: "Claire Ptak · p. 112",
-// "May 2024 · p. 42", "Season 1, episode 2, at 12:34", "example.com".
+// "May 2024 · p. 42", "Season 1, episode 2, at 12:34", "example.com"; and
+// its rating, when it has one: "4.5 of 5 spoons".
 export function whereItIs(r: Listed): string {
   const parts: string[] = [];
   if (r.authors.length) parts.push(r.authors.length > 1 ? `${r.authors[0]} and others` : r.authors[0]);
@@ -88,6 +92,7 @@ export function whereItIs(r: Listed): string {
   if (r.source_kind === "family") parts.push("family collection");
   const pages = [...new Set(r.pages)];
   if (pages.length) parts.push(`p. ${pages.join(" / ")}`);
+  if (r.spoons != null) parts.push(`${r.spoons} of 5 spoons`);
   return parts.join(" · ");
 }
 

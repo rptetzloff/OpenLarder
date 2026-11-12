@@ -82,6 +82,10 @@ class UsedBy(BaseModel):
     site: str | None = None
     # On an ingredient's page: the line naming it, as the source writes it.
     line: str | None = None
+    # Its rating (routers/ratings.py): the average, one to five, and how
+    # many gave one.
+    spoons: float | None = None
+    ratings: int = 0
 
 
 class AliasOut(BaseModel):
@@ -222,6 +226,11 @@ async def with_pages(
     ):
         # The newest edition with a cover stands for the book.
         covers.setdefault(source_id, cover_id)
+    # Here, not at the top: routers/ratings.py is nothing this module needs
+    # to load.
+    from openlarder.routers.ratings import averages
+
+    rated = await averages(session, recipe_ids)
     return [
         UsedBy(
             id=r,
@@ -236,6 +245,8 @@ async def with_pages(
             episode=episodes.get(r, (None, None))[0],
             at=episodes.get(r, (None, None))[1],
             site=sites.get(r),
+            spoons=rated[r][0] if r in rated else None,
+            ratings=rated[r][1] if r in rated else 0,
         )
         for r, t, b, bt in rows
     ]

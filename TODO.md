@@ -536,9 +536,16 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       group see the list, edit and admin members save to it, mark cooked
       and take off. Leaving a group unshares it; deleting the account
       deletes it; the catalog reset empties it.
-      - [ ] Likes, reviews and your own notes on a recipe: these are
-        public, user-written text, so they wait on the content rules and
-        moderation. Ask Ray what he wants first.
+      - [x] Ratings (#147; *Ray, 2026-11-11: "star ratings or similar...
+        spoons or forks or salamanders"*; migration 0068): one to five
+        spoons on a recipe's page from anyone signed in, changed or cleared
+        at will. Everyone sees the average and how many rated it, on the
+        page and in listings ("4.5 of 5 spoons"); nobody sees who. No words
+        go with one, so nothing to moderate.
+      - [ ] Using ratings: sorting search by them, and top-rated recipes
+        on author and source pages (SCOPING.md). Not in the dumps yet.
+      - [ ] Written reviews and your own notes on a recipe: user-written
+        text, so they wait on the content rules and moderation. Ask Ray.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to

@@ -122,6 +122,10 @@ document.title = "Privacy policy · OpenLarder";
         isn't part of the open data, the edit history or the API;
       </li>
       <li>
+        the ratings you give: which recipe, and how many spoons. A recipe shows the average and
+        how many people rated it, never who;
+      </li>
+      <li>
         the recipes you save: which, and whether you want to cook each or have. Only you see
         them, and the members of the groups you share them with (their editors change the list);
         they aren't part of the open data, the edit history or the API;
@@ -208,7 +212,7 @@ document.title = "Privacy policy · OpenLarder";
     <p>
       You can delete your account yourself, from Your account. That removes, at once, your user
       record, your sessions and API keys, your group memberships, your family collections and the
-      edit history recorded for them, your larder lists, your shelf, your saved recipes, your votes on requests, your suggested
+      edit history recorded for them, your larder lists, your shelf, your saved recipes, your ratings, your votes on requests, your suggested
       changes still open, and what you've added that is still waiting for review. A group you were
       the last admin of passes to its longest-standing member; one with nobody else in it is
       deleted. What you added to the catalog that has been published stays, because you licensed
