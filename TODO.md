@@ -103,16 +103,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] The commission wording, checked 2026-11-11: Amazon asks for its
         Associates statement "clearly and conspicuously" on the site, so
         the line under the buy buttons says it whenever one of the buttons
-        showing is Amazon's, and the terms say it always. The FTC's guidance prefers
-        a disclosure before or beside the links: the buy line is directly
-        under its buttons, the Shop line under the whole list, not each
-        link. Add both placements to the lawyer review.
-      - [ ] 3. Header: Requests to the footer, with two links to it where
-        someone is looking for a book that isn't there (*Ray, 2026-11-11*):
-        under the Sources search box, "Can't find a source? Request it",
-        and on a search with no results, "Nothing matched. If the book
-        isn't indexed yet, request it". "My kitchen" and the account as two
-        menus; a phone menu; a skip link.
+        showing is Amazon's, and the terms say it always. The FTC's
+        guidance prefers a disclosure before or beside the links: the buy
+        line is directly under its buttons, the Shop line under the whole
+        list, not each link. Add both placements to the lawyer review.
+      - [x] 3. Header (#152): Search, Sources, Ingredients and Authors.
+        Requests is in the footer, with two links to it where someone is
+        looking for a book that isn't there (*Ray, 2026-11-11*): under the
+        Sources search box, "Can't find a source? Request it", and on a
+        search with no results, "Nothing matched. If the book isn't
+        indexed yet, request it". Signed in, two menus: "My kitchen"
+        (Larder, Shelf, Saved, Groups) and the account under your name
+        (Account, Admin for editors, Sign out). Each is a button that
+        opens a list of links; Esc closes it and gives focus back, as does
+        a click elsewhere or tabbing out. On a phone: the logo, Search and
+        one Menu with all of it. "Skip to content" is the first thing Tab
+        reaches. The header's CSS is its own (SiteHeader.vue).
       - [ ] 4. Home: recent sources as one row that scrolls sideways, 20 of
         them, with arrows and a "Browse all sources" card.
       - [ ] 5. Search, results first: the form folded to a summary once

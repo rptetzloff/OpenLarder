@@ -555,6 +555,9 @@ onMounted(async () => {
           <p v-if="result.shelf_books === 0" class="status">
             Your shelf has no books yet: on a book's page, “I have this book” puts it there.
           </p>
+          <p v-else-if="result.total === 0" class="status">
+            Nothing matched. If the book isn't indexed yet, <a href="/requests">request it</a>.
+          </p>
           <ul class="hits">
             <li v-for="r in result.recipes" :key="r.id" class="hit">
               <img v-if="r.cover_url" :src="r.cover_url" alt="" class="hit-cover" loading="lazy" />
