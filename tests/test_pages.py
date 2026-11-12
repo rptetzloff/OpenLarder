@@ -69,7 +69,6 @@ async def test_a_recipes_page_has_its_own_head(admin, adb, client) -> None:
     assert response.headers["cache-control"] == "no-cache"
     assert response.headers["content-type"].startswith("text/html")
     page = response.text
-    assert '<div id="app"></div>' in page
     assert _tag(page, r"<title>(.*?)</title>") == ["Banana Bread · Against All Grain · OpenLarder"]
     said = (
         "Banana Bread is on page 190 of Against All Grain by Danielle Walker."
@@ -193,6 +192,98 @@ async def test_a_sources_page_has_its_own_head(admin, adb, client) -> None:
     empty = await _book(admin, title="Plenty", authors=())
     page = (await client.get(f"/sources/{empty}")).text
     assert _content(page, "description") == ["Plenty, a book. No recipes indexed yet."]
+
+
+# The body, before the SPA draws it
+
+
+def _body(page: str) -> str:
+    """What's where the SPA mounts."""
+    found = re.search(r'<div id="app">(.*?)</div>\s*<script type="module"', page, re.DOTALL)
+    assert found, page
+    return found.group(1)
+
+
+async def test_a_recipes_page_says_what_it_shows(admin, adb, client) -> None:
+    book = await _book(admin, authors=("Walker, Danielle (Chef)", "Simone Miller"))
+    blend = await _recipe(
+        admin, adb, book, title="Biscuit Blend", page="14", ingredients=("Flour",)
+    )
+    recipe = await _recipe(
+        admin,
+        adb,
+        book,
+        ingredients=("Egg", "Butter or Coconut Oil", "Biscuit Blend (p. 14)"),
+    )
+    shown = (await client.get(f"/api/recipes/{recipe}")).json()
+    ids = {
+        o["name"]: o["ingredient"]["id"]
+        for line in shown["lines"]
+        for o in line["options"]
+        if o["ingredient"]
+    }
+    authors = {c["name"]: c["author_id"] for c in shown["source"]["credits"]}
+    assert _body((await client.get(f"/recipes/{recipe}")).text) == (
+        '<main><article class="wide">'
+        '<nav aria-label="Breadcrumb"><a href="/sources">Sources</a> / '
+        f'<a href="/sources/{book}">Against All Grain</a> / Banana Bread</nav>'
+        "<h1>Banana Bread</h1>"
+        f'<p>Page 190 of <a href="/sources/{book}">Against All Grain</a> by '
+        f'<a href="/authors/{authors["Danielle Walker"]}">Danielle Walker</a> and '
+        f'<a href="/authors/{authors["Simone Miller"]}">Simone Miller</a>.</p>'
+        "<h2>Ingredients</h2><ul>"
+        f'<li><a href="/ingredients/{ids["Egg"]}">Egg</a></li>'
+        f'<li><a href="/ingredients/{ids["Butter"]}">Butter</a> or '
+        f'<a href="/ingredients/{ids["Coconut Oil"]}">Coconut Oil</a></li>'
+        f'<li><a href="/recipes/{blend}">Biscuit Blend</a> (p. 14)</li>'
+        "</ul></article></main>"
+    )
+
+
+async def test_a_sources_page_lists_its_recipes(admin, adb, client, monkeypatch) -> None:
+    book = await _book(admin)
+    bread = await _recipe(admin, adb, book)
+    granola = await _recipe(admin, adb, book, title="Granola", page="12")
+    await _recipe(admin, adb, book, title="Waffles", page="20")
+    author = (await client.get(f"/api/sources/{book}")).json()["credits"][0]["author_id"]
+    head = (
+        '<main><article class="wide">'
+        '<nav aria-label="Breadcrumb"><a href="/sources">Sources</a> / Against All Grain</nav>'
+        "<h1>Against All Grain</h1>"
+        f'<p>A book by <a href="/authors/{author}">Danielle Walker</a>.</p>'
+        "<h2>Recipes</h2><ul>"
+        f'<li><a href="/recipes/{bread}">Banana Bread</a>, page 190</li>'
+        f'<li><a href="/recipes/{granola}">Granola</a>, page 12</li>'
+    )
+    body = _body((await client.get(f"/sources/{book}")).text)
+    assert body.startswith(head) and body.endswith("page 20</li></ul></article></main>")
+    # Past the cap, the rest are a link away: the page itself, which has them.
+    monkeypatch.setattr(pages, "RECIPES_LISTED", 2)
+    assert _body((await client.get(f"/sources/{book}")).text) == (
+        f'{head}</ul><p><a href="/sources/{book}">All 3 recipes</a></p></article></main>'
+    )
+
+
+async def test_a_summary_is_escaped(admin, adb, client) -> None:
+    book = await _book(admin, title='Cakes & "Bakes"', authors=("<b>Ann</b>",))
+    recipe = await _recipe(
+        admin, adb, book, title="<script>alert(1)</script> Pie", ingredients=("<i>Egg</i>",)
+    )
+    for path in (f"/recipes/{recipe}", f"/sources/{book}"):
+        body = _body((await client.get(path)).text)
+        assert "<script>" not in body and "<b>" not in body and "<i>" not in body, path
+        assert "&lt;script&gt;alert(1)&lt;/script&gt; Pie" in body
+        assert "Cakes &amp; &quot;Bakes&quot;" in body
+
+
+async def test_a_page_with_no_record_to_show_has_no_summary(people, client) -> None:
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Secret Box", "acknowledged": True})
+    ).json()["id"]
+    for asking in (client, ann):
+        for path in (f"/sources/{box}", f"/recipes/{uuid.uuid4()}"):
+            assert _body((await asking.get(path)).text) == "", path
 
 
 # What isn't there, and what isn't for everyone
