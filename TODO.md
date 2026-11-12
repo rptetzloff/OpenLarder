@@ -216,8 +216,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         cache would also keep showing a record for those minutes after
         it's made private; measure before adding one, and drop the entry
         on that change if so.
-      - [ ] 3. A plain summary in the body for recipes and sources: titles,
-        pages and ingredient names only.
+      - [x] 3. A plain summary in the body for recipes and sources (#161),
+        where the SPA mounts and so replaced when it does. A recipe: its
+        name, its source and who made it as links, the page (or the issue,
+        the episode, the web address), and each ingredient as the source
+        names it, linked. A source: what it is, who made it, its editions,
+        and its recipes as links with their pages, the first 500 and then
+        "All N recipes". Nothing the page doesn't show anyone; nothing at
+        all for a record that isn't everyone's.
+      - [ ] The summary shows for a moment before the SPA draws the page
+        over it (the spec says leave it visible). If it's noticed, hide
+        it as `.visually-hidden` is, once Google is seen to read it still.
       - [ ] 4. `/sitemap.xml` of public records, and its line in robots.txt.
       - [ ] 5. Ingredients and authors.
       - [ ] 6. JSON-LD: Book and BreadcrumbList; never Recipe, as the page
