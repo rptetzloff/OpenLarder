@@ -202,6 +202,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         found for (a Vegan swap for butter serves Dairy-Free), whose
         stand-in doesn't record one itself. It says which allergens it
         checks, and never that the recipe suits the diet.
+      - [x] Meat, poultry and pork (#143; *Ray, 2026-11-11*): three more in
+        the allergen list (migration 0064), recorded, inherited, suggested
+        and shown as allergens are, as "Allergens and meat". Vegan,
+        Vegetarian and Pescetarian avoid all three, so their checks find
+        bacon and chicken stock. The word rules read them (version
+        allergen-rules-v2): on the household index, 88 more of the 1,000
+        most used names get a suggestion (296 in all, 29% of uses). Run
+        "Suggest allergens" again for them.
+      - [ ] Halal and Kosher as diets, now pork is recorded: ask Ray. Kosher
+        is more than avoiding pork and shellfish (meat with milk), so it
+        would check only part.
       - [ ] The notice's wording is in the lawyer review below.
 - [x] **Ingredient affiliate links** (#136; *Ray, 2026-11-11*): a "Shop"
       link on each recipe line's ingredients and on each ingredient's page,

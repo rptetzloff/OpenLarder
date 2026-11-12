@@ -108,7 +108,7 @@ async function check() {
       </p>
       <p v-else class="allergen-notice">
         Only what the catalog records about these ingredients: one with nothing recorded may still
-        contain any allergen. {{ result.notice }}
+        contain any of them. {{ result.notice }}
       </p>
     </div>
   </section>

@@ -1,4 +1,5 @@
-"""Suggesting allergens from ingredients' names, for a moderator to accept
+"""Suggesting allergens, and meat, poultry and pork (migration 0064), from
+ingredients' names, for a moderator to accept
 or dismiss in the Suggestions queue (kind 'allergen').
 
 *SCOPING.md, Allergen seeding:* a first pass per ingredient, reviewed
@@ -26,7 +27,7 @@ from openlarder import allergens, visibility
 from openlarder.models import FdcFood, Ingredient, Suggestion
 
 MODEL = "rules"
-VERSION = "allergen-rules-v1"
+VERSION = "allergen-rules-v2"
 
 # Words that say an ingredient isn't the real thing, whatever else it says:
 # "vegan butter", "egg replacer", "gluten-free flour" (but not "free-range
@@ -66,7 +67,67 @@ _FLOUR_NOT_WHEAT = (
     " hazelnut amaranth lupin pea lentil garbanzo bean squash"
 ).split()
 
+# Meat, poultry and pork (migration 0064) that isn't: "vegetarian sausage",
+# "poultry seasoning", "chicken of the woods", "duck egg". Kept out of
+# NOT_IT, as "vegetarian parmesan" is still milk.
+_NOT_FLESH = (
+    "vegetarian veggie meatless mock seasoning rub spice wood egg flavor flavour flavored"
+    " flavoured style"
+).split()
+_NOT_MEAT_STEAK = (
+    "tuna salmon swordfish halibut cod fish cauliflower cabbage portobello mushroom tofu"
+    " celeriac sauce turkey chicken pork ham gammon"
+).split()
+
 RULES = [
+    _rule(
+        "meat",
+        "beef veal lamb mutton venison bison buffalo goat rabbit hare boar oxtail brisket suet"
+        " tallow bresaola pastrami biltong elk veau",
+        [
+            *_NOT_FLESH,
+            "mozzarella",
+            "tomato",
+            "wing",
+            "sauce",
+            "cheese",
+            "milk",
+            "yogurt",
+            "curd",
+            "gouda",
+            "butter",
+            "feta",
+        ],
+    ),
+    _rule(
+        "meat",
+        "steak meatball hamburger burger mince meatloaf short_rib sirloin chuck filet_mignon"
+        " tri_tip rib_roast rib_eye sweetbread demi_glace bone_marrow marrow_bone ground_meat"
+        " prime_rib",
+        [*_NOT_FLESH, *_NOT_MEAT_STEAK, "bean", "bun", "lentil", "pie"],
+        likely=False,
+    ),
+    _rule("meat", "gelatin gelatine", ("agar",), status="may_contain", likely=False),
+    _rule(
+        "poultry",
+        "chicken turkey goose quail pheasant hen poultry capon squab poussin schmaltz"
+        " guinea_fowl partridge foie_gra volaille",
+        _NOT_FLESH,
+    ),
+    _rule("poultry", "duck", [*_NOT_FLESH, "sauce"]),
+    _rule(
+        "pork",
+        "pork bacon ham prosciutto pancetta guanciale lard lardon speck mortadella gammon"
+        " pepperoni chorizo salami coppa capicola nduja pig spam",
+        [*_NOT_FLESH, "turkey", "beef", "chicken", "duck", "lamb", "soy", "coconut"],
+    ),
+    _rule(
+        "pork",
+        "sausage bratwurst kielbasa frankfurter hot_dog andouille salumi baby_back spare_rib",
+        [*_NOT_FLESH, "turkey", "beef", "chicken", "duck", "lamb", "soy", "bun", "roll"],
+        likely=False,
+    ),
+    _rule("pork", "gelatin gelatine", ("agar",), status="may_contain", likely=False),
     _rule(
         "milk",
         "milk butter buttermilk cream cheese yogurt yoghurt ghee kefir whey casein curd ricotta"

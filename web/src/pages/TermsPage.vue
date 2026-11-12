@@ -84,7 +84,7 @@ onMounted(async () => {
 
     <h2>Allergens and diets</h2>
     <p>
-      Allergen and diet information comes from public food databases and from contributors. It
+      Allergen, meat and diet information comes from public food databases and from contributors. It
       describes an ingredient in general, not any product: one brand's stock may contain milk when
       another's doesn't, and oats may be processed alongside wheat. It may be incomplete or wrong.
       OpenLarder never says a recipe is safe for an allergy. Always check the labels of what you
