@@ -4,8 +4,9 @@ import { list as allergenList, loadAllergens } from "../allergens";
 import { checkDiet, type Diet, type DietCheck, listDiets } from "../substitutions";
 
 // Cooking this recipe for a diet: its ingredients that record an allergen
-// the diet avoids, and the swaps recorded for them (diets.py). Never says
-// the recipe suits the diet.
+// the diet avoids, and the swaps recorded for them (diets.py); and what the
+// diet avoids only together (Kosher's meat with milk), found across the
+// recipe. Never says the recipe suits the diet.
 // noticeAbove: the page shows the allergen notice just above already.
 const props = defineProps<{ recipeId: string; noticeAbove?: boolean }>();
 
@@ -18,7 +19,7 @@ const error = ref("");
 onMounted(async () => {
   loadAllergens();
   try {
-    diets.value = (await listDiets()).filter((d) => d.avoids.length);
+    diets.value = (await listDiets()).filter((d) => d.avoids.length || d.together.length);
   } catch {
     diets.value = [];
   }
@@ -31,10 +32,25 @@ const checks = computed(() =>
   (result.value?.diet.avoids ?? []).map((k) => (labels.value[k] ?? k).toLowerCase()),
 );
 
-function listed(words: string[]) {
+function listed(words: string[], and = "and") {
   if (words.length < 2) return words.join("");
-  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+  return `${words.slice(0, -1).join(", ")} ${and} ${words[words.length - 1]}`;
 }
+const label = (key: string) => (labels.value[key] ?? key).toLowerCase();
+// "meat or poultry together with milk", one for each thing they go with.
+const pairs = computed(() => {
+  const by = new Map<string, string[]>();
+  for (const p of result.value?.diet.together ?? []) {
+    by.set(p.other, [...(by.get(p.other) ?? []), label(p.allergen)]);
+  }
+  return [...by].map(([other, keys]) => `${listed(keys, "or")} together with ${label(other)}`);
+});
+// What the diet means here, in words.
+const meaning = computed(() =>
+  [checks.value.length ? listed(checks.value) : "", ...pairs.value].filter(Boolean).join(", and for "),
+);
+const names = (has: { ingredient: { name: string }; status: string }[]) =>
+  has.map((h) => (h.status === "may_contain" ? `${h.ingredient.name} (may)` : h.ingredient.name));
 
 async function check() {
   result.value = null;
@@ -65,12 +81,28 @@ async function check() {
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div v-if="result" aria-live="polite">
       <p class="muted">
-        {{ result.diet.name }} here means checking for {{ listed(checks) }}, and nothing else.
+        {{ result.diet.name }} here means checking for {{ meaning }}, and nothing else.
       </p>
-      <p v-if="!result.lines.length" class="status">
-        No ingredient here records {{ listed(checks) }}.
+      <p v-if="!result.lines.length && !result.together.length" class="status">
+        Nothing recorded for this recipe's ingredients is among those.
       </p>
-      <ul v-else class="ingredient-lines diet-lines">
+      <ul v-if="result.together.length" class="ingredient-lines diet-lines diet-together">
+        <li v-for="t in result.together" :key="`${t.allergen.key}-${t.other.key}`">
+          <p>
+            <strong>{{ t.allergen.label }} with {{ t.other.label.toLowerCase() }}.</strong>
+            {{ t.allergen.label }}:
+            <template v-for="(h, i) in t.has" :key="h.ingredient.id"
+              ><template v-if="i > 0">, </template
+              ><a :href="`/ingredients/${h.ingredient.id}`">{{ names([h])[0] }}</a></template
+            >. {{ t.other.label }}:
+            <template v-for="(h, i) in t.has_other" :key="h.ingredient.id"
+              ><template v-if="i > 0">, </template
+              ><a :href="`/ingredients/${h.ingredient.id}`">{{ names([h])[0] }}</a></template
+            >.
+          </p>
+        </li>
+      </ul>
+      <ul v-if="result.lines.length" class="ingredient-lines diet-lines">
         <li v-for="line in result.lines" :key="line.ingredient.id">
           <p>
             <a :href="`/ingredients/${line.ingredient.id}`">{{ line.ingredient.name }}</a>

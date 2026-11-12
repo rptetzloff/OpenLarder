@@ -144,6 +144,9 @@ async def test_a_removal_now_keeps_the_whole_row(adb) -> None:
     await adb.execute(text("INSERT INTO ingredients (name, match_key) VALUES ('Sumac', 'sumac')"))
     await adb.execute(text("DELETE FROM ingredients WHERE name = 'Sumac'"))
     changes = await adb.scalar(
-        text("SELECT changes FROM revisions WHERE table_name = 'ingredients' AND action = 'd'")
+        text(
+            "SELECT changes FROM revisions WHERE table_name = 'ingredients' AND action = 'd'"
+            " ORDER BY id DESC LIMIT 1"
+        )
     )
     assert changes["match_key"] == ["sumac", None] and "created_at" in changes

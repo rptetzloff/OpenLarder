@@ -46,7 +46,8 @@ async function save(d: Diet) {
     <h3 id="diets-title">Diets and what they avoid</h3>
     <p class="muted">
       A recipe's “Cooking for a diet” checks its ingredients for these allergens, and offers the
-      swaps recorded for a diet that avoids them too. A diet avoiding none isn't offered.
+      swaps recorded for a diet that avoids them too. A diet avoiding none isn't offered. What a
+      diet avoids only together (Kosher: meat with milk) is set in the database, not here.
     </p>
     <ul class="diet-list">
       <li v-for="d in diets" :key="d.id">
@@ -54,7 +55,15 @@ async function save(d: Diet) {
           <strong>{{ d.name }}</strong>
           <span class="muted">
             ·
-            {{ d.avoids.length ? d.avoids.map((k) => labels[k] ?? k).join(", ") : "nothing" }}</span
+            {{ d.avoids.length ? d.avoids.map((k) => labels[k] ?? k).join(", ") : "nothing"
+            }}<template v-if="d.together.length"
+              >; and, only together,
+              {{
+                d.together
+                  .map((p) => `${labels[p.allergen] ?? p.allergen} with ${(labels[p.other] ?? p.other).toLowerCase()}`)
+                  .join(", ")
+              }}</template
+            ></span
           >
           <button
             type="button"

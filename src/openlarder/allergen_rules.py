@@ -27,7 +27,7 @@ from openlarder import allergens, visibility
 from openlarder.models import FdcFood, Ingredient, Suggestion
 
 MODEL = "rules"
-VERSION = "allergen-rules-v2"
+VERSION = "allergen-rules-v3"
 
 # Words that say an ingredient isn't the real thing, whatever else it says:
 # "vegan butter", "egg replacer", "gluten-free flour" (but not "free-range
@@ -79,6 +79,12 @@ _NOT_MEAT_STEAK = (
     " celeriac sauce turkey chicken pork ham gammon"
 ).split()
 
+_NOT_ALCOHOL = (
+    "vinegar root ginger bonnet egg extract flavoring flavouring nonalcoholic alcohol_free"
+    " non_alcoholic dealcoholized butterscotch yeast grape must jelly gum vanilla pine"
+    " vinaigrette salut tomato"
+).split()
+
 RULES = [
     _rule(
         "meat",
@@ -128,6 +134,21 @@ RULES = [
         likely=False,
     ),
     _rule("pork", "gelatin gelatine", ("agar",), status="may_contain", likely=False),
+    # Alcohol (migration 0066): drinks named outright. Vinegars made from
+    # them aren't, nor "root beer", "ginger ale" or a "scotch bonnet";
+    # extracts are left to a moderator.
+    _rule(
+        "alcohol",
+        "wine beer ale lager stout rum brandy cognac armagnac vodka gin whiskey whisky bourbon"
+        " tequila mezcal sherry vermouth champagne prosecco cava liqueur sake mirin port"
+        " marsala madeira amaretto kirsch schnapps cointreau kahlua limoncello absinthe pernod"
+        " pastis ouzo grappa calvados scotch shaoxing chardonnay riesling merlot cabernet"
+        " pinot sauvignon zinfandel chianti moscato sangria bitters curacao curaçao"
+        " triple_sec grand_marnier hard_cider hard_apple frangelico campari amaro lillet sambuca"
+        " pisco aperol aquavit chartreuse",
+        _NOT_ALCOHOL,
+    ),
+    _rule("alcohol", "liquor", [*_NOT_ALCOHOL, "cocoa", "chocolate", "cacao"]),
     _rule(
         "milk",
         "milk butter buttermilk cream cheese yogurt yoghurt ghee kefir whey casein curd ricotta"

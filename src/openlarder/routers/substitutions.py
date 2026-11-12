@@ -17,11 +17,18 @@ from openlarder.models import Recipe, Substitution, Tag, TagKind
 router = APIRouter(tags=["substitutions"])
 
 
+class Pair(BaseModel):
+    allergen: str
+    other: str
+
+
 class Diet(BaseModel):
     id: uuid.UUID
     name: str
     # The allergens it avoids (diets.py), for a recipe's page to check.
     avoids: list[str] = []
+    # Those it avoids only together: Kosher's meat with milk.
+    together: list[Pair] = []
 
 
 class ThingOut(BaseModel):
@@ -71,9 +78,18 @@ async def list_diets(session: Session) -> list[Diet]:
         select(Tag.id, Tag.name).where(Tag.kind == TagKind.DIET).order_by(func.lower(Tag.name))
     )
     avoids = await diets.avoided(session)
+    together = await diets.avoided_together(session)
     order = {a.key: a.position for a in await allergens.listed(session)}
     return [
-        Diet(id=i, name=n, avoids=sorted(avoids.get(i, ()), key=lambda k: order.get(k, 99)))
+        Diet(
+            id=i,
+            name=n,
+            avoids=sorted(avoids.get(i, ()), key=lambda k: order.get(k, 99)),
+            together=[
+                Pair(allergen=a, other=b)
+                for a, b in sorted(together.get(i, ()), key=lambda p: order.get(p[0], 99))
+            ],
+        )
         for i, n in rows
     ]
 
@@ -116,9 +132,24 @@ class DietLine(BaseModel):
     swaps: list[SwapOut]
 
 
+class Has(BaseModel):
+    ingredient: ThingOut
+    status: Literal["contains", "may_contain"]
+
+
+class TogetherOut(BaseModel):
+    """Two things the diet avoids together, both recorded in this recipe."""
+
+    allergen: Found
+    other: Found
+    has: list[Has]
+    has_other: list[Has]
+
+
 class DietCheck(BaseModel):
     diet: Diet
     lines: list[DietLine]
+    together: list[TogetherOut] = []
     notice: str
 
 
@@ -139,6 +170,19 @@ async def check_recipe(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such diet.")
     labels = {a.key: a.label for a in await allergens.listed(session)}
     lines = await diets.check(session, recipe_id, diet_id, viewer)
+
+    def side(key: str, has: list) -> tuple[Found, list[Has]]:
+        # "Contains" when any ingredient does.
+        status = "contains" if any(s == "contains" for _, _, s in has) else "may_contain"
+        return Found(key=key, label=labels.get(key, key), status=status), [
+            Has(ingredient=ThingOut(kind="ingredient", id=i, name=n), status=s) for i, n, s in has
+        ]
+
+    together = []
+    for t in await diets.check_together(session, recipe_id, diet_id):
+        a, has = side(t.allergen, t.has)
+        b, has_other = side(t.other, t.has_other)
+        together.append(TogetherOut(allergen=a, other=b, has=has, has_other=has_other))
     return DietCheck(
         diet=diet,
         lines=[
@@ -153,6 +197,7 @@ async def check_recipe(
             )
             for line in lines
         ],
+        together=together,
         notice=allergens.NOTICE,
     )
 

@@ -59,11 +59,19 @@ class DietAllergen(Base):
     check its lines against (diets.py)."""
 
     __tablename__ = "diet_allergens"
-    __table_args__ = (PrimaryKeyConstraint("diet_tag_id", "allergen"),)
+    __table_args__ = (
+        PrimaryKeyConstraint("diet_tag_id", "allergen"),
+        CheckConstraint("with_allergen <> allergen", name="with_another"),
+    )
 
     diet_tag_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tags.id", ondelete="CASCADE")
     )
     allergen: Mapped[str] = mapped_column(
         Text, ForeignKey("allergens.key", ondelete="CASCADE"), index=True
+    )
+    # Avoided only in a recipe that records this one too (migration 0066):
+    # Kosher's meat with milk. None: avoided outright.
+    with_allergen: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("allergens.key", ondelete="CASCADE")
     )

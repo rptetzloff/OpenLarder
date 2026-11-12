@@ -74,6 +74,28 @@ def test_names_say_meat_poultry_and_pork() -> None:
     assert _said("Duck Egg") == {"egg": ("contains", True)}
 
 
+def test_names_say_alcohol() -> None:
+    for drink in ("Dark Rum", "Vodka", "Mirin", "Bourbon", "Orange Liqueur", "Ruby Port"):
+        assert _said(drink) == {"alcohol": ("contains", True)}, drink
+    assert _said("Dry White Wine") == {
+        "alcohol": ("contains", True),
+        "sulphites": ("contains", False),
+    }
+    assert _said("Beer")["alcohol"] == ("contains", True)
+    for nothing in (
+        "Red Wine Vinegar",
+        "Sherry Vinegar",
+        "Root Beer",
+        "Ginger Ale",
+        "Ginger Beer",
+        "Scotch Bonnet Pepper",
+        "Rum Extract",
+        "Portobello Mushroom",
+        "Ginger",
+    ):
+        assert "alcohol" not in _said(nothing), nothing
+
+
 async def _book(mo, adb, lines: list[str]) -> None:
     book = (await mo.post("/api/sources/manual", json={"title": "Plenty"})).json()["id"]
     edition = str(

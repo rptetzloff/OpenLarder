@@ -31,7 +31,7 @@ async def _id(adb, name: str) -> str:
 async def test_the_list_comes_with_its_notice(client) -> None:
     got = (await client.get("/api/allergens")).json()
     keys = [a["key"] for a in got["allergens"]]
-    assert keys[:3] == ["milk", "egg", "fish"] and "sesame" in keys and len(keys) == 18
+    assert keys[:3] == ["milk", "egg", "fish"] and "sesame" in keys and len(keys) == 19
     assert got["notice"] == allergens.NOTICE and "unverified" in got["notice"]
 
 

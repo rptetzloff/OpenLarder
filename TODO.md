@@ -186,8 +186,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] Ray: build Workflow 5 in n8n (SCOPING.md) for what names
         don't say; `scripts/n8n_role.sql` now grants
         `public_allergens` and `public_ingredient_allergens`.
-      - [ ] Wikidata's allergen statements: check whether its items record
-        enough to be worth suggesting from.
+      - [x] Wikidata's allergen statements: checked 2026-11-11, and not
+        worth suggesting from. It has no allergen property; of the 596
+        foods with a USDA number, five say anything ("has effect: milk
+        allergy" on milk, and the like).
       - [x] Swaps for a diet (#139): each diet avoids allergens (migration
         0061: Dairy-Free milk; Gluten-Free wheat and gluten; Egg-Free egg;
         Nut-Free tree nuts and peanuts; Soy-Free soy; Vegan milk, egg and
@@ -215,10 +217,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         and a diet check for the part the catalog records. Halal checks
         for pork; Kosher for pork, crustaceans and molluscs; each says so,
         "and nothing else".
-      - [ ] What they don't check yet: alcohol (Halal), meat with milk and
-        fish without scales (Kosher). Alcohol could be recorded as meat
-        is; meat with milk needs a check across a recipe's ingredients,
-        not one at a time. Ask Ray.
+      - [x] Alcohol, and meat with milk (#145; *Ray, 2026-11-11: "yes to
+        both"*; migration 0066). Alcohol is recorded as meat is, read from
+        names by the word rules (allergen-rules-v3: "dry white wine",
+        "mirin", "bourbon"; not vinegars, "root beer" or extracts), and
+        Halal avoids it. A diet can avoid two things only together
+        (`diet_allergens.with_allergen`): Kosher's check finds meat or
+        poultry in a recipe that also records milk, across its
+        ingredients, and names both sides. Fish with milk is left alone.
+        The headings read "Allergens, meat and alcohol". Run "Suggest
+        allergens" again for the alcohol suggestions.
+      - [ ] Still unchecked: how meat was slaughtered and fish without
+        scales, which nothing records. Pairs are seeded, with no form to
+        change them: add one if a second diet needs it.
       - [ ] The notice's wording is in the lawyer review below.
 - [x] **Ingredient affiliate links** (#136; *Ray, 2026-11-11*): a "Shop"
       link on each recipe line's ingredients and on each ingredient's page,
