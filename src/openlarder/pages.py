@@ -97,6 +97,12 @@ def _people(names: list[str]) -> str:
     return names[0] if names else ""
 
 
+def _stop(after: str) -> str:
+    """The full stop that ends a sentence, unless what it ends with has its
+    own: "by Time Inc." isn't "by Time Inc..", nor "in Dinner?" "Dinner?."."""
+    return "" if after.rstrip().endswith((".", "!", "?")) else "."
+
+
 def issue_name(label: str) -> str:
     """An issue as people say it: one named by its date in words, any
     other as named (the SPA's issueName)."""
@@ -146,9 +152,9 @@ def recipe_description(shown: recipes.RecipeOut) -> str:
     ingredients as fit; without the authors, then cut, if it's too long."""
     where = f"{shown.title} {_where(shown)}"
     by = _people([c.name for c in shown.source.credits])
-    first = f"{where} by {by}." if by else f"{where}."
+    first = f"{where} by {by}{_stop(by)}" if by else f"{where}{_stop(where)}"
     if len(first) > DESCRIPTION_MAX:
-        first = f"{where}."
+        first = f"{where}{_stop(where)}"
     if len(first) > DESCRIPTION_MAX:
         return _cut(first, DESCRIPTION_MAX)
     names = ingredient_names(shown)
@@ -173,7 +179,10 @@ def source_description(shown: sources.Book) -> str:
         indexed = "1 recipe indexed, with where to find it and its ingredients."
     else:
         indexed = f"{count:,} recipes indexed, each with where to find it and its ingredients."
-    for first in (f"{shown.title}, {what} by {by}." if by else "", f"{shown.title}, {what}."):
+    for first in (
+        f"{shown.title}, {what} by {by}{_stop(by)}" if by else "",
+        f"{shown.title}, {what}.",
+    ):
         if first and len(f"{first} {indexed}") <= DESCRIPTION_MAX:
             return f"{first} {indexed}"
     return _cut(f"{shown.title}, {what}.", DESCRIPTION_MAX)
@@ -227,6 +236,9 @@ def _recipe_place(shown: recipes.RecipeOut) -> str:
     """Where a recipe is, as a paragraph: its source as a link, who made
     it, and the page, the issue, the episode or the web address."""
     source = _a(f"/sources/{shown.source.id}", shown.source.title) + _by(shown.source.credits)
+    # What the source and its authors end with, where they end a sentence.
+    credits = shown.source.credits
+    stop = _stop(credits[-1].name if credits else shown.source.title)
     if shown.issue:
         page = f", page {_e(shown.issue.page)}" if shown.issue.page else ""
         return f"<p>In {source}, {_e(issue_name(shown.issue.label))}{page}.</p>"
@@ -238,14 +250,14 @@ def _recipe_place(shown: recipes.RecipeOut) -> str:
         return f"<p>From {source}: {address}</p>"
     paged = [p for p in shown.pages if p.page]
     if not paged:
-        return f"<p>In {source}.</p>"
+        return f"<p>In {source}{stop}</p>"
     if len(paged) == 1:
-        return f"<p>Page {_e(paged[0].page)} of {source}.</p>"
+        return f"<p>Page {_e(paged[0].page)} of {source}{stop}</p>"
     editions = "".join(
         f"<li>Page {_e(p.page)}: {_edition(p.edition_title, p.published_year, isbn=p.isbn13)}</li>"
         for p in paged
     )
-    return f"<p>In {source}.</p><ul>{editions}</ul>"
+    return f"<p>In {source}{stop}</p><ul>{editions}</ul>"
 
 
 def _line(line: recipes.LineOut) -> str:
@@ -291,7 +303,8 @@ def _listed_recipe(r: sources.RecipeSummary) -> str:
 
 def source_summary(shown: sources.Book) -> str:
     what = KINDS.get(shown.kind, "a source")
-    about = f"<p>{_e(what[0].upper() + what[1:])}{_by(shown.credits)}.</p>"
+    stop = _stop(shown.credits[-1].name if shown.credits else what)
+    about = f"<p>{_e(what[0].upper() + what[1:])}{_by(shown.credits)}{stop}</p>"
     if shown.host:
         about += f"<p>{_a(f'https://{shown.host}', shown.host, 'nofollow noopener')}</p>"
     facts = [
