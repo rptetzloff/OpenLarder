@@ -163,6 +163,8 @@ async function seed() {
   await api(`/api/larder/items/${butter.id}`, "cook", { state: "out" }, "PATCH");
   // Cy owns the book, the edition with the recipe's page.
   await api(`/api/shelf/${book.id}`, "cook", { edition_id: biscuitPage.pages[0].edition_id }, "PUT");
+  // And shares his shelf with the family group: Ada sees it.
+  await api("/api/shelf/groups", "cook", { groups: [group.id] }, "PUT");
   // A problem reported with a recipe.
   await api("/api/reports", "cook", { kind: "recipe", id: biscuits.id, reason: "wrong", note: "Page 23 in mine." });
   // Requests: one asked for twice, one claimed, one declined.

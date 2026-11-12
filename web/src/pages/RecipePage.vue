@@ -64,16 +64,22 @@ const cover = computed(
 function editionLabel(p: Recipe["pages"][number]) {
   const label =
     [p.published_year, p.isbn13 && `ISBN ${p.isbn13}`].filter(Boolean).join(" · ") || "Edition";
-  return p.edition_id === yours.value ? `${label} (yours)` : label;
+  return p.edition_id === yours.value ? `${label} (${whose.value})` : label;
 }
-// The edition on your shelf (routers/shelf.py), shown first if the recipe is in it.
+// The edition on your shelf (routers/shelf.py), or failing that on a shelf
+// shared with you, shown first if the recipe is in it.
 const yours = ref<string | null>(null);
+const whose = ref("yours");
 async function showYours(r: Recipe) {
   try {
     const mine = await onShelf(r.source.id);
-    if (mine.edition_id && r.pages.some((p) => p.edition_id === mine.edition_id)) {
-      yours.value = mine.edition_id;
-      editionId.value = mine.edition_id;
+    const has = (id: string | null) => !!id && r.pages.some((p) => p.edition_id === id);
+    const other = mine.others.find((o) => has(o.edition_id));
+    const found = has(mine.edition_id) ? mine.edition_id : (other?.edition_id ?? null);
+    if (found) {
+      if (found !== mine.edition_id) whose.value = `${other!.owner_name ?? "someone"}'s`;
+      yours.value = found;
+      editionId.value = found;
     }
   } catch {
     // The newest edition, as for anyone.

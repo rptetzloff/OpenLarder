@@ -29,6 +29,7 @@ async def test_a_shelf_is_its_owners(people, client, adb) -> None:
         "source_id": plenty,
         "on_shelf": True,
         "edition_id": plenty_ed,
+        "others": [],
     }
     await ann.put(f"/api/shelf/{jolene}", json={})
     shelf = (await ann.get("/api/shelf")).json()["books"]
@@ -114,3 +115,82 @@ async def test_deleting_the_account_empties_the_shelf(people, adb) -> None:
     await ann.put(f"/api/shelf/{plenty}", json={})
     assert (await ann.post("/api/account/delete", json={"confirm": "ann"})).status_code == 204
     assert await adb.scalar(text("SELECT count(*) FROM shelf_books")) == 0
+
+
+async def _user_id(adb, name):
+    return str(await adb.scalar(text("SELECT id FROM users WHERE display_name = :n"), {"n": name}))
+
+
+async def test_a_shelf_is_shared_with_a_group(people, adb) -> None:
+    """Ray, 2026-11-11: "shareable exactly the same way" as a larder list."""
+    from test_larder import _group_of
+
+    mo = await people("mo", role="moderator")
+    ann, bob, cy, dee = (
+        await people("ann"),
+        await people("bob"),
+        await people("cy"),
+        await people("dee"),
+    )
+    ann_id = await _user_id(adb, "ann")
+    group = await _group_of(ann, (bob, "view"), (cy, "edit"))
+    plenty, plenty_ed = await _book(mo, adb, "Plenty")
+    jolene, _ = await _book(mo, adb, "Jolene")
+    await _recipe(mo, plenty, plenty_ed, "Green Shakshuka")
+    await ann.put(f"/api/shelf/{plenty}", json={"edition_id": plenty_ed})
+
+    # Shared with nobody yet: nobody else sees it.
+    assert (await bob.get("/api/shelf")).json()["shared"] == []
+    stranger = await _group_of(dee)
+    assert (await ann.put("/api/shelf/groups", json={"groups": [stranger]})).status_code == 404
+    r = await ann.put("/api/shelf/groups", json={"groups": [group]})
+    assert r.status_code == 200 and [g["id"] for g in r.json()["shared_with"]] == [group]
+
+    [seen] = (await bob.get("/api/shelf")).json()["shared"]
+    assert (seen["owner_name"], seen["editable"]) == ("ann", False)
+    assert [b["title"] for b in seen["books"]] == ["Plenty"]
+    assert (await dee.get("/api/shelf")).json()["shared"] == []
+    [other] = (await bob.get(f"/api/shelf/{plenty}")).json()["others"]
+    assert (other["owner_name"], other["on_shelf"], other["edition_id"]) == (
+        "ann",
+        True,
+        plenty_ed,
+    )
+    # It counts in a search.
+    found = (await bob.get("/api/search", params={"q": "shakshuka", "shelf": True})).json()
+    assert found["shelf_books"] == 1 and found["total"] == 1
+
+    # A viewer can't change it; an editor can; a stranger can't see it's there.
+    whose = {"owner": ann_id}
+    assert (await bob.put(f"/api/shelf/{jolene}", params=whose, json={})).status_code == 403
+    assert (await bob.delete(f"/api/shelf/{plenty}", params=whose)).status_code == 403
+    assert (await dee.put(f"/api/shelf/{jolene}", params=whose, json={})).status_code == 404
+    assert (await cy.put(f"/api/shelf/{jolene}", params=whose, json={})).status_code == 200
+    assert (await cy.delete(f"/api/shelf/{plenty}", params=whose)).status_code == 204
+    assert [b["title"] for b in (await ann.get("/api/shelf")).json()["books"]] == ["Jolene"]
+    # Cy's own shelf is untouched.
+    assert (await cy.get("/api/shelf")).json()["books"] == []
+
+    # Unshared, it's gone from theirs.
+    await ann.put("/api/shelf/groups", json={"groups": []})
+    assert (await bob.get("/api/shelf")).json()["shared"] == []
+    assert (await cy.put(f"/api/shelf/{plenty}", params=whose, json={})).status_code == 404
+
+
+async def test_leaving_a_group_stops_sharing_with_it(people, adb) -> None:
+    from test_larder import _group_of, _list
+
+    ann, bob = await people("ann"), await people("bob")
+    bob_id = await _user_id(adb, "bob")
+    group = await _group_of(ann, (bob, "edit"))
+    pantry = await _list(bob, "Bob's pantry")
+    await bob.put(f"/api/larder/lists/{pantry}/groups", json={"groups": [group]})
+    await bob.put("/api/shelf/groups", json={"groups": [group]})
+    assert len((await ann.get("/api/shelf")).json()["shared"]) == 1
+    assert len((await ann.get("/api/larder")).json()["lists"]) == 1
+
+    assert (await bob.delete(f"/api/groups/{group}/members/{bob_id}")).status_code == 204
+    assert (await ann.get("/api/shelf")).json()["shared"] == []
+    assert (await ann.get("/api/larder")).json()["lists"] == []
+    assert await adb.scalar(text("SELECT count(*) FROM shelf_groups")) == 0
+    assert await adb.scalar(text("SELECT count(*) FROM larder_list_groups")) == 0

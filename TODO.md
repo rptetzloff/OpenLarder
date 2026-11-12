@@ -488,8 +488,16 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         Private like the larder (migration 0062): not history, dumps or
         the API's public reads; a book merge moves it to the book kept, an
         unmerge back with its edition; deleting the account deletes it.
-      - [ ] Sharing a shelf with household groups, as larder lists are: ask
-        Ray whether it's wanted.
+      - [x] Sharing a shelf with household groups (#142; *Ray, 2026-11-11:
+        "shareable exactly the same way"* as a larder list; migration
+        0063): "Share" on `/shelf` picks which of your groups see it; view
+        members see it there and on each book's page, edit and admin
+        members put books on it and take them off. Search's "Only books on
+        my shelf" counts the shelves shared with you, and a recipe opens at
+        their edition when you've none of your own.
+      - [x] Leaving a group, or being removed, left your larder lists
+        shared with it (found in #142): they're unshared now, with the
+        shelf, as family collections were.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to
