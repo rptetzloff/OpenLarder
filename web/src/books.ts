@@ -264,8 +264,11 @@ export async function listSources(
   sort?: "recent" | "recipes",
   // Only these kinds; every kind when empty.
   kinds: string[] = [],
+  // Only sources with at least this many recipes; all of them when 0.
+  minRecipes = 0,
 ): Promise<{ sources: BookSummary[]; total: number; kinds: Record<string, number> }> {
   const query = new URLSearchParams({ q });
+  if (minRecipes) query.set("min_recipes", String(minRecipes));
   if (offset) query.set("offset", String(offset));
   if (limit) query.set("limit", String(limit));
   if (sort) query.set("sort", sort);

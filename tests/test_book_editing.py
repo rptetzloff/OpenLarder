@@ -300,6 +300,29 @@ async def test_sources_can_come_most_recipes_first(admin, client, adb) -> None:
     assert [s["title"] for s in found["sources"]] == ["Banana", "Apple"]
 
 
+async def test_sources_with_no_recipes_can_be_left_out(admin, client, adb) -> None:
+    """The front page's row: nothing that opens on an empty source (Ray's
+    cleanup pass, section 9). Only published recipes count, as on a card."""
+    for title in ("Apple", "Banana", "Cherry"):
+        await _book(admin, title=title, authors=[])
+    await adb.execute(
+        text(
+            "INSERT INTO recipes (source_id, title, review)"
+            " SELECT id, 'Bread', CASE title WHEN 'Cherry' THEN 'pending' ELSE 'published' END"
+            " FROM sources WHERE title IN ('Banana', 'Cherry')"
+        )
+    )
+    some = (await client.get("/api/sources", params={"min_recipes": 1})).json()
+    assert ([s["title"] for s in some["sources"]], some["total"]) == (["Banana"], 1)
+    assert some["kinds"] == {"book": 1}
+    recent = (await client.get("/api/sources", params={"min_recipes": 1, "sort": "recent"})).json()
+    assert [(s["title"], s["recipes"]) for s in recent["sources"]] == [("Banana", 1)]
+    # More than any has: nothing. Unasked, everything, as the Sources page lists.
+    assert (await client.get("/api/sources", params={"min_recipes": 2})).json()["total"] == 0
+    assert (await client.get("/api/sources")).json()["total"] == 3
+    assert (await client.get("/api/sources", params={"min_recipes": -1})).status_code == 422
+
+
 async def test_a_picker_asks_for_a_few(admin, client) -> None:
     for title in ("Bread A", "Bread B", "Bread C"):
         await _book(admin, title=title, authors=[])
