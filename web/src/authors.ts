@@ -30,7 +30,7 @@ export interface Author {
   website: string | null;
   links: { id: string; url: string; label: string | null }[];
   // This author's roles on each book, and the name it prints for them.
-  sources: (BookSummary & { roles: string[]; credited_as: string })[];
+  sources: (BookSummary & { roles: string[]; credited_as: string; name: string })[];
   // People credited on the same books, most shared first.
   coauthors: AuthorSummary[];
   // Others whose names compare the same: likely one person, to merge.

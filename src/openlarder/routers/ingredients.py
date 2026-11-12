@@ -18,8 +18,10 @@ from sqlalchemy.orm import aliased
 from openlarder import fdc, ingredients, openlibrary, substitutions, visibility, web, wikidata
 from openlarder import recipes as recipe_entries
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
+from openlarder.author_names import shown_name
 from openlarder.db import Session
 from openlarder.models import (
+    Author,
     Edition,
     Episode,
     FdcFood,
@@ -212,12 +214,13 @@ async def with_pages(
         ).all()
     )
     credited: dict[uuid.UUID, list[str]] = {}
-    for source_id, name in await session.execute(
-        select(SourceCredit.source_id, SourceCredit.credited_as)
+    for source_id, printed, name in await session.execute(
+        select(SourceCredit.source_id, SourceCredit.credited_as, Author.name)
+        .join(Author, Author.id == SourceCredit.author_id)
         .where(SourceCredit.source_id.in_(source_ids))
         .order_by(SourceCredit.source_id, SourceCredit.position)
     ):
-        credited.setdefault(source_id, []).append(name)
+        credited.setdefault(source_id, []).append(shown_name(printed, name))
     covers: dict[uuid.UUID, int] = {}
     for source_id, cover_id in await session.execute(
         select(Edition.source_id, Edition.open_library_cover_id)

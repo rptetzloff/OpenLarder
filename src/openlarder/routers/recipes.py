@@ -28,9 +28,11 @@ from openlarder import (
 from openlarder import lines as line_reading
 from openlarder.archiving import ArchiverDep
 from openlarder.auth import CurrentUser, SameOrigin, Viewer
+from openlarder.author_names import shown_name
 from openlarder.buying import BuyLink
 from openlarder.db import Session
 from openlarder.models import (
+    Author,
     Edition,
     Episode,
     Ingredient,
@@ -245,7 +247,9 @@ class EpisodeOut(BaseModel):
 
 class CreditRef(BaseModel):
     author_id: uuid.UUID
+    # As stored, and as shown (author_names.shown_name).
     credited_as: str
+    name: str
 
 
 class SourceRef(BaseModel):
@@ -497,11 +501,13 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
         used_pages.setdefault(user_id, its_page)
     credits = (
         await session.execute(
-            select(SourceCredit.author_id, SourceCredit.credited_as)
+            select(SourceCredit.author_id, SourceCredit.credited_as, Author.name)
+            .join(Author, Author.id == SourceCredit.author_id)
             .where(SourceCredit.source_id == work.id)
             .order_by(SourceCredit.position)
         )
     ).all()
+    credits = [(a, printed, shown_name(printed, name)) for a, printed, name in credits]
     adder = await session.get(User, recipe.created_by) if recipe.created_by else None
     return RecipeOut(
         id=recipe.id,
@@ -512,7 +518,10 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             id=work.id,
             title=work.title,
             kind=work.kind,
-            credits=[CreditRef(author_id=a, credited_as=n) for a, n in credits],
+            credits=[
+                CreditRef(author_id=a, credited_as=printed, name=name)
+                for a, printed, name in credits
+            ],
         ),
         web_address=page.url if page else None,
         issue=IssueOut(
@@ -546,7 +555,7 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
                     else None
                 ),
                 buy=buying.links(
-                    e.id, e.isbn13, work.kind, work.title, credits[0][1] if credits else None
+                    e.id, e.isbn13, work.kind, work.title, credits[0][2] if credits else None
                 ),
             )
             for page, e in pages

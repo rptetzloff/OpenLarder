@@ -93,7 +93,7 @@ async def test_a_recipe_says_who_wrote_its_source_where_its_used_and_who_added_i
     blend = next(r["id"] for r in shown["recipes"] if r["title"] == "Biscuit Blend")
     recipe = (await client.get(f"/api/recipes/{blend}")).json()
     assert recipe["source"]["credits"] == [
-        {"author_id": str(author), "credited_as": "Ann Author, PhD"}
+        {"author_id": str(author), "credited_as": "Ann Author, PhD", "name": "Ann Author, PhD"}
     ]
     # The newest edition's page.
     assert [(u["title"], u["page"]) for u in recipe["used_in"]] == [("Cheddar Biscuits", "31")]

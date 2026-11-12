@@ -24,6 +24,7 @@ from sqlalchemy.orm import aliased
 
 from openlarder import author_facts, author_merge, openlibrary, visibility, wikidata
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
+from openlarder.author_names import shown_name
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
 from openlarder.routers.ingredients import contains_pattern
@@ -66,9 +67,11 @@ class LinkOut(BaseModel):
 
 
 class AuthorBook(BookSummary):
-    # This author's roles on it, and the name it prints for them.
+    # This author's roles on it, and the name it prints for them: as
+    # stored, and as shown (author_names.shown_name).
     roles: list[str]
     credited_as: str
+    name: str
 
 
 class CoAuthor(BaseModel):
@@ -212,7 +215,12 @@ async def get_author(author_id: uuid.UUID, session: Session, viewer: Viewer) -> 
         )
     ).all()
     books = [
-        AuthorBook(**card.model_dump(), roles=roles[card.id], credited_as=printed[card.id])
+        AuthorBook(
+            **card.model_dump(),
+            roles=roles[card.id],
+            credited_as=printed[card.id],
+            name=shown_name(printed[card.id], author.name),
+        )
         for card in await summaries(session, works)
     ]
     shared = func.count(func.distinct(SourceCredit.source_id))

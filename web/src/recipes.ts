@@ -29,7 +29,7 @@ export interface Recipe {
     title: string;
     kind: "book" | "website" | "magazine" | "newspaper" | "tv_show" | "podcast" | "video_channel" | "social" | "packaging" | "family";
     // Who it credits, in order, as it prints them.
-    credits: { author_id: string; credited_as: string }[];
+    credits: { author_id: string; credited_as: string; name: string }[];
   };
   pages: RecipePage[];
   // A website's recipe: the page it's on.
