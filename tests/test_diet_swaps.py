@@ -40,10 +40,11 @@ async def test_diets_say_what_they_avoid(client) -> None:
     diets = await _diets(client)
     assert diets["Dairy-Free"]["avoids"] == ["milk"]
     assert diets["Gluten-Free"]["avoids"] == ["wheat", "gluten"]
-    assert diets["Vegan"]["avoids"] == ["milk", "egg", "fish", "crustaceans", "molluscs"]
+    flesh = ["meat", "poultry", "pork"]
+    assert diets["Vegan"]["avoids"] == ["milk", "egg", "fish", "crustaceans", "molluscs", *flesh]
     assert diets["Paleo"]["avoids"] == []
     # A diet, for tags and swaps; meat isn't an allergen.
-    assert diets["Pescetarian"]["avoids"] == []
+    assert diets["Pescetarian"]["avoids"] == flesh
 
 
 async def test_a_recipe_for_a_diet(people, client, adb) -> None:
@@ -106,7 +107,7 @@ async def test_moderators_say_what_a_diet_avoids(people, client) -> None:
     r = await mo.put(f"/api/diets/{paleo}/allergens", json=body)
     assert r.status_code == 200, r.text
     assert r.json()["avoids"] == ["milk", "wheat"]
-    bad = await mo.put(f"/api/diets/{paleo}/allergens", json={"allergens": ["meat"]})
+    bad = await mo.put(f"/api/diets/{paleo}/allergens", json={"allergens": ["gravel"]})
     assert bad.status_code == 422
     r = await mo.put(f"/api/diets/{paleo}/allergens", json={"allergens": []})
     assert r.json()["avoids"] == []

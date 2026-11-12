@@ -42,6 +42,38 @@ def test_names_say_what_they_contain() -> None:
         assert _said(nothing) == {}, nothing
 
 
+def test_names_say_meat_poultry_and_pork() -> None:
+    """Ray, 2026-11-11: recorded as allergens are; poultry is one."""
+    for poultry in ("Chicken Stock", "Ground Turkey", "Duck Fat", "Cornish Game Hen", "Foie Gras"):
+        assert _said(poultry) == {"poultry": ("contains", True)}, poultry
+    for meat in ("Ground Beef", "Leg of Lamb", "Veal Stock", "Oxtail"):
+        assert _said(meat) == {"meat": ("contains", True)}, meat
+    assert _said("Flank Steak") == {"meat": ("contains", False)}
+    for pork in ("Bacon", "Lard", "Pork Shoulder", "Prosciutto", "Ham Hock"):
+        assert _said(pork) == {"pork": ("contains", True)}, pork
+    assert _said("Italian Sausage") == {"pork": ("contains", False)}
+    assert _said("Chicken Sausage") == {"poultry": ("contains", True)}
+    assert _said("Turkey Bacon") == {"poultry": ("contains", True)}
+    assert _said("Powdered Gelatin") == {
+        "meat": ("may_contain", False),
+        "pork": ("may_contain", False),
+    }
+    assert _said("Goat Cheese") == {"milk": ("contains", True)}
+    assert _said("Tuna Steak") == {"fish": ("contains", True)}
+    for nothing in (
+        "Poultry Seasoning",
+        "Chicken of the Woods",
+        "Duck Sauce",
+        "Vegetarian Sausage",
+        "Cauliflower Steak",
+        "Beefsteak Tomato",
+        "Hamburger Bun",
+        "Vegetable Stock",
+    ):
+        assert not {"meat", "poultry", "pork"} & set(_said(nothing)), nothing
+    assert _said("Duck Egg") == {"egg": ("contains", True)}
+
+
 async def _book(mo, adb, lines: list[str]) -> None:
     book = (await mo.post("/api/sources/manual", json={"title": "Plenty"})).json()["id"]
     edition = str(

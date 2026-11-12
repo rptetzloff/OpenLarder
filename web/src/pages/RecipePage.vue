@@ -365,7 +365,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             class="recipe-section"
             aria-labelledby="recipe-allergens"
           >
-            <h2 id="recipe-allergens">Allergens recorded</h2>
+            <h2 id="recipe-allergens">Allergens and meat recorded</h2>
             <ul class="ingredient-lines recipe-allergens">
               <li v-for="a in recipe.allergens" :key="a.key">
                 <strong
@@ -382,7 +382,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </ul>
             <p class="allergen-notice">
               Only what the catalog records about these ingredients: one with nothing recorded may
-              still contain any allergen. {{ allergenNotice }}
+              still contain any of them. {{ allergenNotice }}
             </p>
           </section>
 

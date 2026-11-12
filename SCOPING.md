@@ -144,6 +144,8 @@ Ingredients carry allergen data (contains dairy, gluten, egg). This lets the sit
 
 *Built (migration 0059, #137):* the allergens are the US's nine major allergens and the EU's fourteen together (milk, egg, fish, crustacean shellfish, molluscs, tree nuts, peanuts, wheat, gluten, soy, sesame, celery, mustard, lupin, sulphites). An ingredient records, for any of them, contains, may contain, or doesn't contain; narrower ingredients inherit from the nearest broader one that records it, and "doesn't contain" is how a narrower one says otherwise (Vegan Butter under Butter). Moderators record them on the ingredient's page. A recipe lists only what its ingredients contain or may contain, and says that an ingredient with nothing recorded may still contain any allergen. The notice is `allergens.NOTICE`, served by `/api/allergens` and in the dumps' description. *List and inheritance chosen by Claude under the 2026-11-06 decision; tell Claude to change either.*
 
+*Meat, poultry and pork (migration 0064; Ray, 2026-11-11):* recorded in the same list, the same way, and shown the same way ("Allergens and meat recorded"): diets avoid them, and poultry is an allergy too. Meat is red meat and game; pork and poultry are their own, so a diet can avoid one alone. Vegan, Vegetarian and Pescetarian avoid all three. The word rules read them from names ("chicken stock": poultry; "sausage": usually pork; "gelatin": may contain meat or pork).
+
 ## Author pages
 
 Every author gets a page: a bio, links, their books, the people they've written with, and their top-ranked recipes. Once verified, an author can curate their own page. *Decided by Ray, 2026-11-06.*

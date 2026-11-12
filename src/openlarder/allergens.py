@@ -8,6 +8,10 @@ recipe is safe for anyone. The site never says a recipe is safe for an
 allergy: a recipe lists only what its ingredients record as containing or
 maybe containing, never that it's free of anything.
 
+Meat, poultry and pork are recorded the same way, in the same list
+(migration 0064; *Ray, 2026-11-11*): diets avoid them, and poultry is an
+allergy too.
+
 An ingredient records, for any allergen, that it contains it, may contain
 it (oats, often processed alongside wheat), or doesn't. A narrower
 ingredient inherits each from the nearest broader one recording it, so
@@ -26,7 +30,7 @@ from openlarder.models import Allergen, Ingredient, IngredientAllergen
 from openlarder.models.allergens import STATUSES
 
 NOTICE = (
-    "Allergen information here is crowdsourced and unverified. It describes ingredients in"
+    "Allergen and meat information here is crowdsourced and unverified. It describes ingredients in"
     " general, not any product: one brand's stock may contain milk when another's doesn't,"
     " and oats may be processed alongside wheat. It isn't a guarantee that a recipe is safe"
     " for anyone, so check the labels on what you buy."
