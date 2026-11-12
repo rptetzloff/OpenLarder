@@ -45,6 +45,9 @@ async def test_diets_say_what_they_avoid(client) -> None:
     assert diets["Paleo"]["avoids"] == []
     # A diet, for tags and swaps; meat isn't an allergen.
     assert diets["Pescetarian"]["avoids"] == flesh
+    # Ray, 2026-11-11: the part of each the catalog records.
+    assert diets["Halal"]["avoids"] == ["pork"]
+    assert diets["Kosher"]["avoids"] == ["crustaceans", "molluscs", "pork"]
 
 
 async def test_a_recipe_for_a_diet(people, client, adb) -> None:

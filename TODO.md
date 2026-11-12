@@ -210,9 +210,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         allergen-rules-v2): on the household index, 88 more of the 1,000
         most used names get a suggestion (296 in all, 29% of uses). Run
         "Suggest allergens" again for them.
-      - [ ] Halal and Kosher as diets, now pork is recorded: ask Ray. Kosher
-        is more than avoiding pork and shellfish (meat with milk), so it
-        would check only part.
+      - [x] Halal and Kosher as diets (#144; *Ray, 2026-11-11: "many
+        cookbooks have it"*; migration 0065): tags for books and recipes,
+        and a diet check for the part the catalog records. Halal checks
+        for pork; Kosher for pork, crustaceans and molluscs; each says so,
+        "and nothing else".
+      - [ ] What they don't check yet: alcohol (Halal), meat with milk and
+        fish without scales (Kosher). Alcohol could be recorded as meat
+        is; meat with milk needs a check across a recipe's ingredients,
+        not one at a time. Ask Ray.
       - [ ] The notice's wording is in the lawyer review below.
 - [x] **Ingredient affiliate links** (#136; *Ray, 2026-11-11*): a "Shop"
       link on each recipe line's ingredients and on each ingredient's page,
