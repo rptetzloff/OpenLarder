@@ -542,6 +542,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         at will. Everyone sees the average and how many rated it, on the
         page and in listings ("4.5 of 5 spoons"); nobody sees who. No words
         go with one, so nothing to moderate.
+      - [x] One action bar under a recipe's title (#149; Ray's design,
+        2026-11-11, in private/): the average as mustard spoons, part-filled
+        ("4.3"), with its number and count; "Rate it" or "Your rating" with
+        Clear; "Want to cook" and "Cooked" as toggles; under it, the shared
+        lists it's on or could go on. Signed out: "Sign in to rate or save".
       - [ ] Using ratings: sorting search by them, and top-rated recipes
         on author and source pages (SCOPING.md). Not in the dumps yet.
       - [x] Notes (#148; *Ray, 2026-11-11: "more than reviews... notes....
