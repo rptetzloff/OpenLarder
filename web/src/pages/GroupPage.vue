@@ -246,7 +246,7 @@ function destroy() {
                     new Date(i.expires_at).toLocaleDateString(undefined, { dateStyle: "long" })
                   }}</span
                 >
-                <button type="button" class="link" @click="act(() => cancelInvite(id, i.id))">
+                <button type="button" class="secondary small" @click="act(() => cancelInvite(id, i.id))">
                   Cancel
                 </button>
               </li>

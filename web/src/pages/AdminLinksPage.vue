@@ -240,7 +240,7 @@ watch(show, () => {
                 </button>
                 <button
                   type="button"
-                  class="link"
+                  class="secondary small"
                   :disabled="busy"
                   :aria-label="`Dismiss for ${r.ingredient.name}`"
                   @click="decide('dismiss', [ofTab(r)!.id])"

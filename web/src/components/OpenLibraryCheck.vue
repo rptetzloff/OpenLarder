@@ -46,7 +46,7 @@ async function take() {
 
 <template>
   <section class="ol-link">
-    <button type="button" class="link" :disabled="busy" @click="check">
+    <button type="button" class="secondary small" :disabled="busy" @click="check">
       {{ busy && differences === null ? "Checking Open Library…" : "Check Open Library" }}
     </button>
     <p v-if="error" class="error" role="alert">{{ error }}</p>

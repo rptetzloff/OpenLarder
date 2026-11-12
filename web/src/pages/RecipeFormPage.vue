@@ -439,7 +439,7 @@ async function save(another = false) {
                 <dd>{{ where }}</dd>
               </div>
             </dl>
-            <button type="button" class="link" @click="go(2)">Change</button>
+            <button type="button" class="secondary small" @click="go(2)">Change</button>
           </div>
 
           <section v-if="step === 1" aria-labelledby="step-heading">
@@ -744,12 +744,12 @@ async function save(another = false) {
               <p v-if="refusedLeft" class="muted">
                 {{ refusedLeft }} line{{ refusedLeft === 1 ? " starts" : "s start" }} with an amount,
                 which saving refuses.
-                <button type="button" class="link" @click="go(3)">Fix them</button>
+                <button type="button" class="secondary small" @click="go(3)">Fix them</button>
               </p>
               <p v-else-if="checksLeft" class="muted">
                 {{ checksLeft }} line{{ checksLeft === 1 ? " has" : "s have" }} a check on
                 {{ checksLeft === 1 ? "it" : "them" }}; they save as typed.
-                <button type="button" class="link" @click="go(3)">Look again</button>
+                <button type="button" class="secondary small" @click="go(3)">Look again</button>
               </p>
             </template>
             <template v-if="propose">
@@ -803,7 +803,7 @@ async function save(another = false) {
           <div v-if="book.kind === 'book' && !recipeId" class="aside-card">
             <h2>Enter a whole book</h2>
             <p>One row per recipe: page, title, ingredients. Each row saves as you go.</p>
-            <a :href="`/sources/${book.id}/bulk`" class="button-primary">Open bulk entry</a>
+            <a :href="`/sources/${book.id}/bulk`" class="primary">Open bulk entry</a>
           </div>
           <div class="aside-card">
             <h2>Bulk import</h2>
@@ -811,7 +811,7 @@ async function save(another = false) {
               Upload a list of sources and their recipes. Every line is kept; anything doubtful is
               flagged on its recipe.
             </p>
-            <a href="/admin/import" class="button-primary">Open bulk import</a>
+            <a href="/admin/import" class="primary">Open bulk import</a>
             <p><a href="/admin/imports">Import history</a></p>
           </div>
         </aside>

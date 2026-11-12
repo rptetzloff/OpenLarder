@@ -190,13 +190,13 @@ onMounted(() => {
           </p>
         </div>
         <div class="ingredient-actions">
-          <a :href="`/search?i=${ingredient.id}`" class="button-primary"
+          <a :href="`/search?i=${ingredient.id}`" class="primary"
             >Search with {{ ingredient.name.toLowerCase() }}</a
           >
           <a
             v-if="grocerNow()"
             :href="grocerHref(grocerNow()!, ingredient.id)"
-            class="button-outline"
+            class="secondary"
             rel="sponsored noopener"
             >Shop at {{ grocerNow()!.label }}</a
           >
@@ -289,7 +289,7 @@ onMounted(() => {
           <button
             v-if="user?.may_edit && !addingSwap"
             type="button"
-            class="link"
+            class="secondary small"
             @click="addingSwap = true"
           >
             + Add a swap
@@ -319,7 +319,7 @@ onMounted(() => {
         <p v-if="error" class="error" role="alert">
           {{ error }}
           <template v-if="taken">
-            <button type="button" class="link" :disabled="busy" @click="merge(taken)">
+            <button type="button" class="secondary small" :disabled="busy" @click="merge(taken)">
               Merge into “{{ taken.name }}”
             </button>
           </template>
@@ -357,7 +357,7 @@ onMounted(() => {
           Under “{{ ingredient.parent.name }}”.
           <button
             type="button"
-            class="link"
+            class="secondary small"
             :disabled="busy"
             @click="placeUnder(ingredient.id, null)"
           >
@@ -398,7 +398,7 @@ onMounted(() => {
         </p>
 
         <p v-if="ingredient.total === 0">
-          <button id="delete-ingredient" type="button" class="link" @click="remove">
+          <button id="delete-ingredient" type="button" class="secondary small" @click="remove">
             Delete this ingredient
           </button>
         </p>

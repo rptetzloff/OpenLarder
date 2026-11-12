@@ -118,7 +118,7 @@ async function save() {
           </select>
           <button
             type="button"
-            class="link"
+            class="secondary small"
             :disabled="i === 0"
             :aria-label="`Move ${c.name} up`"
             @click="move(i, -1)"
@@ -127,7 +127,7 @@ async function save() {
           </button>
           <button
             type="button"
-            class="link"
+            class="secondary small"
             :disabled="i === form.credits.length - 1"
             :aria-label="`Move ${c.name} down`"
             @click="move(i, 1)"
@@ -136,7 +136,7 @@ async function save() {
           </button>
           <button
             type="button"
-            class="link"
+            class="secondary small"
             :aria-label="`Remove ${c.name}`"
             @click="form.credits.splice(i, 1)"
           >
@@ -145,7 +145,7 @@ async function save() {
         </div>
         <button
           type="button"
-          class="link"
+          class="secondary small"
           @click="form.credits.push({ author_id: null, name: '', role: 'author' })"
         >
           Add a name

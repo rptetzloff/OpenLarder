@@ -96,7 +96,7 @@ const remove = (o: OtherShelf) =>
         <button
           v-if="o.editable"
           type="button"
-          class="link"
+          class="secondary small"
           :disabled="busy"
           :aria-label="`Take it off ${name(o)}`"
           @click="remove(o)"
@@ -105,7 +105,7 @@ const remove = (o: OtherShelf) =>
         </button>
       </li>
       <li v-for="o in addable" :key="o.owner_id">
-        <button type="button" class="link" :disabled="busy" @click="add(o)">
+        <button type="button" class="secondary small" :disabled="busy" @click="add(o)">
           Put it on {{ name(o) }}
         </button>
       </li>
@@ -133,10 +133,10 @@ const remove = (o: OtherShelf) =>
   display: grid;
   gap: 0.2rem;
 }
-.shelf-others .link {
+.shelf-others button {
   margin-left: 0.35rem;
 }
-.shelf-others li > .link:first-child {
+.shelf-others li > button:first-child {
   margin-left: 0;
 }
 </style>

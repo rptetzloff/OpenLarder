@@ -147,9 +147,23 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] An author's own record is shown as stored: one typed in a
         catalogue's form ("Walker, Danielle") stays that way on the
         authors list until an admin fixes it on the author's page.
-      - [ ] 7. Links and buttons: terracotta underlined for links in
-        sentences and a card's title; outline buttons for actions; text
-        buttons only for extras; one primary and one secondary style.
+      - [x] 7. Links and buttons (#156). A link in a page is terracotta
+        and underlined unless a rule says otherwise, not the other way
+        round, and a card's title is too (the cover cards). An action is
+        an outline button: 48 of the 80 text buttons became one, leaving
+        32 for extras (Clear, Cancel, "More kinds", History, Report a
+        problem), a picker's choices and the small × that removes a chip.
+        A text button is the text's colour everywhere, so terracotta
+        always means a link. One primary and one secondary style, on a
+        `<button>` or a link that is one (`a.primary`, `a.secondary`;
+        `button-primary` and `button-outline` are gone), 44px tall; in a
+        table or list row `small` draws it smaller and still takes a tap
+        44px high.
+      - [ ] Still text buttons that are choices, not extras: the
+        suggestions under a picker (ingredient, larder, book, author),
+        which want a listbox of their own.
+      - [ ] The × that removes a chip or another name is drawn about 12px
+        wide; it wants a 44px target like the rest.
       - [ ] 8. Tokens, alongside the rest: the type sizes and corner radii
         are in `:root` now (#150); fold odd sizes in and move page CSS out
         of App.vue as each page is touched.

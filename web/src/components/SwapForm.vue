@@ -173,7 +173,7 @@ async function save() {
       >
       <p v-if="use">
         <strong>{{ use.name }}</strong>
-        <button type="button" class="link" @click="use = null">Change</button>
+        <button type="button" class="secondary small" @click="use = null">Change</button>
       </p>
       <IngredientPicker
         v-else-if="useKind === 'ingredient'"
@@ -229,7 +229,7 @@ async function save() {
           <span>Book</span>
           <p>
             <strong>{{ bookTitle || "…" }}</strong>
-            <button type="button" class="link" @click="bookId = ''">Change</button>
+            <button type="button" class="secondary small" @click="bookId = ''">Change</button>
           </p>
         </template>
         <div v-else class="isbn-form">

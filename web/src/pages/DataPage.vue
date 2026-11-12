@@ -50,8 +50,8 @@ onMounted(async () => {
           {{ (dumps.latest.counts.ingredients ?? 0).toLocaleString() }} ingredients.
         </p>
         <p class="row-actions">
-          <a :href="dumps.latest.csv_url" class="button-outline">CSV ({{ size(dumps.latest.csv_bytes) }})</a>
-          <a :href="dumps.latest.json_url" class="button-outline"
+          <a :href="dumps.latest.csv_url" class="secondary">CSV ({{ size(dumps.latest.csv_bytes) }})</a>
+          <a :href="dumps.latest.json_url" class="secondary"
             >JSON Lines ({{ size(dumps.latest.json_bytes) }})</a
           >
         </p>

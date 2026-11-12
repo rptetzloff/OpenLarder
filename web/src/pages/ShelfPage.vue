@@ -98,7 +98,7 @@ watch(
       <template v-else-if="shelf">
         <p v-if="count" class="status shelf-summary">
           {{ count.toLocaleString() }} {{ count === 1 ? "book" : "books" }}.
-          <a href="/search?own=1" class="button-outline">Search my shelf</a>
+          <a href="/search?own=1" class="secondary">Search my shelf</a>
         </p>
         <div v-if="every.length > 8" class="list-find">
           <label for="shelf-filter">Find on the shelves</label>
@@ -122,7 +122,7 @@ watch(
               >
               <button
                 type="button"
-                class="link"
+                class="secondary small"
                 :aria-expanded="sharing"
                 @click="sharing = !sharing"
               >
@@ -169,7 +169,7 @@ watch(
               <button
                 v-if="s.editable"
                 type="button"
-                class="link shelf-remove"
+                class="secondary small shelf-remove"
                 :disabled="busy"
                 :aria-label="`Take off ${b.title}`"
                 @click="remove(b, s.owner)"

@@ -41,7 +41,7 @@ const when = (iso: string) =>
         <button
           v-if="canRevert && !c.withheld"
           type="button"
-          class="link change-undo"
+          class="secondary small change-undo"
           :disabled="busy"
           @click="undo(c)"
         >

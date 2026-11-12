@@ -289,19 +289,19 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <a
               v-if="book.recipes.length"
               :href="`/search?source=${book.id}`"
-              class="button-outline"
+              class="secondary"
               >Search in this {{ KIND_NAMES[book.kind] }}</a
             >
             <a
               v-if="book.editable"
               :href="`/sources/${book.id}/recipes/new`"
-              class="button-outline"
+              class="secondary"
               >Add a recipe</a
             >
             <a
               v-if="book.editable && isBook"
               :href="`/sources/${book.id}/bulk`"
-              class="button-outline"
+              class="secondary"
               >Enter a whole book</a
             >
             <!-- A contributor suggests a change to a published source's details. -->
@@ -313,14 +313,14 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                 book.kind !== 'family'
               "
               :href="`/sources/${book.id}/propose`"
-              class="button-outline"
+              class="secondary"
               >Suggest a change</a
             >
             <!-- Its contributor fixes a book while it waits; moderators have the admin bar. -->
             <a
               v-if="book.details_editable && !adminTools"
               :href="`/sources/${book.id}/edit`"
-              class="button-outline"
+              class="secondary"
               >Edit the {{ KIND_NAMES[book.kind] }}</a
             >
           </p>
@@ -334,7 +334,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <p v-else class="byline">
               <button
                 type="button"
-                class="link"
+                class="secondary small"
                 @click="
                   newName = book.title;
                   renaming = true;
@@ -342,7 +342,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               >
                 Rename</button
               >&nbsp;
-              <button type="button" class="link" @click="remove">Delete</button>
+              <button type="button" class="secondary small" @click="remove">Delete</button>
             </p>
             <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
           </template>

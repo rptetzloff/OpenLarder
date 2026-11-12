@@ -132,11 +132,11 @@ watch(
         <p v-if="total" class="status larder-summary">
           {{ larder.counted.toLocaleString() }} of {{ total.toLocaleString() }}
           {{ total === 1 ? "thing counts" : "things count" }} in a search.
-          <a href="/search?larder=1" class="button-outline">What can I make?</a>
+          <a href="/search?larder=1" class="secondary">What can I make?</a>
         </p>
         <p v-if="ticked.length" class="larder-ticked" role="status">
           {{ ticked.length }} {{ ticked.length === 1 ? "thing" : "things" }} ticked.
-          <a :href="withTicked" class="button-outline">What can I make with these?</a>
+          <a :href="withTicked" class="secondary">What can I make with these?</a>
           <button type="button" class="link" @click="ticked = []">Clear</button>
         </p>
         <div class="larder-lists">
@@ -149,19 +149,19 @@ watch(
             <div class="larder-list-head">
               <h2 :id="`list-${list.id}`">{{ list.name }}</h2>
               <span v-if="list.mine">
-                <button type="button" class="link" :disabled="busy" @click="rename(list)">
+                <button type="button" class="secondary small" :disabled="busy" @click="rename(list)">
                   Rename
                 </button>
                 <button
                   v-if="larder.groups.length"
                   type="button"
-                  class="link"
+                  class="secondary small"
                   :aria-expanded="sharing === list.id"
                   @click="sharing = sharing === list.id ? null : list.id"
                 >
                   Share
                 </button>
-                <button type="button" class="link" :disabled="busy" @click="drop(list)">
+                <button type="button" class="secondary small" :disabled="busy" @click="drop(list)">
                   Remove
                 </button>
               </span>
@@ -222,7 +222,7 @@ watch(
                     <button
                       v-if="list.editable"
                       type="button"
-                      class="link"
+                      class="secondary small"
                       :disabled="busy"
                       @click="unmatch(item)"
                     >
@@ -234,7 +234,7 @@ watch(
                     <button
                       v-if="list.editable"
                       type="button"
-                      class="link"
+                      class="secondary small"
                       :disabled="busy"
                       @click="choosing = item.id"
                     >
@@ -285,7 +285,7 @@ watch(
                   </label>
                   <button
                     type="button"
-                    class="link"
+                    class="secondary small"
                     :disabled="busy"
                     @click="act(() => removeItem(item.id))"
                   >

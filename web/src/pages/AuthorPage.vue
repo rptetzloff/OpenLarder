@@ -249,7 +249,7 @@ onMounted(load);
             <li v-for="a in author.same_name" :key="a.id">
               <a :href="`/authors/${a.id}`">{{ a.name }}</a>
               <span class="page-ref">{{ a.sources }} {{ a.sources === 1 ? "source" : "sources" }}</span>
-              <button type="button" class="link merge-here" :disabled="busy" @click="merge(a, author)">
+              <button type="button" class="secondary small merge-here" :disabled="busy" @click="merge(a, author)">
                 Merge into this one
               </button>
             </li>
