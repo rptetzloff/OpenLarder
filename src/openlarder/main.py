@@ -44,6 +44,7 @@ from openlarder.routers import (
     monitoring,
     people,
     proposals,
+    ratings,
     recipes,
     reports,
     review,
@@ -205,6 +206,7 @@ app.include_router(foods.router)
 app.include_router(merges.router)
 app.include_router(reports.router)
 app.include_router(review.router)
+app.include_router(ratings.router)
 app.include_router(saved.router)
 app.include_router(search.router)
 app.include_router(shelf.router)

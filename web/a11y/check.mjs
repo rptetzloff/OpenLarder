@@ -169,6 +169,9 @@ async function seed() {
   await api(`/api/saved/${biscuits.id}`, "cook", { state: "want" }, "PUT");
   await api(`/api/saved/${blend.id}`, "cook", { state: "cooked" }, "PUT");
   await api("/api/saved/groups", "cook", { groups: [group.id] }, "PUT");
+  // Spoons from both, so a rating shows.
+  await api(`/api/recipes/${biscuits.id}/rating`, "cook", { spoons: 5 }, "PUT");
+  await api(`/api/recipes/${biscuits.id}/rating`, "admin", { spoons: 4 }, "PUT");
   // A problem reported with a recipe.
   await api("/api/reports", "cook", { kind: "recipe", id: biscuits.id, reason: "wrong", note: "Page 23 in mine." });
   // Requests: one asked for twice, one claimed, one declined.

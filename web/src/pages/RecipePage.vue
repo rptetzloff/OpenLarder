@@ -20,6 +20,7 @@ import type { Me } from "../me";
 import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
 import { onShelf } from "../shelf";
 import SaveButton from "../components/SaveButton.vue";
+import SpoonRating from "../components/SpoonRating.vue";
 import type { Thing } from "../substitutions";
 
 // Back from suggesting a change (RecipeFormPage's propose).
@@ -221,6 +222,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         :can-add="!!user?.may_edit"
         :save="saveTags"
       />
+      <SpoonRating v-if="user !== undefined" :recipe-id="recipe.id" :signed-in="!!user" />
       <SaveButton v-if="user" :recipe-id="recipe.id" />
 
       <div class="recipe-layout">
