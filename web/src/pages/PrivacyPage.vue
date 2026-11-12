@@ -122,6 +122,10 @@ document.title = "Privacy policy · OpenLarder";
         isn't part of the open data, the edit history or the API;
       </li>
       <li>
+        your shelf, if you keep one: which books you have, and which edition. Only you see it,
+        and it isn't part of the open data, the edit history or the API;
+      </li>
+      <li>
         what you add to or change in the catalog, with your display name and when: its edit
         history, which anyone who can see the record can read. For a family collection, only
         those who can see the collection see its history;
@@ -197,7 +201,7 @@ document.title = "Privacy policy · OpenLarder";
     <p>
       You can delete your account yourself, from Your account. That removes, at once, your user
       record, your sessions and API keys, your group memberships, your family collections and the
-      edit history recorded for them, your larder lists, your votes on requests, your suggested
+      edit history recorded for them, your larder lists, your shelf, your votes on requests, your suggested
       changes still open, and what you've added that is still waiting for review. A group you were
       the last admin of passes to its longest-standing member; one with nobody else in it is
       deleted. What you added to the catalog that has been published stays, because you licensed

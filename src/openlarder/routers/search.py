@@ -19,6 +19,9 @@ missing.
 **Title words** must all appear in the title, ignoring case; accents count,
 as they do for ingredients. The trigram index on recipe titles serves them.
 
+**Your shelf** (routers/shelf.py): only the books you own, with any
+sources chosen too.
+
 **Sources**: a recipe in any of them. IDs that name no ingredient or source now,
 as after a merge, are left out of the search and reported, so an old link
 still finds what it can. An ingredient's own page lists exactly the recipes
@@ -56,6 +59,7 @@ from openlarder.routers.ingredients import (
     with_pages,
 )
 from openlarder.routers.larder import seen_list_ids
+from openlarder.routers.shelf import shelf_source_ids
 from openlarder.tagging import MAX_TAGS
 
 router = APIRouter(prefix="/api/search", tags=["search"])
@@ -121,6 +125,8 @@ class Found(BaseModel):
     # Searched with the viewer's larder: how many of its items counted
     # (have or running low, matched to an ingredient).
     larder_items: int | None = None
+    # Kept to the viewer's shelf: how many books are on it.
+    shelf_books: int | None = None
 
 
 def _too_many(n: int, limit: int, what: str) -> None:
@@ -152,9 +158,13 @@ async def search(
     larder_list: Annotated[list[uuid.UUID] | None, Query()] = None,
     larder_item: Annotated[list[uuid.UUID] | None, Query()] = None,
     larder_without: Annotated[list[uuid.UUID] | None, Query()] = None,
+    # Only the books on your shelf (routers/shelf.py).
+    shelf: bool = False,
     offset: int = Query(0, ge=0),
 ) -> Found:
     stocked: list[uuid.UUID] = []
+    if shelf and viewer is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search your shelf.")
     if larder:
         if viewer is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search with your larder.")
@@ -170,7 +180,7 @@ async def search(
     asked = list(dict.fromkeys(ingredient or []))
     unwanted = list(dict.fromkeys(without or []))
     words = list(dict.fromkeys(q.casefold().split()))
-    shelf = list(dict.fromkeys(source or []))
+    picked = list(dict.fromkeys(source or []))
     tagged = list(dict.fromkeys(tag or []))
     if not asked and not words and not tagged and not larder:
         raise HTTPException(
@@ -179,7 +189,7 @@ async def search(
         )
     _too_many(len(asked), MAX_INGREDIENTS, "ingredients")
     _too_many(len(words), MAX_WORDS, "words of a title")
-    _too_many(len(shelf), MAX_SOURCES, "sources")
+    _too_many(len(picked), MAX_SOURCES, "sources")
     _too_many(len(unwanted), MAX_INGREDIENTS, "ingredients to leave out")
     _too_many(len(tagged), MAX_TAGS, "tags")
 
@@ -191,7 +201,7 @@ async def search(
     names = {i: n for i, n in found_names}
     found_titles = await session.execute(
         select(Source.id, Source.title).where(
-            Source.id.in_(shelf), visibility.sources_seen_by(viewer)
+            Source.id.in_(picked), visibility.sources_seen_by(viewer)
         )
     )
     titles = {i: t for i, t in found_titles}
@@ -200,13 +210,13 @@ async def search(
     )
     tags_known = [i for i in tagged if i in tag_names]
     known = [i for i in asked if i in names]
-    books = [i for i in shelf if i in titles]
+    books = [i for i in picked if i in titles]
     found = Found(
         sources=[Named(id=i, name=titles[i]) for i in books],
         ingredients=[Named(id=i, name=names[i]) for i in known],
         without=[Named(id=i, name=names[i]) for i in unwanted if i in names],
         missing=[i for i in asked + unwanted if i not in names],
-        missing_sources=[i for i in shelf if i not in titles],
+        missing_sources=[i for i in picked if i not in titles],
         tags=[Named(id=i, name=tag_names[i]) for i in tags_known],
         missing_tags=[i for i in tagged if i not in tag_names],
         q=" ".join(q.split()),
@@ -215,6 +225,12 @@ async def search(
         # Read at call time, so a test can shrink it.
         per_page=PAGE,
     )
+    if shelf:
+        found.shelf_books = await session.scalar(
+            select(func.count()).select_from(shelf_source_ids(viewer).subquery())
+        )
+        if not found.shelf_books:
+            return found
     if larder:
         found.larder_items = len(stocked)
         if not stocked and not known:
@@ -228,6 +244,8 @@ async def search(
         conditions.append(Recipe.source_id.in_(select(Source.id).where(Source.kind.in_(kind))))
     if books:
         conditions.append(Recipe.source_id.in_(books))
+    if shelf:
+        conditions.append(Recipe.source_id.in_(shelf_source_ids(viewer)))
     for t in tags_known:
         conditions.append(
             exists().where(RecipeTag.recipe_id == Recipe.id, RecipeTag.tag_id == t)

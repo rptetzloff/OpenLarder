@@ -50,6 +50,8 @@ const useLarder = computed(() => !!larderLists.value.length || !!larderOnly.valu
 // out; a line offering something else ("butter or oil") doesn't need it.
 const unwanted = ref<Named[]>([]);
 const shelf = ref<Named[]>([]);
+// Only the books you own (routers/shelf.py).
+const onShelf = ref(params.get("own") === "1");
 const title = ref(params.get("q") ?? "");
 // Every kind until some are unticked; the address lists them only then.
 const asked = params.getAll("kind").filter((k) => ALL_KINDS.includes(k));
@@ -80,7 +82,7 @@ const searching = computed(
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own"]) {
     url.searchParams.delete(key);
   }
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
@@ -93,6 +95,7 @@ function toAddress() {
   for (const id of larderLists.value) url.searchParams.append("ll", id);
   for (const id of larderOnly.value) url.searchParams.append("li", id);
   for (const id of larderOut.value) url.searchParams.append("lx", id);
+  if (onShelf.value) url.searchParams.set("own", "1");
   history.replaceState(null, "", url);
 }
 
@@ -121,6 +124,7 @@ async function run(toPage = 1) {
         larderLists: larderLists.value,
         larderItems: larderOnly.value,
         larderWithout: larderOut.value,
+        onShelf: onShelf.value,
       },
     );
     if (mine !== latest) return;
@@ -138,6 +142,7 @@ watch(title, () => {
   titleTimer = setTimeout(() => run(), 300);
 });
 watch(kinds, () => run(), { deep: true });
+watch(onShelf, () => run());
 watch(tags, () => run(), { deep: true });
 function toggleTag(id: string, on: boolean) {
   tags.value = on ? [...tags.value, id] : tags.value.filter((t) => t !== id);
@@ -306,6 +311,7 @@ onMounted(async () => {
       larderLists: larderLists.value,
       larderItems: larderOnly.value,
       larderWithout: larderOut.value,
+      onShelf: onShelf.value,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
@@ -443,6 +449,14 @@ onMounted(async () => {
               <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
             </li>
           </ul>
+          <label v-if="user" class="check shelf-check">
+            <input v-model="onShelf" type="checkbox" />
+            Only books on <a href="/shelf">my shelf</a
+            ><template v-if="onShelf && result?.shelf_books != null">
+              ({{ result.shelf_books.toLocaleString() }}
+              {{ result.shelf_books === 1 ? "book" : "books" }})</template
+            >
+          </label>
         </div>
       </div>
 
@@ -517,6 +531,9 @@ onMounted(async () => {
             {{ summary }}
             <span v-if="chosen.length || useLarder" class="muted"> · closest to made first</span>
           </h2>
+          <p v-if="result.shelf_books === 0" class="status">
+            Your shelf has no books yet: on a book's page, “I have this book” puts it there.
+          </p>
           <ul class="hits">
             <li v-for="r in result.recipes" :key="r.id" class="hit">
               <img v-if="r.cover_url" :src="r.cover_url" alt="" class="hit-cover" loading="lazy" />

@@ -2,6 +2,7 @@
 import BookMerge from "../components/BookMerge.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import ShopChooser from "../components/ShopChooser.vue";
+import ShelfButton from "../components/ShelfButton.vue";
 import { REVIEW_LABELS } from "../review";
 
 // Back from suggesting a change (BookEditPage's propose).
@@ -277,6 +278,13 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </li>
             <li v-if="book.paywalled">Subscription site</li>
           </ul>
+          <ShelfButton
+            v-if="user && isBook"
+            :source-id="book.id"
+            :editions="book.editions.map((e) => ({ id: e.id, label: editionLabel(e) }))"
+            :shown="edition?.id ?? null"
+            @mine="(id) => (editionId = id)"
+          />
           <p class="actions">
             <a
               v-if="book.recipes.length"

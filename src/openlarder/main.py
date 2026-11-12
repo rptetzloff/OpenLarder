@@ -48,6 +48,7 @@ from openlarder.routers import (
     reports,
     review,
     search,
+    shelf,
     site,
     sources,
     substitutions,
@@ -204,6 +205,7 @@ app.include_router(merges.router)
 app.include_router(reports.router)
 app.include_router(review.router)
 app.include_router(search.router)
+app.include_router(shelf.router)
 app.include_router(site.router)
 app.include_router(substitutions.router)
 app.include_router(suggestions.router)
