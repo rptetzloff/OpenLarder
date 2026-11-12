@@ -342,6 +342,19 @@ async def list_ingredients(
     )
 
 
+async def as_signed_out(session, ingredient_id: uuid.UUID) -> IngredientOut | None:
+    """The ingredient as someone signed out gets it from the route below,
+    with the first page of its recipes, or None when they don't (only
+    recipes that aren't everyone's use it, or it isn't there): what the
+    server may write into a page before the browser does (pages.py)."""
+    try:
+        return await get_ingredient(ingredient_id, session, None, offset=0, under=False)
+    except HTTPException as refused:
+        if refused.status_code != status.HTTP_404_NOT_FOUND:
+            raise
+        return None
+
+
 @router.get("/{ingredient_id}", response_model=IngredientOut)
 async def get_ingredient(
     ingredient_id: uuid.UUID,

@@ -3,9 +3,9 @@
 Every page is the same index.html until the SPA fills it, so a link
 preview, and any crawler that doesn't run scripts, saw the site's title and
 nothing else, and an id that names nothing answered 200. For a recipe's
-page and a source's, the server now looks the record up and writes the
-page's own head into index.html. The SPA is unchanged: it mounts as before.
-*Ray's spec, 2026-11-11.*
+page, a source's, an ingredient's and an author's, the server now looks
+the record up and writes the page's own head into index.html. The SPA is
+unchanged: it mounts as before. *Ray's spec, 2026-11-11.*
 
 The same goes for the body: a plain summary (the name, where a recipe is,
 its ingredients by name; a source's recipes) inside the element the SPA
@@ -34,8 +34,8 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import visibility
-from openlarder.models import BookMerge, Recipe, Source
-from openlarder.routers import recipes, sources
+from openlarder.models import Author, BookMerge, Ingredient, Recipe, Source
+from openlarder.routers import authors, ingredients, recipes, sources
 
 SITE = "OpenLarder"
 # A search result's snippet is cut at about this; the spec says under 160.
@@ -311,6 +311,119 @@ def source_summary(shown: sources.Book) -> str:
     )
 
 
+def _fitted(first: str, lead: str, names: list[str]) -> str:
+    """A sentence, then as many of the names as fit under the limit after
+    the lead ("Also called"), with how many more; or the sentence alone."""
+    for count in range(min(len(names), NAMED), 0, -1):
+        rest = len(names) - count
+        more = f", and {rest} more" if rest else ""
+        whole = f"{first} {lead} {', '.join(names[:count])}{more}."
+        if len(whole) <= DESCRIPTION_MAX:
+            return whole
+    return _cut(first, DESCRIPTION_MAX)
+
+
+def ingredient_description(shown: ingredients.IngredientOut) -> str:
+    """As "Cheddar is in 120 recipes indexed on OpenLarder, 480 counting what
+    comes under it. Also called mature cheddar."
+    """
+    if shown.family_total == 0:
+        first = f"No recipe indexed on OpenLarder uses {shown.name} yet."
+    else:
+        count = shown.total
+        used = f"{count:,} recipe{'' if count == 1 else 's'} indexed on OpenLarder"
+        under = shown.family_total - count
+        if count == 0:
+            first = (
+                f"{shown.name} is in {shown.family_total:,} "
+                f"recipe{'' if shown.family_total == 1 else 's'} indexed on OpenLarder, "
+                "counting what comes under it."
+            )
+        elif under > 0:
+            first = (
+                f"{shown.name} is in {used}, {shown.family_total:,} counting what comes under it."
+            )
+        else:
+            first = f"{shown.name} is in {used}."
+    return _fitted(first, "Also called", [a.name for a in shown.aliases])
+
+
+def _used(r: ingredients.UsedBy) -> str:
+    """A recipe that uses an ingredient: its title and its source as
+    links, and where in it."""
+    where = [issue_name(r.issue)] if r.issue else []
+    if r.episode:
+        where.append(r.episode)
+    if r.pages:
+        where.append(f"page {r.pages[0]}")
+    place = f", {_e(', '.join(where))}" if where else ""
+    source = _a(f"/sources/{r.source_id}", r.source_title)
+    return f"<li>{_a(f'/recipes/{r.id}', r.title)}, {source}{place}</li>"
+
+
+def ingredient_summary(shown: ingredients.IngredientOut) -> str:
+    about = ""
+    if shown.parent:
+        about += f"<p>Comes under {_a(f'/ingredients/{shown.parent.id}', shown.parent.name)}.</p>"
+    if shown.aliases:
+        about += f"<p>Also called {_e(', '.join(a.name for a in shown.aliases))}.</p>"
+    if shown.children:
+        under = _listed([_a(f"/ingredients/{c.id}", c.name) for c in shown.children])
+        about += f"<p>Includes {under}.</p>"
+    used = "".join(_used(r) for r in shown.recipes)
+    more = ""
+    if shown.listed_total > len(shown.recipes):
+        words = f"All {shown.listed_total:,} recipes"
+        more = f"<p>{_a(f'/ingredients/{shown.id}', words)}</p>"
+    return _summary(
+        [_a("/ingredients", "Ingredients"), _e(shown.name)],
+        f"<h1>{_e(shown.name)}</h1>",
+        about,
+        f"<h2>Recipes using {_e(shown.name)}</h2><ul>{used}</ul>{more}" if used else "",
+    )
+
+
+def author_description(shown: authors.AuthorOut) -> str:
+    """As "Danielle Walker is credited on 3 sources indexed on OpenLarder:
+    Against All Grain, Meals Made Simple, and 1 more."
+    """
+    count = len(shown.sources)
+    if count == 0:
+        return _cut(f"No source indexed on OpenLarder credits {shown.name} yet.", DESCRIPTION_MAX)
+    first = (
+        f"{shown.name} is credited on {count:,} source{'' if count == 1 else 's'} "
+        "indexed on OpenLarder"
+    )
+    titles = [s.title for s in shown.sources]
+    # As many of the sources as fit, up to three; none, if a title is long.
+    for named in range(min(count, 3), 0, -1):
+        rest = count - named
+        more = f", and {rest} more" if rest else ""
+        whole = f"{first}: {', '.join(titles[:named])}{more}."
+        if len(whole) <= DESCRIPTION_MAX:
+            return whole
+    return _cut(f"{first}.", DESCRIPTION_MAX)
+
+
+def _credited(s: authors.AuthorBook) -> str:
+    """A source an author is credited on: its title as a link, what it is,
+    and how many recipes."""
+    what = KINDS.get(s.kind, "a source")
+    count = f"{s.recipes:,} recipe{'' if s.recipes == 1 else 's'}"
+    return f"<li>{_a(f'/sources/{s.id}', s.title)}, {_e(what)}, {count}</li>"
+
+
+def author_summary(shown: authors.AuthorOut) -> str:
+    credited = "".join(_credited(s) for s in shown.sources)
+    together = _listed([_a(f"/authors/{c.id}", c.name) for c in shown.coauthors])
+    return _summary(
+        [_a("/authors", "Authors"), _e(shown.name)],
+        f"<h1>{_e(shown.name)}</h1>",
+        f"<h2>Sources</h2><ul>{credited}</ul>" if credited else "",
+        f"<p>Credited with {together}.</p>" if together else "",
+    )
+
+
 async def recipe(session: AsyncSession, recipe_id: uuid.UUID) -> Page:
     shown = await recipes.as_signed_out(session, recipe_id)
     if shown is None:
@@ -360,6 +473,74 @@ async def source(session: AsyncSession, source_id: uuid.UUID) -> Page:
         og_type="book" if shown.kind == "book" else "website",
         body=source_summary(shown),
     )
+
+
+async def ingredient(session: AsyncSession, ingredient_id: uuid.UUID) -> Page:
+    """An ingredient only recipes that aren't everyone's use is as hidden
+    as they are. One merged into another isn't recorded as such, so its
+    old address is a 404."""
+    shown = await ingredients.as_signed_out(session, ingredient_id)
+    if shown is None:
+        there = await session.scalar(select(exists().where(Ingredient.id == ingredient_id)))
+        return HIDDEN if there else NOT_FOUND
+    return Page(
+        title=f"{shown.name} · Ingredients · {SITE}",
+        description=ingredient_description(shown),
+        path=f"/ingredients/{shown.id}",
+        body=ingredient_summary(shown),
+    )
+
+
+async def author(session: AsyncSession, author_id: uuid.UUID) -> Page:
+    shown = await authors.as_signed_out(session, author_id)
+    if shown is None:
+        there = await session.scalar(select(exists().where(Author.id == author_id)))
+        return HIDDEN if there else NOT_FOUND
+    return Page(
+        title=f"{shown.name} · {SITE}",
+        description=author_description(shown),
+        path=f"/authors/{shown.id}",
+        og_type="profile" if shown.kind == "person" else "website",
+        body=author_summary(shown),
+    )
+
+
+# The lists: one page each to index, whatever was typed or chosen on it,
+# so the address without its query is the one a search engine keeps.
+LISTS = {
+    "": Page(path="/"),
+    "sources": Page(
+        title=f"Sources · {SITE}",
+        description=(
+            "Cookbooks, websites, magazines and shows, with the recipes indexed from each:"
+            " where every recipe is and what goes in it."
+        ),
+        path="/sources",
+    ),
+    "ingredients": Page(
+        title=f"Ingredients · {SITE}",
+        description=(
+            "Every ingredient the indexed recipes use. Open one to see the recipes that use it."
+        ),
+        path="/ingredients",
+    ),
+    "authors": Page(
+        title=f"Authors · {SITE}",
+        description="The people and kitchens behind the indexed cookbooks, and what each made.",
+        path="/authors",
+    ),
+}
+
+
+def without_record(path: str) -> Page | None:
+    """What a page with no record says, by its path: the front page and
+    the lists their own head, the search page and the personal ones what
+    crawlers may do; None for any other, which is index.html as it is."""
+    found = LISTS.get(path.strip("/"))
+    if found:
+        return found
+    robots = robots_for(path)
+    return Page(robots=robots) if robots else None
 
 
 # Pages that are someone's own, or the admins': never in a search engine.
