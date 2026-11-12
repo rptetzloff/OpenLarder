@@ -471,7 +471,7 @@ The MVP proves the catalog is useful with a few hundred books indexed; social fe
 
 - Bulk CSV import. *Built early, 2026-11-07, for the household index; admins only until review exists.*
 - Ingredient shopping links (Instacart or similar)
-- Saves, likes, "want to cook" lists, reviews, user descriptions. *Saves built (#146): want to cook and cooked, private, shared with household groups as the shelf is. Ratings built (#147): one to five spoons, shown as an average and a count, never who. Reviews and descriptions aren't.*
+- Saves, likes, "want to cook" lists, reviews, user descriptions. *Saves built (#146): want to cook and cooked, private, shared with household groups as the shelf is. Ratings built (#147): one to five spoons, shown as an average and a count, never who. Notes built (#148; Ray: "more than reviews... notes.... that are kept personal (or shared)"): one per person per recipe, private unless shared with household groups. Public reviews and descriptions aren't.*
 - Contributor-written author bios, with the other user-written text, and top-ranked recipes on author pages, once ratings exist
 - Personal shelf: mark books you own, filter search to your shelf. *Built (#141): the edition you own, too, so a recipe opens at your page.*
 - Personal larder: a person's own inventory lists (pantry, spice drawer, fridge, freezer, named as they like), each item their own name matched to a canonical ingredient, feeding "what can I make with what I have". Private by default, shareable with friends and family, public by choice. *Ray, 2026-11-08; open questions in TODO.md. Placed in Phase 2 by Claude, beside the shelf; move it up if it should come sooner.*

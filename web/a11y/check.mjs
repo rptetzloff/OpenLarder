@@ -172,6 +172,9 @@ async function seed() {
   // Spoons from both, so a rating shows.
   await api(`/api/recipes/${biscuits.id}/rating`, "cook", { spoons: 5 }, "PUT");
   await api(`/api/recipes/${biscuits.id}/rating`, "admin", { spoons: 4 }, "PUT");
+  // Cy's note on the biscuits, shared with the family; Ada's, her own.
+  await api(`/api/recipes/${biscuits.id}/notes`, "cook", { body: "Double the cheddar.\nBake five minutes less.", groups: [group.id] }, "PUT");
+  await api(`/api/recipes/${biscuits.id}/notes`, "admin", { body: "Good with soup.", groups: [] }, "PUT");
   // A problem reported with a recipe.
   await api("/api/reports", "cook", { kind: "recipe", id: biscuits.id, reason: "wrong", note: "Page 23 in mine." });
   // Requests: one asked for twice, one claimed, one declined.
@@ -262,6 +265,8 @@ function pages(s) {
     ["/saved", "cook"],
     ["/saved", "admin"],
     ["/saved", null],
+    ["/saved#notes", "cook"],
+    ["/saved#notes", "admin"],
     ["/search?sv=1", "cook"],
     [`/sources/${s.book.id}`, "cook"],
     ["/search?own=1&q=biscuit", "cook"],

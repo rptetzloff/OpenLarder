@@ -42,6 +42,7 @@ from openlarder.models.larder import (
 )
 from openlarder.models.limits import DailyCount
 from openlarder.models.merges import BookMerge
+from openlarder.models.notes import RecipeNote, RecipeNoteGroup
 from openlarder.models.proposals import Proposal
 from openlarder.models.ratings import RecipeRating
 from openlarder.models.reports import Report
@@ -81,6 +82,8 @@ __all__ = [
     "LarderList",
     "LarderListGroup",
     "SavedGroup",
+    "RecipeNote",
+    "RecipeNoteGroup",
     "RecipeRating",
     "SavedRecipe",
     "ShelfBook",

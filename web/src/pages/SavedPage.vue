@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { whereItIs } from "../ingredients";
 import type { Me } from "../me";
+import { allNotes, type NotedRecipe } from "../notes";
 import { mySaved, save, type Saved, type SavedRecipe, shareSaved, type State, unsave } from "../saved";
 
 // Saved recipes (routers/saved.py): what you want to cook and what you
@@ -14,8 +15,12 @@ const saved = ref<Saved | null>(null);
 const error = ref("");
 const busy = ref(false);
 const sharing = ref(false);
-// Want to cook, or cooked.
-const tab = ref<State>("want");
+// Want to cook, cooked, or the recipes with notes you can see
+// (routers/notes.py), which needn't be saved.
+const tab = ref<State | "notes">(location.hash === "#notes" ? "notes" : "want");
+const notes = ref<NotedRecipe[]>([]);
+const when = (at: string) =>
+  new Date(at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 
 // Yours, then each shared with you: one layout for both.
 const lists = computed(() =>
@@ -45,6 +50,7 @@ async function act(work: () => Promise<Saved | unknown>) {
   try {
     await work();
     saved.value = await mySaved();
+    notes.value = await allNotes();
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -76,7 +82,7 @@ watch(
     <div class="list-head">
       <h1>Saved recipes</h1>
       <p class="muted">
-        The recipes you want to cook, and the ones you have. Only you see them, and the household
+        The recipes you want to cook, the ones you have, and your notes. Only you see them, and the household
         <a href="/groups">groups</a> you share them with. To save one, open its page and choose
         “Want to cook”.
       </p>
@@ -96,10 +102,37 @@ watch(
             <button type="button" class="secondary small" :aria-pressed="tab === 'cooked'" @click="tab = 'cooked'">
               Cooked <span class="count">{{ count("cooked").toLocaleString() }}</span>
             </button>
+            <button type="button" class="secondary small" :aria-pressed="tab === 'notes'" @click="tab = 'notes'">
+              Notes <span class="count">{{ notes.length.toLocaleString() }}</span>
+            </button>
           </div>
           <a v-if="every.length" href="/search?sv=1" class="button-outline">Search my saved recipes</a>
         </div>
-        <section v-for="l in lists" :key="l.key" class="saved-section">
+        <section v-if="tab === 'notes'" class="saved-section">
+          <p v-if="!notes.length" class="status">
+            No notes yet. On a recipe's page, “Add a note” keeps your own words about it: yours
+            alone, unless you share it with a group.
+          </p>
+          <ul v-else class="hits">
+            <li v-for="(n, i) in notes" :key="i" class="hit">
+              <img v-if="n.cover_url" :src="n.cover_url" alt="" class="hit-cover" loading="lazy" />
+              <span v-else class="hit-cover" aria-hidden="true"></span>
+              <div>
+                <h3><a :href="`/recipes/${n.id}`">{{ n.title }}</a></h3>
+                <p class="hit-where">
+                  <a :href="`/sources/${n.source_id}`">{{ n.source_title }}</a
+                  ><template v-if="whereItIs(n)"> · {{ whereItIs(n) }}</template>
+                </p>
+                <p class="saved-note">{{ n.body }}</p>
+                <p class="hit-where">
+                  {{ n.mine ? "Your note" : `${n.author ?? "Someone"}'s note` }} ·
+                  {{ when(n.noted_at) }}
+                </p>
+              </div>
+            </li>
+          </ul>
+        </section>
+        <section v-for="l in tab === 'notes' ? [] : lists" :key="l.key" class="saved-section">
           <template v-if="l.owner">
             <h2>{{ l.title }}</h2>
             <p class="muted">{{ l.note }}</p>
@@ -192,6 +225,10 @@ watch(
   flex-wrap: wrap;
   gap: 0.25rem 0.75rem;
   margin: 0 0 0.75rem;
+}
+.saved-note {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .saved-actions {
   display: flex;
