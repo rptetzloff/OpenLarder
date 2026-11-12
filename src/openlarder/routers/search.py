@@ -22,6 +22,9 @@ as they do for ingredients. The trigram index on recipe titles serves them.
 **Your shelf** (routers/shelf.py): only the books you own, with any
 sources chosen too.
 
+**Saved** (routers/saved.py): only the recipes you've saved, or that are
+on a list shared with you.
+
 **Sources**: a recipe in any of them. IDs that name no ingredient or source now,
 as after a merge, are left out of the search and reported, so an old link
 still finds what it can. An ingredient's own page lists exactly the recipes
@@ -59,6 +62,7 @@ from openlarder.routers.ingredients import (
     with_pages,
 )
 from openlarder.routers.larder import seen_list_ids
+from openlarder.routers.saved import saved_recipe_ids
 from openlarder.routers.shelf import shelf_source_ids
 from openlarder.tagging import MAX_TAGS
 
@@ -160,11 +164,15 @@ async def search(
     larder_without: Annotated[list[uuid.UUID] | None, Query()] = None,
     # Only the books on your shelf (routers/shelf.py).
     shelf: bool = False,
+    # Only the recipes you've saved (routers/saved.py).
+    saved: bool = False,
     offset: int = Query(0, ge=0),
 ) -> Found:
     stocked: list[uuid.UUID] = []
     if shelf and viewer is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search your shelf.")
+    if saved and viewer is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search your saved recipes.")
     if larder:
         if viewer is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to search with your larder.")
@@ -182,7 +190,7 @@ async def search(
     words = list(dict.fromkeys(q.casefold().split()))
     picked = list(dict.fromkeys(source or []))
     tagged = list(dict.fromkeys(tag or []))
-    if not asked and not words and not tagged and not larder:
+    if not asked and not words and not tagged and not larder and not saved:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "Choose an ingredient or a tag, or type part of a title.",
@@ -236,7 +244,7 @@ async def search(
         if not stocked and not known:
             return found
     # Everything asked for is gone: nothing left to search by.
-    if not known and not words and not tags_known and not stocked:
+    if not known and not words and not tags_known and not stocked and not saved:
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
     conditions.append(visibility.recipes_seen_by(viewer))
@@ -246,6 +254,8 @@ async def search(
         conditions.append(Recipe.source_id.in_(books))
     if shelf:
         conditions.append(Recipe.source_id.in_(shelf_source_ids(viewer)))
+    if saved:
+        conditions.append(Recipe.id.in_(saved_recipe_ids(viewer)))
     for t in tags_known:
         conditions.append(
             exists().where(RecipeTag.recipe_id == Recipe.id, RecipeTag.tag_id == t)

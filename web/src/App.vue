@@ -29,6 +29,7 @@ import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
 import LarderPage from "./pages/LarderPage.vue";
 import ShelfPage from "./pages/ShelfPage.vue";
+import SavedPage from "./pages/SavedPage.vue";
 import BookEditPage from "./pages/BookEditPage.vue";
 import BookPage from "./pages/BookPage.vue";
 import BulkEntryPage from "./pages/BulkEntryPage.vue";
@@ -79,6 +80,7 @@ const onReports = path === "/admin/reports";
 const onRequests = path === "/requests";
 const onLarder = path === "/larder";
 const onShelf = path === "/shelf";
+const onSaved = path === "/saved";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
@@ -164,6 +166,7 @@ onMounted(async () => {
           <a v-if="user.may_edit" href="/admin">Admin</a>
           <a href="/larder" :aria-current="onLarder ? 'page' : undefined">Larder</a>
           <a href="/shelf" :aria-current="onShelf ? 'page' : undefined">Shelf</a>
+          <a href="/saved" :aria-current="onSaved ? 'page' : undefined">Saved</a>
           <a href="/groups">Groups</a>
           <a href="/account">{{ user.display_name ?? "Choose a name" }}</a>
           <!-- A form, not fetch: signing out ends at the broker, which ends the
@@ -215,6 +218,7 @@ onMounted(async () => {
     <RequestsPage v-else-if="onRequests" :user="user" />
     <LarderPage v-else-if="onLarder" :user="user" />
     <ShelfPage v-else-if="onShelf" :user="user" />
+    <SavedPage v-else-if="onSaved" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
     <BookPage v-else-if="bookId" :id="bookId" :user="user" />
     <RecipeFormPage v-else-if="newRecipeFor" :book-id="newRecipeFor" :user="user" />

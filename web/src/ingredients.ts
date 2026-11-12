@@ -217,6 +217,7 @@ export async function searchRecipes(
     larderItems = [],
     larderWithout = [],
     onShelf = false,
+    saved = false,
   }: {
     offset?: number;
     sources?: string[];
@@ -232,6 +233,8 @@ export async function searchRecipes(
     larderWithout?: string[];
     // Only the books on your shelf.
     onShelf?: boolean;
+    // Only the recipes you've saved.
+    saved?: boolean;
   } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
@@ -247,6 +250,7 @@ export async function searchRecipes(
     for (const id of larderWithout) query.append("larder_without", id);
   }
   if (onShelf) query.set("shelf", "true");
+  if (saved) query.set("saved", "true");
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");

@@ -52,6 +52,8 @@ const unwanted = ref<Named[]>([]);
 const shelf = ref<Named[]>([]);
 // Only the books you own (routers/shelf.py).
 const onShelf = ref(params.get("own") === "1");
+// Only the recipes you've saved (routers/saved.py); enough to search by.
+const onlySaved = ref(params.get("sv") === "1");
 const title = ref(params.get("q") ?? "");
 // Every kind until some are unticked; the address lists them only then.
 const asked = params.getAll("kind").filter((k) => ALL_KINDS.includes(k));
@@ -77,12 +79,17 @@ const narrowedKinds = computed(() =>
   kinds.value.length === ALL_KINDS.length ? [] : kinds.value,
 );
 const searching = computed(
-  () => useLarder.value || !!chosen.value.length || !!title.value.trim() || !!tags.value.length,
+  () =>
+    useLarder.value ||
+    onlySaved.value ||
+    !!chosen.value.length ||
+    !!title.value.trim() ||
+    !!tags.value.length,
 );
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv"]) {
     url.searchParams.delete(key);
   }
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
@@ -96,6 +103,7 @@ function toAddress() {
   for (const id of larderOnly.value) url.searchParams.append("li", id);
   for (const id of larderOut.value) url.searchParams.append("lx", id);
   if (onShelf.value) url.searchParams.set("own", "1");
+  if (onlySaved.value) url.searchParams.set("sv", "1");
   history.replaceState(null, "", url);
 }
 
@@ -125,6 +133,7 @@ async function run(toPage = 1) {
         larderItems: larderOnly.value,
         larderWithout: larderOut.value,
         onShelf: onShelf.value,
+        saved: onlySaved.value,
       },
     );
     if (mine !== latest) return;
@@ -143,6 +152,7 @@ watch(title, () => {
 });
 watch(kinds, () => run(), { deep: true });
 watch(onShelf, () => run());
+watch(onlySaved, () => run());
 watch(tags, () => run(), { deep: true });
 function toggleTag(id: string, on: boolean) {
   tags.value = on ? [...tags.value, id] : tags.value.filter((t) => t !== id);
@@ -285,7 +295,13 @@ onMounted(async () => {
   const ids = params.getAll("i").slice(0, MAX_INGREDIENTS);
   const sources = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_SOURCES);
   try {
-    if (!ids.length && !title.value.trim() && !tags.value.length && !useLarder.value) {
+    if (
+      !ids.length &&
+      !title.value.trim() &&
+      !tags.value.length &&
+      !useLarder.value &&
+      !onlySaved.value
+    ) {
       // larder=1 alone: the picker ticks every list, then searches.
       // Sources, before anything to search by: their names are all to show.
       for (const id of sources) {
@@ -312,6 +328,7 @@ onMounted(async () => {
       larderItems: larderOnly.value,
       larderWithout: larderOut.value,
       onShelf: onShelf.value,
+      saved: onlySaved.value,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
@@ -456,6 +473,10 @@ onMounted(async () => {
               ({{ result.shelf_books.toLocaleString() }}
               {{ result.shelf_books === 1 ? "book" : "books" }})</template
             >
+          </label>
+          <label v-if="user" class="check shelf-check">
+            <input v-model="onlySaved" type="checkbox" />
+            Only recipes I've <a href="/saved">saved</a>
           </label>
         </div>
       </div>

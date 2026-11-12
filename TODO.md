@@ -526,6 +526,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [x] Leaving a group, or being removed, left your larder lists
         shared with it (found in #142): they're unshared now, with the
         shelf, as family collections were.
+- [x] **Saved recipes** (#146; SCOPING.md, "Saves, likes, 'want to cook'
+      lists"; migration 0067). "Want to cook" on a recipe's page saves it;
+      "I've cooked it" moves it to cooked; either comes off again. `/saved`
+      (a Saved link when signed in) lists both, as search results are
+      shown. Search's "Only recipes I've saved" (`saved=true`; `sv=1` in
+      the address) keeps to them, and searches by them alone. Private like
+      the larder and shelf, and shared the same way: view members of a
+      group see the list, edit and admin members save to it, mark cooked
+      and take off. Leaving a group unshares it; deleting the account
+      deletes it; the catalog reset empties it.
+      - [ ] Likes, reviews and your own notes on a recipe: these are
+        public, user-written text, so they wait on the content rules and
+        moderation. Ask Ray what he wants first.
 - [ ] **LLM-assisted data processing.** *Ray, 2026-11-08.* Local models
       through n8n suggest ingredient merges, hierarchy, fixes for flagged
       lines and author names, for an admin to accept; they never write to
