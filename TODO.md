@@ -243,8 +243,17 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] An ingredient or author merged into another isn't recorded
         as such (only books are, book_merges), so its old address is a
         404, not a 301 to the one kept.
-      - [ ] 6. JSON-LD: Book and BreadcrumbList; never Recipe, as the page
-        has no method or amounts.
+      - [x] 6. Structured data (#164), one JSON-LD block a page. A source
+        is a Book with who wrote it (a Person, or an Organization for a
+        test kitchen), its ISBN and its year; or a WebSite, a Periodical,
+        a TVSeries, by its kind. A recipe's page is a WebPage, part of its
+        source and about its ingredients: never a Recipe, as the page has
+        no method or amounts. An author is a Person or an Organization,
+        with the same one on Wikidata and Open Library. Every page has
+        its breadcrumb. None for a record that isn't everyone's.
+      - [ ] Ray: run a recipe's page and a book's through Google's Rich
+        Results Test once live (the spec's check: valid Book and
+        BreadcrumbList, no Recipe).
       - [ ] Ray: submit the sitemap to Google Search Console and Bing
         Webmaster Tools once live.
 - [x] **Wikidata facts on author pages** (#90): born and died (years

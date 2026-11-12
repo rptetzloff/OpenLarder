@@ -25,6 +25,7 @@ in it the API wouldn't give a stranger, and can't drift from it.
 """
 
 import html
+import json
 import re
 import uuid
 from dataclasses import dataclass
@@ -63,6 +64,8 @@ class Page:
     moved_to: str | None = None
     # What the page shows, as plain HTML, until the SPA draws it.
     body: str = ""
+    # What it's about, as schema.org things, addresses as paths.
+    data: tuple[dict, ...] = ()
 
 
 NOT_FOUND = Page(status=404, robots="noindex")
@@ -424,6 +427,111 @@ def author_summary(shown: authors.AuthorOut) -> str:
     )
 
 
+# Structured data (schema.org, as JSON-LD): what a page is about, for a
+# search engine to read without guessing. Addresses are written as paths
+# here and made whole in fill, which knows the site's address.
+
+# What a source is, to schema.org. The rest are a CreativeWork.
+SCHEMA_TYPES = {
+    "book": "Book",
+    "website": "WebSite",
+    "magazine": "Periodical",
+    "newspaper": "Periodical",
+    "tv_show": "TVSeries",
+    "podcast": "PodcastSeries",
+}
+
+
+def _trail(*steps: tuple[str, str]) -> dict:
+    """The page's breadcrumb, as it shows: each step's name and address."""
+    return {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": n, "name": name, "item": path}
+            for n, (name, path) in enumerate(steps, start=1)
+        ],
+    }
+
+
+def _work(source_id: uuid.UUID, kind: str, title: str) -> dict:
+    """A source, by what it is: a Book, a WebSite, a Periodical, a TVSeries."""
+    return {
+        "@type": SCHEMA_TYPES.get(kind, "CreativeWork"),
+        "@id": f"/sources/{source_id}",
+        "name": title,
+        "url": f"/sources/{source_id}",
+    }
+
+
+def recipe_data(shown: recipes.RecipeOut) -> list[dict]:
+    """A page about a recipe, never a Recipe: the page has no method and no
+    amounts, and saying it's one would mislead a searcher and a search
+    engine both. It's part of its source and about its ingredients."""
+    page = {
+        "@type": "WebPage",
+        "@id": f"/recipes/{shown.id}",
+        "name": shown.title,
+        "url": f"/recipes/{shown.id}",
+        "isPartOf": _work(shown.source.id, shown.source.kind, shown.source.title),
+    }
+    about = [{"@type": "Thing", "name": name} for name in ingredient_names(shown)]
+    if about:
+        page["about"] = about
+    trail = _trail(
+        ("Sources", "/sources"),
+        (shown.source.title, f"/sources/{shown.source.id}"),
+        (shown.title, f"/recipes/{shown.id}"),
+    )
+    return [page, trail]
+
+
+def source_data(shown: sources.Book, organisations: set[uuid.UUID]) -> list[dict]:
+    """A Book with who wrote it, its ISBN and its year (the newest
+    edition's that has them); or what else the source is, by its kind."""
+    work = _work(shown.id, shown.kind, shown.title)
+    # Its authors; a photographer or an illustrator is a contributor.
+    by_role: dict[str, list[dict]] = {}
+    for credit in shown.credits:
+        role = "author" if credit.role == "author" else "contributor"
+        by_role.setdefault(role, []).append(
+            {
+                "@type": "Organization" if credit.author_id in organisations else "Person",
+                "name": credit.name,
+                "url": f"/authors/{credit.author_id}",
+            }
+        )
+    work.update(by_role)
+    if shown.kind == "book":
+        isbn = next((e.isbn13 for e in shown.editions if e.isbn13), None)
+        year = next((e.published_year for e in shown.editions if e.published_year), None)
+        if isbn:
+            work["isbn"] = isbn
+        if year:
+            work["datePublished"] = str(year)
+    if shown.host:
+        work["sameAs"] = f"https://{shown.host}"
+    return [work, _trail(("Sources", "/sources"), (shown.title, f"/sources/{shown.id}"))]
+
+
+def ingredient_data(shown: ingredients.IngredientOut) -> list[dict]:
+    return [_trail(("Ingredients", "/ingredients"), (shown.name, f"/ingredients/{shown.id}"))]
+
+
+def author_data(shown: authors.AuthorOut) -> list[dict]:
+    """A person or an organisation, and the same one elsewhere: Wikidata,
+    Open Library, their own site."""
+    who = {
+        "@type": "Person" if shown.kind == "person" else "Organization",
+        "@id": f"/authors/{shown.id}",
+        "name": shown.name,
+        "url": f"/authors/{shown.id}",
+    }
+    same = [u for u in (shown.wikidata_url, shown.open_library_url, shown.website) if u]
+    if same:
+        who["sameAs"] = same
+    return [who, _trail(("Authors", "/authors"), (shown.name, f"/authors/{shown.id}"))]
+
+
 async def recipe(session: AsyncSession, recipe_id: uuid.UUID) -> Page:
     shown = await recipes.as_signed_out(session, recipe_id)
     if shown is None:
@@ -435,6 +543,7 @@ async def recipe(session: AsyncSession, recipe_id: uuid.UUID) -> Page:
         path=f"/recipes/{shown.id}",
         og_type="article",
         body=recipe_summary(shown),
+        data=tuple(recipe_data(shown)),
     )
 
 
@@ -466,12 +575,20 @@ async def source(session: AsyncSession, source_id: uuid.UUID) -> Page:
             return HIDDEN
         kept = await _kept(session, source_id)
         return Page(status=301, moved_to=f"/sources/{kept}") if kept else NOT_FOUND
+    # Which of those it credits are organisations: a test kitchen isn't a Person.
+    credited = [c.author_id for c in shown.credits]
+    organisations = set(
+        await session.scalars(
+            select(Author.id).where(Author.id.in_(credited), Author.kind == "organisation")
+        )
+    )
     return Page(
         title=f"{shown.title} · {SITE}",
         description=source_description(shown),
         path=f"/sources/{shown.id}",
         og_type="book" if shown.kind == "book" else "website",
         body=source_summary(shown),
+        data=tuple(source_data(shown, organisations)),
     )
 
 
@@ -488,6 +605,7 @@ async def ingredient(session: AsyncSession, ingredient_id: uuid.UUID) -> Page:
         description=ingredient_description(shown),
         path=f"/ingredients/{shown.id}",
         body=ingredient_summary(shown),
+        data=tuple(ingredient_data(shown)),
     )
 
 
@@ -502,6 +620,7 @@ async def author(session: AsyncSession, author_id: uuid.UUID) -> Page:
         path=f"/authors/{shown.id}",
         og_type="profile" if shown.kind == "person" else "website",
         body=author_summary(shown),
+        data=tuple(author_data(shown)),
     )
 
 
@@ -570,6 +689,33 @@ def _put(shell: str, pattern: str, tag: str) -> str:
     return shell.replace("</head>", f"{tag}</head>", 1)
 
 
+# The keys whose values are addresses, written as paths until fill.
+ADDRESSES = {"@id", "url", "item"}
+
+
+def _whole(value, site: str):
+    """Structured data with its paths made whole addresses."""
+    if isinstance(value, dict):
+        return {
+            key: f"{site}{v}"
+            if key in ADDRESSES and isinstance(v, str) and v.startswith("/")
+            else _whole(v, site)
+            for key, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_whole(v, site) for v in value]
+    return value
+
+
+def json_ld(data: tuple[dict, ...] | list[dict], site_url: str) -> str:
+    """One JSON-LD block. "<" is written as its escape, so nothing in a
+    title can end the script."""
+    graph = {"@context": "https://schema.org", "@graph": _whole(list(data), site_url.rstrip("/"))}
+    text = json.dumps(graph, ensure_ascii=False, separators=(",", ":"))
+    text = text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return f'<script type="application/ld+json">{text}</script>'
+
+
 # Where the SPA mounts: empty in index.html, and whatever is put there is
 # replaced when it does.
 MOUNT = re.compile(r'(<div id="app">)\s*(</div>)')
@@ -607,4 +753,6 @@ def fill(shell: str, page: Page, site_url: str) -> str:
         more.append(_meta("property", "og:type", page.og_type))
     if page.robots:
         more.append(_meta("name", "robots", page.robots))
+    if page.data:
+        more.append(json_ld(page.data, site_url))
     return shell.replace("</head>", f"{''.join(more)}</head>", 1) if more else shell

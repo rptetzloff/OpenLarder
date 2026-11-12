@@ -3,6 +3,7 @@ recipe's and a source's get their own head, an id that names nothing is a
 404, and nothing of a record someone signed out can't see is ever written.
 *Ray's spec, 2026-11-11.*"""
 
+import json
 import re
 import uuid
 
@@ -444,6 +445,161 @@ def test_the_front_page_and_the_lists_say_which_address_is_theirs(tmp_path) -> N
         assert _content(page, "robots") == []
     # A page with nothing to say is index.html as it is.
     assert pages.without_record("data") is None
+
+
+# Structured data
+
+
+def _data(page: str) -> list[dict]:
+    """The page's one JSON-LD block, as its graph."""
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', page, re.DOTALL)
+    assert len(blocks) == 1, blocks
+    graph = json.loads(blocks[0])
+    assert graph["@context"] == "https://schema.org"
+    return graph["@graph"]
+
+
+SITE_URL = "http://testserver"
+
+
+async def test_a_recipes_page_is_a_page_about_it_never_a_recipe(admin, adb, client) -> None:
+    """The page has no method and no amounts, so it isn't marked up as a
+    Recipe: it's a WebPage, part of its book, about its ingredients."""
+    book = await _book(admin)
+    recipe = await _recipe(admin, adb, book, ingredients=("Egg", "Almond Flour"))
+    page = (await client.get(f"/recipes/{recipe}")).text
+    assert _data(page) == [
+        {
+            "@type": "WebPage",
+            "@id": f"{SITE_URL}/recipes/{recipe}",
+            "name": "Banana Bread",
+            "url": f"{SITE_URL}/recipes/{recipe}",
+            "isPartOf": {
+                "@type": "Book",
+                "@id": f"{SITE_URL}/sources/{book}",
+                "name": "Against All Grain",
+                "url": f"{SITE_URL}/sources/{book}",
+            },
+            "about": [
+                {"@type": "Thing", "name": "Egg"},
+                {"@type": "Thing", "name": "Almond Flour"},
+            ],
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": 1,
+                    "name": "Sources",
+                    "item": f"{SITE_URL}/sources",
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "name": "Against All Grain",
+                    "item": f"{SITE_URL}/sources/{book}",
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 3,
+                    "name": "Banana Bread",
+                    "item": f"{SITE_URL}/recipes/{recipe}",
+                },
+            ],
+        },
+    ]
+    assert '"Recipe"' not in page
+
+
+async def test_a_book_says_who_wrote_it_its_isbn_and_its_year(admin, adb, client) -> None:
+    book = await _book(admin, authors=("Danielle Walker", "America's Test Kitchen"))
+    await adb.execute(text("UPDATE editions SET isbn13 = '9780393541113', published_year = 2020"))
+    credits = (await client.get(f"/api/sources/{book}")).json()["credits"]
+    danielle, kitchen = (c["author_id"] for c in credits)
+    fixed = await admin.patch(
+        f"/api/authors/{kitchen}", json={"name": "America's Test Kitchen", "kind": "organisation"}
+    )
+    assert fixed.status_code == 200, fixed.text
+    work, trail = _data((await client.get(f"/sources/{book}")).text)
+    assert work == {
+        "@type": "Book",
+        "@id": f"{SITE_URL}/sources/{book}",
+        "name": "Against All Grain",
+        "url": f"{SITE_URL}/sources/{book}",
+        "author": [
+            {"@type": "Person", "name": "Danielle Walker", "url": f"{SITE_URL}/authors/{danielle}"},
+            {
+                "@type": "Organization",
+                "name": "America's Test Kitchen",
+                "url": f"{SITE_URL}/authors/{kitchen}",
+            },
+        ],
+        "isbn": "9780393541113",
+        "datePublished": "2020",
+    }
+    assert [(i["name"], i["item"]) for i in trail["itemListElement"]] == [
+        ("Sources", f"{SITE_URL}/sources"),
+        ("Against All Grain", f"{SITE_URL}/sources/{book}"),
+    ]
+
+
+async def test_other_sources_are_what_they_are(admin, client) -> None:
+    async def kind_of(path, body):
+        added = await admin.post(path, json=body)
+        assert added.status_code == 200, added.text
+        return _data((await client.get(f"/sources/{added.json()['id']}")).text)[0]
+
+    site = await kind_of(
+        "/api/sources/websites", {"address": "https://example.com/", "name": "Example Kitchen"}
+    )
+    assert (site["@type"], site["sameAs"]) == ("WebSite", "https://example.com")
+    magazine = await kind_of("/api/sources/periodicals", {"kind": "magazine", "title": "Saveur"})
+    assert magazine["@type"] == "Periodical" and "isbn" not in magazine
+    show = await kind_of("/api/sources/shows", {"kind": "tv_show", "title": "Salt and Time"})
+    assert show["@type"] == "TVSeries"
+
+
+async def test_an_ingredient_and_an_author_say_where_they_are(admin, adb, client) -> None:
+    book = await _book(admin, authors=("Danielle Walker",))
+    await _recipe(admin, adb, book)
+    egg = await adb.scalar(text("SELECT id FROM ingredients WHERE name = 'Egg'"))
+    author = (await client.get(f"/api/sources/{book}")).json()["credits"][0]["author_id"]
+    (trail,) = _data((await client.get(f"/ingredients/{egg}")).text)
+    assert [(i["name"], i["item"]) for i in trail["itemListElement"]] == [
+        ("Ingredients", f"{SITE_URL}/ingredients"),
+        ("Egg", f"{SITE_URL}/ingredients/{egg}"),
+    ]
+    who, trail = _data((await client.get(f"/authors/{author}")).text)
+    assert who == {
+        "@type": "Person",
+        "@id": f"{SITE_URL}/authors/{author}",
+        "name": "Danielle Walker",
+        "url": f"{SITE_URL}/authors/{author}",
+    }
+    assert [i["name"] for i in trail["itemListElement"]] == ["Authors", "Danielle Walker"]
+
+
+async def test_structured_data_cant_end_its_script(admin, adb, client) -> None:
+    book = await _book(admin, title="</script><script>alert(1)</script>", authors=())
+    recipe = await _recipe(admin, adb, book, title="Pie & <b>Mash</b>")
+    for path in (f"/recipes/{recipe}", f"/sources/{book}"):
+        page = (await client.get(path)).text
+        assert "<script>alert(1)" not in page and "<b>Mash" not in page, path
+    # And read back, it still says what the record says.
+    assert _data(page)[0]["name"] == "</script><script>alert(1)</script>"
+    recipe_page = _data((await client.get(f"/recipes/{recipe}")).text)[0]
+    assert recipe_page["name"] == "Pie & <b>Mash</b>"
+
+
+async def test_a_page_with_nothing_to_say_has_no_structured_data(people, client) -> None:
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Secret Box", "acknowledged": True})
+    ).json()["id"]
+    for asking in (client, ann):
+        for path in (f"/sources/{box}", f"/recipes/{uuid.uuid4()}"):
+            assert "application/ld+json" not in (await asking.get(path)).text, path
 
 
 # What isn't there, and what isn't for everyone
