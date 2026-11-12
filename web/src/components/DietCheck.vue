@@ -7,8 +7,9 @@ import { checkDiet, type Diet, type DietCheck, listDiets } from "../substitution
 // the diet avoids, and the swaps recorded for them (diets.py); and what the
 // diet avoids only together (Kosher's meat with milk), found across the
 // recipe. Never says the recipe suits the diet.
-// noticeAbove: the page shows the allergen notice just above already.
-const props = defineProps<{ recipeId: string; noticeAbove?: boolean }>();
+// A card in the recipe page's sidebar (Ray's cleanup pass, section 2).
+// noticeShown: the page shows the full allergen notice already.
+const props = defineProps<{ recipeId: string; noticeShown?: boolean }>();
 
 const diets = ref<Diet[]>([]);
 const chosen = ref("");
@@ -68,15 +69,15 @@ async function check() {
 </script>
 
 <template>
-  <section v-if="diets.length" class="recipe-section diet-check" aria-labelledby="diet-check-title">
+  <section v-if="diets.length" class="diet-check" aria-labelledby="diet-check-title">
     <h2 id="diet-check-title">Cooking for a diet</h2>
-    <label class="diet-choice">
-      Diet
-      <select v-model="chosen" @change="check">
-        <option value="">Choose one</option>
-        <option v-for="d in diets" :key="d.id" :value="d.id">{{ d.name }}</option>
-      </select>
-    </label>
+    <select v-model="chosen" aria-labelledby="diet-check-title" @change="check">
+      <option value="">Choose a diet</option>
+      <option v-for="d in diets" :key="d.id" :value="d.id">{{ d.name }}</option>
+    </select>
+    <p v-if="!result && !loading" class="muted diet-help">
+      Shows swaps for ingredients a diet avoids. Crowdsourced, not a safety guarantee.
+    </p>
     <p v-if="loading" class="status" aria-live="polite">Checking…</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div v-if="result" aria-live="polite">
@@ -135,8 +136,8 @@ async function check() {
           <p v-else class="status">No swap recorded for it yet.</p>
         </li>
       </ul>
-      <p v-if="noticeAbove" class="allergen-notice">
-        As above: only what the catalog records, which is no guarantee.
+      <p v-if="noticeShown" class="allergen-notice">
+        Only what the catalog records, which is no guarantee.
       </p>
       <p v-else class="allergen-notice">
         Only what the catalog records about these ingredients: one with nothing recorded may still
@@ -147,18 +148,30 @@ async function check() {
 </template>
 
 <style scoped>
-.diet-choice select {
+.diet-check {
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+.diet-check h2 {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-md);
+}
+.diet-check select {
   font: inherit;
-  margin-left: 0.4rem;
-  padding: 0.25rem 0.4rem;
+  font-size: var(--text-md);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.5rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
 }
-.diet-choice {
-  display: inline-block;
-  margin-bottom: 0.75rem;
+.diet-help {
+  margin: 0.5rem 0 0;
 }
 .diet-lines p {
   margin: 0;

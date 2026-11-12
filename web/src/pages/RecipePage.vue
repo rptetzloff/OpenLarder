@@ -2,9 +2,9 @@
 import { arrange } from "../shops";
 import GrocerChooser from "../components/GrocerChooser.vue";
 import DietCheck from "../components/DietCheck.vue";
-import { grocerHref, grocerNow } from "../grocery";
+import { grocerHref, grocerNow, loadGrocers } from "../grocery";
 import { loadAllergens, notice as allergenNotice } from "../allergens";
-import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
+import { buyHref, notes, shopName } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
@@ -18,7 +18,7 @@ import SwapList from "../components/SwapList.vue";
 import { type Flag, recipeFlags } from "../flags";
 import type { Me } from "../me";
 import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
-import { onShelf } from "../shelf";
+import { type OnShelf, onShelf } from "../shelf";
 import RecipeActions from "../components/RecipeActions.vue";
 import RecipeNotes from "../components/RecipeNotes.vue";
 import type { Thing } from "../substitutions";
@@ -38,6 +38,8 @@ const flags = ref<Flag[]>([]);
 const openFlags = computed(() => flags.value.filter((f) => !f.resolution));
 
 onMounted(loadAllergens);
+// The grocers, for the rows' Shop buttons.
+onMounted(loadGrocers);
 onMounted(async () => {
   try {
     const res = await fetch(`/api/recipes/${props.id}`);
@@ -72,9 +74,26 @@ function editionLabel(p: Recipe["pages"][number]) {
 // shared with you, shown first if the recipe is in it.
 const yours = ref<string | null>(null);
 const whose = ref("yours");
+// The book on your shelf, or one shared with you, for the sidebar to say.
+const shelf = ref<OnShelf | null>(null);
+const shelved = computed(() => {
+  const s = shelf.value;
+  if (!s) return null;
+  const other = s.others.find((o) => o.on_shelf);
+  if (!s.on_shelf && !other) return null;
+  const editionId = s.on_shelf ? s.edition_id : other!.edition_id;
+  const page = recipe.value?.pages.find((p) => p.edition_id === editionId);
+  return {
+    where: s.on_shelf ? "On your shelf" : `On ${other!.owner_name ?? "someone"}'s shelf`,
+    edition: page
+      ? [page.published_year, page.isbn13 && `ISBN ${page.isbn13}`].filter(Boolean).join(" · ")
+      : "",
+  };
+});
 async function showYours(r: Recipe) {
   try {
     const mine = await onShelf(r.source.id);
+    shelf.value = mine;
     const has = (id: string | null) => !!id && r.pages.some((p) => p.edition_id === id);
     const other = mine.others.find((o) => has(o.edition_id));
     const found = has(mine.edition_id) ? mine.edition_id : (other?.edition_id ?? null);
@@ -97,17 +116,26 @@ const findLabel = computed(() => {
   if (r.source.kind === "family") return "From the family collection";
   return "Find it in";
 });
-// Where the amounts and method are, said plainly.
-const methodWhere = computed(() => {
-  const r = recipe.value;
-  if (!r) return "";
-  if (r.web_address) return r.source.kind === "social" ? "on the post" : "on the page";
-  if (r.issue) return "in the issue";
-  if (r.episode) return "in the episode";
-  if (r.source.kind === "packaging") return "on the packaging";
-  if (r.source.kind === "family") return "with the family's copy";
-  return "in the book";
-});
+// A line's ingredients a grocer can be searched for: one Shop button each.
+type Line = Recipe["lines"][number];
+const shoppable = (line: Line) => line.options.filter((o) => o.ingredient);
+const between = (line: Line, j: number) =>
+  j < line.options.length - 1 ? ", " : line.options.length > 2 ? ", or " : " or ";
+// Commissions are said beside the links they're about (Ray, 2026-11-12):
+// a line under the buy buttons, with the wording a shop's programme
+// requires while its button is showing (Amazon's Associates statement),
+// and one under the ingredients for all their Shop links.
+const shopping = computed(
+  () => !!grocerNow() && !!recipe.value?.lines.some((l) => shoppable(l).length),
+);
+// History, folded away until asked for from the sidebar's foot.
+const showHistory = ref(false);
+// The reader's first two shops as buttons; the rest behind "More shops".
+const moreShops = ref(false);
+const SHOPS_SHOWN = 2;
+const shopsShown = computed(() =>
+  moreShops.value ? buyLinks.value : buyLinks.value.slice(0, SHOPS_SHOWN),
+);
 
 // The ingredient lines, as typed, to paste into a shopping list.
 const copyNote = ref("");
@@ -140,9 +168,13 @@ const swapChoices = computed<Thing[]>(() => {
 const firstPage = computed(() => recipe.value?.pages.find((p) => p.page) ?? recipe.value?.pages[0]);
 const addingSwap = ref(false);
 
-// "8 November 2026", for an archived copy's date and when it was added.
+// "8 November 2026", for an archived copy's date.
 function day(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "long" }) : "";
+}
+// "Nov 8, 2026", for when it was added.
+function shortDay(iso: string | null) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
 }
 
 // The page's copy, and whether it's gone, for admins.
@@ -299,68 +331,95 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                 </div>
                 <div v-if="buyLinks.length" class="buy-links">
                   <p class="buy-row">
-                    <span>Buy the book:</span>
+                    <span class="muted">Buy the book</span>
                     <a
-                      v-for="b in buyLinks"
+                      v-for="b in shopsShown"
                       :key="b.retailer"
                       :href="buyHref(b)"
                       rel="sponsored noopener"
+                      class="buy-button"
                       >{{ shopName(b) }}</a
                     >
+                    <button
+                      v-if="buyLinks.length > SHOPS_SHOWN && !moreShops"
+                      type="button"
+                      class="link more-shops"
+                      @click="moreShops = true"
+                    >
+                      More shops
+                    </button>
                   </p>
-                  <p class="buy-note">{{ DISCLOSURE }}</p>
-                  <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>
+                  <p class="buy-note">
+                    OpenLarder may earn a commission if you buy through these links.
+                    <template v-for="n in notes(shopsShown)" :key="n">{{ n }}{{ " " }}</template>
+                    <a href="/terms#commissions">How this works</a>
+                  </p>
                 </div>
               </template>
               <p v-if="recipe.chapter" class="find-chapter">In “{{ recipe.chapter }}”</p>
             </div>
           </section>
 
-          <p class="reference-note">
-            OpenLarder is a cookbook reference: it tells you where this recipe is and what goes in
-            it. The amounts and the method are {{ methodWhere }}.
-          </p>
-
           <section class="recipe-section">
             <div class="table-head">
-              <h2>Ingredients ({{ recipe.lines.length }})</h2>
+              <h2>
+                Ingredients
+                <span class="ingredient-count">{{ recipe.lines.length }}</span>
+              </h2>
               <span v-if="recipe.lines.length" class="copy-list">
                 <span class="status" role="status">{{ copyNote }}</span>
                 <button type="button" class="secondary" @click="copyList">Copy list</button>
               </span>
             </div>
-            <GrocerChooser v-if="recipe.lines.length" :signed-in="!!user" />
-            <ul v-if="recipe.lines.length" class="ingredient-lines">
+            <ul v-if="recipe.lines.length" class="ingredient-lines ingredient-rows">
               <li v-for="(line, i) in recipe.lines" :key="i">
-                <template v-for="(o, j) in line.options" :key="j">
-                  <template v-if="j > 0">{{
-                    j < line.options.length - 1 ? ", " : line.options.length > 2 ? ", or " : " or "
-                  }}</template>
-                  <a v-if="o.recipe" :href="`/recipes/${o.recipe.id}`">{{ o.name }}</a>
-                  <a v-else-if="o.ingredient" :href="`/ingredients/${o.ingredient.id}`">{{
-                    o.name
-                  }}</a>
-                  <template v-else>{{ o.name }}</template>
-                  <span v-if="o.page" class="page-ref">p. {{ o.page }}</span>
-                </template>
-                <span v-if="grocerNow() && line.options.some((o) => o.ingredient)" class="shop-links">
-                  ·
-                  <template v-for="(o, j) in line.options.filter((o) => o.ingredient)" :key="j"
-                    ><template v-if="j > 0"> · </template
-                    ><a :href="grocerHref(grocerNow()!, o.ingredient!.id)" rel="sponsored noopener"
-                      >{{
-                        line.options.filter((x) => x.ingredient).length > 1
-                          ? `Shop ${o.name.toLowerCase()}`
-                          : "Shop"
-                      }}<span class="visually-hidden">{{
-                        ` for ${o.name} at ${grocerNow()!.label}`
-                      }}</span></a
-                    ></template
+                <span class="row-names">
+                  <template v-for="(o, j) in line.options" :key="j">
+                    <span v-if="j > 0" class="muted">{{ between(line, j) }}</span>
+                    <a v-if="o.recipe" :href="`/recipes/${o.recipe.id}`">{{ o.name }}</a>
+                    <a v-else-if="o.ingredient" :href="`/ingredients/${o.ingredient.id}`">{{
+                      o.name
+                    }}</a>
+                    <span v-else>{{ o.name }}</span>
+                    <span v-if="o.page" class="page-ref">p. {{ o.page }}</span>
+                  </template>
+                </span>
+                <!-- One Shop button for each ingredient the line names: "Shop",
+                     or with a choice of them, the ingredient's name. -->
+                <span v-if="grocerNow() && shoppable(line).length" class="row-shop">
+                  <a
+                    v-for="o in shoppable(line)"
+                    :key="o.ingredient!.id"
+                    :href="grocerHref(grocerNow()!, o.ingredient!.id)"
+                    rel="sponsored noopener"
+                    class="shop-pill"
                   >
+                    <span>
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M2 3h2.5l2 9.5h8.5l1.75-6.5H5.6" />
+                        <circle cx="8" cy="16" r="1.1" />
+                        <circle cx="14" cy="16" r="1.1" />
+                      </svg>
+                      <template v-if="shoppable(line).length > 1"
+                        ><span class="visually-hidden">Shop for </span>{{ o.name }}</template
+                      >
+                      <template v-else
+                        >Shop<span class="visually-hidden"> for {{ o.name.toLowerCase() }}</span></template
+                      >
+                    </span>
+                  </a>
                 </span>
               </li>
             </ul>
             <p v-else class="status">No ingredients recorded yet.</p>
+            <div v-if="shopping" class="commission">
+              <p class="muted">
+                OpenLarder may earn a commission from these Shop links.
+                <template v-if="grocerNow()?.note">{{ grocerNow()!.note }}{{ " " }}</template>
+                <a href="/terms#commissions">How this works</a>
+              </p>
+              <GrocerChooser :signed-in="!!user" />
+            </div>
           </section>
 
           <RecipeNotes v-if="user" :recipe-id="recipe.id" />
@@ -390,8 +449,6 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               still contain any of them. {{ allergenNotice }}
             </p>
           </section>
-
-          <DietCheck v-if="recipe.lines.some((l) => l.options.some((o) => o.ingredient))" :recipe-id="recipe.id" :notice-above="recipe.allergens.length > 0" />
 
           <section v-if="recipe.used_in.length" class="recipe-section">
             <h2>Used in</h2>
@@ -434,6 +491,20 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         </div>
 
         <aside class="recipe-aside">
+          <DietCheck
+            v-if="recipe.lines.some((l) => l.options.some((o) => o.ingredient))"
+            :recipe-id="recipe.id"
+            :notice-shown="recipe.allergens.length > 0"
+          />
+          <p v-if="shelved" class="side-card shelf-status">
+            <span class="tick" aria-hidden="true">
+              <svg viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8.5" /></svg>
+            </span>
+            <span>
+              <strong><a href="/shelf">{{ shelved.where }}</a></strong>
+              <span v-if="shelved.edition" class="muted">{{ shelved.edition }}</span>
+            </span>
+          </p>
           <section v-if="openFlags.length" class="flag-box">
             <h2>Open flags</h2>
             <ul class="flag-list">
@@ -480,14 +551,200 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           </div>
           <p v-if="pageNote" class="status" role="status">{{ pageNote }}</p>
           <p v-if="error" class="error" role="alert">{{ error }}</p>
-          <p v-if="recipe.added_by || recipe.added_on" class="status added-by">
-            Added{{ recipe.added_by ? ` by ${recipe.added_by}` : ""
-            }}{{ recipe.added_on ? ` on ${day(recipe.added_on)}` : "" }}
-          </p>
+          <div class="aside-foot muted">
+            <span v-if="recipe.added_by || recipe.added_on"
+              >Added{{ recipe.added_by ? ` by ${recipe.added_by}` : ""
+              }}{{ recipe.added_on ? `, ${shortDay(recipe.added_on)}` : "" }}</span
+            >
+            <button
+              type="button"
+              class="link"
+              :aria-expanded="showHistory"
+              aria-controls="recipe-history"
+              @click="showHistory = !showHistory"
+            >
+              History
+            </button>
+            <ReportButton kind="recipe" :id="id" />
+          </div>
         </aside>
       </div>
-      <ReportButton kind="recipe" :id="id" />
-      <HistoryPanel kind="recipes" :id="id" :can-revert="!!user?.may_edit" />
+      <div id="recipe-history">
+        <HistoryPanel
+          v-if="showHistory"
+          kind="recipes"
+          :id="id"
+          :can-revert="!!user?.may_edit"
+          start-open
+        />
+      </div>
     </template>
   </article>
 </template>
+
+<style scoped>
+/* Ray's cleanup pass, section 2 (2026-11-11). */
+.buy-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.buy-button:hover {
+  border-color: var(--fg);
+}
+.more-shops {
+  min-height: 2.75rem;
+  font-size: var(--text-sm);
+}
+.buy-note {
+  font-size: var(--text-sm);
+}
+.ingredient-count {
+  margin-left: 0.25rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+/* A row: the names on the left, Shop at the right end. */
+.ingredient-rows {
+  background: var(--surface);
+}
+.ingredient-rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  padding: 0 0.875rem;
+  min-height: 2.75rem;
+}
+.row-names {
+  padding: 0.5rem 0;
+  font-weight: 500;
+}
+.row-names a {
+  color: var(--fg);
+  text-decoration: none;
+}
+.row-names a:hover,
+.row-names a:focus-visible {
+  text-decoration: underline;
+}
+.row-names .muted {
+  font-weight: 400;
+}
+.row-shop {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 0.25rem;
+}
+/* 44px to tap, drawn as a smaller pill. */
+.shop-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.shop-pill > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.shop-pill:hover > span,
+.shop-pill:focus-visible > span {
+  border-color: var(--border);
+  color: var(--fg);
+}
+.shop-pill svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.commission {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+  font-size: var(--text-sm);
+}
+.commission p {
+  margin: 0;
+}
+/* The sidebar's cards and its foot. */
+.side-card {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.shelf-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.shelf-status > span:last-child {
+  display: grid;
+}
+.shelf-status a {
+  color: var(--fg);
+}
+.shelf-status .muted {
+  font-size: var(--text-sm);
+}
+.tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.tick svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.aside-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.75rem;
+  font-size: var(--text-sm);
+}
+.aside-foot :deep(.report-problem) {
+  margin-top: 0;
+}
+.aside-foot :deep(.report-form) {
+  flex-basis: 100%;
+}
+.aside-foot :deep(button.link) {
+  min-height: 2.75rem;
+}
+</style>

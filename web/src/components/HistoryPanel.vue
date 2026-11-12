@@ -4,7 +4,8 @@ import { type Change, type Kind, historyOf } from "../history";
 import ChangeList from "./ChangeList.vue";
 
 // A record's edit history, folded away until opened, and loaded then.
-const props = defineProps<{ kind: Kind; id: string; canRevert?: boolean }>();
+// startOpen: asked for already, so open and loading from the start.
+const props = defineProps<{ kind: Kind; id: string; canRevert?: boolean; startOpen?: boolean }>();
 const changes = ref<Change[] | null>(null);
 const error = ref("");
 
@@ -20,12 +21,14 @@ function opened(event: Event) {
   if ((event.target as HTMLDetailsElement).open && !changes.value) load();
 }
 
+if (props.startOpen) load();
+
 // An undo changes the record itself: the whole page reloads to show it.
 const reverted = () => location.reload();
 </script>
 
 <template>
-  <details class="history-panel" @toggle="opened">
+  <details class="history-panel" :open="startOpen" @toggle="opened">
     <summary>History</summary>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-else-if="!changes" class="status">Loading…</p>

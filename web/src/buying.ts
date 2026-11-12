@@ -25,5 +25,7 @@ export const notes = (links: BuyLink[]) => [
 export const buyHref = (link: BuyLink) =>
   `${link.url}?from=${encodeURIComponent(location.pathname)}`;
 
-// What the FTC asks of an affiliate link: said plainly, beside it.
+// What the FTC asks of an affiliate link: said plainly, beside it. A
+// recipe's page says it in its own words, under its buy buttons and again
+// under its ingredients' Shop links; a book's page uses this.
 export const DISCLOSURE = "OpenLarder earns a commission if you buy through these links.";
