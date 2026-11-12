@@ -113,7 +113,9 @@ async function seed() {
   const episode = await api(`/api/sources/${show.id}/recipes`, "admin", {
     title: "Buttermilk Chicken",
     episode: { season: 1, number: 2, title: "Salt", at: "12:34" },
-    ingredients: ["Buttermilk", "Chicken"],
+    // Chicken, lemon and garlic: one of the front page's example searches,
+    // so its chip is there to be checked.
+    ingredients: ["Buttermilk", "Chicken", "Lemon", "Garlic"],
   });
 
   const box = await api("/api/sources/family", "cook", { title: "Gran's Box", acknowledged: true });

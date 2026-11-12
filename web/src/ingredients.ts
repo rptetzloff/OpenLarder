@@ -112,6 +112,15 @@ export async function listIngredients(
   return res.json();
 }
 
+// The ingredients with exactly these names, whatever the case; those
+// that aren't there are left out.
+export async function ingredientsNamed(names: string[]): Promise<IngredientSummary[]> {
+  const query = new URLSearchParams(names.map((name) => ["name", name]));
+  const res = await fetch(`/api/ingredients?${query}`);
+  if (!res.ok) throw new Error("The ingredients couldn't be loaded.");
+  return ((await res.json()) as IngredientList).ingredients;
+}
+
 // under: list the recipes using anything under it too.
 export async function fetchIngredient(
   id: string,
