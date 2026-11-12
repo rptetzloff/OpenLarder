@@ -1476,7 +1476,6 @@ a.secondary.small::after {
   margin-left: 0.25rem;
   color: var(--muted);
 }
-.ingredient-list .numeric,
 .author-list .numeric {
   text-align: right;
 }
@@ -1488,11 +1487,9 @@ a.secondary.small::after {
     display: inline;
     color: var(--muted);
   }
-  .ingredient-list td.empty,
   .author-list td.empty {
     display: none;
   }
-  .ingredient-list .numeric,
   .author-list .numeric {
     text-align: left;
   }

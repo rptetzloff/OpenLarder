@@ -173,9 +173,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         When fewer than six have one, the row is those by how many, under
         "Most indexed sources"; still none that's empty. The Sources page
         lists everything, as before.
-      - [ ] 10. Ingredients list, no columns of dashes: two columns,
-        Ingredient and Recipes, with "Under Cheese · Also called scallion"
-        beneath a name only when there's something to say.
+      - [x] 10. Ingredients list, no columns of dashes (#158): two
+        columns, Ingredient and Recipes, with one muted line beneath a
+        name only when there's something to say: "Under Cheese · Also
+        called scallion, spring onion". The words stay in the line, so it
+        reads aloud without a column's heading. Its CSS is the page's own.
       - [ ] 11. Home, example searches: "Try:" chips under "Cook with what
         you have", each a finished search of well-used ingredients that
         returns at least ten recipes.
