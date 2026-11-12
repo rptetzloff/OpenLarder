@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import CoverBlank from "../components/CoverBlank.vue";
+import SourceRow from "../components/SourceRow.vue";
 import { onMounted, ref } from "vue";
-import { type BookSummary, KIND_NAMES, listSources } from "../books";
+import { type BookSummary, listSources } from "../books";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import type { Named } from "../ingredients";
 
@@ -24,15 +24,9 @@ function findRecipes() {
 const recent = ref<BookSummary[] | null>(null);
 onMounted(async () => {
   document.title = "OpenLarder";
-  recent.value = (await listSources("", 0, 5, "recent").catch(() => null))?.sources ?? [];
+  // A row's worth, to scroll through (Ray's cleanup pass, section 4).
+  recent.value = (await listSources("", 0, 20, "recent").catch(() => null))?.sources ?? [];
 });
-
-// Under a card's title: who made it, or the site, then how many recipes.
-function byline(s: BookSummary) {
-  const who = s.authors.join(", ") || s.host;
-  const count = `${s.recipes} ${s.recipes === 1 ? "recipe" : "recipes"}`;
-  return who ? `${who} · ${count}` : count;
-}
 </script>
 
 <template>
@@ -85,23 +79,13 @@ function byline(s: BookSummary) {
       </div>
     </section>
 
-    <section class="home-section">
+    <section class="home-section" aria-labelledby="recent-title">
       <div class="section-head">
-        <h2>Recently added sources</h2>
+        <h2 id="recent-title">Recently added sources</h2>
         <a href="/sources">Browse all sources</a>
       </div>
       <p v-if="recent && !recent.length" class="status">Nothing yet.</p>
-      <ul v-else-if="recent" class="cover-grid">
-        <li v-for="s in recent" :key="s.id">
-          <a :href="`/sources/${s.id}`" class="cover-card">
-            <img v-if="s.cover_url" :src="s.cover_url" alt="" loading="lazy" />
-            <CoverBlank v-else :title="s.title" :byline="s.authors.join(', ') || s.host" :kind="s.kind" />
-            <span class="kind">{{ KIND_NAMES[s.kind] }}</span>
-            <strong>{{ s.title }}</strong>
-            <span class="byline">{{ byline(s) }}</span>
-          </a>
-        </li>
-      </ul>
+      <SourceRow v-else-if="recent" :sources="recent" labelledby="recent-title" />
     </section>
 
     <section class="home-section value-cards">

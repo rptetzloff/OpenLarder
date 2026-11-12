@@ -119,8 +119,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         a click elsewhere or tabbing out. On a phone: the logo, Search and
         one Menu with all of it. "Skip to content" is the first thing Tab
         reaches. The header's CSS is its own (SiteHeader.vue).
-      - [ ] 4. Home: recent sources as one row that scrolls sideways, 20 of
-        them, with arrows and a "Browse all sources" card.
+      - [x] 4. Home, recent sources (#153): one row of 20 that scrolls
+        sideways and snaps to cards, within the page's width; an arrow at
+        each end while there's further to go (not on touch devices, nor
+        when everything fits), a fade on the right while more remains, and
+        a last "Browse all sources" card. Arrow keys scroll it once it has
+        focus; no smooth scrolling when the device asks for none.
       - [ ] 5. Search, results first: the form folded to a summary once
         there's a query, focus to the results, six diets then "Show all".
       - [ ] 6. Author names shown as "Danielle Walker", not "Walker,
