@@ -258,9 +258,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         front page and the Sources, Ingredients and Authors lists say
         which address is theirs (the one without a query), and the lists
         have their own title and description.
-      - [ ] An ingredient or author merged into another isn't recorded
-        as such (only books are, book_merges), so its old address is a
-        404, not a 301 to the one kept.
+      - [x] A merged ingredient's or author's old address goes to the one
+        kept (#171; migration 0070): each merge records the id that went
+        and the one kept, and the old page answers 301 to where it is
+        now, following merges on, if anyone can see it. Merges made
+        before this have no record, so their old addresses are still 404.
       - [x] 6. Structured data (#164), one JSON-LD block a page. A source
         is a Book with who wrote it (a Person, or an Organization for a
         test kitchen), its ISBN and its year; or a WebSite, a Periodical,

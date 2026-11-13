@@ -28,6 +28,7 @@ from openlarder.models import (
     IngredientAlias,
     IngredientOption,
     LarderItem,
+    MergedRecord,
     Recipe,
     RecipeIngredient,
     Substitution,
@@ -244,6 +245,8 @@ async def merge(session: AsyncSession, source: Ingredient, target: Ingredient) -
         target.fdc_id = source.fdc_id
     if target.wikidata_id is None:
         target.wikidata_id, target.wikidata_label = source.wikidata_id, source.wikidata_label
+    # Where it went, for its old address to say (pages.py).
+    session.add(MergedRecord(kind="ingredient", gone_id=s, kept_id=t))
     await session.delete(source)
     await session.flush()
 

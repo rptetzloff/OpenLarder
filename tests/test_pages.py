@@ -722,6 +722,114 @@ async def test_a_merged_sources_address_goes_to_the_one_kept(admin, adb, client,
     assert (await client.get(f"/sources/{into_private}")).status_code == 404
 
 
+async def test_a_merged_ingredients_address_goes_to_the_one_kept(admin, adb, client) -> None:
+    book = await _book(admin)
+    await _recipe(
+        admin, adb, book, ingredients=("Scallion", "Spring Onion", "Green Onion", "Butter")
+    )
+    named = {
+        n: str(await adb.scalar(text("SELECT id FROM ingredients WHERE name = :n"), {"n": n}))
+        for n in ("Scallion", "Spring Onion", "Green Onion", "Butter")
+    }
+
+    async def merge(gone, kept):
+        done = await admin.post(f"/api/ingredients/{named[gone]}/merge", json={"into": named[kept]})
+        assert done.status_code == 200, done.text
+
+    # Before: its own page.
+    assert (await client.get(f"/ingredients/{named['Spring Onion']}")).status_code == 200
+    await merge("Spring Onion", "Scallion")
+    moved = await client.get(f"/ingredients/{named['Spring Onion']}")
+    assert moved.status_code == 301
+    assert moved.headers["location"] == f"/ingredients/{named['Scallion']}"
+    # The one kept is merged on: both old addresses go to where it is now.
+    await merge("Scallion", "Green Onion")
+    for old in ("Spring Onion", "Scallion"):
+        moved = await client.get(f"/ingredients/{named[old]}")
+        assert (moved.status_code, moved.headers["location"]) == (
+            301,
+            f"/ingredients/{named['Green Onion']}",
+        ), old
+    # One that was never merged, and one that never was: as before.
+    assert (await client.get(f"/ingredients/{named['Butter']}")).status_code == 200
+    assert (await client.get(f"/ingredients/{uuid.uuid4()}")).status_code == 404
+
+
+async def test_a_merged_authors_address_goes_to_the_one_kept(admin, client) -> None:
+    await _book(admin, title="Plenty", authors=("Yotam Ottolenghi",))
+    book = await _book(admin, title="Simple", authors=("Ottolenghi, Y.",))
+    credits = {}
+    for title in ("Plenty", "Simple"):
+        listed = (await client.get("/api/sources", params={"q": title})).json()["sources"]
+        shown = (await client.get(f"/api/sources/{listed[0]['id']}")).json()
+        credits[title] = shown["credits"][0]["author_id"]
+    assert credits["Plenty"] != credits["Simple"], book
+    done = await admin.post(
+        f"/api/authors/{credits['Simple']}/merge", json={"into": credits["Plenty"]}
+    )
+    assert done.status_code == 200, done.text
+    moved = await client.get(f"/authors/{credits['Simple']}")
+    assert (moved.status_code, moved.headers["location"]) == (
+        301,
+        f"/authors/{credits['Plenty']}",
+    )
+    assert (await client.get(f"/authors/{credits['Plenty']}")).status_code == 200
+
+
+async def test_a_merge_never_points_at_what_isnt_everyones(adb, people, client) -> None:
+    """An old address says where a record went only if anyone can see where:
+    otherwise it would say that an ingredient only a private recipe uses,
+    or an author only a private collection credits, is there."""
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Secret Box", "acknowledged": True})
+    ).json()["id"]
+    made = await ann.post(
+        f"/api/sources/{box}/recipes",
+        json={"title": "Secret Stew", "ingredients": ["Zanzibar Moonsalt"]},
+    )
+    assert made.status_code == 201, made.text
+    salt = await adb.scalar(text("SELECT id FROM ingredients WHERE name = 'Zanzibar Moonsalt'"))
+    nana = await adb.scalar(
+        text(
+            "INSERT INTO authors (name, name_key) VALUES ('Nana Secretta', 'nana secretta')"
+            " RETURNING id"
+        )
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO source_credits (source_id, author_id, position, credited_as)"
+            " VALUES (:s, :a, 1, 'Nana Secretta')"
+        ),
+        {"s": uuid.UUID(box), "a": nana},
+    )
+    old_salt, old_nana, nowhere = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    await adb.execute(
+        text(
+            "INSERT INTO merged_records (gone_id, kind, kept_id) VALUES"
+            " (:a, 'ingredient', :salt), (:b, 'author', :nana), (:c, 'ingredient', :gone)"
+        ),
+        {
+            "a": old_salt,
+            "salt": salt,
+            "b": old_nana,
+            "nana": nana,
+            "c": nowhere,
+            "gone": uuid.uuid4(),
+        },
+    )
+    # Signed out, the owner, and an administrator: the same for all.
+    for asking in (client, ann, await people("ad", admin=True)):
+        for path in (f"/ingredients/{old_salt}", f"/authors/{old_nana}"):
+            response = await asking.get(path)
+            assert response.status_code == 404, path
+            assert "location" not in response.headers
+    # The one kept has gone since: nowhere to go.
+    assert (await client.get(f"/ingredients/{nowhere}")).status_code == 404
+    # And the kind is the address's: an author's id isn't an ingredient's.
+    assert (await client.get(f"/ingredients/{old_nana}")).status_code == 404
+
+
 async def test_only_a_records_own_page_is_filled(admin, adb, client) -> None:
     """/recipes/<id>/edit and the like are the SPA's alone, as before; here,
     with no built SPA to fall through to, that's a plain 404."""

@@ -41,7 +41,7 @@ from openlarder.models.larder import (
     ShelfGroup,
 )
 from openlarder.models.limits import DailyCount
-from openlarder.models.merges import BookMerge
+from openlarder.models.merges import BookMerge, MergedRecord
 from openlarder.models.notes import RecipeNote, RecipeNoteGroup
 from openlarder.models.proposals import Proposal
 from openlarder.models.ratings import RecipeRating
@@ -58,6 +58,7 @@ __all__ = [
     "AuthorLink",
     "Base",
     "BookMerge",
+    "MergedRecord",
     "BookRequest",
     "DailyCount",
     "DietAllergen",
