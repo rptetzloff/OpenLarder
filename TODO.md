@@ -950,6 +950,26 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
+- [x] **Backspace and Delete in the search boxes** (#177). *Ray,
+      2026-11-13: "we also need to be able to back space and delete in
+      the search fields... it doesn't work today".* Tried with real key
+      presses, both keys already edited what's typed in every search box.
+      What they didn't do, and now do: in a box that holds its choices as
+      chips (Search's "I have", "I don't have or don't want" and "In
+      sources"; the larder picker's two), Backspace or Delete in the
+      empty box takes the last chip away, where only its × did; and on
+      the list of choices under a box, a letter, Backspace or Delete goes
+      back to the box and acts there, where it did nothing. A held key
+      doesn't go on from the text to the chips. That these are what Ray
+      met is Claude's reading.
+      - [ ] Not tried on a phone's own keyboard, only with a desktop's
+        keys at a phone's width: some on-screen keyboards don't name the
+        key they send.
+      - [ ] The front page's "Cook with what you have" lists its choices
+        under the box, not in it, so the keys don't take them there.
+      - [ ] No test in CI presses keys: this was checked by a scratch
+        browser run on the built image, which failed on the build before.
+
 - [x] **A line saving refuses was offered "Keep as typed"** (#78): fixed in
       #80; the check now says which lines saving refuses.
 - [x] **Splitting "A or B, or C, D, or E"** (#126): "Lamb Shank or

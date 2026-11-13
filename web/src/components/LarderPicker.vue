@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { dropLastOn } from "../chips";
 import { computed, onMounted, ref } from "vue";
 import OptionList from "./OptionList.vue";
 import { type Item, type Larder, loadLarder } from "../larder";
@@ -104,6 +105,7 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
           type="search"
           autocomplete="off"
           placeholder="Find something in your larder"
+          @keydown="dropLastOn($event, only, (id) => drop('only', id))"
           @keydown.enter.prevent="onlySuggestions[0] && pick('only', onlySuggestions[0])"
         />
       </div>
@@ -128,6 +130,7 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
           type="search"
           autocomplete="off"
           placeholder="Something to keep out of this search"
+          @keydown="dropLastOn($event, leaveOut, (id) => drop('out', id))"
           @keydown.enter.prevent="outSuggestions[0] && pick('out', outSuggestions[0])"
         />
       </div>
