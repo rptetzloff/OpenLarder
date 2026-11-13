@@ -68,7 +68,7 @@ const when = (at: string) =>
       ></textarea>
       <p id="note-help" class="help">
         Your own words: what you changed, what you'd do next time. Please don't copy the recipe's
-        amounts or method here. Only you see it, unless you tick a group.
+        amounts or method here. Only you see it, unless you check a group.
       </p>
       <fieldset v-if="notes.groups.length" class="larder-share">
         <legend>Who else sees it</legend>

@@ -987,7 +987,7 @@ async def check_open_library(
 async def take_from_open_library(
     source_id: uuid.UUID, body: TakeIn, admin: ModeratorUser, session: Session, transport: Transport
 ) -> Taken:
-    """Take the ticked differences from Open Library, fetched again now."""
+    """Take the checked differences from Open Library, fetched again now."""
     work = await session.get(Source, source_id)
     if work is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such book.")
@@ -1153,7 +1153,7 @@ async def add_family(body: FamilyIn, user: CurrentUser, session: Session) -> Add
     if not body.acknowledged:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "Tick that you understand what OpenLarder keeps and who sees it.",
+            "Check the box to say you understand what OpenLarder keeps and who sees it.",
         )
     _check_public(user, body.private)
     existing = await session.scalar(

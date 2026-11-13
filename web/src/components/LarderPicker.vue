@@ -148,7 +148,7 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
           {{ counted.toLocaleString() }} {{ counted === 1 ? "thing counts" : "things count" }},
           each as itself and what's above it: chipotle hot sauce is hot sauce too.
         </template>
-        <template v-else>Tick a list to search with what's on it.</template>
+        <template v-else>Check a list to search with what's on it.</template>
         Things you're out of don't count. <a href="/larder">Your larder</a>
       </p>
     </template>

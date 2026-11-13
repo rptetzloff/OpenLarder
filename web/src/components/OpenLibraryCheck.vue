@@ -55,7 +55,7 @@ async function take() {
       <p v-if="!differences.length" class="status">Open Library says the same as this page.</p>
       <form v-else class="ol-preview" @submit.prevent="take">
         <p class="status">
-          Open Library differs on these. Tick the ones to take; the rest stay as they are here.
+          Open Library differs on these. Check the ones to take; the rest stay as they are here.
         </p>
         <ul class="ol-differences">
           <li v-for="d in differences" :key="d.key">

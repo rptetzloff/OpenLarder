@@ -133,7 +133,7 @@ async def test_adding_needs_the_tick(people) -> None:
     ann = await people("ann")
     response = await ann.post("/api/sources/family", json={"title": "Box"})
     assert response.status_code == 422
-    assert "Tick" in response.json()["detail"]
+    assert response.json()["detail"].startswith("Check the box to say you understand")
 
 
 async def test_only_an_admin_adds_a_public_one_for_now(people) -> None:

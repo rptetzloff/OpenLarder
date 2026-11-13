@@ -136,7 +136,7 @@ watch(
           <a href="/search?larder=1" class="secondary">What can I make?</a>
         </p>
         <p v-if="ticked.length" class="larder-ticked" role="status">
-          {{ ticked.length }} {{ ticked.length === 1 ? "thing" : "things" }} ticked.
+          {{ ticked.length }} {{ ticked.length === 1 ? "thing" : "things" }} checked.
           <a :href="withTicked" class="secondary">What can I make with these?</a>
           <button type="button" class="link" @click="ticked = []">Clear</button>
         </p>

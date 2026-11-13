@@ -342,10 +342,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         the Authors page's address, `?kind=organisation`); the allergen's
         key is `sulphites`; a dump list's field is `licence_url`.
         Changing those changes the public API.
-      - [ ] Not spelling, so not changed, and Ray's to decide: "tick" for
-        marking a box (nine places: "Tick a list to search with what's
-        on it"), where American usage is "check" or "select"; and the
-        privacy policy's date, written "13 November 2026".
+      - [x] "Check", not "tick", for marking a box, and dates with the
+        month first (#179; *Ray, 2026-11-13: "check and November 13,
+        2026"*, asked which to use). Ten places said "tick" or "ticked":
+        eight on the pages, the message when a family collection's box
+        isn't checked, and one route's description in the API's
+        documentation. Three dates were written day first: the privacy
+        policy's and the terms' "Last updated", and when History began.
+        Dates the pages work out are in the reader's own language's
+        order, as before. `tests/test_spelling.py` reads for both.
       - [ ] 7. Covers while they load: the drawn cover behind every
         image. Seen 2026-11-11; to confirm before building.
       - [ ] 8. Small fixes: a description's ingredient count counts lines;

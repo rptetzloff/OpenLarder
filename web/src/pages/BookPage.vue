@@ -483,7 +483,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             ><input v-model="sharing" type="checkbox" :value="g.id" /> {{ g.name }}</label
           >
           <p class="help">
-            Everyone in a ticked group sees this collection; its editors and admins can add and
+            Everyone in a checked group sees this collection; its editors and admins can add and
             change recipes. Only you can rename, delete or share it.
           </p>
           <button type="submit" class="primary">Save</button>
