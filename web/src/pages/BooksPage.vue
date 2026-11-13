@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CoverBlank from "../components/CoverBlank.vue";
+import SourceCover from "../components/SourceCover.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
@@ -21,6 +21,9 @@ import type { Me } from "../me";
 defineProps<{ user: Me | null | undefined }>();
 document.title = "Sources · OpenLarder";
 
+// The covers asked for at once, not when scrolled to: the grid's first row at
+// its widest, six across. On a phone, two across, that is the first three rows.
+const FIRST_ROW = 6;
 const books = ref<BookSummary[] | null>(null);
 const total = ref(0);
 const failed = ref(false);
@@ -416,14 +419,14 @@ async function add() {
       >
     </p>
     <ul v-if="books?.length" class="cover-grid">
-      <li v-for="book in books" :key="book.id">
+      <li v-for="(book, i) in books" :key="book.id">
         <a :href="`/sources/${book.id}`" class="cover-card">
-          <img v-if="book.cover_url" :src="book.cover_url" alt="" loading="lazy" />
-          <CoverBlank
-            v-else
+          <SourceCover
+            :src="book.cover_url"
             :title="book.title"
             :byline="book.authors.join(', ') || book.host"
             :kind="book.kind"
+            :eager="i < FIRST_ROW"
           />
           <span class="kind">{{ KIND_NAMES[book.kind] ?? "source" }}</span>
           <strong>{{ book.title }}</strong>

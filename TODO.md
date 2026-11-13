@@ -351,8 +351,24 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         policy's and the terms' "Last updated", and when History began.
         Dates the pages work out are in the reader's own language's
         order, as before. `tests/test_spelling.py` reads for both.
-      - [ ] 7. Covers while they load: the drawn cover behind every
-        image. Seen 2026-11-11; to confirm before building.
+      - [x] 7. Covers while they load (#180). Confirmed on the live site
+        first, 2026-11-13, by holding the pictures back: 76 of the first
+        100 cards were empty boxes until their picture came, and a
+        picture that failed left the browser's broken-picture mark. Now
+        the drawn cover, title and author, is behind every picture, the
+        picture fades in over it, and a failed one leaves it there. The
+        first six on Sources are asked for at once; every picture has a
+        width and height. The same card is on the home page's row, an
+        author's page and a shelf, so those have it too.
+        - The grid didn't shift before either: the card's shape was
+          already set in the stylesheet. Measured, a card is 167 by 251
+          with its picture held and with it shown.
+        - Not done: the small covers beside search results and saved
+          recipes (`.hit-cover`) are still an empty box until the picture
+          comes, when it fails, and when the book has none.
+        - Not seen from here: how the fade looks on a slow phone. The
+          states were checked by holding and failing the pictures in
+          Chrome, not on a slow connection.
       - [ ] 8. Small fixes: a description's ingredient count counts lines;
         Top rated needs three rated recipes and a damped average; a
         summary for the list pages without JavaScript.

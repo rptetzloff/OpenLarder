@@ -7,7 +7,8 @@
 // It adds what it looks at through the API, as the people users.sql plants,
 // so run it against a throwaway database only, with
 // OPENLARDER_ARCHIVE_WEB_PAGES=false so web recipes ask the Internet Archive
-// for nothing:
+// for nothing. It answers for cover pictures itself, so Open Library is asked
+// for none either:
 //
 //   psql "$DATABASE" -f a11y/users.sql
 //   node a11y/check.mjs                 # A11Y_BASE, CHROME to override
@@ -36,6 +37,28 @@ const TOKENS = {
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A cover's picture, two pixels by three, for the one book users.sql gives a
+// cover that arrives.
+const COVER =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAIAAAA2iEnWAAAAEElEQVR42mPY6qUDRAwoFABM4AcD1RnCuAAAAABJRU5ErkJggg==";
+// On the sources page: the cover that arrived is shown, and the one that
+// failed has left the printed face with its title, not a broken picture.
+const COVERS_SHOWN = `(() => {
+  const cover = (title) =>
+    [...document.querySelectorAll(".cover-card")]
+      .find((a) => a.querySelector("strong")?.textContent === title)
+      ?.querySelector(".cover");
+  const came = cover("Picture on the Cover");
+  const lost = cover("Picture That Never Came");
+  const picture = came?.querySelector("img.arrived");
+  if (!picture || getComputedStyle(picture).opacity !== "1")
+    return "the cover that arrived isn't shown";
+  if (!lost || lost.querySelector("img")) return "the cover that failed left a picture behind";
+  const face = lost.querySelector(".cover-title");
+  if (face?.textContent !== "Picture That Never Came" || getComputedStyle(face).visibility !== "visible")
+    return "the cover that failed didn't leave its title";
+  return "";
+})()`;
 
 // The API, as one of the planted people.
 async function api(path, who, body, method = body ? "POST" : "GET") {
@@ -220,7 +243,8 @@ async function seed() {
 function pages(s) {
   // [path, who, how]: who is signed in, or nobody. how.phone: axe at the
   // phone's width too, for a page that shows a phone something of its
-  // own; how.then: script to run there first, for a state a click makes.
+  // own; how.then: script to run there first, for a state a click makes;
+  // how.expect: script that answers what the page shows wrongly, or nothing.
   return [
     ["/", null],
     ["/", "admin"],
@@ -230,7 +254,7 @@ function pages(s) {
     ["/search?q=biscuits&kind=book&kind=website", null],
     [`/search?tag=${s.vegetarian}`, null],
     [`/search?q=biscuits&x=${s.cheddar}`, null],
-    ["/sources", null],
+    ["/sources", null, { expect: COVERS_SHOWN }],
     ["/sources", "cook"],
     ["/sources", "admin"],
     ["/sources?kind=book&kind=website&sort=recipes", null],
@@ -349,6 +373,19 @@ async function browser() {
     }
     if (m.method === "Runtime.exceptionThrown")
       failures.push(m.params.exceptionDetails?.exception?.description?.split("\n")[0]);
+    // The check answers for covers itself, so the app asks Open Library for
+    // none: cover 1 is a picture, and any other fails (users.sql has one of each).
+    if (m.method === "Fetch.requestPaused") {
+      const { requestId, request } = m.params;
+      if (request.url.includes("/covers/1-"))
+        send("Fetch.fulfillRequest", {
+          requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: "Content-Type", value: "image/png" }],
+          body: COVER,
+        });
+      else send("Fetch.failRequest", { requestId, errorReason: "Failed" });
+    }
   });
   const send = (method, params = {}) =>
     new Promise((r) => {
@@ -363,6 +400,7 @@ async function browser() {
   };
   await send("Page.enable");
   await send("Runtime.enable");
+  await send("Fetch.enable", { patterns: [{ urlPattern: "*/covers/*" }] });
   return { send, evaluate, failures, close: () => (ws.close(), proc.kill()) };
 }
 
@@ -439,6 +477,12 @@ async function check(b, path, who, theme, width, how = {}) {
     await sleep(500);
   }
   const problems = [];
+  // What the page should be showing, where an entry says: its answer is
+  // what's wrong, or nothing.
+  if (how.expect) {
+    const wrong = await b.evaluate(how.expect);
+    if (wrong) problems.push(wrong);
+  }
   const overflow = await overflowOf(b, width);
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px at ${width}px wide`);
   // axe once per theme and page, at desktop width; the phone pass is for

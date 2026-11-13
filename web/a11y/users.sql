@@ -71,3 +71,14 @@ FROM sources s, users u,
      (VALUES ('Tag Suggestion Kitchen (second printing)', false),
              ('Tag Suggestion Kitchen, revised', true)) AS t (title, undone)
 WHERE s.title = 'Tag Suggestion Kitchen' AND u.subject = 'admin';
+
+-- Two books with a cover picture, for the cards that show one
+-- (components/SourceCover.vue). Nothing in the API gives a book a cover
+-- without asking Open Library, and the check doesn't: it answers for these
+-- two itself, sending a picture for cover 1 and failing cover 2.
+WITH s AS (
+  INSERT INTO sources (title) VALUES ('Picture on the Cover'), ('Picture That Never Came')
+  RETURNING id, title
+)
+INSERT INTO editions (source_id, open_library_cover_id)
+SELECT id, CASE title WHEN 'Picture on the Cover' THEN 1 ELSE 2 END FROM s;
