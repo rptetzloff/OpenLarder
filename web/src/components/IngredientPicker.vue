@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import OptionList from "./OptionList.vue";
 import { type IngredientSummary, listIngredients, type Named } from "../ingredients";
 
 // Type to find an ingredient, then pick one; the parent decides what picking
@@ -52,17 +53,19 @@ function pick(c: Named) {
         :placeholder="placeholder"
       />
     </div>
-    <ul v-if="candidates.length" class="merge-candidates">
-      <li v-for="c in candidates" :key="c.id">
-        <button type="button" class="link" :disabled="disabled" @click="pick(c)">
-          {{ c.name }}
-        </button>
-        <span class="page-ref">
-          {{ c.recipes.toLocaleString() }} {{ c.recipes === 1 ? "recipe" : "recipes" }}
-        </span>
-      </li>
-    </ul>
-    <p v-else-if="answered && answered === query.trim()" class="status">
+    <OptionList
+      v-slot="{ option: c }"
+      :options="candidates"
+      :for="inputId"
+      :disabled="disabled"
+      @pick="pick"
+    >
+      {{ c.name }}
+      <span class="page-ref">
+        {{ c.recipes.toLocaleString() }} {{ c.recipes === 1 ? "recipe" : "recipes" }}
+      </span>
+    </OptionList>
+    <p v-if="!candidates.length && answered && answered === query.trim()" class="status">
       No other ingredient matches.
     </p>
   </div>

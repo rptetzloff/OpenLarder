@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
+import OptionList from "./OptionList.vue";
 import { type Book, type BookSummary, findBooks } from "../books";
 import { searchRecipes, type SearchResult } from "../ingredients";
 import {
@@ -194,12 +195,14 @@ async function save() {
             placeholder="flax egg"
           />
         </div>
-        <ul v-if="recipeHits.length" class="merge-candidates">
-          <li v-for="r in recipeHits" :key="r.id">
-            <button type="button" class="link" @click="pickRecipe(r)">{{ r.title }}</button>
-            <span class="page-ref">{{ r.source_title }}</span>
-          </li>
-        </ul>
+        <OptionList
+          v-slot="{ option: r }"
+          :options="recipeHits"
+          for="swap-use-recipe"
+          @pick="pickRecipe"
+        >
+          {{ r.title }} <span class="page-ref">{{ r.source_title }}</span>
+        </OptionList>
       </div>
     </fieldset>
 
@@ -243,12 +246,10 @@ async function save() {
               placeholder="title or author"
             />
           </div>
-          <ul v-if="bookHits.length" class="merge-candidates">
-            <li v-for="b in bookHits" :key="b.id">
-              <button type="button" class="link" @click="pickBook(b)">{{ b.title }}</button>
-              <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
-            </li>
-          </ul>
+          <OptionList v-slot="{ option: b }" :options="bookHits" for="swap-book" @pick="pickBook">
+            {{ b.title }}
+            <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
+          </OptionList>
         </div>
         <template v-if="editions.length > 1">
           <label for="swap-edition">Edition</label>
