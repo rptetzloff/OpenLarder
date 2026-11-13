@@ -173,6 +173,70 @@ async def test_the_list_comes_in_pages(admin, client, monkeypatch) -> None:
     assert ([a["name"] for a in rest["authors"]], rest["total"]) == (["Author 4"], 5)
 
 
+async def test_the_list_can_be_by_last_name(admin, client, monkeypatch) -> None:
+    """As an index files them (Ray, 2026-11-12): people by last name, an
+    organisation by its name."""
+    plenty = await _book(
+        admin,
+        "Plenty",
+        [
+            ("Yotam Ottolenghi", "author"),
+            ("Sami Tamimi", "author"),
+            ("Sarah Ballantyne, PhD", "contributor"),
+            ("America's Test Kitchen", "contributor"),
+            ("Eddy Van Damme", "photographer"),
+        ],
+    )
+    await _book(admin, "Jerusalem", [("Yotam Ottolenghi", "author")])
+    kitchen = _author(plenty, "America's Test Kitchen")
+    fixed = await admin.patch(
+        f"/api/authors/{kitchen}", json={"name": "America's Test Kitchen", "kind": "organisation"}
+    )
+    assert fixed.status_code == 200, fixed.text
+    by_name = (await client.get("/api/authors")).json()
+    assert [a["name"] for a in by_name["authors"]] == [
+        "America's Test Kitchen",
+        "Eddy Van Damme",
+        "Sami Tamimi",
+        "Sarah Ballantyne, PhD",
+        "Yotam Ottolenghi",
+    ]
+    filed = (await client.get("/api/authors", params={"sort": "surname"})).json()
+    assert [(a["name"], a["sources"]) for a in filed["authors"]] == [
+        ("America's Test Kitchen", 1),
+        ("Sarah Ballantyne, PhD", 1),
+        ("Yotam Ottolenghi", 2),
+        ("Sami Tamimi", 1),
+        ("Eddy Van Damme", 1),
+    ]
+    assert filed["total"] == 5
+    # Narrowed and of one kind, as the other sorts are.
+    people = (
+        await client.get("/api/authors", params={"sort": "surname", "kind": "person", "q": "a"})
+    ).json()
+    assert [a["name"] for a in people["authors"]] == [
+        "Sarah Ballantyne, PhD",
+        "Yotam Ottolenghi",
+        "Sami Tamimi",
+        "Eddy Van Damme",
+    ]
+    assert people["total"] == 4
+    # In pages, in the same order.
+    monkeypatch.setattr("openlarder.routers.authors.PAGE", 2)
+    pages = [
+        (await client.get("/api/authors", params={"sort": "surname", "offset": at})).json()
+        for at in (0, 2, 4, 6)
+    ]
+    assert [[a["name"] for a in page["authors"]] for page in pages] == [
+        ["America's Test Kitchen", "Sarah Ballantyne, PhD"],
+        ["Yotam Ottolenghi", "Sami Tamimi"],
+        ["Eddy Van Damme"],
+        [],
+    ]
+    assert {page["total"] for page in pages} == {5}
+    assert (await client.get("/api/authors", params={"sort": "first"})).status_code == 422
+
+
 # Fixing an author
 
 

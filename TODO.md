@@ -262,6 +262,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         BreadcrumbList, no Recipe).
       - [ ] Ray: submit the sitemap to Google Search Console and Bing
         Webmaster Tools once live.
+- [x] **Authors sorted by last name** (#167). *Ray, 2026-11-12: "we need
+      to also be able to sort authors by last name".* The Authors list's
+      Sort has "Last name, A to Z" beside "Name, A to Z" and "Most
+      recipes": a person is filed by their last name ("Yotam Ottolenghi"
+      under O), an organisation by its name less a leading "The". Letters
+      after a name aren't the last name ("Sarah Ballantyne, PhD"); a
+      particle with a capital begins it ("Van Damme" under V), in lower
+      case it doesn't ("de la Renta" under R). The names read as before.
+      - [ ] It can't tell a last name of two words from a middle name:
+        "Mónica Fernández Perea" is filed under Perea. A name to file an
+        author by, set by hand, would fix those.
+      - [ ] The names still read first name first when filed by last name;
+        "Ottolenghi, Yotam" in that order may be easier to scan.
 - [x] **Wikidata facts on author pages** (#90): born and died (years
       only), country and website, from Wikidata's query service, found by
       the author's Open Library ID or a Wikidata item an admin gives on the

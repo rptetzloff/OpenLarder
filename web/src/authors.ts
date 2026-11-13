@@ -58,11 +58,15 @@ async function send(path: string, method: string, body?: unknown) {
 export async function listAuthors(
   q: string,
   offset = 0,
-  options: { sort?: "name" | "recipes"; kind?: "person" | "organisation" | null } = {},
+  options: {
+    // A to Z as the names read, by last name, or the most recipes first.
+    sort?: "name" | "surname" | "recipes";
+    kind?: "person" | "organisation" | null;
+  } = {},
 ): Promise<{ authors: AuthorListed[]; total: number }> {
   const query = new URLSearchParams({ q });
   if (offset) query.set("offset", String(offset));
-  if (options.sort === "recipes") query.set("sort", "recipes");
+  if (options.sort && options.sort !== "name") query.set("sort", options.sort);
   if (options.kind) query.set("kind", options.kind);
   return send(`/api/authors?${query}`, "GET");
 }

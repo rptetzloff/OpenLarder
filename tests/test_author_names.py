@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import text
 
 from fake_broker import _sign_in, make_admins
-from openlarder.author_names import display_name, shown_name
+from openlarder.author_names import display_name, shown_name, surname_key
 
 
 @pytest.mark.parametrize(
@@ -73,6 +73,40 @@ def test_a_catalogue_form_reads_as_printed(stored, shown) -> None:
 )
 def test_a_credit_shows_the_author_or_its_own_name(credited_as, author, shown) -> None:
     assert shown_name(credited_as, author) == shown
+
+
+@pytest.mark.parametrize(
+    "name, organisation, filed",
+    [
+        ("Yotam Ottolenghi", False, "ottolenghi yotam"),
+        ("J. Kenji López-Alt", False, "lopez alt j kenji"),
+        # One name is filed as it is.
+        ("Ottolenghi", False, "ottolenghi"),
+        # Letters after the name aren't the last name, comma or not.
+        ("Sarah Ballantyne, PhD", False, "ballantyne sarah"),
+        ("Mike Nichols MD", False, "nichols mike"),
+        ("Izabella Wentz PharmD.", False, "wentz izabella"),
+        ("Martin Luther King Jr.", False, "king martin luther"),
+        ("Sammy Davis, Jr.", False, "davis sammy"),
+        # A catalogue's form is the same person.
+        ("Walker, Danielle (Chef)", False, "walker danielle"),
+        # A particle with a capital begins the last name; in lower case it
+        # goes with the first names, as a library files it.
+        ("Eddy Van Damme", False, "van damme eddy"),
+        ("Oscar de la Renta", False, "renta oscar de la"),
+        # A first name that happens to be one isn't.
+        ("Van Morrison", False, "morrison van"),
+        # An organisation by its name, less a leading "The".
+        ("The Culinary Institute of America", True, "culinary institute of america"),
+        ("America's Test Kitchen (Firm)", True, "america s test kitchen"),
+        # Marked as a person, it's filed by its last word: the kind says which.
+        ("America's Test Kitchen", False, "kitchen america s test"),
+        # What it can't tell: a last name of two words.
+        ("Mónica Fernández Perea", False, "perea monica fernandez"),
+    ],
+)
+def test_an_author_is_filed_by_last_name(name, organisation, filed) -> None:
+    assert surname_key(name, organisation) == filed
 
 
 @pytest.fixture
