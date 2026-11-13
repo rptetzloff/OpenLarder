@@ -18,7 +18,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 13 November 2026</p>
+    <p class="updated">Last updated November 13, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -130,7 +130,7 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>
         the notes you write on recipes: your words, and which of your groups you share each
-        with. A note is seen only by you and the members of the groups you tick; moderators and
+        with. A note is seen only by you and the members of the groups you check; moderators and
         administrators don't see it; it isn't part of the open data, the edit history or the API;
       </li>
       <li>
@@ -155,7 +155,7 @@ document.title = "Privacy policy · OpenLarder";
         those who can see the collection see its history;
       </li>
       <li>
-        the family collections you add: each one's name, whether it is private, when you ticked
+        the family collections you add: each one's name, whether it is private, when you checked
         that you understand what is kept, and each of its recipes' titles and ingredient names,
         never amounts or the method. A private collection is shown to no one but you and the
         groups you share it with, admins included; the people who run the site can reach

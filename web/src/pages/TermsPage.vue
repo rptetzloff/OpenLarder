@@ -21,7 +21,7 @@ onMounted(async () => {
 <template>
   <article>
     <h1>Terms of service</h1>
-    <p class="updated">Last updated 11 November 2026</p>
+    <p class="updated">Last updated November 11, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks: which book, which page, and

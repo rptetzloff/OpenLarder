@@ -38,6 +38,6 @@ const reverted = () => location.reload();
       :can-revert="canRevert"
       @reverted="reverted"
     />
-    <p v-else class="status">No changes recorded yet. History began on 10 November 2026.</p>
+    <p v-else class="status">No changes recorded yet. History began on November 10, 2026.</p>
   </details>
 </template>

@@ -13,6 +13,10 @@ It reads the source, so it proves the source. What it can't see:
 - Text kept in the database: migration 0072 changed the one label there
   was ("Sulphites"), and test_the_sulphites_label_is_american asks the API.
 - A word that isn't on the list.
+
+Two things that aren't spelling, decided the same day (*Ray, 2026-11-13:
+"check and November 13, 2026"*, asked which to use): a box is checked, not
+ticked; and a date written out has its month first.
 """
 
 import ast
@@ -36,6 +40,14 @@ BRITISH = re.compile(
     r")\w*",
     re.IGNORECASE,
 )
+# American usage, where the words are spelled the same: a box is checked, and a
+# date is "November 13, 2026".
+USAGE = re.compile(
+    r"\b(?:un)?tick(?:ed|ing|s)?\b"
+    r"|\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October"
+    r"|November|December) \d{4}\b",
+    re.IGNORECASE,
+)
 # A value, not words: lower case, alone in its quotes.
 VALUE = re.compile(r"^[a-z_]+$")
 
@@ -51,7 +63,8 @@ DATA = {
 
 
 def _british(words: str, path: str) -> list[str]:
-    return [w for w in BRITISH.findall(words) if w.lower() not in DATA.get(path, ())]
+    spelt = [w for w in BRITISH.findall(words) if w.lower() not in DATA.get(path, ())]
+    return spelt + USAGE.findall(words)
 
 
 def _python_strings(path: Path) -> list[tuple[int, str]]:
@@ -90,7 +103,25 @@ LINE_COMMENT = re.compile(r"^\s*//.*$|\s//\s.*$", re.MULTILINE)
 TAG = re.compile(r"<[^>]*>", re.DOTALL)
 
 
+# The code inside a template string: `/search?${ticked.value.map(...)}` has
+# a name in it, not a word. To its closing brace, or the string's end where
+# another template string inside cut it short.
+IN_TEMPLATE_STRING = re.compile(r"\$\{[^}]*(?:\}|$)")
+
+
+def _quoted(source: str) -> list[str]:
+    return [IN_TEMPLATE_STRING.sub(" ", m.group(2)) for m in QUOTED.finditer(source)]
+
+
 ATTRIBUTE = re.compile(r"""([:@#\w.-]+)=(?:"([^"]*)"|'([^']*)')""")
+# Attributes that name things for the page's own use, not words for a person:
+# a class is "larder-tick" whatever the page says.
+NAMES = {
+    "class", "id", "for", "href", "src", "type", "name", "role", "rel", "value", "ref", "key",
+    "to", "method", "action", "autocomplete", "inputmode", "viewBox", "d", "fill", "stroke",
+    "lang", "target", "scope", "loading", "width", "height", "kind", "input-id", "what",
+}  # fmt: skip
+WORDS_IN_ARIA = {"aria-label", "aria-description", "aria-placeholder", "aria-valuetext"}
 
 
 def _page_strings(path: Path) -> list[str]:
@@ -100,19 +131,19 @@ def _page_strings(path: Path) -> list[str]:
     is code: `:href="dumps.licence_url"` shows nobody a word."""
     source = LINE_COMMENT.sub(" ", BLOCK_COMMENT.sub(" ", path.read_text(encoding="utf-8")))
     if path.suffix != ".vue":
-        return [m.group(2) for m in QUOTED.finditer(source)]
+        return _quoted(source)
     start, end = source.find("<template>"), source.rfind("</template>")
     template = source[start:end] if start != -1 else ""
     script = re.sub(r"<style.*?</style>", " ", source.replace(template, " "), flags=re.DOTALL)
-    found = [m.group(2) for m in QUOTED.finditer(script)]
+    found = _quoted(script)
     for name, double, single in ATTRIBUTE.findall(template):
         value = double or single
         if name.startswith((":", "@", "#", "v-")):
-            found += [m.group(2) for m in QUOTED.finditer(value)]
-        else:
+            found += _quoted(value)
+        elif name not in NAMES and (not name.startswith("aria-") or name in WORDS_IN_ARIA):
             found.append(value)
     for expression in re.findall(r"\{\{(.*?)\}\}", template, flags=re.DOTALL):
-        found += [m.group(2) for m in QUOTED.finditer(expression)]
+        found += _quoted(expression)
     found.append(TAG.sub(" ", re.sub(r"\{\{.*?\}\}", " ", template, flags=re.DOTALL)))
     return found
 
@@ -152,7 +183,7 @@ def test_nothing_a_page_shows_is_in_british_spelling() -> None:
     [
         ("People and organisations credited on sources.", ["organisations"]),
         ("Organisation", ["Organisation"]),
-        ("ticked and greyed", ["greyed"]),
+        ("checked and greyed", ["greyed"]),
         ("the same licence", ["licence"]),
         ("how OpenLarder recognises you", ["recognises"]),
         ("the misspelt ingredient", ["misspelt"]),
@@ -162,6 +193,11 @@ def test_nothing_a_page_shows_is_in_british_spelling() -> None:
         ("promise otherwise precise advertise exercise your flour hour reference", []),
         ('aria-labelledby="x"', []),
         ("labelled as its book has it", ["labelled"]),
+        # Usage: checked, not ticked; the month first.
+        ("Tick a list to search with what's on it.", ["Tick"]),
+        ("2 things ticked. Untick one.", ["ticked", "Untick"]),
+        ("Last updated 13 November 2026", ["13 November 2026"]),
+        ("Last updated November 13, 2026; a ticket, a stick, 13 Novembers", []),
     ],
 )
 def test_the_list_catches_what_it_should(words, caught) -> None:
