@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CoverBlank from "../components/CoverBlank.vue";
+import SourceCover from "../components/SourceCover.vue";
 import OptionList from "../components/OptionList.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
@@ -218,8 +218,7 @@ onMounted(load);
         <ul class="cover-grid">
           <li v-for="b in author.sources" :key="b.id">
             <a :href="`/sources/${b.id}`" class="cover-card">
-              <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" />
-              <CoverBlank v-else :title="b.title" :byline="author.name" />
+              <SourceCover :src="b.cover_url" :title="b.title" :byline="author.name" />
               <strong>{{ b.title }}</strong>
               <span class="byline">
                 {{ b.recipes.toLocaleString() }} {{ b.recipes === 1 ? "recipe" : "recipes"

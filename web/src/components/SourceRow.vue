@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { type BookSummary, KIND_NAMES } from "../books";
-import CoverBlank from "./CoverBlank.vue";
+import SourceCover from "./SourceCover.vue";
 
 // The home page's sources, as one row that scrolls sideways (Ray's cleanup
 // pass, section 4): cards that snap into place, an arrow at each end while
@@ -74,9 +74,8 @@ function byline(s: BookSummary) {
       <ul>
         <li v-for="s in sources" :key="s.id">
           <a :href="`/sources/${s.id}`" class="cover-card">
-            <img v-if="s.cover_url" :src="s.cover_url" alt="" loading="lazy" />
-            <CoverBlank
-              v-else
+            <SourceCover
+              :src="s.cover_url"
               :title="s.title"
               :byline="s.authors.join(', ') || s.host"
               :kind="s.kind"

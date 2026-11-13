@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
-import CoverBlank from "../components/CoverBlank.vue";
+import SourceCover from "../components/SourceCover.vue";
 import type { Me } from "../me";
 import { myShelf, type Shelf, type ShelfBook, shareShelf, takeOffShelf } from "../shelf";
 
@@ -155,8 +155,12 @@ watch(
           <ul v-else class="cover-grid">
             <li v-for="b in matching(s.books)" :key="b.id">
               <a :href="`/sources/${b.id}`" class="cover-card">
-                <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" />
-                <CoverBlank v-else :title="b.title" :byline="b.authors.join(', ')" :kind="b.kind" />
+                <SourceCover
+                  :src="b.cover_url"
+                  :title="b.title"
+                  :byline="b.authors.join(', ')"
+                  :kind="b.kind"
+                />
                 <strong>{{ b.title }}</strong>
                 <span v-if="b.authors.length" class="byline">{{ b.authors.join(", ") }}</span>
                 <span v-if="b.editions > 1 && editionLabel(b)" class="byline"

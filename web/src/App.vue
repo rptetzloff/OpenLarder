@@ -1545,16 +1545,46 @@ a.secondary.small::after {
   color: var(--fg);
   text-decoration: none;
 }
-.cover-card img,
+/* A cover: the printed face, which gives the card its shape, and the picture
+   laid over it once it has arrived (components/SourceCover.vue). */
+.cover-card .cover {
+  position: relative;
+  display: block;
+  margin-bottom: 0.5rem;
+}
 .cover-card .cover-blank {
   width: 100%;
   aspect-ratio: 2 / 3;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+.cover-card .cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--surface);
   box-sizing: border-box;
-  margin-bottom: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+.cover-card .cover img.arrived {
+  opacity: 1;
+}
+/* Under a picture the face is gone, not only covered, so the browser's find
+   doesn't stop on a title nobody can see. After the fade, not at its start. */
+.cover-card .cover:has(img.arrived) .cover-blank {
+  visibility: hidden;
+  transition: visibility 0s 0.2s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cover-card .cover img,
+  .cover-card .cover:has(img.arrived) .cover-blank {
+    transition: none;
+  }
 }
 .cover-card strong {
   color: var(--link);
@@ -2191,8 +2221,9 @@ main h2 {
   background: var(--bg);
   color: var(--fg);
 }
-/* A cover for a source that has none: its title and byline on a colour
-   picked from its title, the same in both themes, like a printed cover. */
+/* A cover drawn for a source, shown where it has no picture and until its
+   picture arrives: its title and byline on a colour picked from its title,
+   the same in both themes, like a printed cover. */
 .cover-blank.cover-blank {
   display: block;
   container-type: inline-size;

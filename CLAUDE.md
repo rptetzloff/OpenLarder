@@ -186,7 +186,9 @@ then runs axe-core's WCAG 2.1 A and AA rules (contrast among them) on each, in
 light and dark, signed out and signed in, and fails on any page that scrolls
 sideways at 390px. A page that shows a phone something of its own (a book's
 page moves its parts and shortens its list) goes through axe at 390px too, and
-an entry can click first, for a state only a click makes. It starts with a
+an entry can click first, for a state only a click makes, or say what its page
+should be showing (a cover's picture once it arrives, its title when the
+picture fails). It starts with a
 control, a page with problems planted in it, and refuses to report a clean run
 unless it catches them. A new page or page state goes into its list in the same
 PR. What axe can't decide it lists for a person; what no tool sees (whether
