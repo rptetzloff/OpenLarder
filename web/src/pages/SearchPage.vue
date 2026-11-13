@@ -55,8 +55,9 @@ const shelf = ref<Named[]>([]);
 const onShelf = ref(params.get("own") === "1");
 // Only the recipes you've saved (routers/saved.py); enough to search by.
 const onlySaved = ref(params.get("sv") === "1");
-// The order: as they match (closest to made, or by source and title), or
-// the rated ones first, best first. Ray, 2026-11-12.
+// The order: as they match (closest to made; for title words, the closest
+// title; else by source and title), or the rated ones first, best first.
+// Ray, 2026-11-12.
 const sort = ref<"match" | "rating">(params.get("sort") === "rating" ? "rating" : "match");
 const title = ref(params.get("q") ?? "");
 // Every kind until some are unticked; the address lists them only then.

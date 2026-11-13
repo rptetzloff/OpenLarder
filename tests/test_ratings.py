@@ -149,7 +149,7 @@ async def test_top_rated_is_the_best_five_and_left_off_with_none(people, client,
 
 
 async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
-    await _rated(
+    book, _ = await _rated(
         people,
         adb,
         {
@@ -160,7 +160,14 @@ async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
             "Egg Soup": [],
         },
     )
-    usual = (await client.get("/api/search", params={"q": "soup"})).json()
+    # No title words, so nothing ranks by title (test_title_rank.py): by book
+    # and title, as a search by tag or ingredient page lists them.
+    tag = str(await adb.scalar(text("SELECT id FROM tags WHERE name = 'Soup'")))
+    tagged = await (await people("mo2", role="moderator")).put(
+        f"/api/sources/{book}/tags", json={"tags": [tag]}
+    )
+    assert tagged.status_code == 200, tagged.text
+    usual = (await client.get("/api/search", params={"tag": tag})).json()
     assert [r["title"] for r in usual["recipes"]] == [
         "Apple Soup",
         "Barley Soup",
@@ -168,7 +175,7 @@ async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
         "Dill Soup",
         "Egg Soup",
     ]
-    best = (await client.get("/api/search", params={"q": "soup", "sort": "rating"})).json()
+    best = (await client.get("/api/search", params={"tag": tag, "sort": "rating"})).json()
     # The rated ones, best first; then the rest as they'd come anyway.
     assert [r["title"] for r in best["recipes"]] == [
         "Carrot Soup",

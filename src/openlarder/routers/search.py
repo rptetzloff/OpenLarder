@@ -18,6 +18,9 @@ missing.
 
 **Title words** must all appear in the title, ignoring case; accents count,
 as they do for ingredients. The trigram index on recipe titles serves them.
+The closest titles come first (title_rank.py): the words as whole words,
+then beginning a word, then inside one. With ingredients too, that only
+orders recipes level on what you have.
 
 **Your shelf** (routers/shelf.py): only the books you own, with any
 sources chosen too.
@@ -39,7 +42,7 @@ from pydantic import BaseModel
 from sqlalchemy import case, exists, func, or_, select, union
 from sqlalchemy.orm import aliased
 
-from openlarder import visibility
+from openlarder import title_rank, visibility
 from openlarder.auth import Viewer
 from openlarder.db import Session
 from openlarder.ingredients import family, rooted_ancestry, rooted_family
@@ -269,19 +272,20 @@ async def search(
     if left_out:
         conditions.append(~_needs_any(left_out))
     by_rating = sort == "rating"
+    title = (words, found.q) if words else None
     if stocked:
         found.recipes, found.total = await _best_match(
-            session, known, conditions, offset, upward=stocked, by_rating=by_rating
+            session, known, conditions, offset, upward=stocked, by_rating=by_rating, title=title
         )
         return found
     if not known:
         page, found.total = await recipes_where(
-            session, *conditions, offset=offset, limit=PAGE, by_rating=by_rating
+            session, *conditions, offset=offset, limit=PAGE, by_rating=by_rating, title=title
         )
         found.recipes = [Hit(**r.model_dump()) for r in page]
         return found
     found.recipes, found.total = await _best_match(
-        session, known, conditions, offset, by_rating=by_rating
+        session, known, conditions, offset, by_rating=by_rating, title=title
     )
     return found
 
@@ -358,13 +362,16 @@ async def _best_match(
     offset: int,
     upward: list[uuid.UUID] = (),
     by_rating: bool = False,
+    title: tuple[list[str], str] | None = None,
 ):
     """Recipes covering any line with what you have: those using the most of
     your ingredients first, then by the share of their lines you have (so
     complete ones come first), fewest still needed, then book and title.
     *Ray, 2026-11-08:* frog's legs and garlic should put the recipes using
     both first; ranking by share alone put one-line garlic pastes there.
-    by_rating: the rated ones first, best first, then the rest that way."""
+    by_rating: the rated ones first, best first, then the rest that way.
+    title: a title search's words and the search as typed; recipes level
+    on what you have come closest title first (title_rank.py)."""
     # Which of yours each match is under (or, from a larder, above): to count
     # how many of yours a recipe uses, and to say which.
     have = list(dict.fromkeys([*chosen, *upward]))
@@ -413,11 +420,18 @@ async def _best_match(
         .where(*conditions)
     )
     total = await session.scalar(select(func.count()).select_from(matching.subquery()))
-    first = ()
-    if by_rating:
+    first, closest = (), [func.lower(Source.title), func.lower(Recipe.title)]
+    if by_rating or title:
         ratings = rated()
         matching = matching.outerjoin(ratings, ratings.c.recipe_id == Recipe.id)
-        first = best_first(ratings)
+        if by_rating:
+            first = best_first(ratings)
+        if title:
+            closest = [
+                *title_rank.order(*title, best_first(ratings)),
+                func.lower(Recipe.title),
+                func.lower(Source.title),
+            ]
     rows = (
         await session.execute(
             matching.order_by(
@@ -427,8 +441,7 @@ async def _best_match(
                 (tally.c.have / tally.c.lines).desc(),
                 (tally.c.lines - tally.c.have).asc(),
                 tally.c.have.desc(),
-                func.lower(Source.title),
-                func.lower(Recipe.title),
+                *closest,
                 Recipe.id,
             )
             .offset(offset)
