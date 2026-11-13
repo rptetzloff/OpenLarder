@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { onMounted, ref } from "vue";
 import { type GroupSummary, listGroups, makeGroup, ROLE_NAMES } from "../groups";
 import type { Me } from "../me";
@@ -40,7 +41,7 @@ async function make() {
         shares nothing by itself.
       </p>
     </div>
-    <p v-if="user === null" class="status"><a href="/api/auth/login">Sign in</a> to see yours.</p>
+    <p v-if="user === null" class="status"><SignInLink /> to see yours.</p>
     <template v-else-if="user">
       <div class="add-panels">
         <details class="add-panel" :open="groups?.length === 0 || undefined">

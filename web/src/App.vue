@@ -2,8 +2,6 @@
 import { adoptGrocer } from "./grocery";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
-import NameForm from "./components/NameForm.vue";
-import { takeRememberedInvite } from "./groups";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
@@ -38,10 +36,12 @@ import RecipeFormPage from "./pages/RecipeFormPage.vue";
 import RecipePage from "./pages/RecipePage.vue";
 import RequestsPage from "./pages/RequestsPage.vue";
 import SearchPage from "./pages/SearchPage.vue";
+import SignInFailedPage from "./pages/SignInFailedPage.vue";
 import SuggestionsPage from "./pages/SuggestionsPage.vue";
 import DataPage from "./pages/DataPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
+import WelcomePage from "./pages/WelcomePage.vue";
 import SiteHeader from "./components/SiteHeader.vue";
 
 // The server returns this app for any path it has no file for, so the page
@@ -82,6 +82,10 @@ const onRequests = path === "/requests";
 const onLarder = path === "/larder";
 const onShelf = path === "/shelf";
 const onSaved = path === "/saved";
+// Sign-in's own two pages (routers/auth.py): where a new account chooses
+// its name, and where a sign-in that didn't work lands.
+const onWelcome = path === "/welcome";
+const onSignInFailed = path === "/sign-in-failed";
 const flagScope = ({ "/admin/flags": "all", "/account/flags": "mine" } as const)[path];
 const UUID = "([0-9a-f-]{36})";
 const match = (pattern: string) => path.match(new RegExp(`^${pattern}$`, "i"))?.[1] ?? null;
@@ -104,11 +108,12 @@ const theme = ref<ThemeChoice>(savedTheme());
 // undefined while asking, null when signed out.
 const user = ref<Me | null | undefined>(undefined);
 // Someone signed in who hasn't chosen a name yet is asked for one before
-// anything else, except the privacy and terms pages, which stay readable.
-const needsName = computed(() => !!user.value && !user.value.display_name && !page);
-// The callback says only that sign-in failed, never why; the reason is in
-// the server log, out of reach of whoever might be forging the request.
-const signInFailed = new URLSearchParams(location.search).get("sign-in") === "failed";
+// anything else, on the welcome page: the callback sends them there, and
+// this sends anyone who reaches another page without one. The privacy,
+// terms and data pages stay readable.
+const needsName = computed(
+  () => !!user.value && !user.value.display_name && !page && !onWelcome,
+);
 
 // The band above the header: this isn't production, or a notice.
 const notice = ref<string | null>(null);
@@ -130,9 +135,7 @@ onMounted(async () => {
   } catch {
     user.value = null;
   }
-  // Back to an invite that sent them to sign in.
-  const pending = user.value ? takeRememberedInvite() : null;
-  if (pending && !inviteCode) location.replace(`/invite/${pending}`);
+  if (needsName.value) location.replace("/welcome");
 });
 </script>
 
@@ -147,15 +150,10 @@ onMounted(async () => {
   <div id="admin-bar"></div>
   <main id="content" ref="content" tabindex="-1">
     <component :is="page" v-if="page" />
-    <section v-else-if="needsName && user">
-      <h1>What should we call you?</h1>
-      <p>Pick the name OpenLarder shows for you. You can change it later on your account page.</p>
-      <NameForm
-        :initial="user.suggested_name ?? ''"
-        submit-label="Continue"
-        @saved="(me) => (user = me)"
-      />
-    </section>
+    <!-- On the way to the welcome page: nothing to draw. -->
+    <template v-else-if="needsName" />
+    <WelcomePage v-else-if="onWelcome" :user="user" />
+    <SignInFailedPage v-else-if="onSignInFailed" />
     <AccountPage v-else-if="onAccount" :user="user" @saved="(me) => (user = me)" />
     <BooksPage v-else-if="onBooks" :user="user" />
     <IngredientsPage v-else-if="onIngredients" />
@@ -191,12 +189,7 @@ onMounted(async () => {
     <RecipeFormPage v-else-if="editRecipeId" :recipe-id="editRecipeId" :user="user" />
     <RecipeFormPage v-else-if="proposeRecipeId" :recipe-id="proposeRecipeId" :user="user" propose />
     <RecipePage v-else-if="recipeId" :id="recipeId" :user="user" />
-    <template v-else>
-      <p v-if="signInFailed" class="sign-in-failed" role="alert">
-        Sign-in didn't work. Please try again.
-      </p>
-      <HomePage />
-    </template>
+    <HomePage v-else />
   </main>
   <footer class="site-footer">
     <div class="bar">
@@ -394,12 +387,6 @@ main > section {
   max-width: 40rem;
   margin: 0 auto;
   padding: 2rem 1rem 0;
-}
-.sign-in-failed {
-  max-width: var(--page);
-  margin: 1rem auto 0;
-  padding: 0 1.5rem;
-  color: var(--error);
 }
 
 /* A page laid out to the full width, as the redesigned ones are. */

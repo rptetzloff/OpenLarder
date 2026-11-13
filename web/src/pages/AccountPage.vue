@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import ApiKeys from "../components/ApiKeys.vue";
@@ -51,7 +52,7 @@ const n = (v: number | null, one: string, many: string) =>
       <p v-if="user?.display_name" class="muted">Signed in as {{ user.display_name }}.</p>
     </div>
     <p v-if="user === null" class="status">
-      <a href="/api/auth/login">Sign in</a> to see your account.
+      <SignInLink /> to see your account.
     </p>
     <template v-else-if="user">
       <ul class="link-cards">

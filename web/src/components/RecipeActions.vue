@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "./SignInLink.vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { type IsSaved, isSaved, type OtherList, save, type State, unsave } from "../saved";
 import PillToggle from "./PillToggle.vue";
@@ -203,7 +204,7 @@ const takeOff = (o: OtherList) =>
         >
       </div>
       <p v-else-if="!signedIn" class="sign-in">
-        <a href="/api/auth/login">Sign in</a> to rate or save
+        <SignInLink /> to rate or save
       </p>
     </div>
     <div v-if="theirs.length || addable.length" class="also muted">

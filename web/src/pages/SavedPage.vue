@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import { whereItIs } from "../ingredients";
 import type { Me } from "../me";
@@ -99,7 +100,7 @@ watch(
       </p>
     </div>
     <p v-if="user === null" class="status">
-      <a href="/api/auth/login">Sign in</a> to save recipes.
+      <SignInLink /> to save recipes.
     </p>
     <template v-else-if="user">
       <p v-if="error" class="error" role="alert">{{ error }}</p>

@@ -35,7 +35,8 @@ async def test_sign_in_creates_a_user_and_a_session(client, broker, adb) -> None
     response = await _sign_in(client, broker)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/"
+    # Someone new chooses a name first (test_sign_in_return.py).
+    assert response.headers["location"] == "/welcome"
     cookie = _session_cookie(response)
     assert "httponly" in cookie and "samesite=lax" in cookie and "path=/" in cookie
     me = await client.get("/api/auth/me")
@@ -112,7 +113,7 @@ async def test_a_state_works_once(client, broker) -> None:
     code, state = broker.approve(login.headers["location"])
     assert (await client.get("/api/auth/callback", params={"code": code, "state": state})).headers[
         "location"
-    ] == "/"
+    ] == "/welcome"
 
     # A fresh code for the same request, so only the spent state can refuse it.
     again, _ = broker.approve(login.headers["location"])

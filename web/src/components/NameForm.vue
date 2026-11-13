@@ -39,6 +39,8 @@ async function submit() {
       one nobody else has.
     </p>
     <p v-if="error" id="display-name-error" class="error" role="alert">{{ error }}</p>
+    <!-- Between the name and the button: the welcome page's few lines. -->
+    <slot />
     <button type="submit" class="primary" :disabled="saving">{{ submitLabel }}</button>
   </form>
 </template>

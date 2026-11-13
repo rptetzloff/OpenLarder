@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import CoverBlank from "../components/CoverBlank.vue";
 import type { Me } from "../me";
@@ -90,7 +91,7 @@ watch(
       </p>
     </div>
     <p v-if="user === null" class="status">
-      <a href="/api/auth/login">Sign in</a> to keep a shelf.
+      <SignInLink /> to keep a shelf.
     </p>
     <template v-else-if="user">
       <p v-if="error" class="error" role="alert">{{ error }}</p>

@@ -856,6 +856,10 @@ async def test_only_a_records_own_page_is_filled(admin, adb, client) -> None:
         ("admin", "noindex"),
         ("admin/people", "noindex"),
         ("requests", "noindex"),
+        # Sign-in's own two pages.
+        ("welcome", "noindex"),
+        ("welcome/", "noindex"),
+        ("sign-in-failed", "noindex"),
         ("", None),
         ("sources", None),
         ("ingredients", None),

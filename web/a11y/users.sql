@@ -1,13 +1,15 @@
--- Two people for the accessibility check (check.mjs): an admin, who adds the
--- catalog it looks at, and an ordinary person with a private collection and
--- a group. Their session tokens are fixed and known, so this is for a
--- throwaway database only: CI's, or a local one.
+-- Three people for the accessibility check (check.mjs): an admin, who adds
+-- the catalog it looks at, an ordinary person with a private collection and
+-- a group, and someone new who hasn't chosen a name, for the welcome page.
+-- Their session tokens are fixed and known, so this is for a throwaway
+-- database only: CI's, or a local one.
 WITH people AS (
   -- Both have accepted the contributor agreement (its version is
 -- agreement.VERSION); Cy is a contributor, so what he adds waits for review.
 INSERT INTO users (issuer, subject, display_name, role, agreed_at, agreed_version)
   VALUES ('a11y-check', 'admin', 'Ada Admin', 'owner', now(), '2026-11-10.2'),
-         ('a11y-check', 'cook', 'Cy Cook', 'contributor', now(), '2026-11-10.2')
+         ('a11y-check', 'cook', 'Cy Cook', 'contributor', now(), '2026-11-10.2'),
+         ('a11y-check', 'new', NULL, 'user', NULL, NULL)
   ON CONFLICT (issuer, subject) DO UPDATE SET display_name = EXCLUDED.display_name
   RETURNING id, subject
 )

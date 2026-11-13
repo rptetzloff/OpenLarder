@@ -3,9 +3,25 @@
 /login redirects to the broker with state, a nonce and a PKCE challenge.
 /callback checks all three, checks the ID token's signature, issuer, audience
 and expiry, then starts a session. /logout ends the session here and sends
-the browser on to the broker to end its session there. A failure of any kind sends the browser
-back to the front page with ?sign-in=failed and logs why; it never says why
-to the browser, which is the party that might be forging it.
+the browser on to the broker to end its session there. A failure of any kind
+sends the browser to /sign-in-failed and logs why; it never says why to the
+browser, which is the party that might be forging it.
+
+Signing in comes back to the page it began on (*Ray's round 2 spec,
+2026-11-13*). Each sign-in link gives /login that page as ``next``; what
+passes auth.safe_next is kept in the sign-in cookie, which is signed, beside
+the state, and the callback redirects to it. It is never read from the
+callback's own address, so nothing on the way to the broker and back can
+change it. Someone with no display name yet goes to /welcome first, and
+/continue takes them on from there. The cookie lasts an hour, so a name
+chosen later than that goes to the front page.
+
+A sign-in is counted without a page of its own: the callback marks the
+address it sends the browser to, "#signed-in=new" or "#signed-in=returning",
+which the analytics loader takes off again and turns into an event
+(analytics.py). It names nobody, and isn't added where nothing counts. Not
+a cookie, which the spec asked for: SCOPING.md brings a consent banner
+with any cookie that's for analytics (*Ray, 2026-11-13*).
 """
 
 import logging
@@ -14,19 +30,22 @@ from typing import Annotated
 import httpx2
 from authlib.common.errors import AuthlibBaseError
 from authlib.integrations.starlette_client import StarletteOAuth2App
-from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from joserfc.errors import JoseError
 from pydantic import BaseModel
 
-from openlarder import agreement, roles
+from openlarder import agreement, analytics, roles
 from openlarder.auth import (
     CALLBACK_PATH,
+    FAILED,
     SESSION_COOKIE,
     SESSION_LIFETIME,
+    WELCOME,
     CurrentUser,
     get_oidc_client,
     optional_oidc_client,
+    safe_next,
     sign_in,
     sign_out,
     suggested_name_from,
@@ -103,8 +122,38 @@ def home_url(request: Request, settings: Settings) -> str:
     return (settings.public_url or str(request.base_url).rstrip("/")) + "/"
 
 
+# The sign-in cookie's name for the page to come back to.
+NEXT = "next"
+
+
+def _taken_next(request: Request) -> str:
+    """The page sign-in began on, once: checked again on the way out, in
+    case what's refused has changed since it was kept."""
+    return safe_next(request.session.pop(NEXT, None)) or "/"
+
+
 @router.get("/login")
-async def login(request: Request, settings: Config, broker: Broker) -> Response:
+async def login(
+    request: Request,
+    settings: Config,
+    broker: Broker,
+    wanted: Annotated[
+        str | None,
+        Query(alias="next", description="The page to come back to: a path on this site."),
+    ] = None,
+    again: Annotated[
+        bool,
+        Query(description="Keep the page the last try was coming back to; `next` is ignored."),
+    ] = False,
+) -> Response:
+    # "Try again" on /sign-in-failed has no page of its own to give: the
+    # one the failed try kept stands. Any other link replaces it, or
+    # clears it, so an old one never outlives the sign-in it was for.
+    if not again:
+        if kept := safe_next(wanted):
+            request.session[NEXT] = kept
+        else:
+            request.session.pop(NEXT, None)
     return await broker.authorize_redirect(request, callback_url(request, settings))
 
 
@@ -116,7 +165,7 @@ async def callback(
         token = await broker.authorize_access_token(request)
     except (AuthlibBaseError, JoseError, httpx2.HTTPError) as exc:
         log.warning("sign-in refused: %r", exc)
-        return RedirectResponse("/?sign-in=failed", status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(FAILED, status.HTTP_303_SEE_OTHER)
 
     claims = token.get("userinfo")
     # No ID token means nothing above checked who this is; an access token
@@ -124,17 +173,23 @@ async def callback(
     # only with whatever the discovery document claimed.
     if not claims or claims.get("iss") != settings.oidc_issuer or not claims.get("sub"):
         log.warning("sign-in refused: no usable ID token")
-        return RedirectResponse("/?sign-in=failed", status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(FAILED, status.HTTP_303_SEE_OTHER)
 
-    raw = await sign_in(
+    signed = await sign_in(
         session, claims["iss"], claims["sub"], suggested_name_from(claims), token.get("id_token")
     )
     await session.commit()
 
-    response = RedirectResponse("/", status.HTTP_303_SEE_OTHER)
+    # Someone with no name yet is asked for one first; the page they began
+    # on stays in the sign-in cookie for /continue.
+    target = _taken_next(request) if signed.named else WELCOME
+    if analytics.counting(settings):
+        # safe_next lets no "#" through, so this is the address's only one.
+        target += analytics.signed_in_mark(new=signed.new)
+    response = RedirectResponse(target, status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE,
-        raw,
+        signed.token,
         max_age=int(SESSION_LIFETIME.total_seconds()),
         path="/",
         httponly=True,
@@ -142,6 +197,13 @@ async def callback(
         samesite="lax",
     )
     return response
+
+
+@router.get("/continue")
+async def carry_on(request: Request) -> Response:
+    """From the welcome page, once a name is chosen: on to the page sign-in
+    began on, or the front page."""
+    return RedirectResponse(_taken_next(request), status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/me", response_model=Me)

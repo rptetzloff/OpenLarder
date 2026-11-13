@@ -207,6 +207,55 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         (WCAG 2.5.3). A chip shows only when every ingredient of it is in the
         catalog, found in one request: the ingredient list takes `name`
         (exact names, as names are matched), up to twenty.
+- [ ] **Round 2 fixes.** *Ray's spec, 2026-11-13, from a signed-out review
+      of the live site; in private/ (not committed).* Eight sections, in
+      priority order, a PR each; the cleanup pass's rules still hold.
+      - [x] 1. Signing in comes back to where you were, and is counted
+        (#172). Every sign-in link gives the page it's on. What's safe of
+        it (a path here: one slash and no second, no backslash, "#" or
+        control character, not the API or a buy link, at most 512
+        characters) is kept in the sign-in cookie beside the state, never
+        read back from the callback's address, and the callback goes
+        there. A new account chooses its name on `/welcome` first, and
+        "Continue" goes on; anyone with no name who reaches another page
+        is sent there. A sign-in that doesn't work lands on
+        `/sign-in-failed`, whose "Try again" keeps the page. Umami counts
+        views of both, and a "sign-in" event, new or returning, that says
+        no page. An invite comes back the same way, so the browser no
+        longer remembers it.
+      - [x] The count keeps nothing in the browser (#172; *Ray,
+        2026-11-13*). The spec's one-minute cookie would have been a
+        cookie for analytics, which SCOPING.md brings a consent banner
+        with, so the callback marks the address it goes to
+        ("#signed-in=new") and the loader takes the mark off. A link
+        passed round with the mark on counts a sign-in that didn't happen.
+      - [ ] The page to come back to is kept an hour, the sign-in
+        cookie's life: a name chosen on `/welcome` later than that goes
+        to the front page.
+      - [ ] Ray: after the deploy, sign in and look for the "sign-in"
+        event in Umami. What the tracker sends was checked against the
+        script the site loads; what Umami's collector makes of it
+        couldn't be from here.
+      - [ ] 2. Title search ranked by relevance: whole words first, then
+        the start of a word, then inside one.
+      - [ ] 3. Book pages on a phone: the recipes before Top rated,
+        Most-used ingredients and Edition; the first 30, then "Show all".
+      - [ ] 4. Book titles' capitals, as suggestions: titles in sentence
+        case, and a lost apostrophe.
+      - [ ] 5. Tap targets on phones: ingredient names on a recipe, and
+        the links in the Find-it card and breadcrumbs.
+      - [ ] 6. One spelling, American, in the interface and what the
+        server sends.
+      - [ ] 7. Covers while they load: the drawn cover behind every
+        image. Seen 2026-11-11; to confirm before building.
+      - [ ] 8. Small fixes: a description's ingredient count counts lines;
+        Top rated needs three rated recipes and a damped average; a
+        summary for the list pages without JavaScript.
+      - The two commission lines on a recipe's page stay as they are,
+        each beside the links it covers (*Ray, 2026-11-13*).
+      - Still to review, from the spec: the signed-in pages, and a
+        keyboard and screen reader pass over the action bar, the menus
+        and the home page's scrolling row.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import type { Me } from "../me";
 import {
@@ -130,7 +131,7 @@ function turnDown(r: BookRequest) {
         </p>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
         <p v-if="user === null" class="help">
-          Signed out, you can ask for a few a day. <a href="/api/auth/login">Sign in</a> to ask for
+          Signed out, you can ask for a few a day. <SignInLink /> to ask for
           more and to see yours.
         </p>
       </form>

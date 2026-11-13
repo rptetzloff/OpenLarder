@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -32,7 +32,7 @@ from openlarder import (
     ratelimit,
     usage,
 )
-from openlarder.auth import SIGN_IN_COOKIE
+from openlarder.auth import SIGN_IN_COOKIE, WELCOME, Viewer
 from openlarder.config import Settings, get_settings
 from openlarder.db import Session, dispose_engine, session_factory
 from openlarder.ratelimit import rate_limit
@@ -389,6 +389,19 @@ async def author_page(
     author_id: uuid.UUID, request: Request, session: Session, shell: Shell, settings: SettingsDep
 ) -> Response:
     return page_response(await pages.author(session, author_id), shell, settings, request)
+
+
+# Where someone new chooses a name (routers/auth.py sends them). Anyone
+# signed out, or named already, has nothing to do here and goes to the
+# front page; the SPA does the same for an address this route doesn't
+# match ("/welcome/").
+@app.get(WELCOME, include_in_schema=False)
+async def welcome_page(
+    viewer: Viewer, request: Request, shell: Shell, settings: SettingsDep
+) -> Response:
+    if viewer is None or viewer.display_name:
+        return RedirectResponse("/", status.HTTP_303_SEE_OTHER)
+    return page_response(pages.Page(robots="noindex"), shell, settings, request)
 
 
 if WEB_DIR.is_dir():
