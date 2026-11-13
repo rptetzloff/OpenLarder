@@ -169,6 +169,52 @@ async def test_the_json_nests_each_recipe(store, catalog, people) -> None:
     assert source["editions"][0]["id"] == catalog["edition"]
 
 
+async def test_a_rating_is_the_average_and_how_many_never_who(store, catalog, people, adb) -> None:
+    """As a recipe's page shows it. The ratings themselves say who gave
+    what, and no dump does."""
+    ann, bo = await people("ann2"), await people("bo")
+    url = f"/api/recipes/{catalog['recipe']}/rating"
+    assert (await ann.put(url, json={"spoons": 5})).status_code == 200
+    assert (await bo.put(url, json={"spoons": 4})).status_code == 200
+    # A private recipe's rating, by the one person who can see it.
+    stew = await adb.scalar(text("SELECT id FROM recipes WHERE title = 'Secret Stew'"))
+    owner = await adb.scalar(
+        text(
+            "SELECT s.owner_id FROM sources s JOIN recipes r ON r.source_id = s.id WHERE r.id = :r"
+        ),
+        {"r": stew},
+    )
+    await adb.execute(
+        text("INSERT INTO recipe_ratings (user_id, recipe_id, spoons) VALUES (:u, :r, 1)"),
+        {"u": owner, "r": stew},
+    )
+    admin = await people("ad", admin=True)
+    built = await admin.post("/api/admin/dumps")
+    assert built.json()["counts"]["recipe_ratings"] == 1
+    csv_zip, json_zip = (_unzip(store.files[p]) for p in sorted(store.files))
+    assert list(csv.DictReader(io.StringIO(csv_zip["recipe_ratings.csv"]))) == [
+        {"recipe_id": catalog["recipe"], "spoons": "4.5", "ratings": "2"}
+    ]
+    [recipe] = [json.loads(line) for line in json_zip["recipes.jsonl"].splitlines()]
+    assert (recipe["spoons"], recipe["ratings"]) == (4.5, 2)
+    assert "recipe_ratings" in csv_zip["README.txt"] and "rating" in json_zip["README.txt"]
+    # Nobody who rated is anywhere in either file.
+    raters = [str(u) for u in await adb.scalars(text("SELECT user_id FROM recipe_ratings"))]
+    assert len(raters) == 3
+    everything = "".join(csv_zip.values()) + "".join(json_zip.values())
+    assert not [u for u in raters if u in everything]
+    assert str(stew) not in everything
+
+
+async def test_an_unrated_recipe_says_so(store, catalog, people) -> None:
+    admin = await people("ad", admin=True)
+    await admin.post("/api/admin/dumps")
+    csv_zip, json_zip = (_unzip(store.files[p]) for p in sorted(store.files))
+    assert csv_zip["recipe_ratings.csv"].splitlines() == ["recipe_id,spoons,ratings"]
+    [recipe] = [json.loads(line) for line in json_zip["recipes.jsonl"].splitlines()]
+    assert (recipe["spoons"], recipe["ratings"]) == (None, 0)
+
+
 async def test_a_failed_upload_records_nothing(store, catalog, people, client) -> None:
     store.fail = True
     admin = await people("ad", admin=True)

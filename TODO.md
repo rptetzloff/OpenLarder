@@ -761,7 +761,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] One person's five spoons tops a list. A least number of
         ratings would show nothing while the site is new; add one
         (routers/ratings.py) when there are enough to ask for.
-      - [ ] Ratings aren't in the dumps yet.
+      - [x] Ratings in the dumps (#168; *Ray, 2026-11-12*): each rated
+        recipe's average and how many rated it, as its page shows them
+        (recipe_ratings.csv; "spoons" and "ratings" on each recipe in the
+        JSON). Never the ratings themselves, which say who gave what. The
+        privacy page and the Open data page say so.
       - [x] Notes (#148; *Ray, 2026-11-11: "more than reviews... notes....
         that are kept personal (or shared)"*; migration 0069): one note per
         person per recipe, written on its page, up to 2,000 characters.
