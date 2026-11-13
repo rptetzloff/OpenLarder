@@ -95,7 +95,7 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
       <div class="chip-input">
         <span v-for="id in only" :key="id" class="chip">
           {{ label(id) }}
-          <button type="button" :aria-label="`Remove ${label(id)}`" @click="drop('only', id)">×</button>
+          <button type="button" class="remove" :aria-label="`Remove ${label(id)}`" @click="drop('only', id)">×</button>
         </span>
         <input
           id="larder-only"
@@ -117,7 +117,7 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
       <div class="chip-input">
         <span v-for="id in leaveOut" :key="id" class="chip chip-unwanted">
           {{ label(id) }}
-          <button type="button" :aria-label="`Remove ${label(id)}`" @click="drop('out', id)">×</button>
+          <button type="button" class="remove" :aria-label="`Remove ${label(id)}`" @click="drop('out', id)">×</button>
         </span>
         <input
           id="larder-out"

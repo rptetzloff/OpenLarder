@@ -168,8 +168,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] Still text buttons that are choices, not extras: the
         suggestions under a picker (ingredient, larder, book, author),
         which want a listbox of their own.
-      - [ ] The × that removes a chip or another name is drawn about 12px
-        wide; it wants a 44px target like the rest.
+      - [x] The × that takes a chip, a name or a line away (#169): one
+        style for all eleven (`button.remove`), drawn small and 44px
+        square to tap. The square is its own box beside what it follows,
+        so it lies over nothing: not a link next to it, not the text box
+        below a row of chips, not the next row's × (rows of chips are 44px
+        apart now). Those that were text buttons aren't, which leaves 27
+        of those (32 before, counted the same way).
       - [ ] 8. Tokens, alongside the rest: the type sizes and corner radii
         are in `:root` now (#150); fold odd sizes in and move page CSS out
         of App.vue as each page is touched.

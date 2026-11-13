@@ -195,7 +195,7 @@ onMounted(load);
             <button
               v-if="user?.may_edit"
               type="button"
-              class="link remove-alias"
+              class="remove"
               :disabled="busy"
               :aria-label="`Remove the link to ${link.label ?? link.url}`"
               @click="remove(link)"

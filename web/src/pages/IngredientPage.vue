@@ -226,16 +226,19 @@ onMounted(() => {
           <p v-if="ingredient.aliases.length">
             <template v-for="(a, i) in ingredient.aliases" :key="a.id">
               <template v-if="i > 0"> · </template>
-              <span>{{ a.name }}</span>
-              <button
-                v-if="user?.may_edit"
-                type="button"
-                class="link remove-alias"
-                :aria-label="`Stop matching ${a.name}`"
-                @click="removeAlias(a)"
-              >
-                ×
-              </button>
+              <!-- Only with its ×: for anyone else the names are plain text. -->
+              <span :class="{ 'with-remove': user?.may_edit }"
+                >{{ a.name }}
+                <button
+                  v-if="user?.may_edit"
+                  type="button"
+                  class="remove"
+                  :aria-label="`Stop matching ${a.name}`"
+                  @click="removeAlias(a)"
+                >
+                  ×
+                </button>
+              </span>
             </template>
           </p>
           <p v-else class="status">No other names yet.</p>
@@ -384,16 +387,18 @@ onMounted(() => {
           Under it now:
           <template v-for="(c, i) in ingredient.children" :key="c.id">
             <template v-if="i > 0">, </template>
-            {{ c.name }}
-            <button
-              type="button"
-              class="link remove-alias"
-              :disabled="busy"
-              :aria-label="`Take ${c.name} out from under it`"
-              @click="placeUnder(c.id, null)"
-            >
-              ×
-            </button>
+            <span class="with-remove"
+              >{{ c.name }}
+              <button
+                type="button"
+                class="remove"
+                :disabled="busy"
+                :aria-label="`Take ${c.name} out from under it`"
+                @click="placeUnder(c.id, null)"
+              >
+                ×
+              </button>
+            </span>
           </template>
         </p>
 

@@ -40,7 +40,7 @@ async function remove(s: Swap) {
       <button
         v-if="canEdit"
         type="button"
-        class="link remove-alias"
+        class="remove"
         :aria-label="`Remove the swap of ${s.use.name} for ${s.instead_of.name}`"
         @click="remove(s)"
       >
