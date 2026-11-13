@@ -128,7 +128,8 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>
         the ratings you give: which recipe, and how many spoons. A recipe shows the average and
-        how many people rated it, never who;
+        how many people rated it, never who; that average and that count are in the open data
+        and the API, and what you gave is in neither;
       </li>
       <li>
         the recipes you save: which, and whether you want to cook each or have. Only you see

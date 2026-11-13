@@ -23,8 +23,8 @@ onMounted(async () => {
     <h1>Open data</h1>
     <p>
       OpenLarder's catalog is open data: every source, recipe, page and ingredient name anyone can
-      see here, free to download and reuse. It's built fresh each week, in two forms with the same
-      contents.
+      see here, and each recipe's average rating, free to download and reuse. It's built fresh
+      each week, in two forms with the same contents.
     </p>
     <ul>
       <li><strong>CSV</strong>: one file per table, for spreadsheets and databases.</li>
@@ -35,7 +35,8 @@ onMounted(async () => {
     </ul>
     <p>
       Private family collections and anything waiting for review are left out, and nothing about
-      accounts is included. To read a little at a time, there's the
+      accounts is included: a rating is the average and how many gave one, never who. To read a
+      little at a time, there's the
       <a href="/api/docs">API</a> instead.
     </p>
 

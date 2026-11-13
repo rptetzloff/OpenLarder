@@ -8,6 +8,11 @@ viewer): no private family collection, nothing waiting for review, and no
 ingredient or author only those use. Nothing about accounts: no user ids,
 no who-added-what, no edit history.
 
+Ratings are in them as a recipe's page shows them: the average, to one
+decimal place, and how many gave one (recipe_ratings.csv; "spoons" and
+"ratings" on each recipe in the JSON). Never the ratings themselves, which
+say who gave what.
+
 Two zips a week, each with a README giving the licence and attribution:
 one CSV per table, and the same catalog as JSON Lines with each recipe's
 places and ingredients inside it. They're uploaded under dumps/ with the
@@ -35,6 +40,7 @@ from openlarder.models import (
     Dump,
     Ingredient,
     Recipe,
+    RecipeRating,
     Source,
 )
 
@@ -81,11 +87,16 @@ COLUMNS = {
     "tags": ["id", "kind", "name"],
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
+    "recipe_ratings": ["recipe_id", "spoons", "ratings"],
     "substitutions": [
         "id", "from_ingredient_id", "from_recipe_id", "to_ingredient_id", "to_recipe_id",
         "diet_tag_id", "diet_kind", "source_edition_id", "source_page", "note",
     ],
 }  # fmt: skip
+
+# Not a table's rows but worked out from them (read): the table itself
+# says who, which a dump never does.
+DERIVED = {"recipe_ratings"}
 
 # The order rows come in: a recipe's lines and a line's options as written,
 # a source's credits as printed; the rest by id.
@@ -132,6 +143,10 @@ ABOUT = {
     ),
     "source_tags": "Tags on whole sources, which their recipes have too.",
     "recipe_tags": "Tags on recipes.",
+    "recipe_ratings": (
+        "Each rated recipe's average, of one to five spoons, to one decimal place, and how"
+        " many people rated it. Not who, nor what any one of them gave."
+    ),
     "substitutions": "What can stand in for what, and for which diet.",
 }
 
@@ -194,12 +209,29 @@ async def read(session: AsyncSession) -> dict[str, list[dict]]:
     seen = _seen()
     rows: dict[str, list[dict]] = {}
     for name, columns in COLUMNS.items():
+        if name in DERIVED:
+            continue
         table: Table = Base.metadata.tables[name]
         order = [table.c[c] for c in ORDER.get(name, COLUMNS[name][:1])]
         result = await session.execute(
             select(*(table.c[c] for c in columns)).where(seen[name]).order_by(*order)
         )
         rows[name] = [{c: _plain(v) for c, v in zip(columns, r, strict=True)} for r in result]
+    # A recipe's rating as its page shows it, for the recipes in the dump.
+    rated = await session.execute(
+        select(
+            RecipeRating.recipe_id,
+            func.round(func.avg(RecipeRating.spoons), 1),
+            func.count(),
+        )
+        .where(RecipeRating.recipe_id.in_(select(Recipe.id).where(seen["recipes"])))
+        .group_by(RecipeRating.recipe_id)
+        .order_by(RecipeRating.recipe_id)
+    )
+    rows["recipe_ratings"] = [
+        {"recipe_id": str(recipe), "spoons": float(spoons), "ratings": count}
+        for recipe, spoons, count in rated
+    ]
     # Links to what isn't in the dump are left blank: a sub-recipe that's
     # hidden, a broader ingredient only hidden recipes use.
     recipe_ids = {r["id"] for r in rows["recipes"]}
@@ -245,7 +277,8 @@ def readme(day: str, rows: dict[str, list[dict]], kind: str) -> str:
     else:
         lines.append(
             "JSON Lines, one record a line: sources.jsonl (with their credits and"
-            " editions), recipes.jsonl (with their places, ingredient lines and tags),"
+            " editions), recipes.jsonl (with their places, ingredient lines, tags and"
+            " rating),"
             " ingredients.jsonl (with other names and allergens), authors.jsonl, tags.jsonl,"
             " substitutions.jsonl, allergens.jsonl."
         )
@@ -293,6 +326,7 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
     lines = _group(rows["recipe_ingredients"], "recipe_id")
     options = _group(rows["ingredient_options"], "recipe_ingredient_id")
     tags_of_recipe = _group(rows["recipe_tags"], "recipe_id")
+    rating = {r["recipe_id"]: r for r in rows["recipe_ratings"]}
     aliases = _group(rows["ingredient_aliases"], "ingredient_id")
     recorded = _group(rows["ingredient_allergens"], "ingredient_id")
     avoids = _group(rows["diet_allergens"], "diet_tag_id")
@@ -323,6 +357,9 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
                 for line in lines.get(r["id"], [])
             ],
             "tags": [t["tag_id"] for t in tags_of_recipe.get(r["id"], [])],
+            # As a listing has them: no average until someone rates it.
+            "spoons": rating[r["id"]]["spoons"] if r["id"] in rating else None,
+            "ratings": rating[r["id"]]["ratings"] if r["id"] in rating else 0,
         }
         for r in rows["recipes"]
     ]
