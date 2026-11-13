@@ -225,7 +225,8 @@ onMounted(() => {
           <h2>Also called</h2>
           <p v-if="ingredient.aliases.length">
             <template v-for="(a, i) in ingredient.aliases" :key="a.id">
-              <template v-if="i > 0"> · </template>
+              <!-- Between plain names; with a × after each, the × parts them. -->
+              <template v-if="i > 0 && !user?.may_edit"> · </template>
               <!-- Only with its ×: for anyone else the names are plain text. -->
               <span :class="{ 'with-remove': user?.may_edit }"
                 >{{ a.name }}
@@ -385,8 +386,7 @@ onMounted(() => {
         />
         <p v-if="ingredient.children.length" class="status">
           Under it now:
-          <template v-for="(c, i) in ingredient.children" :key="c.id">
-            <template v-if="i > 0">, </template>
+          <template v-for="c in ingredient.children" :key="c.id">
             <span class="with-remove"
               >{{ c.name }}
               <button
