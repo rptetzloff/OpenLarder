@@ -1,6 +1,7 @@
 // Authors: what /api/authors returns, and fixing one.
 
 import type { BookSummary } from "./books";
+import type { Listed } from "./ingredients";
 
 export interface AuthorSummary {
   id: string;
@@ -33,6 +34,8 @@ export interface Author {
   sources: (BookSummary & { roles: string[]; credited_as: string; name: string })[];
   // People credited on the same books, most shared first.
   coauthors: AuthorSummary[];
+  // The top rated recipes of their sources, best first.
+  top_rated: Listed[];
   // Others whose names compare the same: likely one person, to merge.
   same_name: AuthorSummary[];
 }

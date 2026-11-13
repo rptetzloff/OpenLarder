@@ -42,6 +42,9 @@ async def secret(people, adb):
     ann = await people("ann")
     box = await _collection(ann)
     stew = await _recipe(ann, box)
+    # Rated, so it would be among an author's top rated if that list forgot
+    # who may see it (routers/ratings.py).
+    assert (await ann.put(f"/api/recipes/{stew}/rating", json={"spoons": 5})).status_code == 200
     salt = await adb.scalar(text("SELECT id FROM ingredients WHERE name = 'Zanzibar Moonsalt'"))
     butter = await adb.scalar(text("SELECT id FROM ingredients WHERE name = 'Butter'"))
     await adb.execute(

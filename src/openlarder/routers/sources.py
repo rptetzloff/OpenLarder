@@ -56,7 +56,8 @@ from openlarder.models import (
     SourceGroup,
     User,
 )
-from openlarder.routers.ingredients import contains_pattern
+from openlarder.routers.ingredients import UsedBy, contains_pattern
+from openlarder.routers.ratings import top_rated
 from openlarder.tagging import TagOut, source_tags
 
 log = logging.getLogger(__name__)
@@ -183,6 +184,9 @@ class Book(BaseModel):
     recipes: list[RecipeSummary]
     # The ingredients its recipes use most, for finding your way in by one.
     ingredients: list[TopIngredient]
+    # Its top rated recipes, best first (routers/ratings.py); none until
+    # some are rated four spoons or more.
+    top_rated: list[UsedBy] = []
     # A magazine's or newspaper's issues, newest first.
     issues: list[IssueSummary]
     # A family collection only its owner sees; and whether the viewer may
@@ -558,6 +562,9 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
             for r in recipes
         ],
         ingredients=[TopIngredient(id=i, name=n, recipes=c) for i, n, c in top],
+        top_rated=await top_rated(
+            session, Recipe.source_id == source_id, visibility.recipes_seen_by(viewer)
+        ),
         issues=[IssueSummary(id=i.id, label=i.label, published_on=i.published_on) for i in issues],
         episodes=[
             EpisodeSummary(

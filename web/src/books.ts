@@ -2,6 +2,7 @@ import type { Review } from "./review";
 // What /api/sources returns, and adding a book by ISBN.
 
 import type { BuyLink } from "./buying";
+import type { Listed } from "./ingredients";
 import type { Tag } from "./tags";
 
 export interface BookSummary {
@@ -97,6 +98,8 @@ export interface Book {
   }[];
   // The ingredients its recipes use most, with how many recipes use each.
   ingredients: { id: string; name: string; recipes: number }[];
+  // Its top rated recipes, best first; none until some are rated well.
+  top_rated: Listed[];
 }
 
 // Resolves to the book's ID, whether it was added now or was already here

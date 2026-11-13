@@ -54,6 +54,9 @@ const shelf = ref<Named[]>([]);
 const onShelf = ref(params.get("own") === "1");
 // Only the recipes you've saved (routers/saved.py); enough to search by.
 const onlySaved = ref(params.get("sv") === "1");
+// The order: as they match (closest to made, or by source and title), or
+// the rated ones first, best first. Ray, 2026-11-12.
+const sort = ref<"match" | "rating">(params.get("sort") === "rating" ? "rating" : "match");
 const title = ref(params.get("q") ?? "");
 // Every kind until some are unticked; the address lists them only then.
 const asked = params.getAll("kind").filter((k) => ALL_KINDS.includes(k));
@@ -135,9 +138,10 @@ const searching = computed(
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv", "sort"]) {
     url.searchParams.delete(key);
   }
+  if (sort.value === "rating") url.searchParams.set("sort", "rating");
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
   for (const b of shelf.value) url.searchParams.append("source", b.id);
   for (const i of chosen.value) url.searchParams.append("i", i.id);
@@ -180,6 +184,7 @@ async function run(toPage = 1) {
         larderWithout: larderOut.value,
         onShelf: onShelf.value,
         saved: onlySaved.value,
+        byRating: sort.value === "rating",
       },
     );
     if (mine !== latest) return;
@@ -200,6 +205,7 @@ watch(title, () => {
 watch(kinds, () => run(), { deep: true });
 watch(onShelf, () => run());
 watch(onlySaved, () => run());
+watch(sort, () => run());
 watch(tags, () => run(), { deep: true });
 function toggleTag(id: string, on: boolean) {
   tags.value = on ? [...tags.value, id] : tags.value.filter((t) => t !== id);
@@ -376,6 +382,7 @@ onMounted(async () => {
       larderWithout: larderOut.value,
       onShelf: onShelf.value,
       saved: onlySaved.value,
+      byRating: sort.value === "rating",
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
@@ -638,10 +645,22 @@ onMounted(async () => {
           come first, with where to find them.
         </p>
         <template v-else-if="result">
-          <h2 ref="resultsHead" class="results-head" tabindex="-1">
-            {{ summary }}
-            <span v-if="chosen.length || useLarder" class="muted"> · closest to made first</span>
-          </h2>
+          <div class="results-top">
+            <h2 ref="resultsHead" class="results-head" tabindex="-1">
+              {{ summary }}
+              <span v-if="sort === 'rating'" class="muted"> · highest rated first</span>
+              <span v-else-if="chosen.length || useLarder" class="muted">
+                · closest to made first</span
+              >
+            </h2>
+            <div v-if="result.total > 1" class="table-controls">
+              <label for="search-sort">Sort</label>
+              <select id="search-sort" v-model="sort">
+                <option value="match">Best match</option>
+                <option value="rating">Highest rated</option>
+              </select>
+            </div>
+          </div>
           <p v-if="result.shelf_books === 0" class="status">
             Your shelf has no books yet: on a book's page, “I have this book” puts it there.
           </p>
@@ -712,6 +731,24 @@ onMounted(async () => {
 }
 .results-head:focus {
   outline: none;
+}
+/* The count, and how the results are ordered. */
+.results-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.results-top .results-head {
+  margin: 0;
+}
+.results-top .table-controls {
+  align-items: center;
+}
+.results-top select {
+  min-height: 2.75rem;
 }
 .filters-toggle {
   display: none;

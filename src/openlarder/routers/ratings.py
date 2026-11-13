@@ -6,6 +6,15 @@ it at will. Everyone who can see the recipe sees its average and how many
 gave it; nobody sees who gave what. Listings carry the same two numbers
 (routers/ingredients.py, with_pages). No words go with a rating, so there
 is nothing to moderate.
+
+Ratings rank, too (*Ray, 2026-11-12*). A source's page and an author's
+show their top rated recipes: those averaging four spoons or more, the
+best five, the higher average first and, level, the one more people
+rated. With none, the section is left off, not filled with some other
+ranking (SCOPING.md). A search can be sorted the same way: rated recipes
+first, then the rest as they'd come anyway. One person's five spoons tops
+a list for now; a least number of ratings would show nothing at all while
+the site is new, and is a constant to add here when it isn't.
 """
 
 import uuid
@@ -17,7 +26,8 @@ from sqlalchemy import delete, func, select
 from openlarder import visibility
 from openlarder.auth import CurrentUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Recipe, RecipeRating
+from openlarder.models import Recipe, RecipeRating, Source
+from openlarder.routers.ingredients import UsedBy, with_pages
 
 router = APIRouter(tags=["ratings"])
 
@@ -45,6 +55,48 @@ async def averages(session, recipe_ids: list[uuid.UUID]) -> dict[uuid.UUID, tupl
         .group_by(RecipeRating.recipe_id)
     )
     return {r: (round(float(avg), 1), n) for r, avg, n in rows}
+
+
+# Top rated: this average or more, as it's shown (to one decimal place),
+# and this many of them.
+TOP_SPOONS = 4
+TOP_SHOWN = 5
+
+
+def rated():
+    """Each rated recipe's average, as it's shown, and how many rated it:
+    to join recipes to, and order them by."""
+    return (
+        select(
+            RecipeRating.recipe_id.label("recipe_id"),
+            func.round(func.avg(RecipeRating.spoons), 1).label("spoons"),
+            func.count().label("ratings"),
+        )
+        .group_by(RecipeRating.recipe_id)
+        .subquery("rated")
+    )
+
+
+def best_first(ratings) -> tuple:
+    """The order ratings put recipes in: the higher average first, then the
+    one more people rated; unrated ones after them all."""
+    return (ratings.c.spoons.desc().nulls_last(), ratings.c.ratings.desc().nulls_last())
+
+
+async def top_rated(session, *conditions) -> list[UsedBy]:
+    """The top rated of the recipes meeting the conditions, best first."""
+    ratings = rated()
+    rows = (
+        await session.execute(
+            select(Recipe.id, Recipe.title, Source.id, Source.title)
+            .join(Source, Source.id == Recipe.source_id)
+            .join(ratings, ratings.c.recipe_id == Recipe.id)
+            .where(*conditions, ratings.c.spoons >= TOP_SPOONS)
+            .order_by(*best_first(ratings), func.lower(Recipe.title), Recipe.id)
+            .limit(TOP_SHOWN)
+        )
+    ).all()
+    return await with_pages(session, rows)
 
 
 async def _seen(session, viewer, recipe_id: uuid.UUID) -> None:

@@ -3,6 +3,7 @@ import CoverBlank from "../components/CoverBlank.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
+import TopRated from "../components/TopRated.vue";
 import {
   addLink,
   type Author,
@@ -230,6 +231,8 @@ onMounted(load);
           </li>
         </ul>
       </section>
+
+      <TopRated :recipes="author.top_rated" with-source />
 
       <section v-if="author.coauthors.length" class="source-section">
         <h2>Credited with</h2>

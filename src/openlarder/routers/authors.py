@@ -27,7 +27,8 @@ from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.author_names import shown_name
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
-from openlarder.routers.ingredients import contains_pattern
+from openlarder.routers.ingredients import UsedBy, contains_pattern
+from openlarder.routers.ratings import top_rated
 from openlarder.routers.sources import BookSummary, summaries
 from openlarder.wikidata import WikidataTransport, wikidata_transport  # noqa: F401
 
@@ -95,6 +96,9 @@ class AuthorOut(BaseModel):
     links: list[LinkOut]
     sources: list[AuthorBook]
     coauthors: list[CoAuthor]
+    # The top rated recipes of their sources, best first (routers/
+    # ratings.py); none until some are rated four spoons or more.
+    top_rated: list[UsedBy] = []
     # Other authors whose names compare the same: likely the same person,
     # to merge (author_merge.py).
     same_name: list[AuthorSummary]
@@ -266,6 +270,9 @@ async def get_author(author_id: uuid.UUID, session: Session, viewer: Viewer) -> 
         links=[LinkOut(id=x.id, url=x.url, label=x.label) for x in links],
         sources=books,
         coauthors=[CoAuthor(id=i, name=n, sources=c) for i, n, c in coauthors],
+        top_rated=await top_rated(
+            session, Recipe.source_id.in_(roles), visibility.recipes_seen_by(viewer)
+        ),
         same_name=[
             AuthorSummary(id=i, name=n, sources=c)
             for i, n, c in await session.execute(

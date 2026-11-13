@@ -71,3 +71,129 @@ async def test_deleting_the_account_takes_its_ratings(people, client, adb) -> No
     await ann.put(f"/api/recipes/{soup}/rating", json={"spoons": 1})
     assert (await ann.post("/api/account/delete", json={"confirm": "ann"})).status_code == 204
     assert (await client.get(f"/api/recipes/{soup}/rating")).json()["ratings"] == 0
+
+
+# Ratings rank (Ray, 2026-11-12)
+
+
+async def _rated(people, adb, spoons_by_title, authors=("Yotam Ottolenghi",)):
+    """A book with a recipe of each title, given these spoons by as many
+    people; returns the book, its author and the recipes by title."""
+    mo = await people("mo", role="moderator")
+    book = (
+        await mo.post("/api/sources/manual", json={"title": "Plenty", "authors": list(authors)})
+    ).json()["id"]
+    edition = str(
+        await adb.scalar(text("SELECT id FROM editions WHERE source_id = :s"), {"s": book})
+    )
+    raters = [await people(f"rater{n}") for n in range(max(map(len, spoons_by_title.values())))]
+    recipes = {}
+    for page, (title, spoons) in enumerate(spoons_by_title.items(), start=1):
+        made = await mo.post(
+            f"/api/sources/{book}/recipes",
+            json={
+                "title": title,
+                "editions": [{"edition_id": edition, "page": str(page)}],
+                "ingredients": ["Garlic"] if "Garlic" in title else ["Leek", "Onion"],
+            },
+        )
+        assert made.status_code == 201, made.text
+        recipes[title] = made.json()["id"]
+        for rater, given in zip(raters, spoons, strict=False):
+            rated = await rater.put(
+                f"/api/recipes/{made.json()['id']}/rating", json={"spoons": given}
+            )
+            assert rated.status_code == 200, rated.text
+    return book, recipes
+
+
+async def test_a_sources_page_and_an_authors_show_their_top_rated(people, client, adb) -> None:
+    book, _ = await _rated(
+        people,
+        adb,
+        {
+            "Good Soup": [4, 5],  # 4.5
+            "Best Bread": [5, 5],  # 5.0, from two
+            "Fine Cake": [5],  # 5.0, from one: after the one two people rated
+            "Fair Stew": [3, 5],  # 4.0: just in
+            "Poor Pie": [3],  # under four spoons
+            "Almost Tart": [4, 4, 3],  # 3.7: shown as under four, so not in
+            "Plain Rice": [],
+        },
+    )
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    assert [(r["title"], r["spoons"], r["ratings"], r["pages"]) for r in shown["top_rated"]] == [
+        ("Best Bread", 5.0, 2, ["2"]),
+        ("Fine Cake", 5.0, 1, ["3"]),
+        ("Good Soup", 4.5, 2, ["1"]),
+        ("Fair Stew", 4.0, 2, ["4"]),
+    ]
+    author = shown["credits"][0]["author_id"]
+    theirs = (await client.get(f"/api/authors/{author}")).json()["top_rated"]
+    assert [(r["title"], r["source_title"]) for r in theirs] == [
+        ("Best Bread", "Plenty"),
+        ("Fine Cake", "Plenty"),
+        ("Good Soup", "Plenty"),
+        ("Fair Stew", "Plenty"),
+    ]
+
+
+async def test_top_rated_is_the_best_five_and_left_off_with_none(people, client, adb) -> None:
+    book, _ = await _rated(people, adb, {f"Dish {n}": [5] for n in range(7)} | {"Plain": []})
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    # Level on spoons and on how many: by title.
+    assert [r["title"] for r in shown["top_rated"]] == [f"Dish {n}" for n in range(5)]
+    mo = await people("mo2", role="moderator")
+    bare = (await mo.post("/api/sources/manual", json={"title": "Unrated Book"})).json()["id"]
+    assert (await client.get(f"/api/sources/{bare}")).json()["top_rated"] == []
+
+
+async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
+    await _rated(
+        people,
+        adb,
+        {
+            "Apple Soup": [],
+            "Barley Soup": [4],
+            "Carrot Soup": [5, 5],
+            "Dill Soup": [5],
+            "Egg Soup": [],
+        },
+    )
+    usual = (await client.get("/api/search", params={"q": "soup"})).json()
+    assert [r["title"] for r in usual["recipes"]] == [
+        "Apple Soup",
+        "Barley Soup",
+        "Carrot Soup",
+        "Dill Soup",
+        "Egg Soup",
+    ]
+    best = (await client.get("/api/search", params={"q": "soup", "sort": "rating"})).json()
+    # The rated ones, best first; then the rest as they'd come anyway.
+    assert [r["title"] for r in best["recipes"]] == [
+        "Carrot Soup",
+        "Dill Soup",
+        "Barley Soup",
+        "Apple Soup",
+        "Egg Soup",
+    ]
+    assert best["total"] == usual["total"] == 5
+    assert (await client.get("/api/search", params={"q": "soup", "sort": "x"})).status_code == 422
+
+
+async def test_rating_comes_before_how_well_ingredients_match(people, client, adb) -> None:
+    """Sorted by rating, a rated recipe using one of your ingredients comes
+    before an unrated one using them all: that's what was asked for."""
+    _, recipes = await _rated(people, adb, {"Leek Tart": [], "Garlic Paste": [5], "Leek Soup": [4]})
+    named = {
+        n: str(await adb.scalar(text("SELECT id FROM ingredients WHERE name = :n"), {"n": n}))
+        for n in ("Leek", "Onion", "Garlic")
+    }
+    asked = {"ingredient": [named["Leek"], named["Onion"], named["Garlic"]]}
+    usual = (await client.get("/api/search", params=asked)).json()
+    assert [r["title"] for r in usual["recipes"]] == ["Leek Soup", "Leek Tart", "Garlic Paste"]
+    best = (await client.get("/api/search", params={**asked, "sort": "rating"})).json()
+    assert [r["title"] for r in best["recipes"]] == ["Garlic Paste", "Leek Soup", "Leek Tart"]
+    assert [r["have"] for r in best["recipes"]] == [1, 2, 2]
+    # Paged the same way.
+    assert best["total"] == 3
