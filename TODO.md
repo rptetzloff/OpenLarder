@@ -236,8 +236,26 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         event in Umami. What the tracker sends was checked against the
         script the site loads; what Umami's collector makes of it
         couldn't be from here.
-      - [ ] 2. Title search ranked by relevance: whole words first, then
-        the start of a word, then inside one.
+      - [x] 2. Title search ranked by relevance (#173). Everything with
+        the words in its title is still found; the closest titles come
+        first: every word a whole word of the title, plurals counting
+        ("Carrot Cake" and "Crab Cakes" for "cake"), then every word
+        beginning one ("Cakewalk Cookies"), then inside one ("Pancakes",
+        "Cheesecake"). Within each: the title exactly as typed, then the
+        rated recipes, best first, then the shorter title, then A to Z.
+        With ingredients too, what you have still ranks first and this
+        orders recipes level on it. "Highest rated" still puts every
+        rated recipe first.
+      - [ ] Words the English reading drops ("the", "and") are never
+        whole words to it: a search for "the" alone has nothing in the
+        first group.
+      - [ ] No index was added, where the spec asked for two. The trigram
+        index that finds titles is from migration 0001. A GIN index on the
+        titles' English reading can't serve an ORDER BY, and went unused
+        when tried. On a table of the catalog's size (18,859 titles):
+        "cake" 4.7 ms ranked, 2.2 ms before; a single letter in nearly
+        every title, the worst, 136 ms against 15 ms. If that matters
+        one day, store the reading in a column.
       - [ ] 3. Book pages on a phone: the recipes before Top rated,
         Most-used ingredients and Edition; the first 30, then "Show all".
       - [ ] 4. Book titles' capitals, as suggestions: titles in sentence

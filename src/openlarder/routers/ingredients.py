@@ -15,7 +15,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Row, exists, func, or_, select
 from sqlalchemy.orm import aliased
 
-from openlarder import fdc, ingredients, openlibrary, substitutions, visibility, web, wikidata
+from openlarder import (
+    fdc,
+    ingredients,
+    openlibrary,
+    substitutions,
+    title_rank,
+    visibility,
+    web,
+    wikidata,
+)
 from openlarder import recipes as recipe_entries
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.author_names import shown_name
@@ -154,10 +163,13 @@ async def recipes_where(
     offset: int,
     limit: int | None = None,
     by_rating: bool = False,
+    title: tuple[Sequence[str], str] | None = None,
 ) -> tuple[list[UsedBy], int]:
     """A page of the recipes meeting the conditions, by book then title,
     with their pages, and how many there are in all. by_rating: the rated
-    ones first, best first (routers/ratings.py), then the rest that way."""
+    ones first, best first (routers/ratings.py), then the rest that way.
+    title: the words of a title search and the search as typed; the
+    closest titles first (title_rank.py), then by title."""
     total = await session.scalar(select(func.count()).select_from(Recipe).where(*conditions))
     query = (
         select(Recipe.id, Recipe.title, Source.id, Source.title)
@@ -165,13 +177,21 @@ async def recipes_where(
         .where(*conditions)
     )
     order = [func.lower(Source.title), func.lower(Recipe.title), Recipe.id]
-    if by_rating:
+    if by_rating or title:
         # Here, not at the top: routers/ratings.py loads this module.
         from openlarder.routers.ratings import best_first, rated
 
         ratings = rated()
         query = query.outerjoin(ratings, ratings.c.recipe_id == Recipe.id)
-        order = [*best_first(ratings), *order]
+        if title:
+            order = [
+                *title_rank.order(*title, best_first(ratings)),
+                func.lower(Recipe.title),
+                func.lower(Source.title),
+                Recipe.id,
+            ]
+        if by_rating:
+            order = [*best_first(ratings), *order]
     rows = (await session.execute(query.order_by(*order).offset(offset).limit(limit or PAGE))).all()
     return await with_pages(session, rows), total or 0
 
