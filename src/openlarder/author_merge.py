@@ -12,7 +12,7 @@ from sqlalchemy import delete, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from openlarder.models import Author, AuthorLink, SourceCredit
+from openlarder.models import Author, AuthorLink, MergedRecord, SourceCredit
 
 
 async def merge(session: AsyncSession, gone: Author, kept: Author) -> None:
@@ -56,6 +56,8 @@ async def merge(session: AsyncSession, gone: Author, kept: Author) -> None:
     if "wikidata_id" in moving:
         for column in ("born_year", "died_year", "country", "website", "wikidata_checked_at"):
             moving[column] = getattr(gone, column)
+    # Where they went, for their old address to say (pages.py).
+    session.add(MergedRecord(kind="author", gone_id=gone.id, kept_id=kept.id))
     await session.delete(gone)
     await session.flush()
     for column, value in moving.items():

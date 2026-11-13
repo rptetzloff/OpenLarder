@@ -21,7 +21,8 @@ in it the API wouldn't give a stranger, and can't drift from it.
   its "not found" as before.
 - One that's there but not for someone signed out (private, or waiting for
   review): 200, the plain page, noindex, nothing of the record.
-- A source merged into another: 301 to the one kept, if anyone can see it.
+- A source, an ingredient or an author merged into another: 301 to the
+  one kept, if anyone can see it.
 """
 
 import html
@@ -35,7 +36,7 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import visibility
-from openlarder.models import Author, BookMerge, Ingredient, Recipe, Source
+from openlarder.models import Author, BookMerge, Ingredient, MergedRecord, Recipe, Source
 from openlarder.routers import authors, ingredients, recipes, sources
 
 SITE = "OpenLarder"
@@ -581,6 +582,27 @@ async def _kept(session: AsyncSession, gone_id: uuid.UUID) -> uuid.UUID | None:
     )
 
 
+async def _went_to(
+    session: AsyncSession, kind: str, gone_id: uuid.UUID, model, seen
+) -> uuid.UUID | None:
+    """The ingredient or author a merged one went into (migration 0070),
+    following merges on, if anyone can see it: an address that says where a
+    record went mustn't say that one that isn't everyone's is there."""
+    at = gone_id
+    for _ in range(MERGE_HOPS):
+        merged = await session.scalar(
+            select(MergedRecord.kept_id).where(
+                MergedRecord.gone_id == at, MergedRecord.kind == kind
+            )
+        )
+        if merged is None:
+            break
+        at = merged
+    if at == gone_id:
+        return None
+    return await session.scalar(select(model.id).where(model.id == at, seen))
+
+
 async def source(session: AsyncSession, source_id: uuid.UUID) -> Page:
     shown = await sources.as_signed_out(session, source_id)
     if shown is None:
@@ -607,12 +629,15 @@ async def source(session: AsyncSession, source_id: uuid.UUID) -> Page:
 
 async def ingredient(session: AsyncSession, ingredient_id: uuid.UUID) -> Page:
     """An ingredient only recipes that aren't everyone's use is as hidden
-    as they are. One merged into another isn't recorded as such, so its
-    old address is a 404."""
+    as they are. One merged into another goes to the one kept."""
     shown = await ingredients.as_signed_out(session, ingredient_id)
     if shown is None:
-        there = await session.scalar(select(exists().where(Ingredient.id == ingredient_id)))
-        return HIDDEN if there else NOT_FOUND
+        if await session.scalar(select(exists().where(Ingredient.id == ingredient_id))):
+            return HIDDEN
+        kept = await _went_to(
+            session, "ingredient", ingredient_id, Ingredient, visibility.ingredients_seen_by(None)
+        )
+        return Page(status=301, moved_to=f"/ingredients/{kept}") if kept else NOT_FOUND
     return Page(
         title=f"{shown.name} · Ingredients · {SITE}",
         description=ingredient_description(shown),
@@ -625,8 +650,12 @@ async def ingredient(session: AsyncSession, ingredient_id: uuid.UUID) -> Page:
 async def author(session: AsyncSession, author_id: uuid.UUID) -> Page:
     shown = await authors.as_signed_out(session, author_id)
     if shown is None:
-        there = await session.scalar(select(exists().where(Author.id == author_id)))
-        return HIDDEN if there else NOT_FOUND
+        if await session.scalar(select(exists().where(Author.id == author_id))):
+            return HIDDEN
+        kept = await _went_to(
+            session, "author", author_id, Author, visibility.authors_seen_by(None)
+        )
+        return Page(status=301, moved_to=f"/authors/{kept}") if kept else NOT_FOUND
     return Page(
         title=f"{shown.name} · {SITE}",
         description=author_description(shown),

@@ -41,3 +41,25 @@ class BookMerge(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MergedRecord(Base):
+    """Where a merged ingredient or author went (migration 0070): the id
+    that's gone and the one kept, so the page of the one that went can say
+    where it is now (pages.py). These merges can't be undone, so unlike a
+    book's there is nothing else to keep."""
+
+    __tablename__ = "merged_records"
+    __table_args__ = (
+        CheckConstraint("kind IN ('ingredient', 'author')", name="kind_known"),
+        CheckConstraint("gone_id <> kept_id", name="not_into_itself"),
+    )
+
+    gone_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    # Not a key: if the one kept is merged on into a third, this row stays
+    # and is followed on; if it's deleted, there's nowhere to go.
+    kept_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    merged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
