@@ -30,7 +30,12 @@ function fromBox(event: KeyboardEvent) {
     choices()[0].focus();
   }
 }
-// Down and Up move through it; Up from the first, or Escape, goes back.
+// Down and Up move through it; Up from the first, or Escape, goes back. So
+// does typing: a letter, Backspace or Delete on a choice is meant for the
+// box, which gets focus before the key acts, so it lands there. On a
+// choice the keys did nothing, and the box seemed to have stopped taking
+// them (chips.ts has what Ray asked, 2026-11-13). Space is left: it takes
+// the choice, as Enter does.
 function within(event: KeyboardEvent) {
   const all = choices();
   const at = all.indexOf(event.target as HTMLButtonElement);
@@ -42,6 +47,12 @@ function within(event: KeyboardEvent) {
     if (at > 0) all[at - 1].focus();
     else box()?.focus();
   } else if (event.key === "Escape") {
+    box()?.focus();
+  } else if (
+    event.key === "Backspace" ||
+    event.key === "Delete" ||
+    (event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey)
+  ) {
     box()?.focus();
   }
 }

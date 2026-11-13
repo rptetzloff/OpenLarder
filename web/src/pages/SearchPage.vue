@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { dropLastOn } from "../chips";
 import LarderPicker from "../components/LarderPicker.vue";
 import OptionList from "../components/OptionList.vue";
 import { KINDS, listTags, type Tag } from "../tags";
@@ -452,6 +453,7 @@ onMounted(async () => {
           :placeholder="`Add an ingredient (up to ${MAX_INGREDIENTS})`"
           aria-describedby="search-ingredient-help"
           :disabled="chosen.length >= MAX_INGREDIENTS"
+          @keydown="dropLastOn($event, chosen, (i) => dropIngredient(i.id))"
           @keydown.enter.prevent="
             ingredientFind.suggestions.value[0] && addIngredient(ingredientFind.suggestions.value[0])
           "
@@ -488,6 +490,7 @@ onMounted(async () => {
           placeholder="Add an ingredient to leave out"
           aria-describedby="search-unwanted-help"
           :disabled="unwanted.length >= MAX_INGREDIENTS"
+          @keydown="dropLastOn($event, unwanted, (i) => dropUnwanted(i.id))"
           @keydown.enter.prevent="
             unwantedFind.suggestions.value[0] && addUnwanted(unwantedFind.suggestions.value[0])
           "
@@ -537,6 +540,7 @@ onMounted(async () => {
               autocomplete="off"
               placeholder="Type a title, author or site"
               :disabled="shelf.length >= MAX_SOURCES"
+              @keydown="dropLastOn($event, shelf, (b) => dropSource(b.id))"
               @keydown.enter.prevent="
                 sourceFind.suggestions.value[0] && addSource(sourceFind.suggestions.value[0])
               "
