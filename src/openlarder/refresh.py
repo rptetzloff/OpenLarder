@@ -48,6 +48,12 @@ class NotLinked(ValueError):
     """The book has no Open Library work to check against."""
 
 
+def _kind_shown(kind: str) -> str:
+    """An author's kind as it's shown: the stored word is "organisation",
+    and what's shown is in American spelling."""
+    return "organization" if kind == "organisation" else kind
+
+
 def _cover(cover_id: int | None) -> str | None:
     return openlibrary.cover_url(cover_id) if cover_id else None
 
@@ -140,9 +146,9 @@ async def check(
             out.append(
                 Difference(
                     f"author:{author.id}:kind",
-                    f"{author.name}: person or organisation",
-                    author.kind,
-                    found_author.kind,
+                    f"{author.name}: person or organization",
+                    _kind_shown(author.kind),
+                    _kind_shown(found_author.kind),
                     apply=setter(author, "kind", found_author.kind),
                 )
             )

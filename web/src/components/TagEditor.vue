@@ -95,7 +95,7 @@ const add = () =>
         </div>
       </fieldset>
       <p v-if="inherited?.length" class="help">
-        Tags from the source are ticked and greyed: change them on the source's page.
+        Tags from the source are ticked and grayed: change them on the source's page.
       </p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button type="submit" class="primary" :disabled="busy || !all">

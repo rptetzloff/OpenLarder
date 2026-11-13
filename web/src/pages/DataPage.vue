@@ -66,7 +66,7 @@ onMounted(async () => {
         It's under the
         <a :href="dumps.licence_url">Open Database License (ODbL)</a>: you may copy, share and build
         on it, if you credit OpenLarder and keep any database you make from it open under the same
-        licence. Credit it like this:
+        license. Credit it like this:
       </p>
       <blockquote class="attribution">{{ dumps.attribution }}</blockquote>
       <p>

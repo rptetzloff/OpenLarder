@@ -268,6 +268,12 @@ def read(name: str, said_by: str) -> dict[str, Found]:
     return out
 
 
+# An allergen's key as a sentence says it, where that isn't the key with
+# its underscores gone: the key keeps the spelling it was given (migration
+# 0059), and what's shown is in American spelling (0072).
+_SAID = {"sulphites": "sulfites"}
+
+
 def _reason(found: Found, name: str) -> str:
     where = (
         "Its name" if found.said_by == "name" else f"Its FoodData Central food, “{found.said_by}”,"
@@ -276,7 +282,8 @@ def _reason(found: Found, name: str) -> str:
         verb = "may contain"
     else:
         verb = "contains" if found.likely else "usually contains"
-    return f"{where} says “{found.word}”: {name} {verb} {found.allergen.replace('_', ' ')}."
+    said = _SAID.get(found.allergen, found.allergen.replace("_", " "))
+    return f"{where} says “{found.word}”: {name} {verb} {said}."
 
 
 async def suggest(session: AsyncSession) -> int:
