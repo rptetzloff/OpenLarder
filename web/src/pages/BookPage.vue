@@ -15,7 +15,8 @@ import { arrange } from "../shops";
 import { buyHref, DISCLOSURE, FORMAT_NAMES, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
+import { useNarrow } from "../narrow";
 import {
   type Book,
   issueName,
@@ -33,6 +34,13 @@ import type { Me } from "../me";
 // its editions (a book's), the ingredients it uses most, and its recipes as
 // a table, filtered and sorted here.
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
+// On a phone the recipes come straight after the cover, title and shops,
+// before Top rated, the ingredients, the edition and Elsewhere, and only
+// the first thirty are listed until asked (*Ray's round 2 spec,
+// 2026-11-13*: the list began 1,600px down a page 20,000px tall). The
+// parts are moved in the document itself (Teleport), not by CSS `order`,
+// so Tab reaches them in the order they're seen. Wider, nothing moves.
+const narrow = useNarrow();
 const book = ref<Book | null>(null);
 const missing = ref(false);
 const failed = ref(false);
@@ -133,6 +141,24 @@ const chapters = computed(() => {
   );
   return [...new Set(byPage.map((r) => r.chapter).filter((c): c is string => !!c))];
 });
+// On a phone, the first thirty of the recipes listed (all of them are
+// still filtered and sorted), and the rest on request.
+const FIRST = 30;
+const allShown = ref(false);
+const shown = computed(() =>
+  narrow.value && !allShown.value ? rows.value.slice(0, FIRST) : rows.value,
+);
+const tableBody = ref<HTMLElement | null>(null);
+const showAll = ref<HTMLElement | null>(null);
+async function toggleAll() {
+  allShown.value = !allShown.value;
+  await nextTick();
+  // The button is now past everything it showed: focus goes to the first
+  // recipe that wasn't there, where reading carries on. Shown fewer, the
+  // button has moved up: keep it in view.
+  if (allShown.value) tableBody.value?.querySelectorAll<HTMLElement>("tr a")[FIRST]?.focus();
+  else showAll.value?.scrollIntoView({ block: "nearest" });
+}
 function lineSummary(r: Row) {
   const more = r.line_count - r.lines.length;
   return r.lines.join(", ") + (more > 0 ? `, +${more}` : "");
@@ -348,8 +374,11 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
           </template>
         </div>
+        <!-- Hidden on a phone when the shops are all it would hold: Elsewhere
+             is moved below then. -->
         <div
           v-if="buyLinks.length || book.open_library_url || book.host"
+          v-show="buyLinks.length || !narrow"
           class="source-side"
         >
           <!-- The selected edition's shops, beside the cover: the tabs below
@@ -370,50 +399,57 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>
             <ShopChooser v-if="edition.buy.length > 1" :links="edition.buy" :signed-in="!!user" />
           </aside>
-          <aside v-if="book.open_library_url || book.host" class="source-elsewhere">
-            <h2>Elsewhere</h2>
-            <p v-if="book.host">
-              <a :href="`https://${book.host}`" rel="nofollow noopener">{{ book.host }}</a>
-            </p>
-            <p v-if="book.open_library_url">
-              <a :href="book.open_library_url">See it on Open Library</a>
-            </p>
-          </aside>
+          <Teleport to="#source-elsewhere-later" :disabled="!narrow" defer>
+            <aside v-if="book.open_library_url || book.host" class="source-elsewhere">
+              <h2>Elsewhere</h2>
+              <p v-if="book.host">
+                <a :href="`https://${book.host}`" rel="nofollow noopener">{{ book.host }}</a>
+              </p>
+              <p v-if="book.open_library_url">
+                <a :href="book.open_library_url">See it on Open Library</a>
+              </p>
+            </aside>
+          </Teleport>
         </div>
       </div>
 
-      <section v-if="isBook && book.editions.length" class="source-section">
-        <h2>Edition</h2>
-        <div class="edition-tabs" role="group" aria-label="Editions">
-          <button
-            v-for="e in book.editions"
-            :key="e.id"
-            type="button"
-            :aria-pressed="e.id === edition?.id"
-            @click="editionId = e.id"
-          >
-            {{ editionLabel(e) }}
-          </button>
-        </div>
-        <dl v-if="edition" class="edition-facts">
-          <div>
-            <dt>Publisher</dt>
-            <dd>{{ edition.publisher ?? "Not recorded" }}</dd>
+      <!-- Where the recipes go on a phone. -->
+      <div id="source-recipes-first"></div>
+
+      <Teleport to="#source-edition-later" :disabled="!narrow" defer>
+        <section v-if="isBook && book.editions.length" class="source-section">
+          <h2>Edition</h2>
+          <div class="edition-tabs" role="group" aria-label="Editions">
+            <button
+              v-for="e in book.editions"
+              :key="e.id"
+              type="button"
+              :aria-pressed="e.id === edition?.id"
+              @click="editionId = e.id"
+            >
+              {{ editionLabel(e) }}
+            </button>
           </div>
-          <div>
-            <dt>Published</dt>
-            <dd>{{ edition.published_year ?? "Not recorded" }}</dd>
-          </div>
-          <div>
-            <dt>ISBN-13</dt>
-            <dd>{{ edition.isbn13 ?? "None" }}</dd>
-          </div>
-          <div v-if="edition.open_library_url">
-            <dt>Open Library</dt>
-            <dd><a :href="edition.open_library_url">This edition</a></dd>
-          </div>
-        </dl>
-      </section>
+          <dl v-if="edition" class="edition-facts">
+            <div>
+              <dt>Publisher</dt>
+              <dd>{{ edition.publisher ?? "Not recorded" }}</dd>
+            </div>
+            <div>
+              <dt>Published</dt>
+              <dd>{{ edition.published_year ?? "Not recorded" }}</dd>
+            </div>
+            <div>
+              <dt>ISBN-13</dt>
+              <dd>{{ edition.isbn13 ?? "None" }}</dd>
+            </div>
+            <div v-if="edition.open_library_url">
+              <dt>Open Library</dt>
+              <dd><a :href="edition.open_library_url">This edition</a></dd>
+            </div>
+          </dl>
+        </section>
+      </Teleport>
 
       <TopRated :recipes="book.top_rated" />
 
@@ -436,6 +472,10 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         </ul>
       </section>
 
+      <!-- Where the edition and Elsewhere go on a phone. -->
+      <div id="source-edition-later"></div>
+      <div id="source-elsewhere-later"></div>
+
       <section v-if="book.manageable && book.private && myGroups" class="source-section">
         <h2>Shared with</h2>
         <form v-if="myGroups.length" class="recipe-form" @submit.prevent="saveSharing">
@@ -454,80 +494,94 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         </p>
       </section>
 
-      <section class="source-section">
-        <div class="table-head">
-          <h2>{{ isBook && book.editions.length > 1 ? "Recipes in this edition" : "Recipes" }}</h2>
-          <div v-if="book.recipes.length" class="table-controls">
-            <label for="recipe-filter" class="visually-hidden">Filter by title</label>
-            <input
-              id="recipe-filter"
-              v-model="filter"
-              type="search"
-              autocomplete="off"
-              placeholder="Filter by title"
-            />
-            <template v-if="chapters.length">
-              <label for="recipe-chapter" class="visually-hidden">Chapter</label>
-              <select id="recipe-chapter" v-model="chapter">
-                <option value="">All chapters</option>
-                <option v-for="c in chapters" :key="c" :value="c">{{ c }}</option>
-              </select>
-            </template>
-            <template v-if="placeHeading">
-              <label for="recipe-order" class="visually-hidden">Order</label>
-              <select id="recipe-order" v-model="order">
-                <option value="page">{{ placeHeading }} order</option>
-                <option value="title">Title order</option>
-              </select>
-            </template>
+      <Teleport to="#source-recipes-first" :disabled="!narrow" defer>
+        <section class="source-section">
+          <div class="table-head">
+            <h2>{{ isBook && book.editions.length > 1 ? "Recipes in this edition" : "Recipes" }}</h2>
+            <div v-if="book.recipes.length" class="table-controls">
+              <label for="recipe-filter" class="visually-hidden">Filter by title</label>
+              <input
+                id="recipe-filter"
+                v-model="filter"
+                type="search"
+                autocomplete="off"
+                placeholder="Filter by title"
+              />
+              <template v-if="chapters.length">
+                <label for="recipe-chapter" class="visually-hidden">Chapter</label>
+                <select id="recipe-chapter" v-model="chapter">
+                  <option value="">All chapters</option>
+                  <option v-for="c in chapters" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </template>
+              <template v-if="placeHeading">
+                <label for="recipe-order" class="visually-hidden">Order</label>
+                <select id="recipe-order" v-model="order">
+                  <option value="page">{{ placeHeading }} order</option>
+                  <option value="title">Title order</option>
+                </select>
+              </template>
+            </div>
           </div>
-        </div>
-        <table v-if="rows.length" class="recipe-table">
-          <thead>
-            <tr>
-              <th v-if="placeHeading" scope="col">{{ placeHeading }}</th>
-              <th scope="col">Recipe</th>
-              <th scope="col">Ingredients</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in rows" :key="r.id">
-              <td v-if="placeHeading" :class="{ muted: isBook && !pageIn(r)?.page }">
-                {{ place(r) }}
-              </td>
-              <td>
-                <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
-                <span v-if="r.component" class="badge">Component</span>
-                <span v-if="r.review !== 'published'" class="badge waiting">{{
-                  REVIEW_LABELS[r.review]
-                }}</span>
-                <div v-if="r.chapter && !chapter" class="muted chapter-note">{{ r.chapter }}</div>
-              </td>
-              <td class="lines">{{ lineSummary(r) || "None recorded yet" }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else-if="book.recipes.length && (filter.trim() || chapter)" class="status">
-          No recipe here matches{{ filter ? ` “${filter}”` : "" }}{{ chapter ? ` in “${chapter}”` : "" }}.
-        </p>
-        <p v-else-if="book.recipes.length" class="status">
-          None of its recipes is recorded in this edition yet.
-        </p>
-        <p v-else class="status">No recipes indexed yet.</p>
-        <div v-if="isBook && book.editions.length > 1" class="table-foot">
-          <p class="status">
-            Pages are for the selected edition. “Not recorded” means it's in this edition but the
-            page isn't known yet.
+          <table v-if="rows.length" class="recipe-table">
+            <thead>
+              <tr>
+                <th v-if="placeHeading" scope="col">{{ placeHeading }}</th>
+                <th scope="col">Recipe</th>
+                <th scope="col">Ingredients</th>
+              </tr>
+            </thead>
+            <tbody id="recipe-rows" ref="tableBody">
+              <tr v-for="r in shown" :key="r.id">
+                <td v-if="placeHeading" :class="{ muted: isBook && !pageIn(r)?.page }">
+                  {{ place(r) }}
+                </td>
+                <td>
+                  <a :href="`/recipes/${r.id}`">{{ r.title }}</a>
+                  <span v-if="r.component" class="badge">Component</span>
+                  <span v-if="r.review !== 'published'" class="badge waiting">{{
+                    REVIEW_LABELS[r.review]
+                  }}</span>
+                  <div v-if="r.chapter && !chapter" class="muted chapter-note">{{ r.chapter }}</div>
+                </td>
+                <td class="lines">{{ lineSummary(r) || "None recorded yet" }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="narrow && rows.length > FIRST" class="show-all">
+            <button
+              ref="showAll"
+              type="button"
+              class="secondary"
+              :aria-expanded="allShown"
+              aria-controls="recipe-rows"
+              @click="toggleAll"
+            >
+              {{ allShown ? `Show the first ${FIRST}` : `Show all ${rows.length.toLocaleString()}` }}
+            </button>
           </p>
-          <button v-if="absent" type="button" class="link" @click="showAbsent = !showAbsent">
-            {{
-              showAbsent
-                ? "Hide the recipes not in this edition"
-                : `Show ${absent} ${absent === 1 ? "recipe" : "recipes"} not in this edition`
-            }}
-          </button>
-        </div>
-      </section>
+          <p v-if="!rows.length && book.recipes.length && (filter.trim() || chapter)" class="status">
+            No recipe here matches{{ filter ? ` “${filter}”` : "" }}{{ chapter ? ` in “${chapter}”` : "" }}.
+          </p>
+          <p v-else-if="!rows.length && book.recipes.length" class="status">
+            None of its recipes is recorded in this edition yet.
+          </p>
+          <p v-else-if="!rows.length" class="status">No recipes indexed yet.</p>
+          <div v-if="isBook && book.editions.length > 1" class="table-foot">
+            <p class="status">
+              Pages are for the selected edition. “Not recorded” means it's in this edition but the
+              page isn't known yet.
+            </p>
+            <button v-if="absent" type="button" class="link" @click="showAbsent = !showAbsent">
+              {{
+                showAbsent
+                  ? "Hide the recipes not in this edition"
+                  : `Show ${absent} ${absent === 1 ? "recipe" : "recipes"} not in this edition`
+              }}
+            </button>
+          </div>
+        </section>
+      </Teleport>
 
       <section v-if="adminTools && isBook" id="open-library" class="source-section">
         <OpenLibraryLink v-if="!book.open_library_url" :book="book" />
@@ -544,3 +598,9 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
     </template>
   </article>
 </template>
+
+<style scoped>
+.show-all {
+  margin: 0.75rem 0 0;
+}
+</style>

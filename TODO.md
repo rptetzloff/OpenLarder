@@ -256,8 +256,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         "cake" 4.7 ms ranked, 2.2 ms before; a single letter in nearly
         every title, the worst, 136 ms against 15 ms. If that matters
         one day, store the reading in a column.
-      - [ ] 3. Book pages on a phone: the recipes before Top rated,
-        Most-used ingredients and Edition; the first 30, then "Show all".
+      - [x] 3. Book pages on a phone (#174). Under 40rem a source's page
+        runs: cover and title, Get this book, Recipes, Top rated,
+        Most-used ingredients, Edition, Elsewhere. The parts are moved in
+        the document itself, so Tab meets them in the order they're seen;
+        wider, nothing moves. The first 30 recipes are listed, then "Show
+        all N", which moves focus to the first recipe it adds; the title
+        filter, the chapter and the order still work on all of them. The
+        a11y check runs axe at the phone's width for this page, as it
+        opens and with all shown.
+      - [ ] The recipes begin 1,010px down at 375px wide on a book with six
+        shops (measured on the check's 32-recipe book): a little over one
+        screen, where the spec asks for about one. The "Get this book"
+        box above them is 570px of it. Folding the shops behind one
+        button on a phone would do it; that's Ray's to decide.
       - [ ] 4. Book titles' capitals, as suggestions: titles in sentence
         case, and a lost apostrophe.
       - [ ] 5. Tap targets on phones: ingredient names on a recipe, and
