@@ -188,7 +188,7 @@ async def resolve(
 @router.post("/api/flags/{flag_id}/apply", response_model=FlagOut, dependencies=[SameOrigin])
 async def apply(flag_id: uuid.UUID, user: CurrentUser, session: Session) -> FlagOut:
     """Make the change a possible-typo flag suggests: the line is changed to
-    the suggested name and matched to it, the misspelt ingredient goes if
+    the suggested name and matched to it, the misspelled ingredient goes if
     nothing else uses it, and the flag is marked fixed (typos.py)."""
     flag = await session.get(RecipeFlag, flag_id, with_for_update=True)
     recipe = await session.get(Recipe, flag.recipe_id) if flag else None

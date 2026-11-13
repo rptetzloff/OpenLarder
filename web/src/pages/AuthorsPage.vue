@@ -69,7 +69,7 @@ onMounted(() => load());
 const KINDS: { value: Kind | null; label: string }[] = [
   { value: null, label: "Everyone" },
   { value: "person", label: "People" },
-  { value: "organisation", label: "Organisations" },
+  { value: "organisation", label: "Organizations" },
 ];
 </script>
 
@@ -127,8 +127,8 @@ const KINDS: { value: Kind | null; label: string }[] = [
         {{
           kind === "organisation"
             ? total === 1
-              ? "organisation"
-              : "organisations"
+              ? "organization"
+              : "organizations"
             : kind === "person"
               ? total === 1
                 ? "person"
@@ -153,7 +153,7 @@ const KINDS: { value: Kind | null; label: string }[] = [
           <tr v-for="a in authors" :key="a.id">
             <td>
               <a :href="`/authors/${a.id}`" class="strong">{{ a.name }}</a>
-              <span v-if="a.kind === 'organisation'" class="badge">Organisation</span>
+              <span v-if="a.kind === 'organisation'" class="badge">Organization</span>
             </td>
             <td :class="{ empty: !a.known_for }">
               <template v-if="a.known_for">

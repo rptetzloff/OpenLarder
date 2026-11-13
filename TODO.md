@@ -324,8 +324,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         filter boxes and selects over a table; links inside a sentence
         ("Sign in to rate or save", "How this works"). 6 of a recipe
         page's 26 targets, 17 of a book page's 26.
-      - [ ] 6. One spelling, American, in the interface and what the
-        server sends.
+      - [x] 6. One spelling, American, in the interface and what the
+        server sends (#178; migration 0072). What a person could be shown
+        in British spelling was: "Organisation" and "Organisations" on the
+        Authors pages; "greyed" in the tag editor; "licence" on Open data
+        and in a dump's README, with its "LICENCE" heading; "recognises"
+        in the privacy policy; "organisations" in a dump's README;
+        "person or organisation" in Check Open Library; "misspelt" in the
+        API's documentation; and the allergen's label "Sulphites", which
+        is in the database. Comments and identifiers are as they were.
+        `tests/test_spelling.py` reads the pages' text and the server's
+        strings for a list of British spellings.
+      - The spec named "catalogue" in the interface: it's in comments
+        only, nowhere a page or the API shows it (searched 2026-11-13).
+      - Left, being names the API and the dumps use, not words shown: an
+        author's kind is stored and sent as `organisation` (and is in
+        the Authors page's address, `?kind=organisation`); the allergen's
+        key is `sulphites`; a dump list's field is `licence_url`.
+        Changing those changes the public API.
+      - [ ] Not spelling, so not changed, and Ray's to decide: "tick" for
+        marking a box (nine places: "Tick a list to search with what's
+        on it"), where American usage is "check" or "select"; and the
+        privacy policy's date, written "13 November 2026".
       - [ ] 7. Covers while they load: the drawn cover behind every
         image. Seen 2026-11-11; to confirm before building.
       - [ ] 8. Small fixes: a description's ingredient count counts lines;

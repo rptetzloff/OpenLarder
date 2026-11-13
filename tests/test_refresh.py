@@ -188,7 +188,9 @@ async def test_person_or_organisation_is_offered(admin, adb) -> None:
     book = await _pink_cake(admin)
     await adb.execute(text("UPDATE authors SET kind = 'organisation'"))
     kind = _diffs(await _check(admin, book))["author.kind"]
-    assert (kind["ours"], kind["theirs"]) == ("organisation", "person")
+    # Shown in American spelling; what's stored is the word it always was.
+    assert (kind["ours"], kind["theirs"]) == ("organization", "person")
+    assert kind["label"].endswith(": person or organization")
 
 
 async def test_what_open_library_lacks_is_not_offered_as_a_blank(admin, openlib, adb) -> None:

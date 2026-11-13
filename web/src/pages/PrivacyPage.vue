@@ -110,7 +110,7 @@ document.title = "Privacy policy · OpenLarder";
     <p>OpenLarder itself stores only:</p>
     <ul>
       <li>
-        the identifier Authgear gives your account, which is how OpenLarder recognises you;
+        the identifier Authgear gives your account, which is how OpenLarder recognizes you;
       </li>
       <li>
         your account's role: contributor, moderator or administrator, if it has one, and, for a

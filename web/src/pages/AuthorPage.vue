@@ -181,7 +181,7 @@ onMounted(load);
       </nav>
 
       <div class="author-head">
-        <p class="kind">{{ author.kind === "organisation" ? "Organisation" : "Person" }}</p>
+        <p class="kind">{{ author.kind === "organisation" ? "Organization" : "Person" }}</p>
         <h1>{{ author.name }}</h1>
         <p v-if="facts.length" class="author-facts">{{ facts.join(" · ") }}</p>
         <ul
@@ -267,10 +267,10 @@ onMounted(load);
         <form class="recipe-form" @submit.prevent="save">
           <label for="author-name">Name</label>
           <input id="author-name" v-model="name" required maxlength="200" />
-          <label for="author-kind">A person or an organisation</label>
+          <label for="author-kind">A person or an organization</label>
           <select id="author-kind" v-model="kind">
             <option value="person">Person</option>
-            <option value="organisation">Organisation</option>
+            <option value="organisation">Organization</option>
           </select>
           <button type="submit" class="primary" :disabled="busy">Save</button>
         </form>
