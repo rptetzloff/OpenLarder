@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import SuggestionItem from "../components/SuggestionItem.vue";
@@ -135,7 +136,7 @@ watch(allowed, (yes) => {
         mislead.
       </p>
     </div>
-    <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see suggestions.</p>
+    <p v-if="!user" class="status"><SignInLink /> to see suggestions.</p>
     <p v-else-if="!allowed" class="status">This is for moderators.</p>
     <template v-else>
       <div class="list-filters">

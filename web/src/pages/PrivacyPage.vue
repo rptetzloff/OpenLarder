@@ -18,7 +18,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated 11 November 2026</p>
+    <p class="updated">Last updated 13 November 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -42,6 +42,13 @@ document.title = "Privacy policy · OpenLarder";
       sent, so a private
       collection's name never is. If your browser asks sites not to track you (Do Not Track, or
       Global Privacy Control), the counting script isn't loaded at all and nothing is sent.
+    </p>
+    <p v-if="analyticsHost">
+      A sign-in is counted too: that one happened, and whether the account was new or
+      returning. Not which page you were on, and nothing about which account. The same
+      details of your browser and connection go with it as with a page view. To count it,
+      the address of the page you come back to ends “#signed-in” for a moment; nothing is
+      kept in your browser for it.
     </p>
     <p v-else>OpenLarder doesn't count page views.</p>
     <p>
@@ -187,7 +194,8 @@ document.title = "Privacy policy · OpenLarder";
       </li>
       <li>
         <code>openlarder_sign_in</code> exists only while you are signing in, for at most an hour,
-        and protects the sign-in from being forged.
+        and protects the sign-in from being forged. It also holds the page you were on, so
+        that signing in brings you back to it.
       </li>
     </ul>
     <p>

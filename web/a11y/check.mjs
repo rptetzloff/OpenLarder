@@ -30,6 +30,8 @@ const CHROME =
 const TOKENS = {
   admin: "a11y-check-token-admin-0123456789abcdef",
   cook: "a11y-check-token-cook-0123456789abcdef",
+  // Signed in, with no name chosen yet: only the welcome page is theirs.
+  new: "a11y-check-token-new-0123456789abcdef",
 };
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
@@ -274,6 +276,8 @@ function pages(s) {
     ["/search?own=1&q=biscuit", "cook"],
     ["/privacy", null],
     ["/terms", null],
+    ["/welcome", "new"],
+    ["/sign-in-failed", null],
   ];
 }
 

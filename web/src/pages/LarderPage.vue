@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import type { Named } from "../ingredients";
@@ -123,7 +124,7 @@ watch(
       </p>
     </div>
     <p v-if="user === null" class="status">
-      <a href="/api/auth/login">Sign in</a> to keep a larder.
+      <SignInLink /> to keep a larder.
     </p>
     <template v-else-if="user">
       <p v-if="error" class="error" role="alert">{{ error }}</p>

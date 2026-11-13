@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { acceptInvite, readInvite, rememberInvite, type Role, ROLE_NAMES } from "../groups";
+import { signInHref } from "../auth";
+import { acceptInvite, readInvite, type Role, ROLE_NAMES } from "../groups";
 import type { Me } from "../me";
 
 const props = defineProps<{ code: string; user: Me | null | undefined }>();
@@ -18,10 +19,9 @@ onMounted(async () => {
   }
 });
 
-// Signing in comes back to the front page; the app returns here from it.
+// Signing in comes back here, as it does to any page (auth.ts).
 function signIn() {
-  rememberInvite(props.code);
-  location.href = "/api/auth/login";
+  location.href = signInHref();
 }
 
 async function join() {

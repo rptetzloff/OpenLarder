@@ -66,22 +66,3 @@ export const acceptInvite = (code: string) =>
 // Which of your groups see a family collection of yours: all of them, listed.
 export const shareCollection = (source: string, groups: string[]) =>
   send<{ id: string; name: string }[]>(`/api/sources/${source}/groups`, "PUT", { groups });
-
-// An invite opened while signed out, to come back to after signing in.
-const PENDING = "openlarder_invite";
-export function rememberInvite(code: string) {
-  try {
-    sessionStorage.setItem(PENDING, code);
-  } catch {
-    // Without storage, the person opens the link again after signing in.
-  }
-}
-export function takeRememberedInvite(): string | null {
-  try {
-    const code = sessionStorage.getItem(PENDING);
-    sessionStorage.removeItem(PENDING);
-    return code;
-  } catch {
-    return null;
-  }
-}

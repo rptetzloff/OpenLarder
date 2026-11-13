@@ -11,9 +11,11 @@ Whether the broker's session ends is its configuration, not this code's
 
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import timedelta
 from functools import lru_cache
 from typing import Annotated, Any
+from urllib.parse import unquote, urlsplit
 
 import httpx2
 from authlib.integrations.starlette_client import OAuth, StarletteOAuth2App
@@ -29,10 +31,58 @@ from openlarder.models import User, UserSession
 
 SESSION_COOKIE = "openlarder_session"
 # The cookie Starlette's SessionMiddleware keeps state and nonce in between
-# the redirect to the broker and the callback. Nothing else is put in it.
+# the redirect to the broker and the callback, and the page to come back
+# to after (safe_next). Nothing else is put in it.
 SIGN_IN_COOKIE = "openlarder_sign_in"
 CALLBACK_PATH = "/api/auth/callback"
 SESSION_LIFETIME = timedelta(days=30)
+
+
+# Sign-in's own pages. Coming back to one would tell someone it had just
+# worked for that it hadn't, or ask a named person for a name.
+WELCOME = "/welcome"
+FAILED = "/sign-in-failed"
+NEXT_MAX = 512
+
+
+def _reads_as_elsewhere(text: str) -> bool:
+    return "//" in text or "\\" in text or any(ord(c) < 32 or ord(c) == 127 for c in text)
+
+
+def safe_next(value: object) -> str | None:
+    """Where to go back to after signing in, if it's a page of this site;
+    None for anything else, which sends people to the front page.
+
+    The value comes from a link anyone can write, and the callback redirects
+    to it, so one that a browser could read as another site's address is
+    refused whole, never repaired: a second slash ("//evil.example" is
+    another host), a backslash (browsers read "/\\evil.example" the same
+    way), a control character (browsers drop a tab or a newline from an
+    address, which can bring two slashes together). The path is looked at
+    again with its percent-escapes read, as the server reads them before
+    choosing a route. Nor the API or a buy link: /go/ would send someone on
+    to a shop and count a click nobody made. Nor one with a "#": the
+    site's links never send one, and the callback may add its own
+    (analytics.signed_in_mark).
+
+    Stricter than it must be: a search for "a//b" isn't come back to. The
+    site's own links escape a slash in what was typed, so that takes an
+    address written by hand.
+    """
+    if not isinstance(value, str) or len(value) > NEXT_MAX:
+        return None
+    if not value.startswith("/") or "#" in value or _reads_as_elsewhere(value):
+        return None
+    parts = urlsplit(value)
+    path = unquote(parts.path)
+    if parts.scheme or parts.netloc or _reads_as_elsewhere(path):
+        return None
+    path = path.rstrip("/").lower()
+    if path in (WELCOME, FAILED) or any(
+        path == under or path.startswith(under + "/") for under in ("/api", "/go")
+    ):
+        return None
+    return value
 
 
 def new_token() -> str:
@@ -96,25 +146,43 @@ def get_oidc_client(
     return client
 
 
+@dataclass(frozen=True)
+class SignedIn:
+    # The session's raw token, for the cookie.
+    token: str
+    # This sign-in made the account.
+    new: bool
+    # They've chosen a display name. Until then they're asked for one.
+    named: bool
+
+
 async def sign_in(
     session: AsyncSession, issuer: str, subject: str, suggested: str | None, id_token: str | None
-) -> str:
-    """Find or create the user, start a session, and return its raw token.
+) -> SignedIn:
+    """Find or create the user and start a session.
 
     The broker's name only ever refreshes the suggestion. Once someone has
     chosen a display name, signing in never touches it.
     """
-    stmt = insert(User).values(issuer=issuer, subject=subject, suggested_name=suggested)
-    user_id = await session.scalar(
-        stmt.on_conflict_do_update(
-            index_elements=["issuer", "subject"],
-            set_={
-                "suggested_name": case(
-                    (User.display_name.is_(None), stmt.excluded.suggested_name), else_=None
-                )
-            },
-        ).returning(User.id)
+    # Asked before the upsert, which can't say which it did. Two first
+    # sign-ins of one person at the same moment would both read as new;
+    # it's only counted (routers/auth.py), so that's left.
+    existed = await session.scalar(
+        select(User.id).where(User.issuer == issuer, User.subject == subject)
     )
+    stmt = insert(User).values(issuer=issuer, subject=subject, suggested_name=suggested)
+    user_id, display_name = (
+        await session.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["issuer", "subject"],
+                set_={
+                    "suggested_name": case(
+                        (User.display_name.is_(None), stmt.excluded.suggested_name), else_=None
+                    )
+                },
+            ).returning(User.id, User.display_name)
+        )
+    ).one()
     # Expired sessions are swept here rather than by a job: there is no
     # worker yet, and this keeps one user's rows from growing without bound.
     await session.execute(
@@ -134,7 +202,7 @@ async def sign_in(
         )
     )
     await session.flush()
-    return token
+    return SignedIn(token=token, new=existed is None, named=display_name is not None)
 
 
 class Ended:

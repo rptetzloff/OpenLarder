@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "./SignInLink.vue";
 import { computed } from "vue";
 import type { Me } from "../me";
 import HeaderMenu from "./HeaderMenu.vue";
@@ -75,8 +76,7 @@ const name = computed(() => props.user?.display_name ?? "Account");
             </ul>
           </HeaderMenu>
         </template>
-        <!-- A full page load, not fetch: the broker's sign-in page is a redirect. -->
-        <a v-else-if="user === null" href="/api/auth/login" class="secondary">Sign in</a>
+        <SignInLink v-else-if="user === null" class="secondary" />
       </div>
 
       <!-- A phone: Search, and one menu with the rest. -->
@@ -110,7 +110,7 @@ const name = computed(() => props.user?.display_name ?? "Account");
             </ul>
           </template>
           <ul v-else-if="user === null">
-            <li><a href="/api/auth/login">Sign in</a></li>
+            <li><SignInLink /></li>
           </ul>
         </HeaderMenu>
       </div>

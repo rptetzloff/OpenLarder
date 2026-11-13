@@ -149,7 +149,7 @@ def _session_cookie(response: httpx2.Response) -> str:
 def _failed(response: httpx2.Response) -> bool:
     return (
         response.status_code == 303
-        and response.headers["location"] == "/?sign-in=failed"
+        and response.headers["location"] == "/sign-in-failed"
         and SESSION_COOKIE not in response.cookies
     )
 

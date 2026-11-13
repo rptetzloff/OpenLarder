@@ -705,7 +705,18 @@ def without_record(path: str) -> Page | None:
 
 
 # Pages that are someone's own, or the admins': never in a search engine.
-PERSONAL = ("saved", "shelf", "larder", "groups", "account", "admin", "requests")
+# Sign-in's two are here too: nothing on them is about the catalog.
+PERSONAL = (
+    "saved",
+    "shelf",
+    "larder",
+    "groups",
+    "account",
+    "admin",
+    "requests",
+    "welcome",
+    "sign-in-failed",
+)
 
 
 def robots_for(path: str) -> str | None:

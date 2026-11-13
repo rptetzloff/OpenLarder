@@ -59,7 +59,10 @@ other, and the app refuses to start.
 A browser asking not to be tracked (Do Not Track or Global Privacy Control)
 never loads the tracker. A page view sends the path only (no query string,
 invite links as /invite), no page title, and the referring site's address
-only. The privacy page names the Umami host when it's set.
+only. A sign-in sends one event more, "sign-in", saying whether the account
+is new or returning and no page: the callback marks the address it goes to
+(`#signed-in=new`) and the loader takes the mark off, so no cookie is set
+for it. The privacy page names the Umami host when it's set.
 
 ### Data dumps
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import FlagRow from "../components/FlagRow.vue";
@@ -75,7 +76,7 @@ watch(allowed, (yes) => {
         recipe and mark the flag fixed, or dismiss it if it's wrong.
       </p>
     </div>
-    <p v-if="!user" class="status"><a href="/api/auth/login">Sign in</a> to see flags.</p>
+    <p v-if="!user" class="status"><SignInLink /> to see flags.</p>
     <p v-else-if="!allowed" class="status">This is for moderators.</p>
     <template v-else>
       <div class="list-filters">
