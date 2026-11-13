@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CoverBlank from "../components/CoverBlank.vue";
+import OptionList from "../components/OptionList.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
@@ -327,14 +328,16 @@ onMounted(load);
               placeholder="the one to keep"
             />
           </div>
-          <ul v-if="candidates.length" class="merge-candidates">
-            <li v-for="c in candidates" :key="c.id">
-              <button type="button" class="link" :disabled="busy" @click="merge(author, c)">
-                {{ c.name }}
-              </button>
-              <span class="page-ref">{{ c.sources }} {{ c.sources === 1 ? "source" : "sources" }}</span>
-            </li>
-          </ul>
+          <OptionList
+            v-slot="{ option: c }"
+            :options="candidates"
+            for="merge-author"
+            :disabled="busy"
+            @pick="(c) => merge(author!, c)"
+          >
+            {{ c.name }}
+            <span class="page-ref">{{ c.sources }} {{ c.sources === 1 ? "source" : "sources" }}</span>
+          </OptionList>
         </div>
       </section>
       <ReportButton kind="author" :id="id" />

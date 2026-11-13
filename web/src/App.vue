@@ -576,15 +576,6 @@ a.secondary.small::after {
   color: var(--fg);
   font-size: 0.9375rem;
 }
-.suggestions {
-  list-style: none;
-  margin: 0.25rem 0 0;
-  padding: 0.25rem 0;
-}
-.suggestions li {
-  margin: 0;
-  padding: 0.125rem 0;
-}
 
 /* Search. */
 .search-panel {
@@ -2374,9 +2365,6 @@ main h2 {
   background: var(--bg);
   color: var(--fg);
 }
-.merge-candidates {
-  padding-left: 1.25rem;
-}
 .attribution {
   margin: 0.5rem 0 1rem;
   padding: 0.5rem 0.875rem;
@@ -3228,10 +3216,5 @@ button.link {
 .chosen button:not(.remove) {
   margin-left: 0.25rem;
   padding: 0 0.25rem;
-}
-.merge-candidates {
-  list-style: none;
-  padding: 0;
-  margin: 0;
 }
 </style>

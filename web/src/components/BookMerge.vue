@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import OptionList from "./OptionList.vue";
 import { type BookSummary, findBooks, mergeBook, mergePlan, type MergePlan } from "../books";
 
 // Merging this book into another record of the same book (book_merge.py):
@@ -68,12 +69,15 @@ async function merge() {
       placeholder="Find the other book by title or author"
       autocomplete="off"
     />
-    <ul v-if="candidates.length && !chosen" class="merge-candidates">
-      <li v-for="c in candidates" :key="c.id">
-        <button type="button" class="link" @click="choose(c)">{{ c.title }}</button>
-        <span v-if="c.authors?.length" class="muted"> · {{ c.authors.join(", ") }}</span>
-      </li>
-    </ul>
+    <OptionList
+      v-slot="{ option: c }"
+      :options="chosen ? [] : candidates"
+      for="merge-book"
+      @pick="choose"
+    >
+      {{ c.title }}
+      <span v-if="c.authors?.length" class="page-ref">{{ c.authors.join(", ") }}</span>
+    </OptionList>
     <div v-if="chosen" class="notice">
       <p>
         Merge “{{ title }}” into <a :href="`/sources/${chosen.id}`">“{{ chosen.title }}”</a>?

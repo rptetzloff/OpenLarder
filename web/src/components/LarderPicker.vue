@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import OptionList from "./OptionList.vue";
 import { type Item, type Larder, loadLarder } from "../larder";
 
 // "From my larder" on the search page: which lists to search with, and,
@@ -106,12 +107,14 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
           @keydown.enter.prevent="onlySuggestions[0] && pick('only', onlySuggestions[0])"
         />
       </div>
-      <ul v-if="onlySuggestions.length" class="suggestions">
-        <li v-for="i in onlySuggestions" :key="i.id">
-          <button type="button" class="link" @click="pick('only', i)">{{ i.name }}</button>
-          <span class="page-ref">{{ i.ingredient }}</span>
-        </li>
-      </ul>
+      <OptionList
+        v-slot="{ option: i }"
+        :options="onlySuggestions"
+        for="larder-only"
+        @pick="(i) => pick('only', i)"
+      >
+        {{ i.name }} <span class="page-ref">{{ i.ingredient }}</span>
+      </OptionList>
 
       <label for="larder-out" class="larder-picker-label">Leave out (optional)</label>
       <div class="chip-input">
@@ -128,12 +131,14 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
           @keydown.enter.prevent="outSuggestions[0] && pick('out', outSuggestions[0])"
         />
       </div>
-      <ul v-if="outSuggestions.length" class="suggestions">
-        <li v-for="i in outSuggestions" :key="i.id">
-          <button type="button" class="link" @click="pick('out', i)">{{ i.name }}</button>
-          <span class="page-ref">{{ i.ingredient }}</span>
-        </li>
-      </ul>
+      <OptionList
+        v-slot="{ option: i }"
+        :options="outSuggestions"
+        for="larder-out"
+        @pick="(i) => pick('out', i)"
+      >
+        {{ i.name }} <span class="page-ref">{{ i.ingredient }}</span>
+      </OptionList>
 
       <p class="help">
         <template v-if="inUse && counted != null">

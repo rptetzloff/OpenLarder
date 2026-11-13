@@ -165,9 +165,16 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         `button-primary` and `button-outline` are gone), 44px tall; in a
         table or list row `small` draws it smaller and still takes a tap
         44px high.
-      - [ ] Still text buttons that are choices, not extras: the
-        suggestions under a picker (ingredient, larder, book, author),
-        which want a listbox of their own.
+      - [x] The choices under a picker (#170): the ten lists that come up
+        as you type to find an ingredient, a source, a recipe or an author
+        were text buttons. Each choice is a row now, a real button 44px
+        tall the width of its box, with its detail (how many recipes, who
+        wrote it) inside it. Down from the box goes into the list, Down
+        and Up move through it, Up from the first or Escape goes back, and
+        taking one puts focus back in the box. One component for all ten
+        (OptionList.vue). Buttons, not an ARIA listbox: Tab still reaches
+        each one, as the cleanup pass's rules ask. That leaves 17 text
+        buttons, of the 84 the cleanup pass set out to halve.
       - [x] The × that takes a chip, a name or a line away (#169): one
         style for all eleven (`button.remove`), drawn small and 44px
         square to tap. The square is its own box beside what it follows,

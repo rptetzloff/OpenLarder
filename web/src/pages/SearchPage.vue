@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LarderPicker from "../components/LarderPicker.vue";
+import OptionList from "../components/OptionList.vue";
 import { KINDS, listTags, type Tag } from "../tags";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { findBooks } from "../books";
@@ -455,14 +456,17 @@ onMounted(async () => {
           "
         />
       </div>
-      <ul v-if="ingredientFind.suggestions.value.length" class="suggestions">
-        <li v-for="s in ingredientFind.suggestions.value" :key="s.id">
-          <button type="button" class="link" @click="addIngredient(s)">{{ s.name }}</button>
-          <span class="page-ref">
-            {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
-          </span>
-        </li>
-      </ul>
+      <OptionList
+        v-slot="{ option: s }"
+        :options="ingredientFind.suggestions.value"
+        for="search-ingredient"
+        @pick="addIngredient"
+      >
+        {{ s.name }}
+        <span class="page-ref">
+          {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
+        </span>
+      </OptionList>
       <p id="search-ingredient-help" class="help">
         An ingredient also finds what's under it: cheese finds cheddar.
       </p>
@@ -488,14 +492,17 @@ onMounted(async () => {
           "
         />
       </div>
-      <ul v-if="unwantedFind.suggestions.value.length" class="suggestions">
-        <li v-for="s in unwantedFind.suggestions.value" :key="s.id">
-          <button type="button" class="link" @click="addUnwanted(s)">{{ s.name }}</button>
-          <span class="page-ref">
-            {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
-          </span>
-        </li>
-      </ul>
+      <OptionList
+        v-slot="{ option: s }"
+        :options="unwantedFind.suggestions.value"
+        for="search-unwanted"
+        @pick="addUnwanted"
+      >
+        {{ s.name }}
+        <span class="page-ref">
+          {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
+        </span>
+      </OptionList>
       <p id="search-unwanted-help" class="help">
         Recipes that need one are left out. One that offers another choice, like “butter or oil”,
         stays.
@@ -534,12 +541,15 @@ onMounted(async () => {
               "
             />
           </div>
-          <ul v-if="sourceFind.suggestions.value.length" class="suggestions">
-            <li v-for="b in sourceFind.suggestions.value" :key="b.id">
-              <button type="button" class="link" @click="addSource(b)">{{ b.title }}</button>
-              <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
-            </li>
-          </ul>
+          <OptionList
+            v-slot="{ option: b }"
+            :options="sourceFind.suggestions.value"
+            for="search-source"
+            @pick="addSource"
+          >
+            {{ b.title }}
+            <span v-if="b.authors.length" class="page-ref">{{ b.authors.join(", ") }}</span>
+          </OptionList>
           <label v-if="user" class="check shelf-check">
             <input v-model="onShelf" type="checkbox" />
             Only books on <a href="/shelf">my shelf</a

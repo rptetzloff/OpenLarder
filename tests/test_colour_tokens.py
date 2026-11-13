@@ -23,6 +23,7 @@ PAIRS = [
     ("fg", "surface", TEXT),  # the home page's band
     ("muted", "surface", TEXT),
     ("fg", "chip", TEXT),  # chosen ingredients
+    ("muted", "chip", TEXT),  # a choice's detail, under the pointer (OptionList)
     ("fg", "admin-bg", TEXT),
     ("fg", "ok-bg", TEXT),  # a line's check that's fine
     ("error", "surface", TEXT),  # a failed save, in the save band
