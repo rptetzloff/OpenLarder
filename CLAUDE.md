@@ -184,11 +184,13 @@ Every page passes an accessibility check before it merges. *Ray, 2026-11-08:
 way".* `web/a11y/check.mjs` adds one of every kind of page through the API,
 then runs axe-core's WCAG 2.1 A and AA rules (contrast among them) on each, in
 light and dark, signed out and signed in, and fails on any page that scrolls
-sideways at 390px. It starts with a control, a page with problems planted in
-it, and refuses to report a clean run unless it catches them. A new page or
-page state goes into its list in the same PR. What axe can't decide it lists
-for a person; what no tool sees (whether wording is clear, focus order,
-how a screen reader sounds) still needs one.
+sideways at 390px. A page that shows a phone something of its own (a book's
+page moves its parts and shortens its list) goes through axe at 390px too, and
+an entry can click first, for a state only a click makes. It starts with a
+control, a page with problems planted in it, and refuses to report a clean run
+unless it catches them. A new page or page state goes into its list in the same
+PR. What axe can't decide it lists for a person; what no tool sees (whether
+wording is clear, focus order, how a screen reader sounds) still needs one.
 
 ## Dependencies default to none
 

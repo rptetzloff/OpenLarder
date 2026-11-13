@@ -189,11 +189,31 @@ async function seed() {
   const odd = await api("/api/requests", "cook", { title: "A Car Manual" });
   await api(`/api/requests/${odd.request.id}/decline`, "admin", { reason: "Not a cookbook." });
 
-  return { waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
+  // A book long enough that a phone lists only its first thirty recipes,
+  // with shops, an edition and something rated, so every part that moves
+  // on a phone is there to move.
+  const long = await api("/api/sources/manual", "admin", {
+    title: "Thirty-Two Bakes",
+    authors: ["Ann Author"],
+    year: 2021,
+    isbn: "9780393541120",
+  });
+  const longEdition = (await api(`/api/sources/${long.id}`, "admin")).editions[0].id;
+  for (let n = 1; n <= 32; n++) {
+    const bake = await api(`/api/sources/${long.id}/recipes`, "admin", {
+      title: `Bake Number ${n}`,
+      editions: [{ edition_id: longEdition, page: String(n) }],
+      ingredients: ["Flour", "Butter"],
+    });
+    if (n === 1) await api(`/api/recipes/${bake.id}/rating`, "cook", { spoons: 5 }, "PUT");
+  }
+  return { long, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
 }
 
 function pages(s) {
-  // [path, who]: who is signed in, or nobody.
+  // [path, who, how]: who is signed in, or nobody. how.phone: axe at the
+  // phone's width too, for a page that shows a phone something of its
+  // own; how.then: script to run there first, for a state a click makes.
   return [
     ["/", null],
     ["/", "admin"],
@@ -278,6 +298,14 @@ function pages(s) {
     ["/terms", null],
     ["/welcome", "new"],
     ["/sign-in-failed", null],
+    // A long book: on a phone its parts are in another order, with the
+    // first thirty recipes; then with all of them shown.
+    [`/sources/${s.long.id}`, null, { phone: true }],
+    [
+      `/sources/${s.long.id}`,
+      "cook",
+      { phone: true, then: `document.querySelector(".show-all button").click()` },
+    ],
   ];
 }
 
@@ -370,7 +398,7 @@ async function control(b) {
 
 const undecided = new Map();
 
-async function check(b, path, who, theme, width) {
+async function check(b, path, who, theme, width, how = {}) {
   await b.send("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-color-scheme", value: theme }],
   });
@@ -399,12 +427,16 @@ async function check(b, path, who, theme, width) {
     );
     if (!busy && i > 3) break;
   }
+  if (how.then && width < 600) {
+    await b.evaluate(how.then);
+    await sleep(500);
+  }
   const problems = [];
   const overflow = await overflowOf(b, width);
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px at ${width}px wide`);
   // axe once per theme and page, at desktop width; the phone pass is for
-  // layout.
-  if (width >= 600) {
+  // layout, unless the page shows a phone something of its own.
+  if (width >= 600 || how.phone) {
     const { violations, incomplete } = await runAxe(b);
     for (const v of violations)
       problems.push(`${v.id} (${v.impact}): ${v.help}\n      ${v.nodes.join("\n      ")}`);
@@ -422,9 +454,9 @@ let checked = 0;
 try {
   await control(b);
   for (const theme of ["light", "dark"]) {
-    for (const [path, who] of pages(s)) {
+    for (const [path, who, how] of pages(s)) {
       for (const width of [1280, 390]) {
-        const problems = await check(b, path, who, theme, width);
+        const problems = await check(b, path, who, theme, width, how);
         checked++;
         if (problems.length) {
           failed++;
@@ -446,6 +478,6 @@ if (undecided.size) {
   for (const where of undecided.keys()) console.log(`    ${where}`);
 }
 console.log(
-  `${checked} page views checked (axe at 1280px, layout at 390px), ${failed} with problems.`,
+  `${checked} page views checked (axe at 1280px, and at 390px where a phone has its own; layout at 390px), ${failed} with problems.`,
 );
 process.exit(failed ? 1 : 0);
