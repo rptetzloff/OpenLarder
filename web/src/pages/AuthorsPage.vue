@@ -6,9 +6,12 @@ document.title = "Authors · OpenLarder";
 
 const params = new URLSearchParams(location.search);
 const q = ref(params.get("q") ?? "");
-// A to Z or the most recipes first; everyone, or only people or only
-// organisations.
-const sort = ref<"name" | "recipes">(params.get("sort") === "recipes" ? "recipes" : "name");
+// A to Z as the names read, by last name (Ray, 2026-11-12), or the most
+// recipes first; everyone, or only people or only organisations.
+type Sort = "name" | "surname" | "recipes";
+const sort = ref<Sort>(
+  (["surname", "recipes"] as const).find((s) => s === params.get("sort")) ?? "name",
+);
 type Kind = "person" | "organisation";
 const kind = ref<Kind | null>(
   (["person", "organisation"] as const).find((k) => k === params.get("kind")) ?? null,
@@ -44,7 +47,7 @@ function remember() {
   const url = new URL(location.href);
   for (const key of ["q", "sort", "kind"]) url.searchParams.delete(key);
   if (q.value.trim()) url.searchParams.set("q", q.value.trim());
-  if (sort.value === "recipes") url.searchParams.set("sort", "recipes");
+  if (sort.value !== "name") url.searchParams.set("sort", sort.value);
   if (kind.value) url.searchParams.set("kind", kind.value);
   history.replaceState(null, "", url);
 }
@@ -94,7 +97,8 @@ const KINDS: { value: Kind | null; label: string }[] = [
       <div class="table-controls">
         <label for="author-sort">Sort</label>
         <select id="author-sort" v-model="sort">
-          <option value="name">A to Z</option>
+          <option value="name">Name, A to Z</option>
+          <option value="surname">Last name, A to Z</option>
           <option value="recipes">Most recipes</option>
         </select>
       </div>

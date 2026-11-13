@@ -24,7 +24,7 @@ from sqlalchemy.orm import aliased
 
 from openlarder import author_facts, author_merge, openlibrary, visibility, wikidata
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
-from openlarder.author_names import shown_name
+from openlarder.author_names import shown_name, surname_key
 from openlarder.db import Session
 from openlarder.models import Author, AuthorLink, Recipe, Source, SourceCredit
 from openlarder.routers.ingredients import UsedBy, contains_pattern
@@ -110,8 +110,9 @@ async def list_authors(
     viewer: Viewer,
     q: str = Query("", max_length=200),
     offset: int = Query(0, ge=0),
-    # "name": A to Z; "recipes": the most recipes first.
-    sort: Literal["name", "recipes"] = "name",
+    # "name": A to Z as the names read; "surname": by last name, as an index
+    # files them (author_names.surname_key); "recipes": the most recipes first.
+    sort: Literal["name", "surname", "recipes"] = "name",
     # Only people, or only organisations (a test kitchen, a magazine's staff).
     kind: Literal["person", "organisation"] | None = None,
 ) -> AuthorList:
@@ -148,13 +149,30 @@ async def list_authors(
                 | SourceCredit.credited_as.ilike(like, escape="\\")
             )
         )
-    total = await session.scalar(select(func.count()).select_from(query.subquery()))
-    order = (
-        (recipes.desc(), func.lower(Author.name), Author.id)
-        if sort == "recipes"
-        else (func.lower(Author.name), Author.id)
-    )
-    rows = (await session.execute(query.order_by(*order).offset(offset).limit(PAGE))).all()
+    if sort == "surname":
+        # Filed in Python: the key is worked out from the name and the kind
+        # (letters after a name, an organisation's "The"), not kept beside
+        # them to go stale. Only ids, names and kinds are read for it; the
+        # page's counts are asked for the page alone.
+        everyone = (
+            await session.execute(query.with_only_columns(Author.id, Author.name, Author.kind))
+        ).all()
+        filed = sorted(
+            everyone,
+            key=lambda a: (surname_key(a[1], a[2] == "organisation"), a[1].casefold(), str(a[0])),
+        )
+        total = len(filed)
+        place = {a[0]: n for n, a in enumerate(filed[offset : offset + PAGE])}
+        rows = (await session.execute(query.where(Author.id.in_(place)))).all()
+        rows.sort(key=lambda r: place[r[0]])
+    else:
+        total = await session.scalar(select(func.count()).select_from(query.subquery()))
+        order = (
+            (recipes.desc(), func.lower(Author.name), Author.id)
+            if sort == "recipes"
+            else (func.lower(Author.name), Author.id)
+        )
+        rows = (await session.execute(query.order_by(*order).offset(offset).limit(PAGE))).all()
     # Each one's source with the most recipes, of those the viewer can see.
     known: dict[uuid.UUID, tuple[int, KnownFor]] = {}
     count = func.count(Recipe.id)

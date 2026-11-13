@@ -1,4 +1,5 @@
-"""Authors' names: how one is compared, and how a credit's is shown.
+"""Authors' names: how one is compared, how a credit's is shown, and how
+one is filed in a list by last name.
 
 Compared: the key two spellings of one name share, for matching a typed or
 imported name to an author already here, and an Open Library author to a
@@ -70,9 +71,14 @@ def name_key(name: str) -> str:
     if name.count(",") == 1:
         last, first = name.split(",")
         name = f"{first} {last}"
-    name = unicodedata.normalize("NFKD", name)
-    name = "".join(c for c in name if not unicodedata.combining(c))
-    return " ".join(re.sub(r"[^\w\s]", " ", name.casefold()).split())
+    return _folded(name)
+
+
+def _folded(text: str) -> str:
+    """Without accents, case or punctuation, and single-spaced."""
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return " ".join(re.sub(r"[^\w\s]", " ", text.casefold()).split())
 
 
 def _bare(part: str) -> str:
@@ -130,6 +136,46 @@ def _no_full_stop(first: str) -> str:
     ):
         return first[:-1]
     return first
+
+
+# Letters after a name that CREDENTIALS doesn't list: a full stop after one
+# of those is kept as the abbreviation's own, and "PharmD." has been seen
+# with a catalogue's (display_name).
+_ALSO_AFTER_A_NAME = {"pharmd"}
+# Words that begin a last name when written with a capital: "Van Damme".
+_PARTICLES = {"van", "von", "de", "del", "della", "der", "den", "di", "da", "du", "la", "le"}
+
+
+def surname_key(name: str, organisation: bool = False) -> str:
+    """What an author is filed by in a list by last name: "Yotam Ottolenghi"
+    -> "ottolenghi yotam". *Ray, 2026-11-12.*
+
+    A person by their last name, then the rest. Letters after the name
+    aren't the last name ("Sarah Ballantyne, PhD", "Martin Luther King
+    Jr."), nor is what follows a comma. A particle written with a capital
+    begins the last name ("Eddy Van Damme" is under V); in lower case it
+    goes with the first names ("Oscar de la Renta" is under R), as a
+    library files it. A single name is filed as it is. An organisation is
+    filed by its name, less a leading "The": who is which is the author's
+    kind, so one marked as a person is filed by its last word until that's
+    put right.
+
+    It can't tell a last name of two words from a middle name: "Mónica
+    Fernández Perea" is filed under Perea, not Fernández.
+    """
+    shown = display_name(name)
+    if organisation:
+        return _folded(re.sub(r"^the\s+", "", shown, flags=re.IGNORECASE))
+    words = shown.split(",")[0].split()
+    after = CREDENTIALS | SUFFIXES | _ALSO_AFTER_A_NAME
+    while len(words) > 1 and _bare(words[-1]) in after:
+        words.pop()
+    if not words:
+        return _folded(shown)
+    start = len(words) - 1
+    while start > 1 and words[start - 1][0].isupper() and _bare(words[start - 1]) in _PARTICLES:
+        start -= 1
+    return _folded(" ".join([*words[start:], *words[:start]]))
 
 
 def shown_name(credited_as: str, author_name: str) -> str:
