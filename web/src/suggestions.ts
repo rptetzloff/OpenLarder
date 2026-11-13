@@ -9,7 +9,14 @@ export interface Side {
 
 export interface Suggestion {
   id: string;
-  kind: "merge" | "parent" | "line_fix" | "tag" | "allergen";
+  kind:
+    | "merge"
+    | "parent"
+    | "line_fix"
+    | "tag"
+    | "allergen"
+    | "title_case"
+    | "title_apostrophe";
   decision: string | null;
   keep: "a" | "b" | null;
   a: Side | null;
@@ -32,6 +39,16 @@ export interface Suggestion {
     status: "contains" | "may_contain";
     already: boolean;
     exists: boolean;
+  } | null;
+  // title_case, title_apostrophe: the book, the title it had when this was
+  // suggested and the one proposed (title_rules.py). unchanged: it still
+  // has that title.
+  title: {
+    source_id: string;
+    was: string;
+    proposed: string;
+    exists: boolean;
+    unchanged: boolean;
   } | null;
   reason: string | null;
   similarity: number | null;
@@ -57,6 +74,8 @@ export const KIND_LABELS: Record<string, string> = {
   parent: "One under another",
   tag: "Tag a recipe",
   allergen: "Allergen",
+  title_case: "Title capitals",
+  title_apostrophe: "Title apostrophe",
   line_fix: "Line fix",
 };
 
@@ -87,6 +106,12 @@ async function post(path: string, body: unknown = {}) {
 // Administrators: suggest allergens from ingredients' names; how many are new.
 export async function suggestAllergens(): Promise<number> {
   return (await post("/api/suggestions/allergens")).suggested;
+}
+
+// Administrators: suggest fixes to books' titles (capitals, a lost
+// apostrophe); how many are new.
+export async function suggestTitles(): Promise<number> {
+  return (await post("/api/suggestions/titles")).suggested;
 }
 
 // Accept many allergen suggestions at once.

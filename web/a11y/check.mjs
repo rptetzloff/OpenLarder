@@ -95,6 +95,13 @@ async function seed() {
   const cheese = (await api("/api/ingredients?q=butter", "admin")).ingredients[0].id;
   await api(`/api/ingredients/${cheddar}/parent`, "admin", { parent: cheese }, "PUT");
 
+  // Two books whose titles the rules question as they arrive (title_rules.py),
+  // for the Suggestions queue: one in sentence case, one missing an apostrophe.
+  await api("/api/sources/manual", "admin", { title: "The grilling book", authors: ["Ann Author"] });
+  await api("/api/sources/manual", "admin", {
+    title: "Ann Authors Best Bakes",
+    authors: ["Ann Author"],
+  });
   const site = await api("/api/sources/websites", "admin", {
     address: "https://example.com/",
     name: "Example Kitchen",

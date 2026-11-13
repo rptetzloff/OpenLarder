@@ -28,6 +28,7 @@ from openlarder import (
     openlibrary,
     references,
     refresh,
+    title_rules,
     visibility,
     web,
 )
@@ -619,6 +620,7 @@ async def add_by_isbn(
         # Same edition under another ISBN, matched by Open Library's edition ID.
         raise await _already_here(session, admin, exc.source_id) from None
     await _mark_new(session, admin, source_id)
+    await _check_title(session, source_id)
     await session.commit()
     log.info("%s added %s (%s)", admin.id, isbn13, found.title)
     return Added(id=source_id)
@@ -637,6 +639,15 @@ async def _already_here(session, user: User, source_id: uuid.UUID) -> HTTPExcept
         status.HTTP_409_CONFLICT,
         {"message": "That edition is already in the catalog.", "source_id": str(source_id)},
     )
+
+
+async def _check_title(session, source_id: uuid.UUID) -> None:
+    """A new book's title, looked at as it arrives (title_rules.py): one in
+    sentence case goes to the Suggestions queue, and is changed by nobody
+    but a moderator. Nothing for a book waiting for review, which the
+    rules read once it's approved (routers/review.py)."""
+    await session.flush()
+    await title_rules.sweep(session, only=[source_id])
 
 
 async def _mark_new(session, user: User, source_id: uuid.UUID) -> None:
@@ -684,6 +695,7 @@ async def add_without_isbn(
             raise await _already_here(session, admin, source_id)
     else:
         await _mark_new(session, admin, source_id)
+        await _check_title(session, source_id)
     await session.commit()
     if not existed:
         log.info("%s added %s without an ISBN", admin.id, title)

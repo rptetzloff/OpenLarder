@@ -270,8 +270,32 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         screen, where the spec asks for about one. The "Get this book"
         box above them is 570px of it. Folding the shops behind one
         button on a phone would do it; that's Ray's to decide.
-      - [ ] 4. Book titles' capitals, as suggestions: titles in sentence
-        case, and a lost apostrophe.
+      - [x] 4. Book titles' capitals, as suggestions (#175; migration
+        0071). Nothing is recapitalised when it's shown. A book's title
+        with a lower-case word of four letters or more after its first
+        goes to the Suggestions queue with the title-cased one ("The
+        grilling book", "The Grilling Book"); small words stay small
+        unless they begin the title or the part after a colon or dash,
+        and a word with a capital in it is left ("BBQ", "iPad"). A title
+        where an author's name has an "s" and no apostrophe before a
+        capitalised word gets one with the apostrophe ("Danielle Walkers
+        Healthy in a Hurry"). A moderator accepts, which changes the
+        title as their edit, or dismisses, and that change isn't
+        suggested for the book again. Looked at as a book is added (by
+        ISBN or by hand), when a contributor's is approved, at the end of
+        an import, and from "Suggest title fixes" on Suggestions
+        (administrators). Only books anyone can see are read.
+      - Where it leaves the spec: the lost apostrophe is a suggestion,
+        not a flag (flags hang on recipes, and a suggestion carries the
+        fix); books only, not every source (a website's name is often
+        lower case on purpose); "with", "from" and the like stay small,
+        so "Cooking with Fire" isn't offered "Cooking With Fire".
+      - [ ] Ray: after the deploy, press "Suggest title fixes" once, for
+        the books already here.
+      - [ ] What the rules can't see: a title run together
+        ("Everydaycook"); a title in another language, where sentence
+        case is right and the suggestion is dismissed; a possessive of a
+        name that isn't an author's. Subtitles aren't read.
       - [ ] 5. Tap targets on phones: ingredient names on a recipe, and
         the links in the Find-it card and breadcrumbs.
       - [ ] 6. One spelling, American, in the interface and what the

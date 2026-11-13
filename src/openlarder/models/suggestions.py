@@ -51,7 +51,9 @@ class Suggestion(Base):
     __tablename__ = "suggestions"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('merge', 'parent', 'line_fix', 'tag', 'allergen')", name="kind_known"
+            "kind IN ('merge', 'parent', 'line_fix', 'tag', 'allergen',"
+            " 'title_case', 'title_apostrophe')",
+            name="kind_known",
         ),
         CheckConstraint("status IN ('open', 'accepted', 'dismissed')", name="status_known"),
         CheckConstraint("(status = 'open') = (decided_at IS NULL)", name="decided_when_closed"),
@@ -73,7 +75,8 @@ class Suggestion(Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     # merge or parent: two ingredient ids, the lower first; line_fix: a flag;
     # tag: a recipe's id and a tag's (0033); allergen: an ingredient's id and
-    # an allergen's key (0060).
+    # an allergen's key (0060); title_case or title_apostrophe: a source's
+    # id (0071).
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     target: Mapped[object] = mapped_column(JSONB, nullable=False)
     proposal: Mapped[object] = mapped_column(JSONB, nullable=False)

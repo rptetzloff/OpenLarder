@@ -20,7 +20,8 @@ const gone = computed(
   () =>
     [s.value.a, s.value.b].some((side) => side && !side.exists) ||
     (s.value.kind === "tag" && !(s.value.recipe?.exists && s.value.tag?.exists)) ||
-    (s.value.kind === "allergen" && !s.value.allergen?.exists),
+    (s.value.kind === "allergen" && !s.value.allergen?.exists) ||
+    (!!s.value.title && !(s.value.title.exists && s.value.title.unchanged)),
 );
 
 function uses(side: Side) {
@@ -101,6 +102,27 @@ async function act(action: "accept" | "dismiss") {
         >
       </p>
     </template>
+    <template v-else-if="s.title">
+      <h2>
+        {{ s.kind === "title_case" ? "Capitals in this title?" : "An apostrophe in this title?" }}
+      </h2>
+      <!-- Both in full, one under the other, so the change can be read. -->
+      <dl class="title-change">
+        <div>
+          <dt>Now</dt>
+          <dd>
+            <a v-if="s.title.exists" :href="`/sources/${s.title.source_id}`">{{
+              s.title.was
+            }}</a>
+            <span v-else>{{ s.title.was }} (gone)</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Suggested</dt>
+          <dd>{{ s.title.proposed }}</dd>
+        </div>
+      </dl>
+    </template>
     <h2 v-else>{{ s.kind }}</h2>
     <p v-if="s.reason" class="suggestion-reason">{{ s.reason }}</p>
     <p class="byline">
@@ -116,7 +138,11 @@ async function act(action: "accept" | "dismiss") {
     <template v-else>
       <p v-if="gone" class="status">
         {{
-          s.kind === "tag"
+          s.title
+            ? s.title.exists
+              ? "The title has been changed since, so this can only be dismissed."
+              : "The book has been deleted since, so this can only be dismissed."
+            : s.kind === "tag"
             ? "Its recipe or its tag has been deleted since, so it can only be dismissed."
             : s.kind === "allergen" && s.a?.exists
               ? "That allergen isn't on the list any more, so it can only be dismissed."
@@ -136,3 +162,22 @@ async function act(action: "accept" | "dismiss") {
     <p v-if="error" class="error" role="alert">{{ error }}</p>
   </li>
 </template>
+
+<style scoped>
+.title-change {
+  margin: 0.25rem 0 0.5rem;
+}
+.title-change div {
+  display: flex;
+  gap: 0.5rem;
+}
+.title-change dt {
+  flex: 0 0 5.5rem;
+  color: var(--muted);
+}
+.title-change dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+</style>
