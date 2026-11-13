@@ -757,6 +757,22 @@ a.secondary.small::after {
   color: var(--muted);
   font-size: 0.875rem;
 }
+/* On a phone a breadcrumb is 44px to tap, drawn as it was: the area reaches
+   12px above and below the words (round 2 spec, 2026-11-13). When they wrap,
+   the rows sit that far apart, so one row's doesn't lie over the next's. */
+@media (max-width: 40rem) {
+  .crumbs {
+    row-gap: 1.5rem;
+  }
+  .crumbs a {
+    position: relative;
+  }
+  .crumbs a::after {
+    content: "";
+    position: absolute;
+    inset: -0.75rem 0;
+  }
+}
 
 /* A source's page. */
 .source-head {

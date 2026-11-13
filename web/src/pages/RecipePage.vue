@@ -625,10 +625,15 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
   min-height: 2.75rem;
 }
 .row-names {
-  padding: 0.5rem 0;
   font-weight: 500;
 }
+/* The row's height is the link's, not the row's padding around it: a name is
+   44px to tap, where it was the 20px of its text (round 2 spec, 2026-11-13).
+   Shop, at the right, is its own. */
 .row-names a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
   color: var(--fg);
   text-decoration: none;
 }
@@ -743,5 +748,40 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
 }
 .aside-foot :deep(button.link) {
   min-height: 2.75rem;
+}
+
+/* On a phone, the links of "Find it in" are 44px to tap, with the lines
+   where they were (round 2 spec, 2026-11-13). The source's link reaches up,
+   over its label; an author's reaches down, over the page number, which
+   isn't a link. Each keeps its own height for the line (the margin takes
+   back what the padding adds), so nothing moves and the two don't meet.
+   The limit: with more authors than a line holds, a name on the first line
+   is as tall to tap as its line, since the next line's names lie under it. */
+@media (max-width: 40rem) {
+  .find-source a {
+    display: inline-block;
+    margin-top: -1.3125rem;
+    padding-top: 1.3125rem;
+  }
+  .find-credits a {
+    display: inline-block;
+    /* Above the page number's words, which are drawn later and would take
+       the taps where the two lie together. */
+    position: relative;
+    z-index: 1;
+    margin-bottom: -1.5rem;
+    padding-bottom: 1.5rem;
+  }
+  /* A link under those (a web page's address, an episode, the archive's
+     copy) can't share their space, so it has its own: the one place the
+     lines move apart. */
+  .find-credits ~ p a,
+  .find-source ~ p:not(.find-credits) a {
+    display: inline-block;
+    padding-block: 0.625rem;
+  }
+  .find-credits + p:has(a) {
+    margin-top: 1.5rem !important;
+  }
 }
 </style>

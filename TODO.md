@@ -269,7 +269,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         shops (measured on the check's 32-recipe book): a little over one
         screen, where the spec asks for about one. The "Get this book"
         box above them is 570px of it. Folding the shops behind one
-        button on a phone would do it; that's Ray's to decide.
+        button on a phone would do it; that's Ray's to decide. *Since,
+        on the live site (2026-11-13): Against All Grain's recipes begin
+        684px down, on a page 5,341px tall where it was about 20,000;
+        fewer shops show there. So this matters only once a book shows
+        six.*
       - [x] 4. Book titles' capitals, as suggestions (#175; migration
         0071). Nothing is recapitalised when it's shown. A book's title
         with a lower-case word of four letters or more after its first
@@ -296,8 +300,30 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         ("Everydaycook"); a title in another language, where sentence
         case is right and the suggestion is dismissed; a possessive of a
         name that isn't an author's. Subtitles aren't read.
-      - [ ] 5. Tap targets on phones: ingredient names on a recipe, and
-        the links in the Find-it card and breadcrumbs.
+      - [x] 5. Tap targets on phones (#176). An ingredient's name on a
+        recipe is 44px to tap, the link filling its row's height, with
+        Shop its own target beside it. Under 40rem the links of "Find it
+        in" and the breadcrumbs (on every page) are 44px too, drawn where
+        they were: the source's link reaches up over its label, an
+        author's down over the page number, a breadcrumb 12px either
+        way. Measured at 390px by asking the page what a tap lands on
+        through the 44px around each target: none of those is short or
+        lies under another, on a book's, a website's, a show's and a
+        magazine's recipe. Desktop: not a word moved.
+      - What moved on a phone: a name that wraps now goes to the next
+        line whole, and each line of it is 44px; a link under the
+        authors (a web page's address) has a line of its own height;
+        the comma after an author sits 1px further along.
+      - [ ] With more authors than a line holds, a name on the first line
+        is as tall to tap as its line (25px): the next line's names lie
+        under the rest.
+      - [ ] Other targets under 44px at 390px, found by the same measure
+        and outside the spec's list: tag chips and a source's ingredient
+        chips (26px); recipe titles in a source's table, in search
+        results and in Top rated; authors' names on a source's page; the
+        filter boxes and selects over a table; links inside a sentence
+        ("Sign in to rate or save", "How this works"). 6 of a recipe
+        page's 26 targets, 17 of a book page's 26.
       - [ ] 6. One spelling, American, in the interface and what the
         server sends.
       - [ ] 7. Covers while they load: the drawn cover behind every
