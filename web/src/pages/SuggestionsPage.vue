@@ -10,6 +10,7 @@ import {
   type Suggestion,
   type SuggestionPage,
   suggestAllergens,
+  suggestTitles,
 } from "../suggestions";
 import type { Me } from "../me";
 
@@ -63,6 +64,24 @@ const likelyShown = computed(() =>
       s.kind === "allergen" && s.status === "open" && s.actionable && s.certainty === "likely",
   ),
 );
+
+async function runTitles() {
+  busy.value = true;
+  note.value = actionError.value = "";
+  try {
+    const n = await suggestTitles();
+    note.value =
+      n === 0
+        ? "Nothing new to suggest."
+        : `${n.toLocaleString()} new title ${n === 1 ? "suggestion" : "suggestions"}.`;
+    kind.value = "";
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
 
 async function runAllergens() {
   busy.value = true;
@@ -135,6 +154,11 @@ watch(allowed, (yes) => {
         one records it on the ingredient, under the crowdsourced notice. Check each: a name can
         mislead.
       </p>
+      <p class="muted">
+        A book's title that looks to be in sentence case, or to have lost an apostrophe, is
+        suggested with the change. Accepting changes the title; dismiss one that's styled that way
+        on purpose, and it isn't suggested for that book again.
+      </p>
     </div>
     <p v-if="!user" class="status"><SignInLink /> to see suggestions.</p>
     <p v-else-if="!allowed" class="status">This is for moderators.</p>
@@ -181,6 +205,15 @@ watch(allowed, (yes) => {
           @click="runAllergens"
         >
           Suggest allergens
+        </button>
+        <button
+          v-if="user.may_run"
+          type="button"
+          class="secondary small"
+          :disabled="busy"
+          @click="runTitles"
+        >
+          Suggest title fixes
         </button>
         <button
           v-if="kind === 'allergen' && state === 'open' && likelyShown.length"

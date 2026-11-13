@@ -13,6 +13,12 @@ to be private, dismissable only if the recipe or the tag has gone; accepting
 tags the recipe, as "Edit tags" would. An allergen suggestion (allergen_rules.py,
 or n8n) is the same for its ingredient; accepting records the allergen on it,
 as its page would, and likely ones can be accepted a page at a time.
+
+A title suggestion (title_rules.py) names a book and the title proposed for
+it. Accepting changes the title, as the moderator's edit. It's hidden when
+the book can't be seen by anyone signed out (the rules only read public
+books, but one can be hidden since), and can only be dismissed when the
+book has gone or its title has changed since it was suggested.
 """
 
 import uuid
@@ -23,7 +29,14 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import Float, case, func, select
 
-from openlarder import allergen_rules, allergens, history, ingredients, visibility
+from openlarder import (
+    allergen_rules,
+    allergens,
+    history,
+    ingredients,
+    title_rules,
+    visibility,
+)
 from openlarder.auth import AdminUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -42,8 +55,8 @@ from openlarder.models import (
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 PAGE = 50
 # What accepting can do; line fixes wait for Workflow 3 and a page of their own.
-ACTIONABLE = {"merge", "parent", "tag", "allergen"}
-Kind = Literal["merge", "parent", "line_fix", "tag", "allergen"]
+ACTIONABLE = {"merge", "parent", "tag", "allergen", *title_rules.KINDS}
+Kind = Literal["merge", "parent", "line_fix", "tag", "allergen", "title_case", "title_apostrophe"]
 
 
 class Side(BaseModel):
@@ -83,6 +96,16 @@ class AllergenRef(BaseModel):
     exists: bool = True
 
 
+class TitleRef(BaseModel):
+    source_id: uuid.UUID
+    # The title when it was suggested, and the one proposed.
+    was: str
+    proposed: str
+    # The source is still there, and still has the title it had.
+    exists: bool
+    unchanged: bool
+
+
 class SuggestionOut(BaseModel):
     id: uuid.UUID
     kind: str
@@ -97,6 +120,8 @@ class SuggestionOut(BaseModel):
     tag: TagRef | None = None
     # allergen: the ingredient (as a), and the allergen for it.
     allergen: AllergenRef | None = None
+    # title_case, title_apostrophe: the book and the title proposed.
+    title: TitleRef | None = None
     reason: str | None
     similarity: float | None
     # merge-v2 on: the model's word for how sure it is. A 12B model asked
@@ -160,6 +185,18 @@ def _allergen_target(row: Suggestion) -> tuple[uuid.UUID, str, str] | None:
         return None
 
 
+def _title_target(row: Suggestion) -> tuple[uuid.UUID, str, str] | None:
+    """A title suggestion's source, the title it had and the one proposed;
+    None if it doesn't name them."""
+    p = row.proposal if isinstance(row.proposal, dict) else {}
+    if row.kind not in title_rules.KINDS:
+        return None
+    try:
+        return uuid.UUID(str(p["source_id"])), str(p["title_now"]), str(p["title"])
+    except (KeyError, ValueError):
+        return None
+
+
 def _named(row: Suggestion) -> list[uuid.UUID]:
     """The ingredients a suggestion names."""
     if ids := _ids(row):
@@ -206,10 +243,25 @@ async def _visible(session, viewer: User, rows: list[Suggestion]) -> list[Sugges
         if tagged
         else set()
     )
+    titled = {t[0] for r in rows if (t := _title_target(r))}
+    # Not the moderator's own view of it: a private collection is hidden
+    # from moderators already, and a book waiting for review isn't one
+    # the rules read. Asked as someone signed out, both stay out.
+    hidden_sources = (
+        set(
+            await session.scalars(
+                select(Source.id).where(Source.id.in_(titled), ~visibility.sources_seen_by(None))
+            )
+        )
+        if titled
+        else set()
+    )
     return [
         r
         for r in rows
-        if not (hidden & set(_named(r))) and not ((t := _tag_target(r)) and t[0] in hidden_recipes)
+        if not (hidden & set(_named(r)))
+        and not ((t := _tag_target(r)) and t[0] in hidden_recipes)
+        and not ((s := _title_target(r)) and s[0] in hidden_sources)
     ]
 
 
@@ -256,6 +308,16 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
     on_ingredients = {r.id: t for r in rows if (t := _allergen_target(r))}
     recorded = await allergens.recorded(
         session, list({t[0] for t in on_ingredients.values() if t[0] in names})
+    )
+    on_sources = {r.id: t for r in rows if (t := _title_target(r))}
+    titles_now = dict(
+        (
+            await session.execute(
+                select(Source.id, Source.title).where(
+                    Source.id.in_([t[0] for t in on_sources.values()])
+                )
+            )
+        ).all()
     )
     out = []
     for r in rows:
@@ -312,6 +374,16 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 exists=tag is not None,
                 already=bool(found and tag and await _has_tag(session, rid, tid)),
             )
+        title_ref = None
+        if r.id in on_sources:
+            source_id, was, proposed = on_sources[r.id]
+            title_ref = TitleRef(
+                source_id=source_id,
+                was=was,
+                proposed=proposed,
+                exists=source_id in titles_now,
+                unchanged=titles_now.get(source_id) == was,
+            )
         out.append(
             SuggestionOut(
                 id=r.id,
@@ -332,9 +404,12 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 recipe=recipe_ref,
                 tag=tag_ref,
                 allergen=allergen_ref,
+                title=title_ref,
                 actionable=r.kind in ACTIONABLE
                 and (
-                    bool(recipe_ref and tag_ref and recipe_ref.exists and tag_ref.exists)
+                    bool(title_ref and title_ref.exists and title_ref.unchanged)
+                    if r.kind in title_rules.KINDS
+                    else bool(recipe_ref and tag_ref and recipe_ref.exists and tag_ref.exists)
                     if r.kind == "tag"
                     else bool(a and a.exists and allergen_ref and allergen_ref.exists)
                     if r.kind == "allergen"
@@ -450,6 +525,20 @@ async def accept(
     if row.kind == "allergen":
         await _record_allergen(session, row)
         return await _decide(session, admin, row, "accepted")
+    if row.kind in title_rules.KINDS:
+        target = _title_target(row)
+        source = await session.get(Source, target[0], with_for_update=True) if target else None
+        if target is None or source is None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "This can't be accepted: its book has gone. Dismiss it."
+            )
+        if source.title != target[1]:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "This can't be accepted: the title has changed since it was suggested. Dismiss it.",
+            )
+        source.title = target[2]
+        return await _decide(session, admin, row, "accepted")
     ids = _ids(row)
     found = [await session.get(Ingredient, i) for i in ids] if ids else []
     if row.kind not in ACTIONABLE or len(found) != 2 or None in found:
@@ -556,3 +645,12 @@ class Suggested(BaseModel):
 async def suggest_allergens(admin: AdminUser, session: Session) -> Suggested:
     """Suggest allergens from ingredients' names (allergen_rules.py)."""
     return Suggested(suggested=await allergen_rules.suggest(session))
+
+
+@router.post("/titles", response_model=Suggested, dependencies=[SameOrigin])
+async def suggest_titles(admin: AdminUser, session: Session) -> Suggested:
+    """Suggest fixes to books' titles: capitals, and a lost apostrophe
+    (title_rules.py)."""
+    new = await title_rules.sweep(session)
+    await session.commit()
+    return Suggested(suggested=new)
