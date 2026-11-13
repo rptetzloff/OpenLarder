@@ -438,7 +438,7 @@ onMounted(async () => {
       <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
         <span v-for="i in chosen" :key="i.id" class="chip">
           {{ i.name }}
-          <button type="button" :aria-label="`Remove ${i.name}`" @click.stop="dropIngredient(i.id)">
+          <button type="button" class="remove" :aria-label="`Remove ${i.name}`" @click.stop="dropIngredient(i.id)">
             ×
           </button>
         </span>
@@ -471,7 +471,7 @@ onMounted(async () => {
       <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
         <span v-for="i in unwanted" :key="i.id" class="chip chip-unwanted">
           {{ i.name }}
-          <button type="button" :aria-label="`Remove ${i.name}`" @click.stop="dropUnwanted(i.id)">
+          <button type="button" class="remove" :aria-label="`Remove ${i.name}`" @click.stop="dropUnwanted(i.id)">
             ×
           </button>
         </span>
@@ -518,7 +518,7 @@ onMounted(async () => {
           <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
             <span v-for="b in shelf" :key="b.id" class="chip">
               {{ b.name }}
-              <button type="button" :aria-label="`Remove ${b.name}`" @click.stop="dropSource(b.id)">
+              <button type="button" class="remove" :aria-label="`Remove ${b.name}`" @click.stop="dropSource(b.id)">
                 ×
               </button>
             </span>

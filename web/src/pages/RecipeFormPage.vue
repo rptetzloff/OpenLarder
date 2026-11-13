@@ -650,7 +650,7 @@ async function save(another = false) {
                     <button
                       v-if="rows.length > 1"
                       type="button"
-                      class="link remove-line"
+                      class="remove"
                       :aria-label="`Remove ingredient ${i + 1}`"
                       title="Remove"
                       @click="removeRow(i)"

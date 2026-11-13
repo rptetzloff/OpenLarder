@@ -476,6 +476,42 @@ button.secondary[aria-pressed="true"] {
 button.secondary[aria-pressed="true"] .count {
   color: inherit;
 }
+/* The × that takes a chip, a name or a line away: drawn small, 44px square
+   to tap. The square is its own box, beside what it follows, so it never
+   lies over a link next to it; the margins keep it from making its line
+   any taller. */
+button.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -0.75rem 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-lg);
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+}
+button.remove:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* A name in running text with the × that takes it away: on one line, so
+   the × never wraps away from what it removes, and 44px tall, so where
+   several wrap, one line's × doesn't lie over the next line's (three
+   other names in a narrow card did, by 19px). */
+.with-remove {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  white-space: nowrap;
+}
 /* In a row of a table or a list: drawn smaller, and still 44px to tap. */
 button.primary.small,
 a.primary.small,
@@ -501,7 +537,11 @@ a.secondary.small::after {
 .chip-input {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
+  /* 0.8125rem between rows: with a chip 31px tall, rows are 44px apart,
+     the height of a chip's × to tap. At 0.375rem one row's × lay over the
+     next row's, and over the text box below; at 0.625rem, still over the
+     next row's by 7px (measured at 390px with three chips). */
+  gap: 0.8125rem 0.375rem;
   align-items: center;
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--border);
@@ -529,19 +569,12 @@ a.secondary.small::after {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  /* Nothing on the right: its × has its own room (button.remove). */
+  padding: 0.25rem 0 0.25rem 0.5rem;
   border-radius: 6px;
   background: var(--chip);
   color: var(--fg);
   font-size: 0.9375rem;
-}
-.chip button {
-  border: none;
-  background: none;
-  color: var(--fg);
-  font: inherit;
-  padding: 0 0.25rem;
-  cursor: pointer;
 }
 .suggestions {
   list-style: none;
@@ -1923,12 +1956,6 @@ main h2 {
   background: var(--bg);
   color: var(--fg);
 }
-.remove-line {
-  padding: 0 0.375rem;
-  font-size: 1.375rem;
-  line-height: 1;
-  text-decoration: none;
-}
 .line-tag {
   margin: 0;
   padding: 0.5rem 0.625rem;
@@ -3115,11 +3142,6 @@ button.link {
 .aliases {
   color: var(--muted);
 }
-.remove-alias {
-  margin-left: 0.125rem;
-  padding: 0 0.25rem;
-  color: var(--muted);
-}
 .fix-ingredient {
   margin-top: 2.5rem;
   border-top: 1px solid var(--border);
@@ -3188,18 +3210,22 @@ button.link {
 .chosen {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  /* Rows 44px apart, as for .chip-input: no × lies over the next row's. */
+  gap: 0.625rem 0.5rem;
   list-style: none;
   padding: 0;
   margin: 0 0 1.5rem;
 }
 .chosen li {
+  display: inline-flex;
+  align-items: center;
   margin: 0;
-  padding: 0.25rem 0.375rem 0.25rem 0.75rem;
+  /* Nothing on the right: its × has its own room (button.remove). */
+  padding: 0.25rem 0 0.25rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 999px;
 }
-.chosen button {
+.chosen button:not(.remove) {
   margin-left: 0.25rem;
   padding: 0 0.25rem;
 }

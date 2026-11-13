@@ -98,7 +98,7 @@ onMounted(async () => {
               {{ i.name }}
               <button
                 type="button"
-                class="link"
+                class="remove"
                 :aria-label="`Remove ${i.name}`"
                 @click="have.splice(n, 1)"
               >
