@@ -186,7 +186,7 @@ class Book(BaseModel):
     # The ingredients its recipes use most, for finding your way in by one.
     ingredients: list[TopIngredient]
     # Its top rated recipes, best first (routers/ratings.py); none until
-    # some are rated four spoons or more.
+    # three are rated and some of them four spoons or more.
     top_rated: list[UsedBy] = []
     # A magazine's or newspaper's issues, newest first.
     issues: list[IssueSummary]

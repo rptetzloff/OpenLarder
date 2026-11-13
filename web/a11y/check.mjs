@@ -41,6 +41,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // cover that arrives.
 const COVER =
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAIAAAA2iEnWAAAAEElEQVR42mPY6qUDRAwoFABM4AcD1RnCuAAAAABJRU5ErkJggg==";
+// A source's page and an author's have their Top rated, which a change to
+// what it waits for could quietly take out of the check.
+const TOP_RATED_SHOWN = `document.querySelector("#top-rated-title + .top-rated li") ? "" : "Top rated isn't shown"`;
 // On the sources page: the cover that arrived is shown, and the one that
 // failed has left the printed face with its title, not a broken picture.
 const COVERS_SHOWN = `(() => {
@@ -109,7 +112,7 @@ async function seed() {
   await api(`/api/sources/${book.id}/tags`, "admin", { tags: [tagged("Gluten-Free")] }, "PUT");
   // A long title, so a table that can't wrap shows up at phone width (the
   // ingredient page's did, with real titles, before this was here).
-  await recipe("Slow-Roasted Aged Cheddar and Caramelised Onion Biscuits with Brown Butter", "30", [
+  const slow = await recipe("Slow-Roasted Aged Cheddar and Caramelised Onion Biscuits with Brown Butter", "30", [
     "Aged cheddar",
     "Onion",
   ]);
@@ -206,6 +209,10 @@ async function seed() {
   // Spoons from both, so a rating shows.
   await api(`/api/recipes/${biscuits.id}/rating`, "cook", { spoons: 5 }, "PUT");
   await api(`/api/recipes/${biscuits.id}/rating`, "admin", { spoons: 4 }, "PUT");
+  // And on two more of the book's, one of them poor: Top rated is left off
+  // until three of a source's recipes are rated (routers/ratings.py).
+  await api(`/api/recipes/${blend.id}/rating`, "cook", { spoons: 4 }, "PUT");
+  await api(`/api/recipes/${slow.id}/rating`, "admin", { spoons: 2 }, "PUT");
   // Cy's note on the biscuits, shared with the family; Ada's, her own.
   await api(`/api/recipes/${biscuits.id}/notes`, "cook", { body: "Double the cheddar.\nBake five minutes less.", groups: [group.id] }, "PUT");
   await api(`/api/recipes/${biscuits.id}/notes`, "admin", { body: "Good with soup.", groups: [] }, "PUT");
@@ -235,7 +242,8 @@ async function seed() {
       editions: [{ edition_id: longEdition, page: String(n) }],
       ingredients: ["Flour", "Butter"],
     });
-    if (n === 1) await api(`/api/recipes/${bake.id}/rating`, "cook", { spoons: 5 }, "PUT");
+    // Three rated, as Top rated needs: five, four and three spoons.
+    if (n <= 3) await api(`/api/recipes/${bake.id}/rating`, "cook", { spoons: 6 - n }, "PUT");
   }
   return { long, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
 }
@@ -258,7 +266,7 @@ function pages(s) {
     ["/sources", "cook"],
     ["/sources", "admin"],
     ["/sources?kind=book&kind=website&sort=recipes", null],
-    [`/sources/${s.book.id}`, null],
+    [`/sources/${s.book.id}`, null, { expect: TOP_RATED_SHOWN }],
     [`/sources/${s.book.id}`, "admin"],
     [`/sources/${s.site.id}`, null],
     [`/sources/${s.magazine.id}`, null],
@@ -282,7 +290,7 @@ function pages(s) {
     [`/ingredients/${s.cheddar}`, "admin"],
     ["/authors", null],
     ["/authors?sort=recipes&kind=person", null],
-    [`/authors/${s.author}`, null],
+    [`/authors/${s.author}`, null, { expect: TOP_RATED_SHOWN }],
     [`/authors/${s.author}`, "admin"],
     ["/groups", "cook"],
     [`/groups/${s.group.id}`, "cook"],
@@ -331,7 +339,7 @@ function pages(s) {
     ["/sign-in-failed", null],
     // A long book: on a phone its parts are in another order, with the
     // first thirty recipes; then with all of them shown.
-    [`/sources/${s.long.id}`, null, { phone: true }],
+    [`/sources/${s.long.id}`, null, { phone: true, expect: TOP_RATED_SHOWN }],
     [
       `/sources/${s.long.id}`,
       "cook",

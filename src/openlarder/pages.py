@@ -147,10 +147,30 @@ def ingredient_names(shown: recipes.RecipeOut) -> list[str]:
     return list(names)
 
 
+def line_names(shown: recipes.RecipeOut) -> list[str]:
+    """A name for each ingredient line, in the lines' order: the first thing
+    the line was matched to. A line offering a choice ("coconut oil or palm
+    shortening") is one line and gets one name; a line matched to nothing
+    gets none, and a name two lines share is given once."""
+    names: dict[str, None] = {}
+    for line in shown.lines:
+        for option in line.options:
+            if option.ingredient or option.recipe:
+                names.setdefault(
+                    option.ingredient.name if option.ingredient else option.recipe.title
+                )
+                break
+    return list(names)
+
+
 def recipe_description(shown: recipes.RecipeOut) -> str:
     """ "Banana Pancakes is on page 190 of Against All Grain by Danielle
     Walker. Ingredients: Egg, Almond Flour, Banana, and 6 more." As many
-    ingredients as fit; without the authors, then cut, if it's too long."""
+    ingredients as fit; without the authors, then cut, if it's too long.
+
+    The names and "more" add up to the recipe's lines, the number its page
+    gives beside "Ingredients", not to the names the lines hold: a line
+    offering two things is one ingredient there, and so here."""
     where = f"{shown.title} {_where(shown)}"
     by = _people([c.name for c in shown.source.credits])
     first = f"{where} by {by}{_stop(by)}" if by else f"{where}{_stop(where)}"
@@ -158,9 +178,9 @@ def recipe_description(shown: recipes.RecipeOut) -> str:
         first = f"{where}{_stop(where)}"
     if len(first) > DESCRIPTION_MAX:
         return _cut(first, DESCRIPTION_MAX)
-    names = ingredient_names(shown)
+    names = line_names(shown)
     for count in range(min(len(names), NAMED), 0, -1):
-        rest = len(names) - count
+        rest = len(shown.lines) - count
         more = f", and {rest} more" if rest else ""
         whole = f"{first} Ingredients: {', '.join(names[:count])}{more}."
         if len(whole) <= DESCRIPTION_MAX:

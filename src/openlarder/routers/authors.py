@@ -97,7 +97,8 @@ class AuthorOut(BaseModel):
     sources: list[AuthorBook]
     coauthors: list[CoAuthor]
     # The top rated recipes of their sources, best first (routers/
-    # ratings.py); none until some are rated four spoons or more.
+    # ratings.py); none until three are rated and some of them four
+    # spoons or more.
     top_rated: list[UsedBy] = []
     # Other authors whose names compare the same: likely the same person,
     # to merge (author_merge.py).

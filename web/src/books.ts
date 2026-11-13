@@ -98,7 +98,7 @@ export interface Book {
   }[];
   // The ingredients its recipes use most, with how many recipes use each.
   ingredients: { id: string; name: string; recipes: number }[];
-  // Its top rated recipes, best first; none until some are rated well.
+  // Its top rated recipes, best first; none until three are rated, some well.
   top_rated: Listed[];
 }
 

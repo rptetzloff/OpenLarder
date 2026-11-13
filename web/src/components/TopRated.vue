@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // A source's or an author's top rated recipes, best first (Ray, 2026-11-12;
-// routers/ratings.py): those averaging four spoons or more, at most five.
+// routers/ratings.py): those averaging four spoons or more, at most five,
+// once three of its recipes are rated. The order weighs how many rated each,
+// so one person's five can come after two people's four and five.
 // Left off when there are none, not filled with some other ranking.
 import { issueName } from "../books";
 import type { Listed } from "../ingredients";

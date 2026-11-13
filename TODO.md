@@ -369,9 +369,26 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - Not seen from here: how the fade looks on a slow phone. The
           states were checked by holding and failing the pictures in
           Chrome, not on a slow connection.
-      - [ ] 8. Small fixes: a description's ingredient count counts lines;
-        Top rated needs three rated recipes and a damped average; a
-        summary for the list pages without JavaScript.
+      - [ ] 8. Small fixes:
+        - [x] A description's ingredients add up to the recipe's lines
+          (#181), the number its page gives beside "Ingredients". A line
+          offering a choice was counted once for each thing it offered;
+          now it is named by the first and counted once. The page's
+          structured data still names everything.
+        - [x] Top rated waits for three rated recipes and weighs its
+          order (#181): each average as if two more people had given
+          three spoons, so one person's five comes after two people's
+          four and five. What's shown is still the plain average. *The
+          two and the three are Claude's, 2026-11-13; the spec gives
+          neither, and they're constants in routers/ratings.py.*
+          - On the day it merged the live site had one rated recipe in
+            any Top rated list (one person's four, in one book). That
+            list goes until three of the book's recipes are rated.
+          - Not changed, and Ray's to decide: a search sorted "Highest
+            rated" still goes by the plain average, so one person's
+            five is first there.
+        - [ ] A summary for the list pages without JavaScript, and the
+          site's search action on the front page.
       - The two commission lines on a recipe's page stay as they are,
         each beside the links it covers (*Ray, 2026-11-13*).
       - Still to review, from the spec: the signed-in pages, and a
@@ -942,9 +959,11 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         the rated recipes first that way and then the rest as they'd come.
         Sorted by rating, a rated recipe using one of your ingredients
         comes before an unrated one using them all.
-      - [ ] One person's five spoons tops a list. A least number of
-        ratings would show nothing while the site is new; add one
-        (routers/ratings.py) when there are enough to ask for.
+      - [x] One person's five spoons tops a list (#181, in Top rated:
+        see round 2's small fixes above). *Was: a least number of
+        ratings would show nothing while the site is new; add one when
+        there are enough to ask for. Ray's spec of 2026-11-13 asks for
+        it now.*
       - [x] Ratings in the dumps (#168; *Ray, 2026-11-12*): each rated
         recipe's average and how many rated it, as its page shows them
         (recipe_ratings.csv; "spoons" and "ratings" on each recipe in the

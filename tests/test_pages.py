@@ -14,6 +14,7 @@ from conftest import SHELL
 from fake_broker import _settings, _sign_in, make_admins
 from openlarder import pages
 from openlarder.main import spa_response
+from openlarder.routers import recipes
 
 E = uuid.uuid4()
 GENERIC = "<title>OpenLarder</title>"
@@ -128,6 +129,53 @@ async def test_a_description_stays_under_160_characters(admin, adb, client) -> N
     long = await _recipe(admin, adb, book, title="Very " * 38 + "Long Cake", page="2")
     said = _content((await client.get(f"/recipes/{long}")).text, "description")[0]
     assert len(said) < 160 and said.endswith("…")
+
+
+async def test_a_description_counts_lines_as_the_page_does(admin, adb, client) -> None:
+    """Ray's spec, 2026-11-13: "Count lines, not names." A line offering a
+    choice is one ingredient on the recipe's page, which counts its lines;
+    the description's names and "more" add up to the same number."""
+    book = await _book(admin)
+    lines = [
+        "Coconut Oil or Palm Shortening",
+        "Egg",
+        "Honey or Maple Syrup",
+        *[f"Thing {n}" for n in range(1, 7)],
+    ]
+    recipe = await _recipe(admin, adb, book, ingredients=lines)
+    shown = (await client.get(f"/api/recipes/{recipe}")).json()
+    # Nine lines, eleven names: the two choices were taken as choices.
+    assert len(shown["lines"]) == 9
+    assert sum(len(line["options"]) for line in shown["lines"]) == 11
+    page = (await client.get(f"/recipes/{recipe}")).text
+    assert _content(page, "description")[0] == (
+        "Banana Bread is on page 190 of Against All Grain by Danielle Walker."
+        " Ingredients: Coconut Oil, Egg, Honey, Thing 1, Thing 2, Thing 3, and 3 more."
+    )
+    # Everything a line names is still in the page's structured data.
+    about = [thing["name"] for thing in _data(page)[0]["about"]]
+    assert len(about) == 11 and "Palm Shortening" in about and "Maple Syrup" in about
+
+
+async def test_a_line_with_no_name_of_its_own_is_still_counted(admin, adb, client) -> None:
+    """A line matched to nothing, as an import can leave one, and a line
+    matched to what an earlier line was: neither adds a name, both are
+    lines, so both are among the "more"."""
+    book = await _book(admin)
+    recipe = await _recipe(admin, adb, book, ingredients=("Egg", "Butter"))
+    shown = recipes.RecipeOut.model_validate((await client.get(f"/api/recipes/{recipe}")).json())
+    egg, butter = shown.lines
+    unmatched = recipes.LineOut(
+        text="a pinch of something",
+        options=[recipes.OptionOut(name="something", page=None, recipe=None, ingredient=None)],
+    )
+    said = pages.recipe_description(
+        shown.model_copy(update={"lines": [egg, unmatched, butter, egg]})
+    )
+    assert said.endswith(" Ingredients: Egg, Butter, and 2 more.")
+    # With nothing matched there is nothing to name, and no count alone.
+    said = pages.recipe_description(shown.model_copy(update={"lines": [unmatched]}))
+    assert said == "Banana Bread is on page 190 of Against All Grain by Danielle Walker."
 
 
 async def test_where_a_recipe_is_reads_by_its_kind_of_source(admin, client) -> None:
