@@ -91,11 +91,14 @@ async def test_rated_recipes_come_first_among_titles_as_close(book, client) -> N
     await book("A Hearty Winter Barley Soup", spoons=[4])
     await book("Carrot and Coriander Soup", spoons=[5, 5])
     await book("Dill Soup", spoons=[5])
+    await book("Eel and Elderflower Soup", spoons=[4, 5])
     await book("Soupy Rice", spoons=[5, 5, 5])
     assert await _found(client, q="soup") == [
-        # Whole word: the higher average, then the more who rated it, then
-        # the unrated; a rating counts before a shorter title.
+        # Whole word: the better rated as Top rated weighs them (two
+        # people's four and five before one person's five), then the
+        # unrated; a rating counts before a shorter title.
         "Carrot and Coriander Soup",
+        "Eel and Elderflower Soup",
         "Dill Soup",
         "A Hearty Winter Barley Soup",
         "Leek Soup",
@@ -106,6 +109,7 @@ async def test_rated_recipes_come_first_among_titles_as_close(book, client) -> N
     assert await _found(client, q="soup", sort="rating") == [
         "Soupy Rice",
         "Carrot and Coriander Soup",
+        "Eel and Elderflower Soup",
         "Dill Soup",
         "A Hearty Winter Barley Soup",
         "Leek Soup",

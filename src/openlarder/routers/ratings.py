@@ -11,8 +11,7 @@ Ratings rank, too (*Ray, 2026-11-12*). A source's page and an author's
 show their top rated recipes: those averaging four spoons or more, the
 best five. With none, the section is left off, not filled with some other
 ranking (SCOPING.md). A search can be sorted by rating: rated recipes
-first, the higher average first and, level, the one more people rated,
-then the rest as they'd come anyway.
+first, best first, then the rest as they'd come anyway.
 
 Top rated is weighed (*Ray's spec, 2026-11-13: "show Top rated only when at
 least three recipes have ratings, and rank by a damped average so a single
@@ -23,10 +22,15 @@ one person's five (3.7 so weighed) comes after two people's four and five
 (3.8). What's shown beside each is still its plain average. The two and
 the three are Claude's, 2026-11-13; the spec gives neither.
 
+A search sorted by rating is in the same weighed order, and so is the
+rating's say between two titles that match a search equally (*Ray,
+2026-11-13: "Sure", asked whether search should be weighed as Top rated
+is*). There is one order, best_first, and all three use it.
+
 *Superseded 2026-11-13: one person's five spoons topped a list, the higher
 plain average coming first; a least number of ratings was put off because
-it would show nothing while the site was new.* A search sorted by rating
-still goes by the plain average.
+it would show nothing while the site was new. For some hours that day
+Top rated was weighed and a search sorted by rating was not.*
 """
 
 import uuid
@@ -105,9 +109,9 @@ def rated():
 
 
 def best_first(ratings) -> tuple:
-    """The order ratings put recipes in: the higher average first, then the
-    one more people rated; unrated ones after them all."""
-    return (ratings.c.spoons.desc().nulls_last(), ratings.c.ratings.desc().nulls_last())
+    """The order ratings put recipes in: the higher weighed average first,
+    then the one more people rated; unrated ones after them all."""
+    return (ratings.c.weighed.desc().nulls_last(), ratings.c.ratings.desc().nulls_last())
 
 
 async def top_rated(session, *conditions) -> list[UsedBy]:
@@ -130,12 +134,7 @@ async def top_rated(session, *conditions) -> list[UsedBy]:
     rows = (
         await session.execute(
             among.where(ratings.c.spoons >= TOP_SPOONS)
-            .order_by(
-                ratings.c.weighed.desc(),
-                ratings.c.ratings.desc(),
-                func.lower(Recipe.title),
-                Recipe.id,
-            )
+            .order_by(*best_first(ratings), func.lower(Recipe.title), Recipe.id)
             .limit(TOP_SHOWN)
         )
     ).all()

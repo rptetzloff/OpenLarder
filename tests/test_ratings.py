@@ -203,6 +203,7 @@ async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
             "Carrot Soup": [5, 5],
             "Dill Soup": [5],
             "Egg Soup": [],
+            "Fennel Soup": [4, 5],
         },
     )
     # No title words, so nothing ranks by title (test_title_rank.py): by book
@@ -219,17 +220,21 @@ async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
         "Carrot Soup",
         "Dill Soup",
         "Egg Soup",
+        "Fennel Soup",
     ]
     best = (await client.get("/api/search", params={"tag": tag, "sort": "rating"})).json()
-    # The rated ones, best first; then the rest as they'd come anyway.
-    assert [r["title"] for r in best["recipes"]] == [
-        "Carrot Soup",
-        "Dill Soup",
-        "Barley Soup",
-        "Apple Soup",
-        "Egg Soup",
+    # The rated ones, best first as Top rated has them (Ray, 2026-11-13):
+    # two people's four and five before one person's five. Then the rest as
+    # they'd come anyway.
+    assert [(r["title"], r["spoons"], r["ratings"]) for r in best["recipes"]] == [
+        ("Carrot Soup", 5.0, 2),
+        ("Fennel Soup", 4.5, 2),
+        ("Dill Soup", 5.0, 1),
+        ("Barley Soup", 4.0, 1),
+        ("Apple Soup", None, 0),
+        ("Egg Soup", None, 0),
     ]
-    assert best["total"] == usual["total"] == 5
+    assert best["total"] == usual["total"] == 6
     assert (await client.get("/api/search", params={"q": "soup", "sort": "x"})).status_code == 422
 
 
