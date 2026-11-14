@@ -232,10 +232,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] The page to come back to is kept an hour, the sign-in
         cookie's life: a name chosen on `/welcome` later than that goes
         to the front page.
-      - [ ] Ray: after the deploy, sign in and look for the "sign-in"
+      - [x] Ray: after the deploy, sign in and look for the "sign-in"
         event in Umami. What the tracker sends was checked against the
         script the site loads; what Umami's collector makes of it
-        couldn't be from here.
+        couldn't be from here. *Ray, 2026-11-13: "Sign in is there".*
       - [x] 2. Title search ranked by relevance (#173). Everything with
         the words in its title is still found; the closest titles come
         first: every word a whole word of the title, plurals counting
@@ -294,8 +294,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         fix); books only, not every source (a website's name is often
         lower case on purpose); "with", "from" and the like stay small,
         so "Cooking with Fire" isn't offered "Cooking With Fire".
-      - [ ] Ray: after the deploy, press "Suggest title fixes" once, for
-        the books already here.
+      - [x] Ray: after the deploy, press "Suggest title fixes" once, for
+        the books already here. *Ray, 2026-11-13: done.*
       - [ ] What the rules can't see: a title run together
         ("Everydaycook"); a title in another language, where sentence
         case is right and the suggestion is dismissed; a possessive of a
@@ -363,9 +363,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - The grid didn't shift before either: the card's shape was
           already set in the stylesheet. Measured, a card is 167 by 251
           with its picture held and with it shown.
-        - Not done: the small covers beside search results and saved
-          recipes (`.hit-cover`) are still an empty box until the picture
-          comes, when it fails, and when the book has none.
+        - Left as they are (*Ray, 2026-11-13: "covers are fine"*): the
+          small covers beside search results and saved recipes
+          (`.hit-cover`) are an empty box until the picture comes, when
+          it fails, and when the book has none.
         - Not seen from here: how the fade looks on a slow phone. The
           states were checked by holding and failing the pictures in
           Chrome, not on a slow connection.
@@ -384,9 +385,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - On the day it merged the live site had one rated recipe in
             any Top rated list (one person's four, in one book). That
             list goes until three of the book's recipes are rated.
-          - Not changed, and Ray's to decide: a search sorted "Highest
-            rated" still goes by the plain average, so one person's
-            five is first there.
+          - [x] A search sorted "Highest rated" is weighed the same way
+            (#183; *Ray, 2026-11-13: "Sure", asked whether it should
+            be*), and so is the rating's say between two titles that
+            match a search equally. There is one order in
+            routers/ratings.py and all three use it. A recipe showing
+            4.5 from two people can now come above one showing 5 from
+            one. *Was: left on the plain average, and Ray's to decide.*
         - [x] A summary for the list pages without JavaScript, and the
           site's search action on the front page (#182). `/sources`,
           `/ingredients` and `/authors` send their first page of items
@@ -406,6 +411,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             to 0.31 s (authors) and 0.32 to 0.37 s (ingredients),
             against 0.10 to 0.16 s for `/healthz`: the pages begin about
             0.1 to 0.2 s later than they did.
+          - The pages themselves, once it was live (seven or eight
+            requests each, from here, 2026-11-13): `/sources` began in
+            0.17 to 0.22 s, `/` in 0.20 to 0.24 s and once 0.39 s,
+            `/authors` in 0.27 to 0.31 s and `/ingredients` in 0.27 to
+            0.37 s, against 0.11 to 0.16 s for `/privacy`, which asks
+            the database nothing.
           - If the database can't be asked, the page is sent without
             its summary, as before this, not as a 500.
           - Not checked: whether a search engine uses the summary.
