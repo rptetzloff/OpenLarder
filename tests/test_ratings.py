@@ -112,10 +112,11 @@ async def test_a_sources_page_and_an_authors_show_their_top_rated(people, client
         people,
         adb,
         {
-            "Good Soup": [4, 5],  # 4.5
-            "Best Bread": [5, 5],  # 5.0, from two
-            "Fine Cake": [5],  # 5.0, from one: after the one two people rated
-            "Fair Stew": [3, 5],  # 4.0: just in
+            # Shown, and weighed: as if two more people gave three spoons.
+            "Good Soup": [4, 5],  # 4.5, weighed 3.75
+            "Best Bread": [5, 5],  # 5.0, weighed 4.0
+            "Fine Cake": [5],  # 5.0 from one, weighed 3.67: after Good Soup's 4.5 from two
+            "Fair Stew": [3, 5],  # 4.0: just in, weighed 3.5
             "Poor Pie": [3],  # under four spoons
             "Almost Tart": [4, 4, 3],  # 3.7: shown as under four, so not in
             "Plain Rice": [],
@@ -124,16 +125,16 @@ async def test_a_sources_page_and_an_authors_show_their_top_rated(people, client
     shown = (await client.get(f"/api/sources/{book}")).json()
     assert [(r["title"], r["spoons"], r["ratings"], r["pages"]) for r in shown["top_rated"]] == [
         ("Best Bread", 5.0, 2, ["2"]),
-        ("Fine Cake", 5.0, 1, ["3"]),
         ("Good Soup", 4.5, 2, ["1"]),
+        ("Fine Cake", 5.0, 1, ["3"]),
         ("Fair Stew", 4.0, 2, ["4"]),
     ]
     author = shown["credits"][0]["author_id"]
     theirs = (await client.get(f"/api/authors/{author}")).json()["top_rated"]
     assert [(r["title"], r["source_title"]) for r in theirs] == [
         ("Best Bread", "Plenty"),
-        ("Fine Cake", "Plenty"),
         ("Good Soup", "Plenty"),
+        ("Fine Cake", "Plenty"),
         ("Fair Stew", "Plenty"),
     ]
 
@@ -146,6 +147,50 @@ async def test_top_rated_is_the_best_five_and_left_off_with_none(people, client,
     mo = await people("mo2", role="moderator")
     bare = (await mo.post("/api/sources/manual", json={"title": "Unrated Book"})).json()["id"]
     assert (await client.get(f"/api/sources/{bare}")).json()["top_rated"] == []
+
+
+async def test_top_rated_waits_for_three_rated_recipes(people, client, adb) -> None:
+    """Ray's spec, 2026-11-13: "only when at least three recipes have
+    ratings". Rated at all, not rated well: the third here has two spoons."""
+    book, recipes = await _rated(
+        people, adb, {"Best Bread": [5, 5], "Good Soup": [4], "Poor Pie": [], "Plain Rice": []}
+    )
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    author = shown["credits"][0]["author_id"]
+    assert shown["top_rated"] == []
+    assert (await client.get(f"/api/authors/{author}")).json()["top_rated"] == []
+    # The recipes still say what they were given.
+    assert (await client.get(f"/api/recipes/{recipes['Best Bread']}/rating")).json()["spoons"] == 5
+    rater = await people("latecomer")
+    assert (
+        await rater.put(f"/api/recipes/{recipes['Poor Pie']}/rating", json={"spoons": 2})
+    ).status_code == 200
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    assert [r["title"] for r in shown["top_rated"]] == ["Best Bread", "Good Soup"]
+    theirs = (await client.get(f"/api/authors/{author}")).json()["top_rated"]
+    assert [r["title"] for r in theirs] == ["Best Bread", "Good Soup"]
+
+
+async def test_one_five_doesnt_top_a_list_others_have_rated_more(people, client, adb) -> None:
+    """Ray's spec, 2026-11-13: "a damped average so a single 5 does not top
+    the list". What's shown is still each recipe's plain average."""
+    book, _ = await _rated(
+        people,
+        adb,
+        {
+            "Lone Five": [5],  # weighed (5 + 6) / 3 = 3.67
+            "Steady": [5, 4, 5, 4],  # 4.5, weighed (18 + 6) / 6 = 4.0
+            "Nearly": [4, 5],  # 4.5, weighed (9 + 6) / 4 = 3.75
+            "Lone Four": [4],  # weighed (4 + 6) / 3 = 3.33
+        },
+    )
+    shown = (await client.get(f"/api/sources/{book}")).json()
+    assert [(r["title"], r["spoons"], r["ratings"]) for r in shown["top_rated"]] == [
+        ("Steady", 4.5, 4),
+        ("Nearly", 4.5, 2),
+        ("Lone Five", 5.0, 1),
+        ("Lone Four", 4.0, 1),
+    ]
 
 
 async def test_a_search_can_put_the_rated_first(people, client, adb) -> None:
