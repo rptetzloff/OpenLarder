@@ -19,6 +19,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -389,6 +390,47 @@ async def author_page(
     author_id: uuid.UUID, request: Request, session: Session, shell: Shell, settings: SettingsDep
 ) -> Response:
     return page_response(await pages.author(session, author_id), shell, settings, request)
+
+
+# The front page and the lists: their first page of items as links, for a
+# reader with no JavaScript (pages.py). The summary is a courtesy: when the
+# database can't be asked, the page is sent as it was before there was one,
+# for the browser to say what's wrong, not a 500 in place of the site.
+async def _listing(build, path: str, request: Request, session, shell, settings) -> Response:
+    try:
+        page = await build(session)
+    except (SQLAlchemyError, OSError):
+        logging.getLogger(__name__).warning("No summary for /%s", path, exc_info=True)
+        page = pages.without_record(path)
+    return page_response(page, shell, settings, request)
+
+
+@app.get("/", include_in_schema=False)
+async def front_page(
+    request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return await _listing(pages.front, "", request, session, shell, settings)
+
+
+@app.get("/sources", include_in_schema=False)
+async def sources_page(
+    request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return await _listing(pages.sources_list, "sources", request, session, shell, settings)
+
+
+@app.get("/ingredients", include_in_schema=False)
+async def ingredients_page(
+    request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return await _listing(pages.ingredients_list, "ingredients", request, session, shell, settings)
+
+
+@app.get("/authors", include_in_schema=False)
+async def authors_page(
+    request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return await _listing(pages.authors_list, "authors", request, session, shell, settings)
 
 
 # Where someone new chooses a name (routers/auth.py sends them). Anyone
