@@ -23,13 +23,18 @@ in it the API wouldn't give a stranger, and can't drift from it.
   review): 200, the plain page, noindex, nothing of the record.
 - A source, an ingredient or an author merged into another: 301 to the
   one kept, if anyone can see it.
+
+The front page and the three lists have a body too (*Ray's spec,
+2026-11-13*): the first page of each, as the page asks for it with nothing
+typed or chosen, as links. Whatever is typed or chosen in the address, the
+summary is that first page; the browser draws what was asked for.
 """
 
 import html
 import json
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 
 from sqlalchemy import exists, select
@@ -238,13 +243,10 @@ def _by(credits) -> str:
 
 
 def _summary(crumbs: list[str], *parts: str) -> str:
-    """The summary in the page's own frame, so it sits where the page will."""
-    trail = " / ".join(crumbs)
-    return (
-        '<main><article class="wide">'
-        f'<nav aria-label="Breadcrumb">{trail}</nav>{"".join(parts)}'
-        "</article></main>"
-    )
+    """The summary in the page's own frame, so it sits where the page will.
+    A list's page has no trail: it is the top of one."""
+    trail = f'<nav aria-label="Breadcrumb">{" / ".join(crumbs)}</nav>' if crumbs else ""
+    return f'<main><article class="wide">{trail}{"".join(parts)}</article></main>'
 
 
 def _edition(*facts: object, isbn: str | None) -> str:
@@ -713,6 +715,121 @@ LISTS = {
 }
 
 
+def _n(count: int, one: str) -> str:
+    """ "1 recipe", "1,234 recipes"."""
+    return f"{count:,} {one}{'' if count == 1 else 's'}"
+
+
+def _first_of(listed: int, total: int, what: str) -> str:
+    """Said under a list that isn't all of them."""
+    return f"<p>The first {listed:,} of {total:,} {what}.</p>" if total > listed else ""
+
+
+def _listed_source(s: sources.BookSummary) -> str:
+    """A source in a list: its title as a link, what it is and whose, and
+    how many recipes."""
+    by = _people(s.authors)
+    whose = f"{KINDS.get(s.kind, 'a source')} by {by}" if by else KINDS.get(s.kind, "a source")
+    return f"<li>{_a(f'/sources/{s.id}', s.title)}, {_e(whose)}, {_n(s.recipes, 'recipe')}</li>"
+
+
+def _list_page(key: str, heading: str, items: list[str], total: int, what: str) -> Page:
+    """A list's page with its first page of items, or with its head alone
+    when it has none to show."""
+    page = LISTS[key]
+    if not items:
+        return page
+    body = _summary(
+        [],
+        f"<h1>{_e(heading)}</h1>",
+        f"<p>{_e(page.description)}</p>",
+        f"<ul>{''.join(items)}</ul>",
+        _first_of(len(items), total, what),
+    )
+    return replace(page, body=body)
+
+
+# Every argument is given: called as functions, the routes' defaults are
+# FastAPI's markers, not values.
+async def sources_list(session: AsyncSession) -> Page:
+    """Sources, A to Z by title, as its page first shows them to someone
+    signed out."""
+    found = await sources.list_books(
+        session, None, q="", offset=0, limit=sources.PAGE, sort="title", kind=None, min_recipes=0
+    )
+    items = [_listed_source(s) for s in found.sources]
+    return _list_page("sources", "Sources", items, found.total, "sources")
+
+
+async def ingredients_list(session: AsyncSession) -> Page:
+    """Ingredients, the most used first, as its page first shows them."""
+    found = await ingredients.list_ingredients(
+        session, None, q="", offset=0, sort="uses", top=False, name=None
+    )
+    items = [
+        f"<li>{_a(f'/ingredients/{i.id}', i.name)}, {_n(i.recipes, 'recipe')}</li>"
+        for i in found.ingredients
+    ]
+    return _list_page("ingredients", "Ingredients", items, found.total, "ingredients")
+
+
+async def authors_list(session: AsyncSession) -> Page:
+    """Authors, A to Z as their names read, as its page first shows them."""
+    found = await authors.list_authors(session, None, q="", offset=0, sort="name", kind=None)
+    items = [
+        f"<li>{_a(f'/authors/{a.id}', a.name)}, {_n(a.sources, 'source')},"
+        f" {_n(a.recipes, 'recipe')}</li>"
+        for a in found.authors
+    ]
+    return _list_page("authors", "Authors", items, found.total, "authors")
+
+
+# The front page's own words (web/src/pages/HomePage.vue has the same;
+# tests/test_pages.py reads both).
+FRONT_HEADING = "Find the recipe on your shelf."
+FRONT_LEDE = (
+    "A free, open reference to where recipes live: which cookbook, magazine or website,"
+    " which page, and what goes in it."
+)
+# The newest sources the front page names: its row's worth.
+FRONT_ROW = 20
+# The site, and that it can be searched: a title's words go to /search as q.
+WEBSITE = {
+    "@type": "WebSite",
+    "@id": "/#website",
+    "name": SITE,
+    "url": "/",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": {"@type": "EntryPoint", "urlTemplate": "/search?q={search_term_string}"},
+        "query-input": "required name=search_term_string",
+    },
+}
+
+
+async def front(session: AsyncSession) -> Page:
+    """The front page: what the site is, the ways in, and the newest
+    sources with a recipe, as its row asks for them."""
+    found = await sources.list_books(
+        session, None, q="", offset=0, limit=FRONT_ROW, sort="recent", kind=None, min_recipes=1
+    )
+    ways = [
+        _a("/search", "Search recipes"),
+        _a("/sources", "Sources"),
+        _a("/ingredients", "Ingredients"),
+        _a("/authors", "Authors"),
+    ]
+    newest = "".join(_listed_source(s) for s in found.sources)
+    body = _summary(
+        [],
+        f"<h1>{_e(FRONT_HEADING)}</h1>",
+        f"<p>{_e(FRONT_LEDE)}</p>",
+        f"<ul>{''.join(f'<li>{way}</li>' for way in ways)}</ul>",
+        f"<h2>Recently added sources</h2><ul>{newest}</ul>" if newest else "",
+    )
+    return replace(LISTS[""], body=body, data=(WEBSITE,))
+
+
 def without_record(path: str) -> Page | None:
     """What a page with no record says, by its path: the front page and
     the lists their own head, the search page and the personal ones what
@@ -763,7 +880,7 @@ def _put(shell: str, pattern: str, tag: str) -> str:
 
 
 # The keys whose values are addresses, written as paths until fill.
-ADDRESSES = {"@id", "url", "item"}
+ADDRESSES = {"@id", "url", "item", "urlTemplate"}
 
 
 def _whole(value, site: str):

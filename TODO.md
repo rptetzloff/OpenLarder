@@ -369,7 +369,7 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - Not seen from here: how the fade looks on a slow phone. The
           states were checked by holding and failing the pictures in
           Chrome, not on a slow connection.
-      - [ ] 8. Small fixes:
+      - [x] 8. Small fixes:
         - [x] A description's ingredients add up to the recipe's lines
           (#181), the number its page gives beside "Ingredients". A line
           offering a choice was counted once for each thing it offered;
@@ -387,8 +387,34 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - Not changed, and Ray's to decide: a search sorted "Highest
             rated" still goes by the plain average, so one person's
             five is first there.
-        - [ ] A summary for the list pages without JavaScript, and the
-          site's search action on the front page.
+        - [x] A summary for the list pages without JavaScript, and the
+          site's search action on the front page (#182). `/sources`,
+          `/ingredients` and `/authors` send their first page of items
+          as links, as the page first shows them to someone signed out:
+          sources A to Z, ingredients the most used first, authors A to
+          Z, a hundred of each, and "The first 100 of N" under a longer
+          list. `/` sends what the site is, the ways in, and the newest
+          twenty sources with a recipe, with `WebSite` structured data
+          naming the title search.
+          - Whatever is typed or chosen in the address, the summary is
+            the list's first page; the browser draws what was asked for.
+          - Not cached, for the reason under "Pages crawlers and link
+            previews can read": a cache would keep naming a source for
+            its minutes after it was made private. So each of the four
+            pages now waits on its list. From here on 2026-11-13 the
+            lists' API answers began in 0.21 to 0.23 s (sources), 0.29
+            to 0.31 s (authors) and 0.32 to 0.37 s (ingredients),
+            against 0.10 to 0.16 s for `/healthz`: the pages begin about
+            0.1 to 0.2 s later than they did.
+          - If the database can't be asked, the page is sent without
+            its summary, as before this, not as a 500.
+          - Not checked: whether a search engine uses the summary.
+            Google stopped showing a search box under a site's result
+            on 2024-11-21 (its Search Central blog, 2024-10-21, read
+            2026-11-13), so the search action gets none from it; the
+            same post says the markup needn't be removed and that
+            `WebSite` is still read for the site's name. It is what the
+            spec asks for.
       - The two commission lines on a recipe's page stay as they are,
         each beside the links it covers (*Ray, 2026-11-13*).
       - Still to review, from the spec: the signed-in pages, and a

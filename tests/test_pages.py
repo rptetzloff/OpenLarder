@@ -3,12 +3,15 @@ recipe's and a source's get their own head, an id that names nothing is a
 404, and nothing of a record someone signed out can't see is ever written.
 *Ray's spec, 2026-11-11.*"""
 
+import html
 import json
 import re
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from conftest import SHELL
 from fake_broker import _settings, _sign_in, make_admins
@@ -17,6 +20,7 @@ from openlarder.main import spa_response
 from openlarder.routers import recipes
 
 E = uuid.uuid4()
+WEB = Path(__file__).parent.parent / "web"
 GENERIC = "<title>OpenLarder</title>"
 
 
@@ -486,6 +490,18 @@ async def test_what_only_a_private_recipe_names_is_never_written(
     assert "Open Bread" in shared
     assert not [s for s in SECRETS if s in shared]
     assert _content(shared, "description") == ["Butter is in 1 recipe indexed on OpenLarder."]
+    # Nor into the front page or a list, where what's public is: the book,
+    # and butter counted for the one recipe anyone can see.
+    for path, public in (
+        ("/", "Open Book</a>, a book, 1 recipe</li>"),
+        ("/sources", "Open Book</a>, a book, 1 recipe</li>"),
+        ("/ingredients", "Butter</a>, 1 recipe</li>"),
+        ("/authors", ""),
+    ):
+        response = await asking.get(path)
+        assert response.status_code == 200, path
+        assert public in _body(response.text), path
+        assert not [s for s in SECRETS if s in response.text], path
 
 
 # The lists
@@ -512,6 +528,171 @@ def test_the_front_page_and_the_lists_say_which_address_is_theirs(tmp_path) -> N
         assert _content(page, "robots") == []
     # A page with nothing to say is index.html as it is.
     assert pages.without_record("data") is None
+
+
+def _said(key: str) -> str:
+    """A list's sentence, as its summary has it under the heading."""
+    return f"<p>{html.escape(pages.LISTS[key].description)}</p>"
+
+
+async def test_the_lists_name_their_first_page_as_links(admin, adb, client) -> None:
+    """Ray's spec, 2026-11-13: "a short server-sent summary with links to
+    the first page of items", for a reader that runs no script."""
+    # Nothing indexed: the page as it was, its own head and no body.
+    for path in ("/sources", "/ingredients", "/authors"):
+        empty = (await client.get(path)).text
+        assert _body(empty) == "" and len(_content(empty, "og:url")) == 1, path
+    book = await _book(admin, authors=("Danielle Walker",))
+    await _recipe(admin, adb, book, ingredients=("Egg", "Almond Flour"))
+    await _recipe(admin, adb, book, title="Pancakes", page="12", ingredients=("Egg",))
+    bare = await _book(admin, title="Plenty", authors=())
+    author = (await client.get(f"/api/sources/{book}")).json()["credits"][0]["author_id"]
+    egg, flour = [
+        await adb.scalar(text("SELECT id FROM ingredients WHERE name = :n"), {"n": n})
+        for n in ("Egg", "Almond Flour")
+    ]
+    response = await client.get("/sources")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-cache"
+    page = response.text
+    assert _body(page) == (
+        f'<main><article class="wide"><h1>Sources</h1>{_said("sources")}<ul>'
+        f'<li><a href="/sources/{book}">Against All Grain</a>, a book by Danielle Walker,'
+        " 2 recipes</li>"
+        f'<li><a href="/sources/{bare}">Plenty</a>, a book, 0 recipes</li>'
+        "</ul></article></main>"
+    )
+    # The head it had before, once.
+    assert _tag(page, r"<title>(.*?)</title>") == ["Sources · OpenLarder"]
+    assert _tag(page, r'<link rel="canonical" href="([^"]*)" />') == [f"{SITE_URL}/sources"]
+    assert _content(page, "robots") == [] and "application/ld+json" not in page
+    # The most used first, as the Ingredients page opens.
+    page = (await client.get("/ingredients")).text
+    assert _body(page) == (
+        f'<main><article class="wide"><h1>Ingredients</h1>{_said("ingredients")}<ul>'
+        f'<li><a href="/ingredients/{egg}">Egg</a>, 2 recipes</li>'
+        f'<li><a href="/ingredients/{flour}">Almond Flour</a>, 1 recipe</li>'
+        "</ul></article></main>"
+    )
+    assert _tag(page, r"<title>(.*?)</title>") == ["Ingredients · OpenLarder"]
+    page = (await client.get("/authors")).text
+    assert _body(page) == (
+        f'<main><article class="wide"><h1>Authors</h1>{_said("authors")}<ul>'
+        f'<li><a href="/authors/{author}">Danielle Walker</a>, 1 source, 2 recipes</li>'
+        "</ul></article></main>"
+    )
+    assert _tag(page, r"<title>(.*?)</title>") == ["Authors · OpenLarder"]
+
+
+async def test_a_list_says_when_it_isnt_all_of_them(adb, client) -> None:
+    await adb.execute(
+        text(
+            "INSERT INTO sources (title) SELECT 'Book ' || lpad(n::text, 3, '0')"
+            " FROM generate_series(1, 101) n"
+        )
+    )
+    body = _body((await client.get("/sources")).text)
+    assert body.count("<li>") == 100
+    assert ">Book 100</a>" in body and ">Book 101</a>" not in body
+    assert body.endswith("</ul><p>The first 100 of 101 sources.</p></article></main>")
+
+
+async def test_whats_typed_in_the_address_doesnt_change_the_summary(admin, client) -> None:
+    """The summary is the list's first page, and the address a search
+    engine keeps is the one without its query; the browser draws what was
+    asked for."""
+    await _book(admin)
+    plain = (await client.get("/sources")).text
+    asked = (await client.get("/sources?q=nothing-is-called-this&kind=website&sort=recipes")).text
+    assert "Against All Grain" in _body(plain) and _body(asked) == _body(plain)
+    assert _content(asked, "og:url") == [f"{SITE_URL}/sources"]
+
+
+async def test_the_front_page_names_the_ways_in_and_the_newest_sources(admin, adb, client) -> None:
+    ways = (
+        '<ul><li><a href="/search">Search recipes</a></li>'
+        '<li><a href="/sources">Sources</a></li><li><a href="/ingredients">Ingredients</a></li>'
+        '<li><a href="/authors">Authors</a></li></ul>'
+    )
+    opening = (
+        f'<main><article class="wide"><h1>{pages.FRONT_HEADING}</h1><p>{pages.FRONT_LEDE}</p>{ways}'
+    )
+    # With nothing indexed, what the site is and the ways in.
+    assert _body((await client.get("/")).text) == f"{opening}</article></main>"
+    book = await _book(admin, authors=("Danielle Walker",))
+    await _recipe(admin, adb, book)
+    # A source with no recipe isn't in the page's row, so not here either.
+    await _book(admin, title="Plenty", authors=())
+    response = await client.get("/")
+    assert response.status_code == 200
+    page = response.text
+    assert _body(page) == (
+        f"{opening}<h2>Recently added sources</h2><ul>"
+        f'<li><a href="/sources/{book}">Against All Grain</a>, a book by Danielle Walker,'
+        " 1 recipe</li></ul></article></main>"
+    )
+    # The site's own title, and its address.
+    assert GENERIC in page
+    assert _tag(page, r'<link rel="canonical" href="([^"]*)" />') == [f"{SITE_URL}/"]
+    # The site, and how it's searched: a title's words, as the page sends them.
+    assert _data(page) == [
+        {
+            "@type": "WebSite",
+            "@id": f"{SITE_URL}/#website",
+            "name": "OpenLarder",
+            "url": f"{SITE_URL}/",
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": {
+                    "@type": "EntryPoint",
+                    "urlTemplate": f"{SITE_URL}/search?q={{search_term_string}}",
+                },
+                "query-input": "required name=search_term_string",
+            },
+        }
+    ]
+
+
+def test_the_front_pages_words_are_the_ones_the_page_shows() -> None:
+    """Said twice, by the server and by the page that replaces it: this
+    fails when one is reworded without the other."""
+    home = (WEB / "src" / "pages" / "HomePage.vue").read_text(encoding="utf-8")
+    shown = " ".join(home.split())
+    assert f"<h1>{pages.FRONT_HEADING}</h1>" in shown
+    assert f'<p class="lede"> {pages.FRONT_LEDE} </p>' in shown
+    # And the search the structured data names is the one the page sends to.
+    assert "location.href = `/search?${new URLSearchParams({ q: words })}`" in home
+
+
+async def test_a_lists_summary_is_escaped(admin, adb, client) -> None:
+    book = await _book(admin, title="<script>alert(1)</script> & Co", authors=("<b>Bold</b>",))
+    await _recipe(admin, adb, book, ingredients=("<i>Salt</i>",))
+    for path in ("/", "/sources", "/ingredients", "/authors"):
+        page = (await client.get(path)).text
+        assert _body(page), path
+        for raw in ("<script>alert(1)", "<b>Bold", "<i>Salt"):
+            assert raw not in page, (path, raw)
+
+
+async def test_a_list_is_still_a_page_when_the_database_cant_be_asked(client, monkeypatch) -> None:
+    """The summary is a courtesy: without it the page is what it was, for
+    the browser to say what's wrong, not a 500."""
+
+    async def down(session):
+        raise OperationalError("SELECT 1", {}, Exception("the database is away"))
+
+    for name, path, title in (
+        ("front", "/", "OpenLarder"),
+        ("sources_list", "/sources", "Sources · OpenLarder"),
+        ("ingredients_list", "/ingredients", "Ingredients · OpenLarder"),
+        ("authors_list", "/authors", "Authors · OpenLarder"),
+    ):
+        monkeypatch.setattr(pages, name, down)
+        response = await client.get(path)
+        assert response.status_code == 200, path
+        assert _body(response.text) == "" and '<div id="app"></div>' in response.text
+        assert _tag(response.text, r"<title>(.*?)</title>") == [title]
+        assert _content(response.text, "og:url") == [f"{SITE_URL}{path}"]
 
 
 # Structured data
@@ -734,6 +915,9 @@ async def test_a_record_waiting_for_review_is_never_written_either(admin, adb, c
         assert response.status_code == 200
         assert "Waiting Book" not in response.text and "Shown Pie" not in response.text
         assert _content(response.text, "robots") == ["noindex"]
+    for path in ("/", "/sources", "/ingredients", "/authors"):
+        page = (await client.get(path)).text
+        assert "Waiting Book" not in page and "Danielle Walker" not in page, path
 
 
 async def _merged(adb, gone, kept, undone=False):
