@@ -388,12 +388,30 @@ const takeOff = (o: OtherList) =>
     flex-direction: column;
     align-items: stretch;
   }
+  /* Under a finger the five spoons are 220px, and in one row with their
+     label and Clear they were 367px: more than the bar has on a phone
+     narrower than 408px, so the whole page was 24px too wide at 384px and
+     48px at 360px (measured 2026-11-14; Ray's round 4 list, A1). The label
+     goes on a line of its own, which leaves 275px, and Clear goes under the
+     spoons where even that is too much (320px). */
   .yours {
+    flex-wrap: wrap;
+    gap: 0 0.5rem;
     padding-left: 0;
     border-left: 0;
   }
-  .saves > * {
+  .yours-label {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  /* Side by side while both labels fit, each as wide as the other where
+     there's room; one to a row when they don't. */
+  .saves {
+    flex-wrap: wrap;
+  }
+  .saves > .pill-toggle {
     flex: 1 1 0;
+    padding: 0 0.75rem;
   }
 }
 </style>

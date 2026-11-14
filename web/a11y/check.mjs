@@ -1,6 +1,7 @@
 // Accessibility check: every kind of page, as the built app serves it, run
 // through axe-core's WCAG 2.1 A and AA rules (contrast among them) in the
-// light and dark themes, and checked for sideways scrolling at phone width.
+// light and dark themes, and checked for sideways scrolling on a phone: 360px
+// wide, a touch screen, with a word of sixty letters in what people typed.
 // Ray, 2026-11-08: "make sure we're passing accessibility checks, contrast,
 // etc. along the way".
 //
@@ -9,6 +10,9 @@
 // OPENLARDER_ARCHIVE_WEB_PAGES=false so web recipes ask the Internet Archive
 // for nothing. It answers for cover pictures itself, so Open Library is asked
 // for none either:
+//
+// A page also fails for breaking an ordinary word in two, which is what
+// something squeezed does now that any word may break (BROKEN_WORDS).
 //
 //   psql "$DATABASE" -f a11y/users.sql
 //   node a11y/check.mjs                 # A11Y_BASE, CHROME to override
@@ -37,6 +41,48 @@ const TOKENS = {
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The phone the layout is checked on (Ray's round 4 list, A4, 2026-11-14):
+// 360px, the narrowest of the three widths the overflow was measured at, and
+// a touch screen, because the rating's spoons are 44px wide only for a finger
+// (pointer: coarse). At 390px with a mouse, as this was until then, a recipe's
+// page passed while it was 24px too wide on a 384px phone.
+const PHONE = 360;
+// One word of sixty letters, which nothing but the page can break: what
+// anyone may type as a title, a name or a note. (The dish in Aristophanes'
+// Assemblywomen, cut short.) users.sql gives Cy a name of the same kind.
+const LONG = "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilph";
+// The words a page has broken in two. The long word breaks where it must
+// because every word may (App.vue: overflow-wrap), and the cost of that is
+// that something squeezed no longer runs over, where the layout check would
+// see it; it breaks its words instead, "Inherited" into three lines of three
+// letters. So an ordinary word, of up to twenty-five letters, in two pieces
+// is a problem. Not on a drawn cover, whose title is fitted to it.
+const BROKEN_WORDS = `(() => {
+  const name = (e) => e.tagName.toLowerCase() + (typeof e.className === "string" && e.className ? "." + e.className.trim().split(/\\s+/).join(".") : "");
+  const broken = new Set();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let n; (n = walker.nextNode()); ) {
+    const el = n.parentElement;
+    if (!el || el.closest(".cover-blank, .visually-hidden, script, style")) continue;
+    if (getComputedStyle(el).visibility === "hidden") continue;
+    const runs = /\\S+/g;
+    for (let run; (run = runs.exec(n.data)); ) {
+      if (run[0].length > 25) continue;
+      // A run may break at a hyphen or a slash; each word between them may not.
+      const words = /[\\p{L}\\p{N}][\\p{L}\\p{N}'’.,:]*/gu;
+      for (let word; (word = words.exec(run[0])); ) {
+        if (word[0].length < 2) continue;
+        range.setStart(n, run.index + word.index);
+        range.setEnd(n, run.index + word.index + word[0].length);
+        const lines = [...range.getClientRects()].filter((r) => r.width > 0);
+        if (lines.length > 1 && Math.abs(lines[0].top - lines[lines.length - 1].top) > 2)
+          broken.add('"' + word[0] + '" (' + name(el) + " in " + name(el.parentElement) + ")");
+      }
+    }
+  }
+  return [...broken].slice(0, 5);
+})()`;
 // A cover's picture, two pixels by three, for the one book users.sql gives a
 // cover that arrives.
 const COVER =
@@ -245,8 +291,57 @@ async function seed() {
     // Three rated, as Top rated needs: five, four and three spoons.
     if (n <= 3) await api(`/api/recipes/${bake.id}/rating`, "cook", { spoons: 6 - n }, "PUT");
   }
-  return { long, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
+
+  // The long word, wherever a person can type one: a book's title and its
+  // author, a recipe's title (twice in the book, so both are flagged as
+  // having the same title), an ingredient, and what's said about them.
+  const wordy = await api("/api/sources/manual", "admin", {
+    title: LONG,
+    authors: [LONG],
+    year: 2022,
+    isbn: "9780393541137",
+  });
+  const wordyPage = await api(`/api/sources/${wordy.id}`, "admin");
+  const wordyEdition = wordyPage.editions[0].id;
+  const wordyRecipe = (page) =>
+    api(`/api/sources/${wordy.id}/recipes`, "admin", {
+      title: LONG,
+      editions: [{ edition_id: wordyEdition, page }],
+      ingredients: ["Aged cheddar", LONG],
+    });
+  const word = await wordyRecipe("1");
+  await wordyRecipe("2");
+  const address = `https://example.com/${LONG}/${LONG}?${LONG}=${LONG}`;
+  await api("/api/reports", "cook", { kind: "recipe", id: word.id, reason: "wrong", note: `${LONG} ${address}` });
+  await api(`/api/recipes/${word.id}/notes`, "cook", { body: `${LONG}\n${address}`, groups: [group.id] }, "PUT");
+  await api(`/api/saved/${word.id}`, "cook", { state: "want" }, "PUT");
+  await api(`/api/shelf/${wordy.id}`, "cook", { edition_id: wordyEdition }, "PUT");
+  await api(`/api/recipes/${word.id}/rating`, "cook", { spoons: 5 }, "PUT");
+  await api("/api/requests", "cook", { title: LONG, author: LONG, note: `${LONG} ${address}` });
+  await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: LONG });
+  // A click on its buy link, as a browser sends one (a click with no
+  // browser's name is taken for a bot's and not counted), so Buy-link clicks
+  // has the title to show. The shop it leads to is never asked for anything.
+  const click = await fetch(`${BASE}/go/bookshop/${wordyEdition}?from=/sources/${wordy.id}`, {
+    redirect: "manual",
+    headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },
+  });
+  if (click.status < 300 || click.status >= 400) throw new Error(`The buy link answered ${click.status}`);
+  const wordyAuthor = wordyPage.credits[0].author_id;
+  // The ingredient users.sql suggests links for, and has foods like.
+  const oats = (await api("/api/ingredients?q=Quick-Cooking Oats", "admin")).ingredients.find(
+    (i) => i.name === "Quick-Cooking Oats",
+  ).id;
+  const wordyIngredient = (await api(`/api/recipes/${word.id}`, "admin")).lines
+    .flatMap((l) => l.options)
+    .find((o) => o.ingredient?.name.toLowerCase() === LONG.toLowerCase()).ingredient.id;
+  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
 }
+
+// Script that presses the button whose words begin so; with none, it throws,
+// and the check stops, so a renamed button can't pass by showing nothing.
+const press = (words) =>
+  `[...document.querySelectorAll("main button")].find((b) => b.textContent.trim().startsWith(${JSON.stringify(words)})).click()`;
 
 function pages(s) {
   // [path, who, how]: who is signed in, or nobody. how.phone: axe at the
@@ -345,6 +440,30 @@ function pages(s) {
       "cook",
       { phone: true, then: `document.querySelector(".show-all button").click()` },
     ],
+    // Ingredient links' other tables, and the two forms a moderator opens on
+    // an ingredient's page: on a phone each is laid out for one.
+    ["/admin/links", "admin", { phone: true, then: press("Unsure foods") }],
+    ["/admin/links", "admin", { phone: true, then: press("Other names") }],
+    [`/ingredients/${s.oats}`, "admin", { phone: true, then: press("+ Record") }],
+    [`/ingredients/${s.oats}`, "admin", { phone: true, then: press("+ Link") }],
+    // The long word's own pages. Its other places are on pages above: both
+    // lists of flags, the reports, the clicks, the requests, Cy's larder,
+    // shelf and saved recipes, the lists of sources, ingredients and authors.
+    [`/sources/${s.wordy.id}`, null],
+    [`/sources/${s.wordy.id}`, "admin"],
+    [`/sources/${s.wordy.id}`, "cook"],
+    [`/sources/${s.wordy.id}/edit`, "admin"],
+    [`/sources/${s.wordy.id}/bulk`, "admin"],
+    [`/recipes/${s.word.id}`, null],
+    [`/recipes/${s.word.id}`, "admin"],
+    [`/recipes/${s.word.id}`, "cook"],
+    [`/recipes/${s.word.id}/edit`, "admin"],
+    [`/authors/${s.wordyAuthor}`, null],
+    [`/authors/${s.wordyAuthor}`, "admin"],
+    [`/ingredients/${s.wordyIngredient}`, null],
+    [`/ingredients/${s.wordyIngredient}`, "admin"],
+    [`/search?q=${LONG}`, null],
+    [`/search?i=${s.wordyIngredient}`, "cook"],
   ];
 }
 
@@ -429,24 +548,36 @@ const overflowOf = (b, width) => b.evaluate(`document.documentElement.scrollWidt
 // The control: a page with problems planted in it must fail, or a clean run
 // means nothing (the checker isn't running, or isn't looking).
 async function control(b) {
-  await b.send("Emulation.setDeviceMetricsOverride", {
-    width: 390,
-    height: 900,
-    deviceScaleFactor: 1,
-    mobile: true,
-  });
+  await phone(b, PHONE);
   await b.send("Page.navigate", { url: `${BASE}/privacy` });
   await sleep(2000);
+  // Too wide by 20px, which is less than a recipe's page was over by. (As
+  // wide as the screen exactly isn't too wide at all: main has no padding
+  // of its own, and the control said so.)
   await b.evaluate(
-    `document.querySelector("main").insertAdjacentHTML("beforeend", '<p style="color:#ccc;background:#fff">faint</p><img src="/x.png"><div style="width:500px">wide</div>')`,
+    `document.querySelector("main").insertAdjacentHTML("beforeend", '<p style="color:#ccc;background:#fff">faint</p><img src="/x.png"><div style="width:${PHONE + 20}px">wide</div><p style="width:2rem">Breakfast</p>')`,
   );
   const found = (await runAxe(b)).violations.map((v) => v.id);
-  const wide = await overflowOf(b, 390);
+  const wide = await overflowOf(b, PHONE);
   const missed = ["color-contrast", "image-alt"].filter((id) => !found.includes(id));
-  if (missed.length || wide <= 0)
-    throw new Error(
-      `The control wasn't caught (missed ${missed.join(", ") || "overflow"}); the check proves nothing.`,
-    );
+  if (wide <= 0) missed.push("overflow");
+  if (!(await b.evaluate(BROKEN_WORDS)).some((w) => w.startsWith('"Breakfast"'))) missed.push("a broken word");
+  if (missed.length)
+    throw new Error(`The control wasn't caught (missed ${missed.join(", ")}); the check proves nothing.`);
+  // What's only too wide under a finger is missed if the phone has a mouse.
+  if (!(await b.evaluate(`matchMedia("(pointer: coarse)").matches`)))
+    throw new Error("The phone isn't a touch screen; what's sized for a finger isn't being checked.");
+}
+
+// The screen a page is looked at on: under 600px it's a phone, with a finger.
+async function phone(b, width) {
+  await b.send("Emulation.setDeviceMetricsOverride", {
+    width,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: width < 600,
+  });
+  await b.send("Emulation.setTouchEmulationEnabled", { enabled: width < 600, maxTouchPoints: 5 });
 }
 
 const undecided = new Map();
@@ -455,12 +586,7 @@ async function check(b, path, who, theme, width, how = {}) {
   await b.send("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-color-scheme", value: theme }],
   });
-  await b.send("Emulation.setDeviceMetricsOverride", {
-    width,
-    height: 900,
-    deviceScaleFactor: 1,
-    mobile: width < 600,
-  });
+  await phone(b, width);
   await b.send("Network.clearBrowserCookies");
   if (who)
     await b.send("Network.setCookie", {
@@ -493,6 +619,7 @@ async function check(b, path, who, theme, width, how = {}) {
   }
   const overflow = await overflowOf(b, width);
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px at ${width}px wide`);
+  for (const word of await b.evaluate(BROKEN_WORDS)) problems.push(`breaks ${word} in two`);
   // axe once per theme and page, at desktop width; the phone pass is for
   // layout, unless the page shows a phone something of its own.
   if (width >= 600 || how.phone) {
@@ -514,7 +641,7 @@ try {
   await control(b);
   for (const theme of ["light", "dark"]) {
     for (const [path, who, how] of pages(s)) {
-      for (const width of [1280, 390]) {
+      for (const width of [1280, PHONE]) {
         const problems = await check(b, path, who, theme, width, how);
         checked++;
         if (problems.length) {
@@ -537,6 +664,6 @@ if (undecided.size) {
   for (const where of undecided.keys()) console.log(`    ${where}`);
 }
 console.log(
-  `${checked} page views checked (axe at 1280px, and at 390px where a phone has its own; layout at 390px), ${failed} with problems.`,
+  `${checked} page views checked (axe at 1280px, and at ${PHONE}px where a phone has its own; layout at ${PHONE}px, as a touch screen), ${failed} with problems.`,
 );
 process.exit(failed ? 1 : 0);

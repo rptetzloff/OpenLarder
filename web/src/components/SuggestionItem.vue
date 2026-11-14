@@ -178,6 +178,5 @@ async function act(action: "accept" | "dismiss") {
 .title-change dd {
   margin: 0;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 </style>

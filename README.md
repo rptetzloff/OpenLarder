@@ -179,7 +179,8 @@ CI (`.github/workflows/ci.yml`) runs the same checks plus a build of the image,
 and the accessibility check below.
 
 The accessibility check (`web/a11y/check.mjs`) runs every kind of page through
-axe-core's WCAG 2.1 AA rules in light and dark, and checks phone width. It adds
+axe-core's WCAG 2.1 AA rules in light and dark, and checks that none scrolls
+sideways on a 360px touch screen or breaks an ordinary word in two. It adds
 a sample catalog through the API, so give it a throwaway database and an app
 with archiving off:
 

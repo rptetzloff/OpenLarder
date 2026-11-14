@@ -120,7 +120,7 @@ function inheritedWords(key: string): string {
                 <option value="free">Doesn't contain</option>
               </select>
             </td>
-            <td class="muted">{{ inheritedWords(a.key) }}</td>
+            <td class="muted"><span class="cell-label">Inherited: </span>{{ inheritedWords(a.key) }}</td>
           </tr>
         </tbody>
       </table>
@@ -172,5 +172,36 @@ function inheritedWords(key: string): string {
 .actions {
   display: flex;
   gap: 0.75rem;
+}
+/* A phone has no room for three columns: at 360px "Inherited" was three
+   lines of three letters. Each allergen is a row of its own: its name, then
+   its choice with what's inherited beside it, or under it. */
+@media (max-width: 40rem) {
+  .allergen-table,
+  .allergen-table tbody {
+    display: block;
+  }
+  .allergen-table thead {
+    display: none;
+  }
+  .allergen-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .allergen-table th,
+  .allergen-table td {
+    padding: 0;
+  }
+  .allergen-table tbody th {
+    flex-basis: 100%;
+    font-weight: 600;
+  }
+  .allergen-table select {
+    min-height: 2.75rem;
+  }
 }
 </style>

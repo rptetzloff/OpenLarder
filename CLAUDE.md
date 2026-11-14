@@ -184,8 +184,15 @@ Every page passes an accessibility check before it merges. *Ray, 2026-11-08:
 way".* `web/a11y/check.mjs` adds one of every kind of page through the API,
 then runs axe-core's WCAG 2.1 A and AA rules (contrast among them) on each, in
 light and dark, signed out and signed in, and fails on any page that scrolls
-sideways at 390px. A page that shows a phone something of its own (a book's
-page moves its parts and shortens its list) goes through axe at 390px too, and
+sideways on a phone: 360px wide, a touch screen, with a word of sixty letters
+in the titles, names and notes people typed (*Ray's round 4 list,
+2026-11-14*; at 390px with a mouse it had passed a recipe's page that was 24px
+too wide on a 384px phone, where the rating's spoons are sized for a finger).
+It fails as well on a page that breaks an ordinary word in two: any word may
+break now, so that the long one can, and what is squeezed no longer runs over
+where the layout check would see it. A page that shows a phone something of
+its own (a book's page moves its parts and shortens its list) goes through axe
+at the phone's width too, and
 an entry can click first, for a state only a click makes, or say what its page
 should be showing (a cover's picture once it arrives, its title when the
 picture fails). It starts with a
