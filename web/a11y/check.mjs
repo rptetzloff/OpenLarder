@@ -152,6 +152,33 @@ const PRODUCER_ON_INGREDIENT = `(() => {
   return cards === 2 ? "" : "The ingredient's page shows " + cards + " producers, not the two that supply it";
 })()`;
 const PRODUCERS_SAID = `document.querySelector('main a[href="/producers"]') ? "" : "The page doesn't speak of producers"`;
+// The ingredient hierarchy's words (Ray, 2026-11-15, for "Comes under"):
+// cheddar counts as cheese, and cheese includes cheddar. A card with nothing
+// to say isn't there, and nothing says "Nothing broader yet". The check
+// puts Aged cheddar under another ingredient, so one page has each card.
+const HIERARCHY = (has, hasnt) => `(() => {
+  const main = document.querySelector("main");
+  const old = /comes under|nothing broader|nothing narrower|what's under/i.exec(main.textContent);
+  if (old) return 'The page still says "' + old[0] + '"';
+  const cards = [...document.querySelectorAll(".ingredient-cards > div")];
+  const card = (words) => cards.find((c) => c.querySelector("h2")?.textContent.trim() === words);
+  for (const words of ${JSON.stringify(has)}) {
+    if (!card(words)) return 'The page has no "' + words + '" card';
+    if (!card(words).querySelector('a[href^="/ingredients/"]')) return 'The "' + words + '" card links no ingredient';
+  }
+  for (const words of ${JSON.stringify(hasnt)})
+    if (card(words)) return 'The page has a "' + words + '" card with nothing to say';
+  return "";
+})()`;
+// How many the list of ingredients found, as a sentence: it read "10
+// ingredientsmatch" until this looked, the space lost with a template.
+const COUNT_SAID = (words) => `(() => {
+  const said = document.querySelector(".results-count")?.textContent.replace(/\\s+/g, " ").trim();
+  return ${words}.test(said ?? "") ? "" : 'The count reads "' + said + '"';
+})()`;
+const COUNTS_AS = HIERARCHY(["Counts as"], ["Includes"]);
+const INCLUDES = HIERARCHY(["Includes"], ["Counts as"]);
+const NEITHER = HIERARCHY([], ["Counts as", "Includes"]);
 // The admin bar: its links in the bar on a wide screen; on a phone one row,
 // with the page's name on a button, and the links only once it's pressed.
 const ADMIN_BAR = `(() => {
@@ -468,7 +495,7 @@ async function seed() {
   const wordyIngredient = (await api(`/api/recipes/${word.id}`, "admin")).lines
     .flatMap((l) => l.options)
     .find((o) => o.ingredient?.name.toLowerCase() === LONG.toLowerCase()).ingredient.id;
-  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar };
+  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese };
 }
 
 // Script that presses the button whose words begin so; with none, it throws,
@@ -513,9 +540,11 @@ function pages(s) {
     [`/recipes/${s.pie.id}`, "cook"],
     [`/recipes/${s.biscuits.id}/edit`, "admin"],
     ["/ingredients", null],
-    ["/ingredients?top=true&sort=name", null],
-    [`/ingredients/${s.cheddar}`, null],
-    [`/ingredients/${s.cheddar}`, "admin"],
+    ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
+    ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
+    [`/ingredients/${s.cheddar}`, null, { expect: COUNTS_AS }],
+    [`/ingredients/${s.cheddar}`, "admin", { expect: COUNTS_AS }],
+    [`/ingredients/${s.cheese}`, null, { expect: INCLUDES }],
     ["/authors", null],
     ["/authors?sort=recipes&kind=person", null],
     [`/authors/${s.author}`, null, { expect: TOP_RATED_SHOWN }],
@@ -669,7 +698,7 @@ function pages(s) {
     [`/recipes/${s.word.id}/edit`, "admin"],
     [`/authors/${s.wordyAuthor}`, null],
     [`/authors/${s.wordyAuthor}`, "admin"],
-    [`/ingredients/${s.wordyIngredient}`, null],
+    [`/ingredients/${s.wordyIngredient}`, null, { expect: NEITHER }],
     [`/ingredients/${s.wordyIngredient}`, "admin"],
     [`/search?q=${LONG}`, null],
     [`/search?i=${s.wordyIngredient}`, "cook"],

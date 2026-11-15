@@ -350,10 +350,11 @@ async def set_parent(
     if parent is not None:
         below = set(await session.scalars(family(ingredient.id)))
         if parent.id == ingredient.id:
-            raise ValueError("An ingredient can't go under itself.")
+            raise ValueError("An ingredient can't count as itself.")
         if parent.id in below:
             raise ValueError(
-                f"“{parent.name}” comes under “{ingredient.name}”, so it can't go above it."
+                f"“{parent.name}” already counts as “{ingredient.name}”, "
+                "so it can't be the other way round too."
             )
     ingredient.parent_id = parent.id if parent else None
     await session.flush()

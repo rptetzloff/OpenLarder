@@ -63,11 +63,11 @@ async function act(action: "accept" | "dismiss") {
       </p>
     </template>
     <template v-else-if="s.kind === 'parent' && child && parent">
-      <h2>One under another?</h2>
+      <h2>Does one count as the other?</h2>
       <p>
         <a v-if="child.exists" :href="`/ingredients/${child.id}`">{{ child.name }}</a>
         <span v-else>{{ child.name }} (gone)</span>
-        goes under
+        counts as
         <a v-if="parent.exists" :href="`/ingredients/${parent.id}`">{{ parent.name }}</a>
         <span v-else>{{ parent.name }} (gone)</span>
       </p>

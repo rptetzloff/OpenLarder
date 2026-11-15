@@ -59,7 +59,7 @@ async function save() {
 function inheritedWords(key: string): string {
   const a = inherited.value[key];
   if (!a) return "None";
-  const from = a.inherited_from ? ` from ${a.inherited_from.name}` : " from a broader ingredient";
+  const from = a.inherited_from ? ` from ${a.inherited_from.name}` : " from an ingredient it counts as";
   return `${STATUS_WORDS[a.status]}${from}`;
 }
 </script>
@@ -94,7 +94,7 @@ function inheritedWords(key: string): string {
             <a v-if="a.inherited_from" :href="`/ingredients/${a.inherited_from.id}`">{{
               a.inherited_from.name
             }}</a>
-            <template v-else>a broader ingredient</template>
+            <template v-else>an ingredient it counts as</template>
             records</span
           >
         </li>
@@ -104,8 +104,8 @@ function inheritedWords(key: string): string {
 
     <form v-else class="allergens-form" @submit.prevent="save">
       <p class="muted">
-        What {{ ingredient.name.toLowerCase() }} records itself. Narrower ingredients inherit it;
-        “Doesn't contain” overrides what a broader one records.
+        What {{ ingredient.name.toLowerCase() }} records itself. Ingredients that count as it
+        inherit it; “Doesn't contain” overrides what an ingredient it counts as records.
       </p>
       <table class="allergen-table">
         <thead>

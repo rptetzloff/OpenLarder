@@ -71,7 +71,7 @@ export interface SuggestionPage {
 
 export const KIND_LABELS: Record<string, string> = {
   merge: "Same ingredient",
-  parent: "One under another",
+  parent: "One counts as another",
   tag: "Tag a recipe",
   allergen: "Allergen",
   title_case: "Title capitals",

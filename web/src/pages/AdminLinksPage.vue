@@ -102,7 +102,7 @@ async function suggest() {
     note.value =
       `Suggested ${out.fdc.toLocaleString()} foods, ${out.wikidata.toLocaleString()} Wikidata items` +
       ` and ${out.names.toLocaleString()} other names; and in Suggestions,` +
-      ` ${out.merges.toLocaleString()} merges and ${out.parents.toLocaleString()} broader ingredients.`;
+      ` ${out.merges.toLocaleString()} merges and ${out.parents.toLocaleString()} “counts as” links.`;
     await load();
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);

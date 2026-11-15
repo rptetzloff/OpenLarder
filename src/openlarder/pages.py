@@ -363,8 +363,8 @@ def _fitted(first: str, lead: str, names: list[str]) -> str:
 
 
 def ingredient_description(shown: ingredients.IngredientOut) -> str:
-    """As "Cheddar is in 120 recipes indexed on OpenLarder, 480 counting what
-    comes under it. Also called mature cheddar."
+    """As "Cheddar is in 120 recipes indexed on OpenLarder, 480 including
+    everything that counts as it. Also called mature cheddar."
     """
     if shown.family_total == 0:
         first = f"No recipe indexed on OpenLarder uses {shown.name} yet."
@@ -376,11 +376,12 @@ def ingredient_description(shown: ingredients.IngredientOut) -> str:
             first = (
                 f"{shown.name} is in {shown.family_total:,} "
                 f"recipe{'' if shown.family_total == 1 else 's'} indexed on OpenLarder, "
-                "counting what comes under it."
+                "including everything that counts as it."
             )
         elif under > 0:
             first = (
-                f"{shown.name} is in {used}, {shown.family_total:,} counting what comes under it."
+                f"{shown.name} is in {used}, {shown.family_total:,} including everything "
+                "that counts as it."
             )
         else:
             first = f"{shown.name} is in {used}."
@@ -403,7 +404,7 @@ def _used(r: ingredients.UsedBy) -> str:
 def ingredient_summary(shown: ingredients.IngredientOut) -> str:
     about = ""
     if shown.parent:
-        about += f"<p>Comes under {_a(f'/ingredients/{shown.parent.id}', shown.parent.name)}.</p>"
+        about += f"<p>Counts as {_a(f'/ingredients/{shown.parent.id}', shown.parent.name)}.</p>"
     if shown.aliases:
         about += f"<p>Also called {_e(', '.join(a.name for a in shown.aliases))}.</p>"
     if shown.children:

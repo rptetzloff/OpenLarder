@@ -391,17 +391,17 @@ async def test_an_ingredients_page_has_its_own_head_and_summary(admin, adb, clie
         '<main><article class="wide">'
         '<nav aria-label="Breadcrumb"><a href="/ingredients">Ingredients</a> / Aged Cheddar</nav>'
         "<h1>Aged Cheddar</h1>"
-        f'<p>Comes under <a href="/ingredients/{named["Cheese"]}">Cheese</a>.</p>'
+        f'<p>Counts as <a href="/ingredients/{named["Cheese"]}">Cheese</a>.</p>'
         "<p>Also called Mature Cheddar.</p>"
         "<h2>Recipes using Aged Cheddar</h2><ul>"
         f'<li><a href="/recipes/{bread}">Banana Bread</a>, '
         f'<a href="/sources/{book}">Against All Grain</a>, page 190</li>'
         "</ul></article></main>"
     )
-    # The broader one: what's under it counted, and named.
+    # The one it counts as: what counts as it counted too, and named.
     page = (await client.get(f"/ingredients/{named['Cheese']}")).text
     assert _content(page, "description") == [
-        "Cheese is in 1 recipe indexed on OpenLarder, 2 counting what comes under it."
+        "Cheese is in 1 recipe indexed on OpenLarder, 2 including everything that counts as it."
     ]
     body = _body(page)
     assert (

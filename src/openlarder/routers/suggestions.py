@@ -562,7 +562,7 @@ async def accept(
             await ingredients.set_parent(session, child, parent)
         else:
             raise HTTPException(
-                status.HTTP_409_CONFLICT, "This suggestion doesn't say which goes under which."
+                status.HTTP_409_CONFLICT, "This suggestion doesn't say which counts as which."
             )
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None

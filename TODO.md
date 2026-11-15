@@ -821,6 +821,74 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           producer's card is about 230px and two about 540px with their
           heading (measured): the list starts that much lower. Ray's spec
           puts them there; after the list is the other place for them.
+- [ ] **Round 5.** *Ray's spec and wireframes, 2026-11-15, from a review
+      of `dev` at be914e9 (the build with "Want this book"): a local copy
+      with test data, signed in as an owner and signed out, at 360, 384,
+      412 and 1280px, then every 20px from 640 to 1100px; in private/ (not
+      committed).* A PR for each item, in this order.
+      - [x] 1. The ingredient hierarchy in plain words (#196). *Ray,
+        2026-11-15: "Counts as".* Cheddar counts as cheese, and cheese
+        includes cheddar, where the site had said it as a place: comes
+        under, under it, broader, narrower, top level. "Counts as" holds
+        for kinds, parts and cuts, which "a kind of" doesn't. An
+        ingredient that counts as nothing is a main ingredient ("Main
+        ingredients only" on the list). Changed wherever a person reads
+        it: an ingredient's page and its moderator's form, the list,
+        Search's hint, the front page, allergens, suggestions, a
+        producer's form, Ingredient links, the pages crawlers and link
+        previews read, the data dictionary (which now says the column is
+        `parent_id`), and the two refusals. On an ingredient's page a
+        "Counts as" or "Includes" card with nothing to say isn't there.
+        Only words: no column, API field, parameter or address changed,
+        and comments and docstrings keep the old words until the code
+        around them is touched. `tests/test_counts_as.py` fails if the old
+        words come back where a person reads them.
+        - Beyond the list's table, the same words in four places it
+          didn't name (Claude's choice, 2026-11-15): the admin bar's "Put
+          under…" is "Count it as…"; the moderator's form says "Counts as
+          “Ginger”" where it said "Under “Ginger”"; a suggestion reads
+          "A counts as B" and its refusal "which counts as which"; and an
+          ingredient's history says "counts as: nothing → “Cheese”" where
+          it said "parent".
+        - Found by looking at the list, and fixed: its count read "10
+          ingredientsmatch “cheddar”", the space lost with a template
+          that held the last part. It was on openlarder.com. The
+          accessibility check reads the sentence now.
+        - The list's own check (a grep that should print nothing) prints
+          seven lines, all in docstrings, which the list also says to
+          leave: allergen_rules.py, models/allergens.py (two),
+          models/shops.py, routers/suggestions.py and wikidata_names.py
+          (two). The test reads Python's strings apart from its
+          docstrings, so it holds the rule the grep was after.
+      - [ ] 2. Between a phone and a desktop, 640 to 1100px: an
+        ingredient's recipe table squeezes its Source column; Flagged
+        recipes, My flagged recipes and Buy-link clicks are wider than
+        the screen; the signed-in header can't wrap (measured 2026-11-14,
+        below). And the overflow check at 700, 820 and 1024px, with a
+        rule for tables.
+      - [ ] 3. Search results and Saved recipes draw a cover in the
+        source's color where there's no picture, not an empty box.
+      - [ ] 4. Breadcrumbs stop at the parent, since the last one repeats
+        the title under it; on a phone, one link back.
+      - [ ] 5. A page's own admin bar (ingredient, source, author) is one
+        row on a phone, as the main one is.
+      - [ ] 6. Saved recipes: one button for each tab ("Cooked it", "Cook
+        again") and Remove, each with an Undo. *Ray, 2026-11-15: one
+        button per tab over the two pills.*
+      - [ ] 7. A book's buy buttons are grouped by format under a heading
+        and say only the shop, in the recipe page's outline style: "Print"
+        on a button read as printing the page.
+      - [ ] 8. Your shelf, Your larder and Saved recipes keep one sentence
+        under the heading and fold the rest into "How this works", open
+        only when the page is empty; Your account says when the agreement
+        was accepted and folds its text.
+      - [ ] 9. Search on a phone: the filters go inside "More options".
+        *Ray, 2026-11-15: "Filters probably makes sense under More
+        options".*
+      - Not checked by the review, so still open: a keyboard-only and
+        screen reader pass (open since round 2); signed-in pages on
+        openlarder.com itself; the review queue, Ingredient links and
+        Merged books with real rows; the dark theme.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the
@@ -1511,18 +1579,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
-- [ ] **Another way to say "Comes under" on an ingredient.** *Ray,
+- [ ] **The notice beside allergen information isn't styled.** Found
+      2026-11-15, reading App.vue for round 5. Its rule is written
+      `.used-in /* … */ .allergen-notice`, a selector left half-finished
+      when the grocery links went in (724f558), so it only matches a
+      notice inside a "Used in" row, and there is none. The notice was
+      meant to be small and muted (0.875rem, 48rem wide) and shows as an
+      ordinary paragraph on a recipe's page, an ingredient's and the diet
+      check. Not rendered and compared yet; for round 5's item 2, which
+      is in the same stylesheet.
+
+- [x] **Another way to say "Comes under" on an ingredient** (#196). *Ray,
       2026-11-14: "I don't like the verbiage 'comes under' for the
-      ingredients".* Which words instead is his to say. Where it's said to
-      a reader: the card's heading on an ingredient's page ("Comes
-      under", beside "Includes" and "Also called"); the same page as
-      crawlers and link previews read it ("Comes under …", "counting what
-      comes under it", pages.py); and the refusal when one ingredient is
-      put above another that's over it (ingredients.py). Its neighbours
-      say the same thing other ways and would want to agree with it:
-      "Put under…", "Add under this…", "Take it out from under",
-      "counting what's under it", and Search's "also finds what's under
-      it".
+      ingredients"; 2026-11-15: "Counts as".* Done as round 5's first
+      item, above.
 
 - [x] **The accessibility check takes 40 seconds here, not thirteen minutes** (#187).
       *Ray, 2026-11-14, of a pull request's checks: "is there a way we can

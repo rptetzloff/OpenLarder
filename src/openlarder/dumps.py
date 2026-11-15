@@ -125,15 +125,17 @@ ABOUT = {
     "recipe_ingredients": "Each recipe's ingredient lines as written, in order; no amounts.",
     "ingredient_options": "Each line read into its options, matched to an ingredient or a recipe.",
     "ingredients": (
-        "Canonical ingredients, the broader one each is under, and the same food's"
-        " USDA FoodData Central ID and Wikidata item, where linked."
+        "Canonical ingredients, the ingredient each counts as (cheddar counts as cheese;"
+        " the column is parent_id), and the same food's USDA FoodData Central ID and"
+        " Wikidata item, where linked."
     ),
     "ingredient_aliases": "Other names for ingredients.",
     "allergens": "The allergens ingredients record.",
     "ingredient_allergens": (
         "What each ingredient records about an allergen: contains, may_contain, or free"
-        " (doesn't, overriding a broader ingredient's). Narrower ingredients inherit from"
-        " the nearest broader one. Crowdsourced and unverified: about ingredients in general,"
+        " (doesn't, overriding that of an ingredient it counts as). An ingredient inherits"
+        " from the nearest ingredient it counts as. Crowdsourced and unverified: about"
+        " ingredients in general,"
         " not any product, and no guarantee a recipe is safe for anyone."
     ),
     "tags": "Course, cuisine, diet and technique tags.",
