@@ -1312,6 +1312,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
+- [ ] **Another way to say "Comes under" on an ingredient.** *Ray,
+      2026-11-14: "I don't like the verbiage 'comes under' for the
+      ingredients".* Which words instead is his to say. Where it's said to
+      a reader: the card's heading on an ingredient's page ("Comes
+      under", beside "Includes" and "Also called"); the same page as
+      crawlers and link previews read it ("Comes under …", "counting what
+      comes under it", pages.py); and the refusal when one ingredient is
+      put above another that's over it (ingredients.py). Its neighbours
+      say the same thing other ways and would want to agree with it:
+      "Put under…", "Add under this…", "Take it out from under",
+      "counting what's under it", and Search's "also finds what's under
+      it".
+
 - [x] **The accessibility check takes 40 seconds here, not thirteen minutes** (#187).
       *Ray, 2026-11-14, of a pull request's checks: "is there a way we can
       speed up tests?"* The check was the eleven minutes: one browser, and
