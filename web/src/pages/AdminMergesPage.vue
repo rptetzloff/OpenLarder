@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import type { Me } from "../me";
@@ -74,11 +75,7 @@ watch(
 <template>
   <AdminBar v-if="user?.may_edit" :user="user" current="/admin/merges" />
   <article class="wide">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="/admin">Admin</a>
-      <span aria-hidden="true">›</span>
-      <span aria-current="page">Merged books</span>
-    </nav>
+    <Crumbs :trail="[{ href: '/admin', label: 'Admin' }]" />
     <div class="list-head">
       <h1>Merged books</h1>
       <p class="muted">Every merge of two books, newest first, by whom.</p>

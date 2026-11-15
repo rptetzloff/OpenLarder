@@ -912,8 +912,21 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         fails, where the browser's broken picture was. The check plants a
         recipe in each of its two books with pictures and looks at both
         thumbnails.
-      - [ ] 4. Breadcrumbs stop at the parent, since the last one repeats
-        the title under it; on a phone, one link back.
+      - [x] 4. Breadcrumbs stop at the parent, since the last one repeated
+        the title under it (#199). "Sources / Fiery Ferments" above a
+        recipe, "Sources / Books" above a book, "Ingredients" above an
+        ingredient, "Admin" above an admin page: all twenty pages that
+        have one, through one component (Crumbs.vue). On a phone it is one
+        link back to the parent, with a chevron, on one line with an
+        ellipsis, and 44px to tap. On a recipe's page on openlarder.com at
+        384px the trail was 135px tall and the title began 224px down.
+        - "Books" in "Sources / Books" is a link now, to the sources of
+          that kind, so a phone has "‹ Books" above a book and not
+          "‹ Sources" (Claude's choice, 2026-11-15, said to Ray before it
+          was built).
+        - Search engines are still given the whole trail, the page itself
+          last (pages.py: the BreadcrumbList). The page crawlers read
+          stops at the parent, as the page does.
       - [ ] 5. A page's own admin bar (ingredient, source, author) is one
         row on a phone, as the main one is.
       - [ ] 6. Saved recipes: one button for each tab ("Cooked it", "Cook

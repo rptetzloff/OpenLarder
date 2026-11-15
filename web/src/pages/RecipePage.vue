@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { arrange } from "../shops";
 import GrocerChooser from "../components/GrocerChooser.vue";
 import DietCheck from "../components/DietCheck.vue";
@@ -227,13 +228,12 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
     <p v-else-if="failed" role="alert">This recipe couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!recipe" class="status">Loading…</p>
     <template v-else>
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="/sources">Sources</a>
-        <span aria-hidden="true">/</span>
-        <a :href="`/sources/${recipe.source.id}`">{{ recipe.source.title }}</a>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{{ recipe.title }}</span>
-      </nav>
+      <Crumbs
+        :trail="[
+          { href: '/sources', label: 'Sources' },
+          { href: `/sources/${recipe.source.id}`, label: recipe.source.title },
+        ]"
+      />
 
       <div class="recipe-title">
         <h1>{{ recipe.title }}</h1>

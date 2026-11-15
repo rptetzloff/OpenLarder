@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import BookMerge from "../components/BookMerge.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import ShopChooser from "../components/ShopChooser.vue";
@@ -266,13 +267,12 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
         </div>
       </Teleport>
 
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="/sources">Sources</a>
-        <span aria-hidden="true">/</span>
-        <span>{{ kindPlural(book.kind) }}</span>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{{ book.title }}</span>
-      </nav>
+      <Crumbs
+        :trail="[
+          { href: '/sources', label: 'Sources' },
+          { href: `/sources?kind=${book.kind}`, label: kindPlural(book.kind) },
+        ]"
+      />
 
       <div class="source-head">
         <img v-if="cover" :src="cover" :alt="`Cover of ${book.title}`" class="source-cover" />

@@ -244,7 +244,9 @@ def _by(credits) -> str:
 
 def _summary(crumbs: list[str], *parts: str) -> str:
     """The summary in the page's own frame, so it sits where the page will.
-    A list's page has no trail: it is the top of one."""
+    A list's page has no trail: it is the top of one. The trail stops at the
+    page's parent, as the page's does (Crumbs.vue): its own name is the
+    heading under it."""
     trail = f'<nav aria-label="Breadcrumb">{" / ".join(crumbs)}</nav>' if crumbs else ""
     return f'<main><article class="wide">{trail}{"".join(parts)}</article></main>'
 
@@ -301,11 +303,7 @@ def _line(line: recipes.LineOut) -> str:
 def recipe_summary(shown: recipes.RecipeOut) -> str:
     lines = "".join(f"<li>{line}</li>" for line in map(_line, shown.lines) if line)
     return _summary(
-        [
-            _a("/sources", "Sources"),
-            _a(f"/sources/{shown.source.id}", shown.source.title),
-            _e(shown.title),
-        ],
+        [_a("/sources", "Sources"), _a(f"/sources/{shown.source.id}", shown.source.title)],
         f"<h1>{_e(shown.title)}</h1>",
         _recipe_place(shown),
         f"<h2>Ingredients</h2><ul>{lines}</ul>" if lines else "",
@@ -341,7 +339,7 @@ def source_summary(shown: sources.Book) -> str:
         words = f"All {len(shown.recipes):,} recipes"
         more = f"<p>{_a(f'/sources/{shown.id}', words)}</p>"
     return _summary(
-        [_a("/sources", "Sources"), _e(shown.title)],
+        [_a("/sources", "Sources")],
         f"<h1>{_e(shown.title)}</h1>",
         f"<p>{_e(shown.subtitle)}</p>" if shown.subtitle else "",
         about,
@@ -416,7 +414,7 @@ def ingredient_summary(shown: ingredients.IngredientOut) -> str:
         words = f"All {shown.listed_total:,} recipes"
         more = f"<p>{_a(f'/ingredients/{shown.id}', words)}</p>"
     return _summary(
-        [_a("/ingredients", "Ingredients"), _e(shown.name)],
+        [_a("/ingredients", "Ingredients")],
         f"<h1>{_e(shown.name)}</h1>",
         about,
         f"<h2>Recipes using {_e(shown.name)}</h2><ul>{used}</ul>{more}" if used else "",
@@ -457,7 +455,7 @@ def author_summary(shown: authors.AuthorOut) -> str:
     credited = "".join(_credited(s) for s in shown.sources)
     together = _listed([_a(f"/authors/{c.id}", c.name) for c in shown.coauthors])
     return _summary(
-        [_a("/authors", "Authors"), _e(shown.name)],
+        [_a("/authors", "Authors")],
         f"<h1>{_e(shown.name)}</h1>",
         f"<h2>Sources</h2><ul>{credited}</ul>" if credited else "",
         f"<p>Credited with {together}.</p>" if together else "",
@@ -480,7 +478,8 @@ SCHEMA_TYPES = {
 
 
 def _trail(*steps: tuple[str, str]) -> dict:
-    """The page's breadcrumb, as it shows: each step's name and address."""
+    """The page's breadcrumb in full, each step's name and address, the page
+    itself last: more than the page shows, which stops at its parent."""
     return {
         "@type": "BreadcrumbList",
         "itemListElement": [

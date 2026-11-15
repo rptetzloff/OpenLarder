@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { computed, onMounted, ref } from "vue";
 import IngredientAllergens from "../components/IngredientAllergens.vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
@@ -179,11 +180,7 @@ onMounted(() => {
         </div>
       </Teleport>
 
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="/ingredients">Ingredients</a>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{{ ingredient.name }}</span>
-      </nav>
+      <Crumbs :trail="[{ href: '/ingredients', label: 'Ingredients' }]" />
 
       <div class="ingredient-head">
         <div>

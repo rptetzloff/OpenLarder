@@ -251,6 +251,28 @@ const COUNT_SAID = (words) => `(() => {
 const COUNTS_AS = HIERARCHY(["Counts as"], ["Includes"]);
 const INCLUDES = HIERARCHY(["Includes"], ["Counts as"]);
 const NEITHER = HIERARCHY([], ["Counts as", "Includes"]);
+// A breadcrumb stops at the page's parent (Ray's round 5 list, item 4,
+// 2026-11-15): its last part had been the page's own title, above the same
+// words as the heading. On a phone it's one link back, with its chevron,
+// on one line however long the parent's name, and still 44px to tap.
+const CRUMBS = `(() => {
+  const nav = document.querySelector("nav.crumbs");
+  if (!nav) return "The page has no breadcrumb";
+  // Each part is a link to somewhere else. The page's own title was the
+  // one that wasn't a link. (Not by its words: a recipe may be named as
+  // its book is, and the check's long one is.)
+  const shown = [...nav.querySelectorAll("a, span:not([aria-hidden])")].filter((e) => e.getClientRects().length);
+  if (!shown.length) return "The breadcrumb shows nothing";
+  const here = shown.find((e) => e.tagName !== "A" || new URL(e.href).pathname === location.pathname);
+  if (here) return 'The breadcrumb ends at the page itself ("' + here.textContent.trim().slice(0, 40) + '"), not its parent';
+  if (!matchMedia("(max-width: 40rem)").matches) return "";
+  if (shown.length !== 1 || shown[0].tagName !== "A")
+    return "On a phone the breadcrumb shows " + shown.length + " parts, not the one link back";
+  const height = Math.round(shown[0].getBoundingClientRect().height);
+  if (height < 44 || height > 50) return "The link back is " + height + "px tall, not one line 44px to tap";
+  if (!getComputedStyle(shown[0], "::before").content.includes("‹")) return "The link back has no chevron";
+  return "";
+})()`;
 // The admin bar: its links in the bar on a wide screen; on a phone one row,
 // with the page's name on a button, and the links only once it's pressed.
 const ADMIN_BAR = `(() => {
@@ -627,7 +649,7 @@ function pages(s) {
     ["/sources", "cook"],
     ["/sources", "admin"],
     ["/sources?kind=book&kind=website&sort=recipes", null],
-    [`/sources/${s.book.id}`, null, { expect: TOP_RATED_SHOWN }],
+    [`/sources/${s.book.id}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],
     [`/sources/${s.book.id}`, "admin"],
     [`/sources/${s.site.id}`, null],
     [`/sources/${s.magazine.id}`, null],
@@ -638,7 +660,7 @@ function pages(s) {
     [`/sources/${s.show.id}/recipes/new`, "admin"],
     [`/sources/${s.box.id}/recipes/new`, "cook"],
     [`/sources/${s.book.id}/bulk`, "admin"],
-    [`/recipes/${s.biscuits.id}`, null],
+    [`/recipes/${s.biscuits.id}`, null, { expect: CRUMBS }],
     [`/recipes/${s.biscuits.id}`, "admin"],
     [`/recipes/${s.web.id}`, null],
     [`/recipes/${s.issue.id}`, null],
@@ -648,15 +670,15 @@ function pages(s) {
     ["/ingredients", null],
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
-    [`/ingredients/${s.cheddar}`, null, { expect: COUNTS_AS }],
+    [`/ingredients/${s.cheddar}`, null, { expect: `(${COUNTS_AS}) || (${CRUMBS})` }],
     [`/ingredients/${s.cheddar}`, "admin", { expect: COUNTS_AS }],
     [`/ingredients/${s.cheese}`, null, { expect: INCLUDES }],
     ["/authors", null],
     ["/authors?sort=recipes&kind=person", null],
-    [`/authors/${s.author}`, null, { expect: TOP_RATED_SHOWN }],
+    [`/authors/${s.author}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],
     [`/authors/${s.author}`, "admin"],
     ["/groups", "cook"],
-    [`/groups/${s.group.id}`, "cook"],
+    [`/groups/${s.group.id}`, "cook", { expect: CRUMBS }],
     ["/invite/not-a-real-invite", null],
     ["/account", "cook"],
     ["/account/flags", "admin"],
@@ -665,7 +687,7 @@ function pages(s) {
     ["/admin/imports", "admin"],
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],
-    ["/admin/clicks", "admin"],
+    ["/admin/clicks", "admin", { expect: CRUMBS }],
     ["/admin/merges", "admin"],
     ["/admin/shops", "admin"],
     ["/admin/shops", "cook"],
@@ -798,7 +820,7 @@ function pages(s) {
     [`/sources/${s.wordy.id}`, "cook"],
     [`/sources/${s.wordy.id}/edit`, "admin"],
     [`/sources/${s.wordy.id}/bulk`, "admin"],
-    [`/recipes/${s.word.id}`, null],
+    [`/recipes/${s.word.id}`, null, { expect: CRUMBS }],
     [`/recipes/${s.word.id}`, "admin"],
     [`/recipes/${s.word.id}`, "cook"],
     [`/recipes/${s.word.id}/edit`, "admin"],
