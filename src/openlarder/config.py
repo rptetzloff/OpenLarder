@@ -92,25 +92,6 @@ class Settings(BaseSettings):
     # recorded for Google Ads (adclicks.py). *Ray, 2026-11-13.* Off unless
     # set; it needs the session secret, which signs its cookie.
     ad_clicks: bool = False
-    # The shops' affiliate settings, as they were before the shops table
-    # (shops.py; *Ray, 2026-11-13*). Migration 0073 copied each one that was
-    # set onto its shop's row, which is what's read now. These are still
-    # read for a row nobody has changed that has no setting, for one release,
-    # and then go. Bookshop.org's affiliate ID, and Amazon's Associates tag
-    # ("openlarder-20").
-    bookshop_affiliate_id: str | None = None
-    amazon_tag: str | None = None
-    # The others come through affiliate networks: each is the network's
-    # deep-link template, https, with {url} where the shop's address goes.
-    barnes_noble_link: str | None = None
-    thriftbooks_link: str | None = None
-    bookoutlet_link: str | None = None
-    kobo_link: str | None = None
-    # Grocers for ingredients (grocery.py), the same kind of template:
-    # Instacart's and Walmart's affiliate programmes. Amazon Fresh uses
-    # amazon_tag.
-    instacart_link: str | None = None
-    walmart_link: str | None = None
     # Limits on /api from outside the site (ratelimit.py): without a key,
     # per address; with one, per key, about ten times as much. Plain reads
     # and searches a minute, and all requests a day (UTC). *Ray, 2026-11-09:
@@ -131,41 +112,6 @@ class Settings(BaseSettings):
             if url.startswith(scheme):
                 return "postgresql+psycopg://" + url[len(scheme) :]
         return url
-
-    @field_validator("bookshop_affiliate_id")
-    @classmethod
-    def _affiliate_digits(cls, value: str | None) -> str | None:
-        value = (value or "").strip() or None
-        if value is not None and not value.isdigit():
-            raise ValueError("OPENLARDER_BOOKSHOP_AFFILIATE_ID is a number, like 12345.")
-        return value
-
-    @field_validator("amazon_tag")
-    @classmethod
-    def _tag_shape(cls, value: str | None) -> str | None:
-        value = (value or "").strip() or None
-        if value is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}", value):
-            raise ValueError("OPENLARDER_AMAZON_TAG is an Associates tag, like openlarder-20.")
-        return value
-
-    @field_validator(
-        "barnes_noble_link",
-        "thriftbooks_link",
-        "bookoutlet_link",
-        "kobo_link",
-        "instacart_link",
-        "walmart_link",
-    )
-    @classmethod
-    def _deep_link(cls, value: str | None, info) -> str | None:
-        value = (value or "").strip() or None
-        if value is not None and not (value.startswith("https://") and "{url}" in value):
-            name = f"OPENLARDER_{info.field_name.upper()}"
-            raise ValueError(
-                f"{name} is the affiliate network's deep link, starting https:// and with"
-                " {url} where the shop's address goes."
-            )
-        return value
 
     @field_validator("public_url")
     @classmethod

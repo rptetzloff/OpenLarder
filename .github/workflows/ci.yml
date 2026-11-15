@@ -114,6 +114,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: docker build -t openlarder:a11y .
+      # The eight affiliate variables below aren't the app's settings any
+      # more. Migration 0073 reads them as it seeds the shops, which is
+      # what gives the pages checked here their buy and grocery links.
       - name: Run the image
         run: |
           docker run -d --name app --network host \

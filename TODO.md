@@ -760,8 +760,25 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           conversion (changes what the privacy page says of them);
           Microsoft Ads' `msclkid`; a direct push to Google's Data
           Manager API in place of the sheet.
-      - [ ] D3. The affiliate environment variables go, a release after
-        D1.
+      - [x] D3. The affiliate environment variables go, a release after
+        D1 (#193): the eight settings and their validators are out of
+        `config.py`, and nothing reads the variables but two migrations.
+        - Migration 0076 first makes standing what the app did for that
+          release: a shop nobody has changed, with no setting, takes its
+          variable's and is switched on. So no link changes, whether or
+          not the setting was moved by hand. It writes no edit history.
+        - The admin page no longer says "its setting is still in …", and
+          switching a shop no longer copies anything.
+        - A variable left behind does nothing, and one of the wrong shape
+          no longer stops the app starting.
+        - The accessibility job and a new database still seed their shops
+          from the variables, in migrations 0073 and 0076, which read the
+          environment themselves.
+        - [ ] Ray: once this is deployed, the eight variables in Coolify
+          can be deleted (`OPENLARDER_BOOKSHOP_AFFILIATE_ID`,
+          `_AMAZON_TAG`, `_BARNES_NOBLE_LINK`, `_THRIFTBOOKS_LINK`,
+          `_BOOKOUTLET_LINK`, `_KOBO_LINK`, `_INSTACART_LINK`,
+          `_WALMART_LINK`). Not before: 0076 reads them as it deploys.
       - [ ] D4. Producers, as a kind of shop: built, and none switched on
         until Ray has the first one's leave to post its link.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
@@ -874,7 +891,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       policy. Each goes through `/go/bookshop/<edition>`, which counts the
       click (edition, shop, time, page; nothing about who) and skips bots.
       Hidden until `OPENLARDER_BOOKSHOP_AFFILIATE_ID` is set in Coolify
-      (Ray, 2026-11-09: no account yet). **More shops (#95):** Barnes &
+      (Ray, 2026-11-09: no account yet). *Superseded (#193): every setting
+      named in this item is on its shop now, at `/admin/shops`, and the
+      variables aren't read.* **More shops (#95):** Barnes &
       Noble, ThriftBooks, Book Outlet, Amazon and Kobo (ebooks, searched by
       title and author), each shown once its setting is in Coolify: Amazon's
       Associates tag (`OPENLARDER_AMAZON_TAG`, with its required wording
@@ -1018,7 +1037,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       `/go/grocer/`, counted like the book links; clicks by grocer and
       ingredient on Buy-link clicks. Each grocer shows once its setting is
       in Coolify: `OPENLARDER_INSTACART_LINK`, `OPENLARDER_WALMART_LINK`
-      (deep-link templates), Amazon's existing tag.
+      (deep-link templates), Amazon's existing tag. *Superseded (#193):
+      each grocer's setting is on its shop now, at `/admin/shops`.*
       - [ ] Ray: join Instacart's affiliate programme (Impact), and ask
         whether a deep link to a search page earns commission.
       - [ ] Instacart's Developer Platform fills a cart with a whole

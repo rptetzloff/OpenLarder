@@ -169,10 +169,6 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
                   <p v-if="s.enabled && !s.shown" class="shop-warn">
                     On, and not shown: it needs {{ s.needs ?? "an address that can be made" }}.
                   </p>
-                  <p v-if="s.variable" class="shop-warn">
-                    Its setting is still in {{ s.variable }}. Saving it here puts it on the shop;
-                    the variable goes in the next release.
-                  </p>
                 </div>
                 <div class="shop-controls">
                   <!-- Each named with its shop, after the words it shows: "On" or

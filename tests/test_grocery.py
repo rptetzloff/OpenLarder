@@ -6,7 +6,6 @@ from urllib.parse import unquote
 import pytest
 from sqlalchemy import text
 
-from fake_broker import _settings
 from openlarder import shops
 
 BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0"}
@@ -14,16 +13,23 @@ TEMPLATE = "https://partner.example/deeplink?murl={url}"
 
 
 @pytest.fixture
-def grocers(monkeypatch):
-    # The variables the grocers' settings were in before the shops table,
-    # which an unchanged row still reads for one release (shops.py).
-    monkeypatch.setattr(
-        shops,
-        "get_settings",
-        lambda: _settings(
-            instacart_link=TEMPLATE, amazon_tag="openlarder-20", walmart_link=TEMPLATE
-        ),
-    )
+async def grocers(adb):
+    # Each grocer's setting on its row and switched on, as migration 0073
+    # seeds it from the variable it was in. These set the variables until
+    # the variables went; the addresses asserted below are as they were.
+    for key, column, value in (
+        ("instacart", "wrapper_template", TEMPLATE),
+        ("amazon", "affiliate_id", "openlarder-20"),
+        ("walmart", "wrapper_template", TEMPLATE),
+    ):
+        await adb.execute(
+            text(
+                f"UPDATE shops SET {column} = :value, enabled = true"
+                " WHERE kind = 'grocer' AND key = :key"
+            ),
+            {"value": value, "key": key},
+        )
+    shops.reset()
 
 
 async def _ingredient(adb, name: str, **more) -> str:
