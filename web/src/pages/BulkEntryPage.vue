@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import type { Book } from "../books";
 import { checkLines, type LineReview, recipeLines, saveRecipe } from "../recipes";
@@ -354,13 +355,7 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!book" class="status">Loading…</p>
     <template v-else>
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="/sources">Sources</a>
-        <span aria-hidden="true">/</span>
-        <a :href="`/sources/${book.id}`">{{ book.title }}</a>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">Enter a whole book</span>
-      </nav>
+      <Crumbs :trail="[{ href: '/sources', label: 'Sources' }, { href: `/sources/${book.id}`, label: book.title }]" />
       <div class="bulk-head">
         <div>
           <h1>Enter a whole book</h1>

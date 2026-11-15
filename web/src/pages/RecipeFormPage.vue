@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import { type Book, issueName, KIND_NAMES, SHOWS } from "../books";
@@ -377,17 +378,14 @@ async function save(another = false) {
 
 <template>
   <article class="wide add-recipe">
-    <nav v-if="book" class="crumbs" aria-label="Breadcrumb">
-      <a href="/sources">Sources</a>
-      <span aria-hidden="true">/</span>
-      <a :href="`/sources/${book.id}`">{{ book.title }}</a>
-      <template v-if="recipeId">
-        <span aria-hidden="true">/</span>
-        <a :href="`/recipes/${recipeId}`">{{ savedTitle }}</a>
-      </template>
-      <span aria-hidden="true">/</span>
-      <span aria-current="page">{{ propose ? "Suggest a change" : recipeId ? "Change" : "Add a recipe" }}</span>
-    </nav>
+    <Crumbs
+      v-if="book"
+      :trail="[
+        { href: '/sources', label: 'Sources' },
+        { href: `/sources/${book.id}`, label: book.title },
+        ...(recipeId ? [{ href: `/recipes/${recipeId}`, label: savedTitle }] : []),
+      ]"
+    />
     <h1>{{ heading }}</h1>
     <p class="muted">Where it is and what goes in it. No amounts, method or headnotes.</p>
     <p v-if="loadFailed" role="alert">This couldn't be loaded. Try reloading the page.</p>

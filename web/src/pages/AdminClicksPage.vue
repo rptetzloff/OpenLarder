@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import type { Me } from "../me";
@@ -34,11 +35,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
 <template>
   <AdminBar v-if="user?.may_edit" :user="user" current="/admin/clicks" />
   <article class="wide">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="/admin">Admin</a>
-      <span aria-hidden="true">›</span>
-      <span aria-current="page">Buy-link clicks</span>
-    </nav>
+    <Crumbs :trail="[{ href: '/admin', label: 'Admin' }]" />
     <div class="list-head">
       <h1>Buy-link clicks</h1>
       <p class="muted">

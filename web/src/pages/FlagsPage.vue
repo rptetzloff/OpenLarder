@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
@@ -76,12 +77,13 @@ watch(allowed, (yes) => {
 <template>
   <AdminBar v-if="scope === 'all' && user?.may_edit" :user="user" current="/admin/flags" />
   <article class="wide">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a v-if="scope === 'all'" href="/admin">Admin</a>
-      <a v-else href="/account">Your account</a>
-      <span aria-hidden="true">›</span>
-      <span aria-current="page">{{ heading }}</span>
-    </nav>
+    <Crumbs
+      :trail="[
+        scope === 'all'
+          ? { href: '/admin', label: 'Admin' }
+          : { href: '/account', label: 'Your account' },
+      ]"
+    />
     <div class="list-head">
       <h1>{{ heading }}</h1>
       <p class="muted">

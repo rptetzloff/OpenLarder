@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import SourceCover from "../components/SourceCover.vue";
 import OptionList from "../components/OptionList.vue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -174,11 +175,7 @@ onMounted(load);
         </div>
       </Teleport>
 
-      <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="/authors">Authors</a>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{{ author.name }}</span>
-      </nav>
+      <Crumbs :trail="[{ href: '/authors', label: 'Authors' }]" />
 
       <div class="author-head">
         <p class="kind">{{ author.kind === "organisation" ? "Organization" : "Person" }}</p>

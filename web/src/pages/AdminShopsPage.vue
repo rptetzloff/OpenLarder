@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 // Shops, for administrators (Ray's round 4 list, part D, 2026-11-13): the
 // booksellers on a book's page and the grocers on an ingredient's, switched
 // on and off, put in order, changed and added from here, with no redeploy.
@@ -114,11 +115,7 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
 <template>
   <AdminBar v-if="user?.may_edit" :user="user" current="/admin/shops" />
   <article class="wide">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="/admin">Admin</a>
-      <span aria-hidden="true">›</span>
-      <span aria-current="page">Shops</span>
-    </nav>
+    <Crumbs :trail="[{ href: '/admin', label: 'Admin' }]" />
     <div class="list-head">
       <h1>Shops</h1>
       <p class="muted">

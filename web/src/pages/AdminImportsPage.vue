@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { onMounted, ref } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import type { Me } from "../me";
@@ -42,11 +43,7 @@ onMounted(async () => {
 <template>
   <AdminBar v-if="user?.may_edit" :user="user" current="/admin/imports" />
   <article class="wide">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="/admin">Admin</a>
-      <span aria-hidden="true">›</span>
-      <span aria-current="page">Import history</span>
-    </nav>
+    <Crumbs :trail="[{ href: '/admin', label: 'Admin' }]" />
     <div class="list-head">
       <h1>Import history</h1>
       <p class="muted">Every bulk import, newest first, with what it added and its report.</p>

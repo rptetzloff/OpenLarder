@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Crumbs from "../components/Crumbs.vue";
 import { computed, onMounted, ref } from "vue";
 import {
   cancelInvite,
@@ -96,13 +97,7 @@ function destroy() {
 
 <template>
   <article class="wide">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="/groups">Groups</a>
-      <template v-if="group">
-        <span aria-hidden="true">›</span>
-        <span aria-current="page">{{ group.name }}</span>
-      </template>
-    </nav>
+    <Crumbs :trail="[{ href: '/groups', label: 'Groups' }]" />
     <p v-if="missing">There's no group here, or you aren't in it.</p>
     <p v-else-if="!group" class="status">Loading…</p>
     <template v-else>

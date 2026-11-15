@@ -299,7 +299,7 @@ async def test_a_recipes_page_says_what_it_shows(admin, adb, client) -> None:
     assert _body((await client.get(f"/recipes/{recipe}")).text) == (
         '<main><article class="wide">'
         '<nav aria-label="Breadcrumb"><a href="/sources">Sources</a> / '
-        f'<a href="/sources/{book}">Against All Grain</a> / Banana Bread</nav>'
+        f'<a href="/sources/{book}">Against All Grain</a></nav>'
         "<h1>Banana Bread</h1>"
         f'<p>Page 190 of <a href="/sources/{book}">Against All Grain</a> by '
         f'<a href="/authors/{authors["Danielle Walker"]}">Danielle Walker</a> and '
@@ -321,7 +321,7 @@ async def test_a_sources_page_lists_its_recipes(admin, adb, client, monkeypatch)
     author = (await client.get(f"/api/sources/{book}")).json()["credits"][0]["author_id"]
     head = (
         '<main><article class="wide">'
-        '<nav aria-label="Breadcrumb"><a href="/sources">Sources</a> / Against All Grain</nav>'
+        '<nav aria-label="Breadcrumb"><a href="/sources">Sources</a></nav>'
         "<h1>Against All Grain</h1>"
         f'<p>A book by <a href="/authors/{author}">Danielle Walker</a>.</p>'
         "<h2>Recipes</h2><ul>"
@@ -389,7 +389,7 @@ async def test_an_ingredients_page_has_its_own_head_and_summary(admin, adb, clie
     assert _content(page, "og:url") == [f"http://testserver/ingredients/{named['Aged Cheddar']}"]
     assert _body(page) == (
         '<main><article class="wide">'
-        '<nav aria-label="Breadcrumb"><a href="/ingredients">Ingredients</a> / Aged Cheddar</nav>'
+        '<nav aria-label="Breadcrumb"><a href="/ingredients">Ingredients</a></nav>'
         "<h1>Aged Cheddar</h1>"
         f'<p>Counts as <a href="/ingredients/{named["Cheese"]}">Cheese</a>.</p>'
         "<p>Also called Mature Cheddar.</p>"
@@ -425,7 +425,7 @@ async def test_an_authors_page_has_its_own_head_and_summary(admin, adb, client) 
     assert _content(page, "og:type") == ["profile"]
     assert _body(page) == (
         '<main><article class="wide">'
-        '<nav aria-label="Breadcrumb"><a href="/authors">Authors</a> / Danielle Walker</nav>'
+        '<nav aria-label="Breadcrumb"><a href="/authors">Authors</a></nav>'
         "<h1>Danielle Walker</h1>"
         "<h2>Sources</h2><ul>"
         f'<li><a href="/sources/{book}">Against All Grain</a>, a book, 1 recipe</li>'

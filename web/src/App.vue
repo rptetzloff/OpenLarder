@@ -731,21 +731,33 @@ a.secondary.small::after {
   color: var(--muted);
   font-size: 0.875rem;
 }
-/* On a phone a breadcrumb is 44px to tap, drawn as it was: the area reaches
-   12px above and below the words (round 2 spec, 2026-11-13). When they wrap,
-   the rows sit that far apart, so one row's doesn't lie over the next's. */
+/* On a phone only the page's parent shows, as one link back to it, on one
+   line (Ray's round 5 list, item 4, 2026-11-15: "‹ Fiery Ferments"; the
+   trail had been two or three lines above a title that said its last part
+   again). It's 44px to tap, drawn as it was: 12px of the link above and
+   below the words (round 2 spec, 2026-11-13), which the margins take back.
+   Padding, not the pseudo-element this was, which a link that cuts its
+   words off would cut off too. */
 @media (max-width: 40rem) {
   .crumbs {
-    row-gap: 1.5rem;
+    display: block;
     margin-bottom: 0.75rem;
   }
-  .crumbs a {
-    position: relative;
+  .crumbs > :not(.crumb-back) {
+    display: none;
   }
-  .crumbs a::after {
-    content: "";
-    position: absolute;
-    inset: -0.75rem 0;
+  .crumbs .crumb-back {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin: -0.75rem 0;
+    padding: 0.75rem 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crumbs .crumb-back::before {
+    content: "‹ ";
   }
 }
 
