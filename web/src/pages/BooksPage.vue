@@ -29,6 +29,7 @@ const total = ref(0);
 const failed = ref(false);
 const loading = ref(false);
 const isbn = ref("");
+const addOpen = ref(false);
 const adding = ref(false);
 const error = ref("");
 
@@ -232,7 +233,26 @@ async function add() {
       </div>
     </div>
 
-    <div v-if="user" class="add-panels">
+    <!-- Four ways to add one are four rows of buttons on a phone, above the
+         search box: there they're behind one button (Ray's round 4 list, B9,
+         2026-11-14). Someone with only the one way sees it as it was. -->
+    <button
+      v-if="user?.may_claim && user.agreed"
+      type="button"
+      class="secondary fold-toggle add-toggle"
+      :aria-expanded="addOpen"
+      aria-controls="add-panels"
+      @click="addOpen = !addOpen"
+    >
+      Add a source
+      <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
+    </button>
+    <div
+      v-if="user"
+      id="add-panels"
+      class="add-panels"
+      :class="{ several: user.may_claim && user.agreed, open: addOpen }"
+    >
       <!-- Contributors add books, which wait for review; the agreement first. -->
       <AgreementPanel v-if="user.may_claim && !user.agreed" :agreed="false" @accepted="reload" />
       <p v-if="user.may_claim && !user.may_edit && !user.trusted && user.agreed" class="muted add-note">

@@ -515,6 +515,19 @@ function pages(s) {
     ],
     [`/search?i=${s.cheddar}&missing=0`, null, { phone: true, expect: MAKE_NOW }],
     [`/search?i=${s.cheddar}&missing=0&tag=${s.vegetarian}`, null, { phone: true, expect: MAKE_NOW }],
+    // What a phone folds away, opened: a flag being dismissed, a change's
+    // rows, the ways to add a source, and what changes a book.
+    [
+      "/admin/flags",
+      "admin",
+      {
+        phone: true,
+        then: `[...document.querySelectorAll(".flag-actions button")].find((b) => b.textContent.includes("Dismiss")).click()`,
+      },
+    ],
+    ["/admin/changes", "admin", { phone: true, then: `document.querySelector(".change-more").click()` }],
+    ["/sources", "admin", { phone: true, then: `document.querySelector(".add-toggle").click()` }],
+    [`/sources/${s.book.id}`, "admin", { phone: true, then: `document.querySelector(".fold-toggle").click()` }],
     // Admin's diets: one being changed, and one being added.
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .change").click()` }],
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .add-diet").click()` }],

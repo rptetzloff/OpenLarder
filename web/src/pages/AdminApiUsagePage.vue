@@ -88,7 +88,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
           {{ n(page.requests) }} requests answered, {{ n(page.refused) }} refused over a limit,
           from {{ n(page.callers.length) }} {{ page.callers.length === 1 ? "caller" : "callers" }}.
         </p>
-        <table v-if="page.callers.length" class="recipe-table usage-table">
+        <table v-if="page.callers.length" class="recipe-table usage-table pairs">
           <thead>
             <tr>
               <th scope="col">Caller</th>

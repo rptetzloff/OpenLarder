@@ -396,13 +396,18 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
           <span><strong>{{ withChecks }}</strong> row{{ withChecks === 1 ? "" : "s" }} with checks</span>
           <span>{{ saving ? "Saving…" : unsaved ? `${unsaved} not saved yet` : "All changes saved" }}</span>
         </div>
-        <p class="help">
-          Each row saves when you leave it. <strong>Tab</strong> moves across;
-          <strong>Enter</strong> in the ingredients saves and starts the next row
-          (<strong>Shift+Enter</strong> for a new line). Separate ingredients with
-          <strong>;</strong> or a new line, and write a recipe printed elsewhere in the book as
-          <strong>Name (p. 14)</strong>. Names only, no amounts.
-        </p>
+        <!-- Five lines on a phone above the first row, for whoever hasn't
+             learnt them (Ray's round 4 list, B11, 2026-11-14). -->
+        <details class="how">
+          <summary>Keys and shortcuts</summary>
+          <p>
+            Each row saves when you leave it. <strong>Tab</strong> moves across;
+            <strong>Enter</strong> in the ingredients saves and starts the next row
+            (<strong>Shift+Enter</strong> for a new line). Separate ingredients with
+            <strong>;</strong> or a new line, and write a recipe printed elsewhere in the book as
+            <strong>Name (p. 14)</strong>. Names only, no amounts.
+          </p>
+        </details>
         <div class="table-head">
           <div class="bulk-filter" role="group" aria-label="Show">
             <button type="button" class="secondary" :aria-pressed="!onlyChecks" @click="onlyChecks = false">

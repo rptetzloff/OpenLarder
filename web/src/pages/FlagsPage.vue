@@ -2,6 +2,7 @@
 import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
+import FilterChoice from "../components/FilterChoice.vue";
 import FlagRow from "../components/FlagRow.vue";
 import { type Flag, type FlagPage, KIND_LABELS, fetchFlags } from "../flags";
 import type { Me } from "../me";
@@ -11,6 +12,8 @@ const props = defineProps<{ user: Me | null | undefined; scope: "all" | "mine" }
 const heading = props.scope === "all" ? "Flagged recipes" : "My flagged recipes";
 document.title = `${heading} · OpenLarder`;
 
+// How many the server gives at a time (routers/flags.py).
+const PAGE = 25;
 const state = ref<"open" | "dealt_with">("open");
 const kind = ref("");
 const page = ref<FlagPage | null>(null);
@@ -27,6 +30,16 @@ const kindChoices = computed(() =>
     (k) => (page.value?.open_by_kind[k] ?? 0) > 0 || k === kind.value || state.value !== "open",
   ),
 );
+
+// The reasons to choose among: buttons, or on a phone one select.
+const reasons = computed(() => [
+  { value: "", label: "Any reason" },
+  ...kindChoices.value.map((k) => ({
+    value: k,
+    label: KIND_LABELS[k],
+    count: state.value === "open" ? (page.value?.open_by_kind[k] ?? 0).toLocaleString() : undefined,
+  })),
+]);
 
 async function load(more = false) {
   loading.value = true;
@@ -92,24 +105,14 @@ watch(allowed, (yes) => {
             Dealt with
           </button>
         </div>
-        <div v-if="kindChoices.length" class="kind-filter" role="group" aria-label="Reason">
-          <button type="button" class="secondary small" :aria-pressed="!kind" @click="kind = ''">
-            Any reason
-          </button>
-          <button
-            v-for="k in kindChoices"
-            :key="k"
-            type="button"
-            class="secondary small"
-            :aria-pressed="kind === k"
-            @click="kind = kind === k ? '' : k"
-          >
-            {{ KIND_LABELS[k] }}
-            <span v-if="state === 'open'" class="count">
-              {{ (page?.open_by_kind[k] ?? 0).toLocaleString() }}
-            </span>
-          </button>
-        </div>
+        <FilterChoice
+          v-if="kindChoices.length"
+          id="flag-reason"
+          v-model="kind"
+          label="Reason"
+          :options="reasons"
+          @again="kind = ''"
+        />
       </div>
       <details class="how">
         <summary>How this works</summary>
@@ -141,7 +144,10 @@ watch(allowed, (yes) => {
         :disabled="loading"
         @click="load(true)"
       >
-        Show more ({{ (page.total - flags.length).toLocaleString() }} left)
+        Show {{ Math.min(PAGE, page.total - flags.length).toLocaleString() }} more ({{
+          (page.total - flags.length).toLocaleString()
+        }}
+        left)
       </button>
     </template>
   </article>

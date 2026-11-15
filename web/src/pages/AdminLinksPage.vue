@@ -141,6 +141,16 @@ watch(show, () => {
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
       <div class="links-tools">
+        <!-- Four buttons are two rows on a phone, and a third for "Suggest
+             links": there they're one select. -->
+        <div class="filter-select">
+          <label for="links-show">Show</label>
+          <select id="links-show" v-model="show">
+            <option v-for="[key, label] in TABS" :key="key" :value="key">
+              {{ label }} ({{ counts[key].toLocaleString() }})
+            </option>
+          </select>
+        </div>
         <div class="filter-buttons" role="group" aria-label="Show">
           <button
             v-for="[key, label] in TABS"
@@ -275,6 +285,36 @@ watch(show, () => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+.filter-select {
+  display: none;
+}
+@media (max-width: 40rem) {
+  .filter-buttons {
+    display: none;
+  }
+  .filter-select {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  /* The label keeps its word whole; a long choice shortens the select. */
+  .filter-select label {
+    flex: none;
+    font-weight: 600;
+  }
+  .filter-select select {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 2.75rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+  }
 }
 .filter-buttons button[aria-pressed="true"] {
   font-weight: 600;

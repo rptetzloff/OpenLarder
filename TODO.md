@@ -583,12 +583,78 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - [ ] A link for a filter opens "More options" as the spec asks,
           which on a phone puts the recipes a screen further down for
           whoever follows one.
-      - [ ] B4 to B12. Page by page: the admin overview as a row for each
-        tool; flagged recipes and people in fewer lines, 25 flags at a
-        time; a change set as one line with its details behind a
-        button; clicks and API usage as label and number side by side;
-        and what a moderator sees on Sources, an ingredient's page, bulk
-        entry and a book's page.
+      - [x] B4 to B12. Page by page, on a phone (#189). Measured at 384px
+        on the check's data, the development banner taken off; a wide
+        screen is as it was unless said.
+        - B4. Admin is a row for each tool, its name at the left and what's
+          waiting at the right, those with something waiting first, and
+          only they say what they're for (one line of it on a phone). A
+          row is 70px where a card was 140px. Drawn once the counts are
+          in, so the rows don't change places. A grid on a wide screen.
+        - B5. A flag is the recipe with Fixed and Dismiss beside it, then
+          one line of why and which book, then its detail: 103px where
+          it was 159px. A row with more to it (a change offered, a reason
+          being typed, what was decided) has that under the rest.
+          Twenty-five at a time, in the API too (it was fifty). The
+          reasons are one select. Your flags is the same page.
+        - B6. A person is their name and role, then one line of the rest
+          ("Trust: waits for review · 0 claims · joined Nov 14, 2026")
+          with Trust and Withhold at its end where they apply: 70px with
+          buttons, 48px without, where it was 153px. The roles are one
+          select.
+        - B7. A change of more than five rows is one line ("added 128
+          recipes, 96 ingredient lines") with the rows behind "Show
+          details", on every width and in a record's own history too.
+          Recent changes on the check's data went from 7,336px to
+          4,486px.
+        - B8. On Buy-link clicks and API usage a record's numbers are two
+          to a row, each with its label at the left and the number at
+          the right; a record with one number has it beside its name.
+        - B9. On Sources the four ways to add one are behind "Add a
+          source": the first cover starts at 682px where it was 815px.
+          Someone with only the one way sees it as it was.
+        - B10. On an ingredient's page three cards saying there's nothing
+          are one line saying so; the allergens' notice is under "How
+          this works" while nothing is recorded; and a recipe using it is
+          its title, then one line of which book and where: 95px where
+          it was 173px. The first recipe starts at 866px where it was
+          1,006px.
+        - B11. Bulk entry's instructions are under "Keys and shortcuts",
+          its status is a line, and a row has the page and chapter on one
+          line, then the title, then the ingredients. The first row
+          starts at 523px where it was 626px.
+        - B12. On a book's page "I have this book" and "Search in this
+          book" are side by side, the rest behind "More", and the title
+          has the page's width: a long one is three lines where it was
+          seven. The first recipe starts at 1,320px where it was 1,411px.
+        - Not asked for, and done with them (*Claude's choice*, said in
+          #185): the kinds on Suggestions and the tabs on Ingredient
+          links are one select on a phone too. The first thing to act on
+          went from 566px to 501px and from 624px to 516px.
+        - Where this leaves the spec, each *Claude's choice*:
+          - B10's notice is folded away only while nothing is recorded.
+            Beside allergens it's what qualifies them, and stays in view.
+          - B10 drops "the repeated ingredient name" under a recipe where
+            the book's line is the ingredient's name, and keeps a line
+            that says something else.
+          - B12 puts the title above the cover and what's beside it, not
+            below: it's the page's heading.
+          - B12's "More" is on a phone only; on a wide screen what it
+            holds is in a row, now with "Edit tags" in it.
+          - B4's Import history shows how many imports there have been,
+            and doesn't count as something waiting.
+        - [ ] Still past the 450px aim at 384px: Buy-link clicks 483,
+          Review 469, Suggestions 501, Ingredient links 516, bulk entry
+          523, Sources 682 for a moderator, an ingredient's page 866 and
+          a book's page 1,320 to their first recipe. The spec's fixes for
+          each are all in; what's left is the pages' own headings, their
+          "How this works" row and the buttons that belong above a list.
+        - [ ] B11's row reads page, chapter, title on a phone, and a
+          keyboard still goes page, title, chapter, as on a wide screen
+          where the title is over the chapter.
+        - [ ] Where one of an ingredient's three cards has something, the
+          other two still say they have nothing: the spec folds them only
+          when all three are empty.
       - [ ] D1, D2. Shops in a table of their own, read with a minute's
         cache and seeded from today's environment variables, with no
         visible change; then `/admin/shops`, for administrators.

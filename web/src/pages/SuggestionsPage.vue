@@ -2,6 +2,7 @@
 import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
+import FilterChoice from "../components/FilterChoice.vue";
 import SuggestionItem from "../components/SuggestionItem.vue";
 import {
   acceptAllergens,
@@ -34,6 +35,15 @@ const kindChoices = computed(() =>
     (k) => (page.value?.open_by_kind[k] ?? 0) > 0 || k === kind.value || state.value !== "open",
   ),
 );
+// To choose among: buttons, or on a phone one select.
+const kindOptions = computed(() => [
+  { value: "", label: "Any kind" },
+  ...kindChoices.value.map((k) => ({
+    value: k,
+    label: KIND_LABELS[k],
+    count: state.value === "open" ? (page.value?.open_by_kind[k] ?? 0).toLocaleString() : undefined,
+  })),
+]);
 
 async function load(more = false) {
   loading.value = true;
@@ -164,24 +174,14 @@ watch(allowed, (yes) => {
             Decided
           </button>
         </div>
-        <div v-if="kindChoices.length" class="kind-filter" role="group" aria-label="Kind">
-          <button type="button" class="secondary small" :aria-pressed="!kind" @click="kind = ''">
-            Any kind
-          </button>
-          <button
-            v-for="k in kindChoices"
-            :key="k"
-            type="button"
-            class="secondary small"
-            :aria-pressed="kind === k"
-            @click="kind = kind === k ? '' : k"
-          >
-            {{ KIND_LABELS[k] }}
-            <span v-if="state === 'open'" class="count">
-              {{ (page?.open_by_kind[k] ?? 0).toLocaleString() }}
-            </span>
-          </button>
-        </div>
+        <FilterChoice
+          v-if="kindChoices.length"
+          id="suggestion-kind"
+          v-model="kind"
+          label="Kind"
+          :options="kindOptions"
+          @again="kind = ''"
+        />
       </div>
       <div v-if="user.may_run || (kind === 'allergen' && likelyShown.length)" class="row-actions">
         <button

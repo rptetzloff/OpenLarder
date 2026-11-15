@@ -76,7 +76,15 @@ function inheritedWords(key: string): string {
         {{ own.length ? "Change" : "+ Record" }}
       </button>
     </div>
-    <p class="allergen-notice">{{ notice }}</p>
+    <!-- With nothing recorded there's nothing for the notice to qualify:
+         it's folded away (Ray's round 4 list, B10, 2026-11-14: nine lines
+         on a phone above an empty list). Beside anything recorded it stays
+         in view, which is where it matters. -->
+    <details v-if="!ingredient.allergens.length && !editing" class="how">
+      <summary>How this works</summary>
+      <p class="allergen-notice">{{ notice }}</p>
+    </details>
+    <p v-else class="allergen-notice">{{ notice }}</p>
     <template v-if="!editing">
       <ul v-if="ingredient.allergens.length" class="allergen-list">
         <li v-for="a in ingredient.allergens" :key="a.key">

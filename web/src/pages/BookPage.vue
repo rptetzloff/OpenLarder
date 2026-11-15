@@ -211,6 +211,15 @@ async function saveSharing() {
 }
 const sharedNames = computed(() => (book.value?.shared_with ?? []).map((g) => g.name).join(", "));
 const adminTools = computed(() => !!props.user?.may_edit && book.value?.kind !== "family");
+// What changes the source, for whoever may: on a phone, behind "More".
+const moreOpen = ref(false);
+const hasMore = computed(() => {
+  const b = book.value;
+  if (!b) return false;
+  const suggests =
+    !b.details_editable && !!props.user?.may_claim && b.review === "published" && b.kind !== "family";
+  return b.tags_editable || b.editable || suggests || (b.details_editable && !adminTools.value);
+});
 
 onMounted(async () => {
   await load();
@@ -291,13 +300,6 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               <a :href="`/search?tag=${t.id}&source=${book.id}`">{{ t.name }}</a>
             </li>
           </ul>
-          <TagEditor
-            v-if="book.tags_editable"
-            what="source"
-            :selected="book.tags.map((t) => t.id)"
-            :can-add="!!user?.may_edit"
-            :save="saveTags"
-          />
           <ul class="tags">
             <li>
               {{ book.recipes.length.toLocaleString() }}
@@ -305,20 +307,43 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </li>
             <li v-if="book.paywalled">Subscription site</li>
           </ul>
-          <ShelfButton
-            v-if="user && isBook"
-            :source-id="book.id"
-            :editions="book.editions.map((e) => ({ id: e.id, label: editionLabel(e) }))"
-            :shown="edition?.id ?? null"
-            @mine="(id) => (editionId = id)"
-          />
-          <p class="actions">
+          <!-- Having it and searching in it stay in view, side by side; what
+               changes it is behind "More" on a phone (Ray's round 4 list,
+               B12, 2026-11-14: five buttons, a row each, 280px). -->
+          <div class="book-actions">
+            <ShelfButton
+              v-if="user && isBook"
+              :source-id="book.id"
+              :editions="book.editions.map((e) => ({ id: e.id, label: editionLabel(e) }))"
+              :shown="edition?.id ?? null"
+              @mine="(id) => (editionId = id)"
+            />
             <a
               v-if="book.recipes.length"
               :href="`/search?source=${book.id}`"
               class="secondary"
               >Search in this {{ KIND_NAMES[book.kind] }}</a
             >
+          </div>
+          <button
+            v-if="hasMore"
+            type="button"
+            class="secondary fold-toggle"
+            :aria-expanded="moreOpen"
+            aria-controls="book-more"
+            @click="moreOpen = !moreOpen"
+          >
+            More
+            <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
+          </button>
+          <div v-if="hasMore" id="book-more" class="actions" :class="{ open: moreOpen }">
+            <TagEditor
+              v-if="book.tags_editable"
+              what="source"
+              :selected="book.tags.map((t) => t.id)"
+              :can-add="!!user?.may_edit"
+              :save="saveTags"
+            />
             <a
               v-if="book.editable"
               :href="`/sources/${book.id}/recipes/new`"
@@ -350,7 +375,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               class="secondary"
               >Edit the {{ KIND_NAMES[book.kind] }}</a
             >
-          </p>
+          </div>
           <template v-if="book.manageable">
             <form v-if="renaming" class="inline-form" @submit.prevent="rename">
               <label for="family-rename" class="visually-hidden">New name</label>
