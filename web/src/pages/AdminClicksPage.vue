@@ -67,11 +67,19 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
       </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!page" class="status">Loading…</p>
-      <p v-else-if="!page.clicks && !page.grocery_clicks" class="status">No clicks in this time.</p>
+      <p
+        v-else-if="!page.clicks && !page.grocery_clicks && !page.producer_clicks"
+        class="status"
+      >
+        No clicks in this time.
+      </p>
       <template v-else>
         <p class="status">
-          {{ n(page.clicks) }} clicks on books' links and {{ n(page.grocery_clicks) }} on
-          ingredients' in {{ page.days }} days.
+          {{ n(page.clicks) }} clicks on books' links<template v-if="page.producer_clicks"
+            >, {{ n(page.grocery_clicks) }} on ingredients' and {{ n(page.producer_clicks) }} on
+            producers'</template
+          ><template v-else> and {{ n(page.grocery_clicks) }} on ingredients'</template> in
+          {{ page.days }} days.
         </p>
         <div class="tool-panels clicks-panels">
           <section class="tool-panel" aria-labelledby="by-shop">
@@ -175,6 +183,27 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
                   <a :href="`/ingredients/${i.ingredient_id}`" class="strong">{{ i.name }}</a>
                 </td>
                 <td class="numeric"><span class="cell-label">Clicks </span>{{ n(i.clicks) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+        <template v-if="page.producer_clicks">
+          <h2 class="section-title">Producers</h2>
+          <table class="recipe-table pairs">
+            <thead>
+              <tr>
+                <th scope="col">Producer</th>
+                <th scope="col" class="numeric">Clicks</th>
+                <th scope="col" class="numeric">Last 7 days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in page.producers" :key="p.retailer">
+                <td>{{ p.label }}</td>
+                <td class="numeric"><span class="cell-label">Clicks </span>{{ n(p.clicks) }}</td>
+                <td class="numeric">
+                  <span class="cell-label">Last 7 days </span>{{ n(p.last_7_days) }}
+                </td>
               </tr>
             </tbody>
           </table>

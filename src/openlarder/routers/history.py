@@ -48,6 +48,7 @@ WHAT = {
     "diet_allergens": "allergen a diet avoids",
     "tags": "tag",
     "shops": "shop",
+    "producer_ingredients": "ingredient a producer supplies",
 }
 # The column that names a row, first found wins.
 NAMED_BY = (
@@ -81,6 +82,7 @@ LOOKUPS = {
     "author_id": Author,
     "tag_id": Tag,
     "diet_tag_id": Tag,
+    "shop_id": Shop,
 }
 LIMIT = 200
 
@@ -133,7 +135,9 @@ async def _names(session, viewer: User | None, revisions: list[Revision]) -> dic
                 wanted.setdefault(model, set()).update(v for v in (before, after) if v)
     names: dict[str, str] = {}
     for model, ids in wanted.items():
-        query = select(model.id, model.name).where(model.id.in_([uuid.UUID(i) for i in ids]))
+        # A shop is called by its label.
+        called = model.label if model is Shop else model.name
+        query = select(model.id, called).where(model.id.in_([uuid.UUID(i) for i in ids]))
         if model is Ingredient:
             query = query.where(visibility.ingredients_seen_by(viewer))
         elif model is Author:
@@ -422,11 +426,14 @@ async def revert_change(
     )
     if hidden is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such change.")
-    # Undoing a change to a shop changes the shop, which is an
-    # administrator's to do (routers/shops.py).
+    # Undoing a change to a shop, or to what a producer supplies, changes
+    # the shop, which is an administrator's to do (routers/shops.py).
     of_a_shop = await session.scalar(
         select(Revision.id)
-        .where(Revision.change_id == change_id, Revision.table_name == "shops")
+        .where(
+            Revision.change_id == change_id,
+            Revision.table_name.in_(("shops", "producer_ingredients")),
+        )
         .limit(1)
     )
     if of_a_shop is not None and not moderator.at_least("admin"):

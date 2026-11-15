@@ -11,7 +11,8 @@ without it. `--confirm <host>` answers that in advance, for a script.
 and all that hangs off them (editions, buy links and their clicks, issues,
 episodes, web pages, credits), recipes and their lines, ingredients,
 aliases and swaps, authors, and the tags given to sources and recipes. With
-them: people's larder items (the lists stay, empty), shelves, saved recipes,
+them: which ingredients each producer supplies (the producers stay),
+people's larder items (the lists stay, empty), shelves, saved recipes,
 ratings and notes, the catalog's edit history, flags, reports, suggested
 changes, n8n's suggestions and embeddings, and import history. Accounts,
 groups, larder lists and requests stay; requests are unlinked from their
@@ -19,11 +20,11 @@ books, to link again as each comes back (migration 0050).
 
 `--everything` empties those too: every account with its sessions, API keys,
 larder lists and group memberships, every group, request and vote, all edit
-history, the sign-ups recorded for ads (adclicks.py), and the list of
-published data dumps (the files stay in their bucket; a fresh dump is built
-within the hour). Anyone signing in after it
-starts again as a new user, the owner too: make yourself owner again by
-hand (roles.py).
+history, the sign-ups recorded for ads (adclicks.py), the clicks on
+producers' links, and the list of published data dumps (the files stay in
+their bucket; a fresh dump is built within the hour). Anyone signing in
+after it starts again as a new user, the owner too: make yourself owner
+again by hand (roles.py).
 
 Never emptied: the tag list (the seeded diets, courses, cuisines and
 techniques, and any added since, which the app expects), FoodData
@@ -90,6 +91,7 @@ CATALOG = (
     "book_merges",
     "merged_records",
     "ingredient_link_suggestions",
+    "producer_ingredients",
 )
 # Emptied too with --everything. (revisions: a catalog reset deletes the
 # catalog's history from it, and this all of it.)
@@ -110,6 +112,7 @@ PEOPLE = (
     "dumps",
     "daily_counts",
     "ad_conversions",
+    "producer_clicks",
     "revisions",
 )
 # Never emptied. A new table must be named in one of the three lists

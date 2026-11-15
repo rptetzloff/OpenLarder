@@ -92,6 +92,7 @@ async def test_the_list_is_each_kind_in_order_with_its_clicks(people, adb, book)
     assert [(g["kind"], g["label"]) for g in groups] == [
         ("bookseller", "Booksellers"),
         ("grocer", "Grocers"),
+        ("producer", "Producers"),
     ]
     assert [s["key"] for s in groups[0]["shops"]] == [
         "bookshop",

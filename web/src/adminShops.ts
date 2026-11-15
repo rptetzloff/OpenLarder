@@ -1,8 +1,8 @@
 // Shops, for administrators: what /api/admin/shops takes and returns
 // (routers/shops.py).
 
-export type ShopKind = "bookseller" | "grocer";
-export type Builder = "bookshop" | "amazon" | "wrapped" | "template";
+export type ShopKind = "bookseller" | "grocer" | "producer";
+export type Builder = "bookshop" | "amazon" | "wrapped" | "template" | "direct";
 
 export interface Shop {
   id: string;
@@ -21,6 +21,12 @@ export interface Shop {
   shown: boolean;
   // Switched on and not shown: what it still needs.
   needs: string | null;
+  // Producers only (producers.py): what it is, what a new customer gets,
+  // the states it ships to (none: everywhere), and what it supplies.
+  description: string | null;
+  offer: string | null;
+  ships_to: string[] | null;
+  supplies: { id: string; name: string }[];
   clicks_30_days: number;
   clicks: number;
   updated_at: string;
@@ -44,6 +50,12 @@ export interface ShopFields {
   earns: "affiliate" | "referral" | "none";
   note: string | null;
   enabled: boolean;
+  // Producers only; a bookseller's or a grocer's are left out.
+  description?: string | null;
+  offer?: string | null;
+  ships_to?: string[] | null;
+  // The ingredients it supplies, by id.
+  supplies?: string[];
 }
 
 export interface Tried {
@@ -52,10 +64,12 @@ export interface Tried {
   sample: string;
 }
 
-// What each kind's own address may ask for, as routers/shops.py checks.
+// What each kind's own address may ask for, as routers/shops.py checks. A
+// producer's is its referral link, used as written.
 export const PLACEHOLDERS: Record<ShopKind, string[]> = {
   bookseller: ["{isbn13}", "{isbn10}", "{title}", "{author}", "{words}", "{id}"],
   grocer: ["{term}", "{id}"],
+  producer: [],
 };
 export const BUILDERS: Record<ShopKind, [Builder, string][]> = {
   bookseller: [
@@ -69,6 +83,7 @@ export const BUILDERS: Record<ShopKind, [Builder, string][]> = {
     ["template", "Its own address, as written"],
     ["amazon", "Amazon Fresh's, made for each ingredient, with the Associates tag"],
   ],
+  producer: [["direct", "Its referral link, as written"]],
 };
 
 async function send<T>(path: string, method: string, body?: unknown): Promise<T> {

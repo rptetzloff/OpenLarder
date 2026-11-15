@@ -779,8 +779,48 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           `_AMAZON_TAG`, `_BARNES_NOBLE_LINK`, `_THRIFTBOOKS_LINK`,
           `_BOOKOUTLET_LINK`, `_KOBO_LINK`, `_INSTACART_LINK`,
           `_WALMART_LINK`). Not before: 0076 reads them as it deploys.
-      - [ ] D4. Producers, as a kind of shop: built, and none switched on
-        until Ray has the first one's leave to post its link.
+      - [x] D4. Producers, as a kind of shop (#194): built, and none
+        added. A producer is a farm, a mill or a maker that sells
+        ingredients itself.
+        - An administrator adds one on Shops, under Producers: its name,
+          its referral link (used as written), what it is, its offer, the
+          states it ships to, the ingredients it supplies, what a click
+          earns, and what's said beside its link. Switched on, it must
+          say what is earned and by whom, unless a click earns nothing,
+          which the site then says itself.
+        - `/producers` has a card for each, in the administrator's order.
+          The footer links it once one is switched on, and the privacy
+          page and the terms speak of producers only then.
+        - An ingredient's page has "From a producer" under its recipes'
+          heading: those that supply it or a broader ingredient it's
+          under (migration 0077, `producer_ingredients`), two at most.
+          Not on recipe pages, and the Shop button is still a grocer's.
+        - A click goes through `/go/producer/<key>` and is counted in
+          `producer_clicks`: which producer, which page, when, nothing
+          about who, and nothing for a bot. They're on the Shops list and
+          on Buy-link clicks.
+        - What a producer supplies is in the edit history, and only an
+          administrator can undo it. Merging an ingredient keeps its
+          producers. Neither table is in a data dump.
+        - Where it ships is said; nobody's place is guessed.
+        - Claude's choices, to overrule if wrong: a producer can only be
+          given ingredients everyone can see, never one that only a
+          private family collection uses; the footer link and the two
+          pages' paragraphs wait for the first producer; the link reads
+          "Visit" and the producer's name, so two on a page differ; an
+          ingredient's page shows one line of the description, with the
+          offer and where it ships on one line, so two cards cost less
+          of a phone's screen.
+        - [ ] Ray: the first producer isn't added. When it has said its
+          link may be posted publicly, add it on Shops (Add a producer),
+          with its disclosure, and switch it on.
+        - [ ] Later, if wanted: show a producer only where it ships.
+          Cloudflare's header for the visitor's region would do it, once
+          it's confirmed on the plan.
+        - [ ] Above an ingredient's recipes on a 384px phone, one
+          producer's card is about 230px and two about 540px with their
+          heading (measured): the list starts that much lower. Ray's spec
+          puts them there; after the list is the other place for them.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the

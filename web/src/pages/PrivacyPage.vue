@@ -9,12 +9,15 @@ const analyticsHost = ref<string | null>(null);
 // *Claude's choice, 2026-11-15; Ray's spec asked that the page say so
 // before the feature is on.*
 const adClicks = ref(false);
+// Whether any producer is listed (producers.py): said only where there is.
+const anyProducers = ref(false);
 onMounted(async () => {
   const site = await fetch("/api/site")
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
   analyticsHost.value = site?.analytics_host ?? null;
   adClicks.value = site?.ad_clicks === true;
+  anyProducers.value = site?.producers === true;
 });
 // Written from what the code does, not from a template. When what is
 // stored, who processes it, or which cookies are set changes, this page
@@ -100,6 +103,15 @@ document.title = "Privacy policy · OpenLarder";
       Walmart, which searches the grocer for that ingredient. These work the same way: OpenLarder
       earns a commission on what's bought, and counts the click (which ingredient, which grocer,
       when, and which page), recording nothing about who clicked.
+    </p>
+    <p v-if="anyProducers">
+      Some ingredients, and the <a href="/producers">Producers</a> page, link to a farm, a mill or
+      a maker that sells ingredients itself. What following the link earns, and for whom, is said
+      beside each one. These work the same way too: the link goes through OpenLarder first, which
+      counts the click (which producer, when, and which page), recording nothing about who
+      clicked. The producer then sees your visit as anyone's would, under its own privacy policy.
+      Where a producer ships is said on its card; OpenLarder doesn't work out where you are to
+      decide what to show you.
     </p>
     <p>
       You can choose which shops show and in what order, and which grocer to shop at. Signed in,

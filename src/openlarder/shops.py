@@ -31,7 +31,8 @@ title and author, and without it that search stayed in code.
 
 **A link that earns nothing isn't shown** (*Ray, 2026-11-09*): a bookseller
 or a grocer is offered when it's switched on and its builder has what it
-needs.
+needs. A producer may earn nothing and still be listed (*Ray, 2026-11-13*):
+it's offered when it's switched on and has its address (producers.py).
 
 **The variables are gone.** For the one release after the table came, a
 row nobody had changed that had no setting took it from the environment
@@ -41,6 +42,7 @@ says. An OPENLARDER_AMAZON_TAG left behind does nothing.
 """
 
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import quote, quote_plus
@@ -78,6 +80,13 @@ class Shop:
     note: str | None
     enabled: bool
     position: int
+    # Producers only: what it is, what a new customer gets, and the US
+    # states it ships to (None, everywhere).
+    description: str | None = None
+    offer: str | None = None
+    ships_to: tuple[str, ...] | None = None
+    # Its row's id; None for one being tried that has no row.
+    id: uuid.UUID | None = None
 
 
 # When they were read, and the rows.
@@ -110,6 +119,10 @@ async def _rows(session: AsyncSession) -> list[Shop]:
                     note=r.note,
                     enabled=r.enabled,
                     position=r.position,
+                    description=r.description,
+                    offer=r.offer,
+                    ships_to=tuple(r.ships_to) if r.ships_to is not None else None,
+                    id=r.id,
                 )
                 for r in found
             ],
@@ -130,11 +143,14 @@ async def find(session: AsyncSession, kind: Kind, key: str) -> Shop | None:
 PLACEHOLDERS = {
     "bookseller": ("isbn13", "isbn10", "title", "author", "words", "id"),
     "grocer": ("term", "id"),
+    # A producer's address is its referral link, used as written.
+    "producer": (),
 }
 # The builders a kind of shop may have.
 BUILDERS = {
     "bookseller": ("bookshop", "amazon", "wrapped", "template"),
     "grocer": ("amazon", "wrapped", "template"),
+    "producer": ("direct",),
 }
 # What's shown for "Test link": a book and an ingredient that are no one's.
 SAMPLE_BOOK = Book(isbn13="9780393541113", title="A Sample Cookbook", author="Ann Author")
@@ -157,6 +173,8 @@ def sample(shop: Shop) -> str | None:
     """Where a click would go for the sample book or ingredient."""
     if shop.kind == "bookseller":
         return for_book(shop, SAMPLE_BOOK)
+    if shop.kind == "producer":
+        return for_producer(shop)
     return for_term(shop, SAMPLE_TERM)
 
 
@@ -233,3 +251,8 @@ def for_term(shop: Shop, term: str) -> str | None:
         tag = quote(shop.affiliate_id, safe="")
         return f"https://www.amazon.com/s?k={quote_plus(term)}&i=amazonfresh&tag={tag}"
     return _address(shop, {"term": quote_plus(term)})
+
+
+def for_producer(shop: Shop) -> str | None:
+    """Where a click on a producer's link goes: its address, as written."""
+    return shop.product_template if shop.builder == "direct" else None

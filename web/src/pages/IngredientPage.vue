@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import IngredientAllergens from "../components/IngredientAllergens.vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import IngredientRecords from "../components/IngredientRecords.vue";
+import ProducerCard from "../components/ProducerCard.vue";
 import { grocerHref, grocerNow, loadGrocers } from "../grocery";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
@@ -269,6 +270,24 @@ onMounted(() => {
             ingredient</label
           >
         </div>
+        <!-- Producers that supply it, two at most (Ray's round 4 list, D4,
+             2026-11-13): under the list's heading, above the list. -->
+        <aside
+          v-if="ingredient.producers.length"
+          class="from-producer"
+          aria-labelledby="from-producer"
+        >
+          <h3 id="from-producer">From a producer</h3>
+          <div class="producer-cards">
+            <ProducerCard
+              v-for="p in ingredient.producers"
+              :key="p.key"
+              :producer="p"
+              :level="4"
+              brief
+            />
+          </div>
+        </aside>
         <table v-if="ingredient.recipes.length" class="recipe-table uses-table">
           <thead>
             <tr>
@@ -428,3 +447,19 @@ onMounted(() => {
     </template>
   </article>
 </template>
+
+<style scoped>
+.from-producer {
+  margin: 0 0 1.25rem;
+}
+.from-producer h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+.producer-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 0.75rem;
+  max-width: 48rem;
+}
+</style>
