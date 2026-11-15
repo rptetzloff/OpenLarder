@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { dropLastOn } from "../chips";
+import CoverThumb from "../components/CoverThumb.vue";
 import LarderPicker from "../components/LarderPicker.vue";
 import OptionList from "../components/OptionList.vue";
 import { KINDS, listTags, type Tag } from "../tags";
@@ -876,8 +877,7 @@ onMounted(async () => {
           </p>
           <ul class="hits">
             <li v-for="r in result.recipes" :key="r.id" class="hit">
-              <img v-if="r.cover_url" :src="r.cover_url" alt="" class="hit-cover" loading="lazy" />
-              <span v-else class="hit-cover" aria-hidden="true"></span>
+              <CoverThumb :src="r.cover_url" :title="r.source_title" />
               <div>
                 <h3><a :href="`/recipes/${r.id}`">{{ r.title }}</a></h3>
                 <p class="hit-where">

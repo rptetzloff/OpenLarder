@@ -639,14 +639,29 @@ a.secondary.small::after {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+/* A source's cover beside a recipe (CoverThumb.vue): its picture, on a
+   block of its drawn cover's colour, which is what shows where there's no
+   picture or it hasn't come. */
 .hit-cover {
+  position: relative;
   flex: none;
   width: 3rem;
   height: 4.5rem;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--surface);
+  background: var(--cover, #2e4a3b);
+}
+.hit-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  opacity: 0;
+}
+.hit-cover img.arrived {
+  opacity: 1;
 }
 .hit h3 {
   margin: 0 0 0.125rem;
