@@ -14,7 +14,7 @@ import CoverBlank from "../components/CoverBlank.vue";
 import ReportButton from "../components/ReportButton.vue";
 import TopRated from "../components/TopRated.vue";
 import { arrange } from "../shops";
-import { buyHref, DISCLOSURE, FORMAT_NAMES, notes } from "../buying";
+import { buyHref, byFormat, DISCLOSURE, FORMAT_HEADINGS, FORMAT_SAID, notes } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import { setSourceTags } from "../tags";
 import { computed, nextTick, onMounted, ref } from "vue";
@@ -434,17 +434,28 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <aside v-if="edition && buyLinks.length" class="source-buy" aria-labelledby="buy-title">
             <h2 id="buy-title">Get this book</h2>
             <p v-if="book.editions.length > 1" class="buy-edition">{{ editionLabel(edition) }}</p>
-            <a
-              v-for="b in buyLinks"
-              :key="b.retailer"
-              :href="buyHref(b)"
-              rel="sponsored noopener"
-              :class="['buy-button', b.format]"
-              ><span class="buy-format">{{ FORMAT_NAMES[b.format] }}</span
-              ><span class="buy-shop">{{ b.label }}</span></a
-            >
-            <p class="buy-note">{{ DISCLOSURE }}</p>
-            <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>
+            <!-- The format is a heading and a button is only its shop (Ray's
+                 round 5 list, item 7). A screen reader, which may meet a
+                 link without its heading, hears both. -->
+            <template v-for="g in byFormat(buyLinks)" :key="g.format">
+              <h3 class="buy-format">{{ FORMAT_HEADINGS[g.format] }}</h3>
+              <div class="buy-shops">
+                <a
+                  v-for="b in g.links"
+                  :key="b.retailer"
+                  :href="buyHref(b)"
+                  rel="sponsored noopener"
+                  class="buy-button"
+                  :aria-label="`Buy the ${FORMAT_SAID[g.format]} at ${b.label}`"
+                  >{{ b.label }}</a
+                >
+              </div>
+            </template>
+            <p class="buy-note">
+              {{ DISCLOSURE }}
+              <template v-for="n in notes(buyLinks)" :key="n">{{ n }}{{ " " }}</template>
+              <a href="/terms#commissions">How this works</a>
+            </p>
             <ShopChooser v-if="edition.buy.length > 1" :links="edition.buy" :signed-in="!!user" />
           </aside>
           </Teleport>

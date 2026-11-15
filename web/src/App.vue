@@ -2591,31 +2591,51 @@ main h2 {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* The buy box: one button a shop, what it sells on the left. */
-.source-buy .buy-button {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0.9rem;
-  margin-bottom: 0.5rem;
-  border-radius: 8px;
+/* A link to a shop that sells the book: one style, on a recipe's page and
+   a book's (Ray's round 5 list, item 7, 2026-11-15). It is the outline the
+   recipe's page had (his cleanup pass, section 2, 2026-11-11). A book's
+   page had dark bars, filled like its "I have this book", which is the
+   one thing there meant to be pressed first. */
+.buy-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-sm);
   font-weight: 600;
   text-decoration: none;
-  color: var(--on-accent);
-  background: var(--accent);
 }
-.source-buy .buy-button:hover {
-  background: var(--accent-hover);
+.buy-button:hover {
+  border-color: var(--fg);
 }
-.source-buy .buy-button.ebook {
-  color: var(--notice-fg);
-  background: var(--notice-bg);
+/* The buy box on a book's page: a small heading for each format, and its
+   shops under it, each only the shop's name. As many to a row as the box
+   has room for at 8.5rem each. Measured: one beside the cover, where the
+   box is 16rem (900px and up); two on a phone of 360px or 384px, and one
+   at 320px, where "Barnes & Noble" would not fit in half; four at 700px
+   and five at 820px, where the box is the page's width and one to a row
+   made each button 723px wide. By the box's width and not the screen's,
+   so there is no breakpoint to keep in step with where the box moves. */
+.source-buy .buy-format {
+  margin: 0.375rem 0 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.source-buy .buy-button.ebook:hover {
-  filter: brightness(0.92);
+.source-buy .buy-shops {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
 }
-.source-buy .buy-button .buy-shop {
-  text-align: right;
+.source-buy .buy-button {
+  justify-content: center;
+  text-align: center;
 }
 .review-new {
   margin-top: 0.5rem;

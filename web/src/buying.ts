@@ -14,7 +14,20 @@ export interface BuyLink {
 export const shopName = (link: BuyLink) =>
   link.format === "ebook" ? `${link.label} (ebook)` : link.label;
 
-export const FORMAT_NAMES = { print: "Print", ebook: "Ebook" } as const;
+// A format as a heading over its shops on a book's page, and as said in a
+// link's name there ("Buy the print book at Bookshop.org"). Ray's round 5
+// list, item 7, 2026-11-15: the format was a word on each button, and
+// "Print" on a button read as printing the page.
+export const FORMAT_HEADINGS = { print: "Print book", ebook: "Ebook" } as const;
+export const FORMAT_SAID = { print: "print book", ebook: "ebook" } as const;
+
+// The links under their formats. A format comes where its first shop does
+// in the order given, which is the reader's, and one with no shop isn't
+// there at all.
+export function byFormat(links: BuyLink[]): { format: BuyLink["format"]; links: BuyLink[] }[] {
+  const formats = [...new Set(links.map((l) => l.format))];
+  return formats.map((format) => ({ format, links: links.filter((l) => l.format === format) }));
+}
 
 // Each shop's own words, once each, for the links shown.
 export const notes = (links: BuyLink[]) => [
@@ -25,7 +38,10 @@ export const notes = (links: BuyLink[]) => [
 export const buyHref = (link: BuyLink) =>
   `${link.url}?from=${encodeURIComponent(location.pathname)}`;
 
-// What the FTC asks of an affiliate link: said plainly, beside it. A
-// recipe's page says it in its own words, under its buy buttons and again
-// under its ingredients' Shop links; a book's page uses this.
-export const DISCLOSURE = "OpenLarder earns a commission if you buy through these links.";
+// What the FTC asks of an affiliate link: said plainly, beside it. Under
+// the buy buttons on a book's page and on a recipe's, which says it again
+// in its own words under its ingredients' Shop links. "May earn", as the
+// recipe's page and the terms had it and the round 5 drawing has for both:
+// until 2026-11-15 a book's page said "earns", which isn't so of a shop
+// with no affiliate ID set.
+export const DISCLOSURE = "OpenLarder may earn a commission if you buy through these links.";

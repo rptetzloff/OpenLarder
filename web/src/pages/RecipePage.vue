@@ -5,7 +5,7 @@ import GrocerChooser from "../components/GrocerChooser.vue";
 import DietCheck from "../components/DietCheck.vue";
 import { grocerHref, grocerNow, loadGrocers } from "../grocery";
 import { loadAllergens, notice as allergenNotice } from "../allergens";
-import { buyHref, notes, shopName } from "../buying";
+import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
@@ -350,7 +350,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                     </button>
                   </p>
                   <p class="buy-note">
-                    OpenLarder may earn a commission if you buy through these links.
+                    {{ DISCLOSURE }}
                     <template v-for="n in notes(shopsShown)" :key="n">{{ n }}{{ " " }}</template>
                     <a href="/terms#commissions">How this works</a>
                   </p>
@@ -584,22 +584,6 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
 
 <style scoped>
 /* Ray's cleanup pass, section 2 (2026-11-11). */
-.buy-button {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  padding: 0 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--fg);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: none;
-}
-.buy-button:hover {
-  border-color: var(--fg);
-}
 .more-shops {
   min-height: 2.75rem;
   font-size: var(--text-sm);
