@@ -279,8 +279,8 @@ async function remove() {
           @pick="supply"
         />
         <p class="help">
-          A broad one covers what's under it: Beef puts it on ground beef's page too. An
-          ingredient's page shows two producers at most.
+          A general one covers everything that counts as it: Beef puts it on ground beef's page
+          too. An ingredient's page shows two producers at most.
         </p>
       </div>
     </template>

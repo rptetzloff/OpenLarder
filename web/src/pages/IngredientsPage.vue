@@ -83,7 +83,7 @@ onMounted(() => load());
         />
       </div>
       <div class="table-controls">
-        <label class="check"><input v-model="top" type="checkbox" /> Top level only</label>
+        <label class="check"><input v-model="top" type="checkbox" /> Main ingredients only</label>
         <label for="ingredient-sort">Sort</label>
         <select id="ingredient-sort" v-model="sort">
           <option value="uses">Most used</option>
@@ -99,10 +99,11 @@ onMounted(() => load());
     </p>
     <template v-else>
       <p class="status results-count" role="status">
-        {{ total.toLocaleString() }} {{ total === 1 ? "ingredient" : "ingredients"
-        }}<template v-if="top"> at the top level</template><template v-if="q.trim()">
-          {{ total === 1 ? "matches" : "match" }} “{{ q.trim() }}”</template
-        >.
+        <!-- One piece of text: a template for the last part lost the space
+             before it, and the line read "10 ingredientsmatch". -->
+        {{ total.toLocaleString() }} {{ top ? "main " : ""
+        }}{{ total === 1 ? "ingredient" : "ingredients"
+        }}{{ q.trim() ? ` ${total === 1 ? "matches" : "match"} “${q.trim()}”` : "" }}.
       </p>
       <table class="recipe-table ingredient-list">
         <thead>
@@ -119,7 +120,7 @@ onMounted(() => load());
                    its own words, so it reads without a column's heading. -->
               <span v-if="i.parent || i.aliases?.length" class="more muted">
                 <template v-if="i.parent"
-                  >Under <a :href="`/ingredients/${i.parent.id}`">{{ i.parent.name }}</a></template
+                  >Counts as <a :href="`/ingredients/${i.parent.id}`">{{ i.parent.name }}</a></template
                 ><template v-if="i.parent && i.aliases?.length"> · </template
                 ><template v-if="i.aliases?.length">Also called {{ i.aliases.join(", ") }}</template>
               </span>

@@ -579,7 +579,8 @@ onMounted(async () => {
       </div>
       <!-- Said to a screen reader with the box; shown while the box is in use. -->
       <p id="search-ingredient-help" class="help when-adding">
-        Up to {{ MAX_INGREDIENTS }}. An ingredient also finds what's under it: cheese finds cheddar.
+        Up to {{ MAX_INGREDIENTS }}. An ingredient also finds what counts as it: cheese finds
+        cheddar.
       </p>
 
       <div v-if="ranked" class="show-row">

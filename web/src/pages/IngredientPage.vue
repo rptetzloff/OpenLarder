@@ -170,8 +170,8 @@ onMounted(() => {
             <strong>Admin</strong>
             <a href="#ingredient-name">Rename</a>
             <a href="#merge-into">Merge into…</a>
-            <a href="#parent-of">Put under…</a>
-            <a href="#child-of">Add under this…</a>
+            <a href="#parent-of">Count it as…</a>
+            <a href="#child-of">Add an ingredient this includes…</a>
             <a v-if="ingredient.aliases.length" href="#also-called">Edit other names</a>
             <a v-if="ingredient.total === 0" href="#delete-ingredient">Delete</a>
             <span v-else class="muted">Delete (only when nothing uses it)</span>
@@ -191,7 +191,7 @@ onMounted(() => {
           <p class="status">
             Used in {{ ingredient.family_total.toLocaleString() }}
             {{ ingredient.family_total === 1 ? "recipe" : "recipes"
-            }}{{ hasChildren ? ", counting what's under it" : "" }}
+            }}{{ hasChildren ? ", including everything it includes" : "" }}
           </p>
         </div>
         <div class="ingredient-actions">
@@ -215,25 +215,26 @@ onMounted(() => {
         id="also-called"
         class="status no-relations"
       >
-        No broader, narrower or other names yet.
+        Nothing it counts as, includes or is also called yet.
       </p>
       <div v-else class="ingredient-cards">
-        <div>
-          <h2>Comes under</h2>
-          <p v-if="ingredient.parent">
+        <!-- Cheddar counts as cheese, and cheese includes cheddar (Ray,
+             2026-11-15, for the words it had). A card with nothing to say
+             isn't there: the line above is for when none has. -->
+        <div v-if="ingredient.parent">
+          <h2>Counts as</h2>
+          <p>
             <a :href="`/ingredients/${ingredient.parent.id}`">{{ ingredient.parent.name }}</a>
           </p>
-          <p v-else class="status">Nothing broader yet.</p>
         </div>
-        <div>
+        <div v-if="ingredient.children.length">
           <h2>Includes</h2>
-          <p v-if="ingredient.children.length">
+          <p>
             <template v-for="(c, i) in ingredient.children" :key="c.id"
               ><template v-if="i > 0"> · </template
               ><a :href="`/ingredients/${c.id}`">{{ c.name }}</a></template
             >
           </p>
-          <p v-else class="status">Nothing narrower yet.</p>
         </div>
         <div id="also-called">
           <h2>Also called</h2>
@@ -386,25 +387,28 @@ onMounted(() => {
           @pick="merge"
         />
 
-        <h3>Broader and narrower</h3>
+        <h3>What it counts as</h3>
         <p class="status">
-          A search for an ingredient also finds the ones under it: put Fresh Ginger and Ground
-          Ginger under Ginger.
+          A search for an ingredient also finds everything that counts as it: make Fresh Ginger
+          and Ground Ginger count as Ginger.
         </p>
         <p v-if="ingredient.parent">
-          Under “{{ ingredient.parent.name }}”.
+          Counts as “{{ ingredient.parent.name }}”.
+          <!-- Named in full for a screen reader, which may meet the button
+               without the sentence before it. -->
           <button
             type="button"
             class="secondary small"
             :disabled="busy"
+            :aria-label="`Stop counting it as ${ingredient.parent.name}`"
             @click="placeUnder(ingredient.id, null)"
           >
-            Take it out from under
+            Stop counting it as
           </button>
         </p>
         <IngredientPicker
           input-id="parent-of"
-          :label="ingredient.parent ? 'Move it under another ingredient' : 'Put it under'"
+          :label="ingredient.parent ? 'Count it as something else' : 'Count it as'"
           placeholder="ginger"
           :exclude="[ingredient.id, ingredient.parent?.id ?? '']"
           :disabled="busy"
@@ -412,14 +416,14 @@ onMounted(() => {
         />
         <IngredientPicker
           input-id="child-of"
-          label="Put another ingredient under this one"
+          label="Add an ingredient that counts as this"
           placeholder="fresh ginger"
           :exclude="[ingredient.id, ...ingredient.children.map((c) => c.id)]"
           :disabled="busy"
           @pick="(c) => placeUnder(c.id, ingredient!.id)"
         />
         <p v-if="ingredient.children.length" class="status">
-          Under it now:
+          Includes now:
           <template v-for="c in ingredient.children" :key="c.id">
             <span class="with-remove"
               >{{ c.name }}
@@ -427,7 +431,7 @@ onMounted(() => {
                 type="button"
                 class="remove"
                 :disabled="busy"
-                :aria-label="`Take ${c.name} out from under it`"
+                :aria-label="`Stop counting ${c.name} as this`"
                 @click="placeUnder(c.id, null)"
               >
                 ×

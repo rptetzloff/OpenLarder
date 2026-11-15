@@ -78,7 +78,7 @@ const tools = computed(() => {
       name: "Suggestions",
       count: openSuggestions.value,
       unit: "open",
-      about: "Ingredients a local model thinks are the same, or belong under another.",
+      about: "Ingredients a local model thinks are the same, or count as another.",
     },
     {
       href: "/admin/links",

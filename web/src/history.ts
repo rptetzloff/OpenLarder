@@ -76,7 +76,7 @@ export function shown(value: unknown): string {
 // What a column reads as: an id names what it points at.
 const LABELS: Record<string, string> = {
   ingredient_id: "ingredient",
-  parent_id: "parent",
+  parent_id: "counts as",
   from_ingredient_id: "swap from",
   to_ingredient_id: "swap to",
   author_id: "author",

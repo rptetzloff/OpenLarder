@@ -127,8 +127,8 @@ onMounted(async () => {
       <div>
         <h3>Search by what you have</h3>
         <p>
-          Ingredients are matched however a source names them, and a broader one finds what's
-          under it: cheese finds cheddar.
+          Ingredients are matched however a source names them, and an ingredient finds everything
+          that counts as it: cheese finds cheddar.
         </p>
       </div>
       <div>
