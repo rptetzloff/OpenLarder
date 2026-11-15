@@ -147,6 +147,10 @@ async function removeAlias(alias: Ingredient["aliases"][number]) {
   }
 }
 
+// As the book wrote it, which is often just the ingredient's name.
+const sameName = (line: string | null) =>
+  !!line && line.trim().toLowerCase() === ingredient.value?.name.toLowerCase();
+
 onMounted(() => {
   load();
   loadGrocers();
@@ -203,7 +207,16 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="ingredient-cards">
+      <!-- Three cards saying there's nothing are one line saying so (Ray's
+           round 4 list, B10, 2026-11-14). -->
+      <p
+        v-if="!ingredient.parent && !ingredient.children.length && !ingredient.aliases.length"
+        id="also-called"
+        class="status no-relations"
+      >
+        No broader, narrower or other names yet.
+      </p>
+      <div v-else class="ingredient-cards">
         <div>
           <h2>Comes under</h2>
           <p v-if="ingredient.parent">
@@ -256,7 +269,7 @@ onMounted(() => {
             ingredient</label
           >
         </div>
-        <table v-if="ingredient.recipes.length" class="recipe-table">
+        <table v-if="ingredient.recipes.length" class="recipe-table uses-table">
           <thead>
             <tr>
               <th scope="col">Recipe</th>
@@ -268,9 +281,11 @@ onMounted(() => {
           <tbody>
             <tr v-for="r in ingredient.recipes" :key="r.id">
               <td><a :href="`/recipes/${r.id}`" class="strong">{{ r.title }}</a></td>
-              <td><a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a></td>
-              <td class="muted">{{ where(r) }}</td>
-              <td class="lines">{{ r.line }}</td>
+              <td class="uses-source"><a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a></td>
+              <td class="muted uses-where">{{ where(r) }}</td>
+              <!-- A line that only says the page's own name again isn't
+                   said again on a phone. -->
+              <td class="lines" :class="{ same: sameName(r.line) }">{{ r.line }}</td>
             </tr>
           </tbody>
         </table>

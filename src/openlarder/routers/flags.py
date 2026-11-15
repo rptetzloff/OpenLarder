@@ -30,7 +30,9 @@ from openlarder.models import (
 )
 
 router = APIRouter(tags=["flags"])
-PAGE = 50
+# Twenty-five at a time (Ray's round 4 list, B5, 2026-11-14): 104 flags were a
+# page of 9,975px on a phone.
+PAGE = 25
 
 
 class RecipeRef(BaseModel):

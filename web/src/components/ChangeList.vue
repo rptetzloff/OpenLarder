@@ -4,6 +4,36 @@ import { type Change, cameThrough, label, madeBy, revertChange, shown } from "..
 
 // Changes, newest first, each with what it added, changed or removed; for
 // moderators, a button to undo one, after which the list is reloaded.
+//
+// A change of more than five rows is one line saying how many of what, with
+// the rows behind "Show details" (Ray's round 4 list, B7, 2026-11-14: one
+// import of 128 recipes listed every line it added, 5,240px on a phone).
+const SHOWN_WHOLE = 5;
+const opened = ref(new Set<string>());
+function toggle(id: string) {
+  const next = new Set(opened.value);
+  if (!next.delete(id)) next.add(id);
+  opened.value = next;
+}
+// "tag on the source" and "allergen a diet avoids" take their s on the first
+// word; the rest on the last.
+const plural = (what: string) => (/ (on|a) /.test(what) ? what.replace(" ", "s ") : `${what}s`);
+// "added 128 recipes, 96 ingredient lines · changed 2 places", in the order
+// the actions and the kinds first appear.
+function summed(c: Change) {
+  const by = new Map<string, Map<string, number>>();
+  for (const e of c.entries) {
+    const kinds = by.get(e.action) ?? new Map<string, number>();
+    kinds.set(e.what, (kinds.get(e.what) ?? 0) + 1);
+    by.set(e.action, kinds);
+  }
+  return [...by]
+    .map(
+      ([action, kinds]) =>
+        `${action} ${[...kinds].map(([what, n]) => `${n.toLocaleString()} ${n === 1 ? what : plural(what)}`).join(", ")}`,
+    )
+    .join(" · ");
+}
 defineProps<{ changes: Change[]; linkSources?: boolean; canRevert?: boolean }>();
 const emit = defineEmits<{ reverted: [] }>();
 const errors = ref<Record<string, string>>({});
@@ -34,6 +64,7 @@ const when = (iso: string) =>
         <span class="muted">
           · <time :datetime="c.at">{{ when(c.at) }}</time>
           <template v-if="cameThrough(c.via)"> · through {{ cameThrough(c.via) }}</template>
+          <template v-if="c.entries.length > SHOWN_WHOLE"> · {{ summed(c) }}</template>
           <template v-if="linkSources && c.source_id">
             · <a :href="`/sources/${c.source_id}`">the source</a>
           </template>
@@ -49,7 +80,21 @@ const when = (iso: string) =>
         </button>
       </p>
       <p v-if="errors[c.id]" class="error" role="alert">{{ errors[c.id] }}</p>
-      <ul class="change-entries">
+      <button
+        v-if="c.entries.length > SHOWN_WHOLE"
+        type="button"
+        class="link change-more"
+        :aria-expanded="opened.has(c.id)"
+        :aria-controls="`change-${c.id}`"
+        @click="toggle(c.id)"
+      >
+        {{ opened.has(c.id) ? "Hide details" : "Show details" }}
+      </button>
+      <ul
+        v-show="c.entries.length <= SHOWN_WHOLE || opened.has(c.id)"
+        :id="`change-${c.id}`"
+        class="change-entries"
+      >
         <li v-for="(e, i) in c.entries" :key="i">
           <span class="change-action" :class="e.action">{{ e.action }}</span>{{ " " }}
           {{ e.what }}{{ e.name ? ` ${shown(e.name)}` : "" }}

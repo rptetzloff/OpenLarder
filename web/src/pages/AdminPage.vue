@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import DietAvoids from "../components/DietAvoids.vue";
 import { type WikidataRun, checkWikidata } from "../authors";
@@ -15,7 +15,7 @@ import type { Me } from "../me";
 const props = defineProps<{ user: Me | null | undefined }>();
 document.title = "Admin · OpenLarder";
 
-// What's waiting, on each card; null until known, or if it couldn't be.
+// What's waiting, on each tool's row; null until known, or if it couldn't be.
 const openFlags = ref<number | null>(null);
 const openSuggestions = ref<number | null>(null);
 const waiting = ref<number | null>(null);
@@ -23,6 +23,8 @@ const reported = ref<number | null>(null);
 const imports = ref<number | null>(null);
 const linksWaiting = ref<number | null>(null);
 const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
+const n = (v: number | null, one: string, many: string) =>
+  v === null ? "" : `${v.toLocaleString()} ${v === 1 ? one : many}`;
 
 async function loadCounts() {
   const [flags, suggestions, runs] = await Promise.allSettled([
@@ -40,7 +42,67 @@ async function loadCounts() {
   if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
   if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
   if (runs.status === "fulfilled") imports.value = runs.value.length;
+  counted.value = true;
 }
+// The tools, a row each: its name, and what's waiting there. Those with
+// something waiting come first, and only they say what they're for (Ray's
+// round 4 list, B4, 2026-11-14: thirteen cards with a description each were
+// 4,744px on a phone, and said again what the bar above them says). Drawn
+// once the counts are in, so the rows don't change places as they arrive.
+const counted = ref(false);
+const tools = computed(() => {
+  const rows = [
+    {
+      href: "/admin/reports",
+      name: "Reports",
+      count: reported.value,
+      unit: "open",
+      about: "Problems people have reported with recipes, sources, ingredients and authors.",
+    },
+    {
+      href: "/admin/review",
+      name: "Review",
+      count: waiting.value,
+      unit: "waiting",
+      about: "Books and recipes contributors have added, for a moderator to approve.",
+    },
+    {
+      href: "/admin/flags",
+      name: "Flagged recipes",
+      count: openFlags.value,
+      unit: "open",
+      about: "Anything an entry or import flagged for a look.",
+    },
+    {
+      href: "/admin/suggestions",
+      name: "Suggestions",
+      count: openSuggestions.value,
+      unit: "open",
+      about: "Ingredients a local model thinks are the same, or belong under another.",
+    },
+    {
+      href: "/admin/links",
+      name: "Ingredient links",
+      count: linksWaiting.value,
+      unit: "likely",
+      about: "The USDA FoodData Central food and Wikidata item each ingredient is probably the same as.",
+    },
+    { href: "/admin/import", name: "Bulk import", run: true },
+    { href: "/admin/api", name: "API usage", run: true },
+    { href: "/admin/clicks", name: "Buy-link clicks", run: true },
+    { href: "/admin/changes", name: "Recent changes" },
+    { href: "/admin/merges", name: "Merged books", run: true },
+    { href: "/admin/people", name: "People and roles" },
+    // How many there have been, not something waiting: it keeps its place.
+    { href: "/admin/imports", name: "Import history", run: true, said: n(imports.value, "import", "imports") },
+  ].filter((t) => !t.run || props.user?.may_run);
+  const waits = (t: (typeof rows)[number]) => (t.count ?? 0) > 0;
+  return [...rows.filter(waits), ...rows.filter((t) => !waits(t))].map((t) => ({
+    ...t,
+    said: t.said ?? (t.unit && t.count != null ? `${t.count.toLocaleString()} ${t.unit}` : ""),
+    about: waits(t) ? t.about : "",
+  }));
+});
 // Who's signed in arrives after the page mounts.
 watch(
   () => props.user?.may_edit,
@@ -125,9 +187,6 @@ async function askWikidata() {
   }
 }
 
-const n = (v: number | null, one: string, many: string) =>
-  v === null ? "" : `${v.toLocaleString()} ${v === 1 ? one : many}`;
-
 // Links page references and matches ingredients in recipes stored before
 // either existed. One
 // request a book, so none runs long; running it again changes nothing.
@@ -186,83 +245,13 @@ async function archiveAll() {
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
-      <ul class="link-cards">
-        <li>
-          <a href="/admin/reports">
-            <h2>Reports</h2>
-            <p class="count">{{ n(reported, "open", "open") }}</p>
-            <p>Problems people have reported with recipes, sources, ingredients and authors.</p>
-          </a>
-        </li>
-        <li>
-          <a href="/admin/review">
-            <h2>Review</h2>
-            <p class="count">{{ n(waiting, "waiting", "waiting") }}</p>
-            <p>Books and recipes contributors have added, for a moderator to approve.</p>
-          </a>
-        </li>
-        <li>
-          <a href="/admin/flags">
-            <h2>Flagged recipes</h2>
-            <p class="count">{{ n(openFlags, "open", "open") }}</p>
-            <p>Anything an entry or import flagged for a look.</p>
-          </a>
-        </li>
-        <li>
-          <a href="/admin/suggestions">
-            <h2>Suggestions</h2>
-            <p class="count">{{ n(openSuggestions, "open", "open") }}</p>
-            <p>Ingredients a local model thinks are the same, or belong under another.</p>
-          </a>
-        </li>
-        <li>
-          <a href="/admin/links">
-            <h2>Ingredient links</h2>
-            <p class="count">{{ n(linksWaiting, "likely", "likely") }}</p>
-            <p>The USDA FoodData Central food and Wikidata item each ingredient is probably the same as.</p>
-          </a>
-        </li>
-        <li v-if="user.may_run">
-          <a href="/admin/import">
-            <h2>Bulk import</h2>
-            <p>Add books and recipes from a book list and a recipe list.</p>
-          </a>
-        </li>
-        <li v-if="user.may_run">
-          <a href="/admin/api">
-            <h2>API usage</h2>
-            <p>Programs reading the API, busiest first, to spot abuse; keys can be revoked there.</p>
-          </a>
-        </li>
-        <li v-if="user.may_run">
-          <a href="/admin/clicks">
-            <h2>Buy-link clicks</h2>
-            <p>Clicks on the shops' links, by shop, book, page and day.</p>
-          </a>
-        </li>
-        <li>
-          <a href="/admin/changes">
-            <h2>Recent changes</h2>
-            <p>Everything added, changed or removed in the catalog, by whom.</p>
-          </a>
-        </li>
-        <li v-if="user.may_run">
-          <a href="/admin/merges">
-            <h2>Merged books</h2>
-            <p>Every merge of two books, by whom; one made in error can be unmerged.</p>
-          </a>
-        </li>
-        <li>
-          <a href="/admin/people">
-            <h2>People and roles</h2>
-            <p>Contributors, moderators and administrators, and who can make whom one.</p>
-          </a>
-        </li>
-        <li v-if="user.may_run">
-          <a href="/admin/imports">
-            <h2>Import history</h2>
-            <p class="count">{{ n(imports, "import", "imports") }}</p>
-            <p>Every import, with its totals and report.</p>
+      <p v-if="!counted" class="status">Loading…</p>
+      <ul v-else class="admin-rows">
+        <li v-for="t in tools" :key="t.href">
+          <a :href="t.href">
+            <span class="tool-name">{{ t.name }}</span>
+            <span v-if="t.said" class="tool-count">{{ t.said }}</span>
+            <span v-if="t.about" class="tool-about">{{ t.about }}</span>
           </a>
         </li>
       </ul>

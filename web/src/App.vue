@@ -836,11 +836,69 @@ a.secondary.small::after {
   background: var(--surface);
   font-size: 0.8125rem;
 }
-.source-about .actions {
+.source-about .actions,
+.book-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+/* In a row with the search, the shelf's button starts where the row does. */
+.source-about .book-actions > .shelf-button {
+  margin: 0;
+}
+@media (max-width: 40rem) {
+  /* The title has the page's width, over the cover and what's beside it:
+     beside a 6rem cover a long one was seven lines (Ray's round 4 list,
+     B12). What's in .source-about is laid out here, a row each: the kind
+     and the title across, the rest beside the cover, and from the buttons
+     on, across again. */
+  .source-head {
+    column-gap: 1rem;
+    row-gap: 0;
+  }
+  .source-about {
+    display: contents;
+  }
+  .source-about > * {
+    grid-column: 2;
+  }
+  .source-about > .kind,
+  .source-about > h1,
+  .source-about > .book-actions,
+  .source-about > .book-actions ~ * {
+    grid-column: 1 / -1;
+  }
+  .source-about > h1 {
+    margin-bottom: 0.75rem;
+  }
+  .source-head > .source-cover {
+    grid-column: 1;
+    grid-row: 3 / span 9;
+    align-self: start;
+  }
+  .source-head > .source-side {
+    margin-top: 1.5rem;
+  }
+  /* Having it and searching in it share a row while both fit. */
+  .book-actions > * {
+    flex: 1 1 0;
+  }
+  .book-actions > a.secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    text-align: center;
+  }
+  .source-about > .fold-toggle {
+    justify-self: start;
+  }
+  .source-about .actions:not(.open) {
+    display: none;
+  }
 }
 .source-elsewhere {
   padding: 0.75rem 1rem;
@@ -1243,6 +1301,35 @@ a.secondary.small::after {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+.no-relations {
+  margin: 1.25rem 0 0;
+}
+@media (max-width: 40rem) {
+  /* A recipe using it: its title, then one line of which book and where
+     (Ray's round 4 list, B10). */
+  .uses-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+  }
+  .uses-table td,
+  .uses-table td:first-child {
+    grid-column: 1 / -1;
+  }
+  .uses-table td.uses-source {
+    grid-column: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .uses-table td.uses-where {
+    grid-column: 2;
+    white-space: nowrap;
+  }
+  .uses-table td.lines.same {
+    display: none;
+  }
+}
 .ingredient-cards h2 {
   margin: 0 0 0.25rem;
   color: var(--muted);
@@ -1379,6 +1466,38 @@ a.secondary.small::after {
 }
 .add-panel {
   flex: 0 1 auto;
+}
+/* A button that opens what a phone has no room to leave open: the ways to
+   add a source, what changes a book. Not drawn on a wide screen, where
+   what it opens is in view. */
+.fold-toggle {
+  display: none;
+}
+.fold-toggle svg {
+  width: 0.625rem;
+  height: 0.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fold-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+@media (max-width: 40rem) {
+  .fold-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+  .add-panels.several:not(.open) {
+    display: none;
+  }
+  .add-panels.several {
+    margin-top: 0.75rem;
+  }
 }
 .add-panel[open] {
   flex: 1 1 100%;
@@ -1995,6 +2114,7 @@ main h2 {
     margin: 0 0 0.5rem;
   }
 }
+/* Cards that are links: the account page's. */
 .link-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -2035,6 +2155,65 @@ main h2 {
   margin-bottom: 0.375rem;
   color: var(--fg);
   font-weight: 600;
+}
+/* Admin's tools: a row each, the whole row a link, with what's waiting
+   there at its right; and what it's for under that, where something is.
+   A grid of them on a wide screen. */
+.admin-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.admin-rows li {
+  margin: 0;
+}
+.admin-rows a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.125rem 1rem;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 3.5rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.admin-rows a:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.admin-rows .tool-name {
+  color: var(--link);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.admin-rows .tool-count {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.admin-rows .tool-about {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+@media (max-width: 40rem) {
+  .admin-rows {
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  /* One line of it, as the row is one tool: the page it leads to says the
+     rest. */
+  .admin-rows .tool-about {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 .section-title {
   margin: 2.5rem 0 1rem;
@@ -2743,6 +2922,16 @@ main h2 {
 .flag-table .flag-actions {
   min-width: 12rem;
 }
+/* What a person's row says in one line on a phone; the table's columns say
+   it on a wide screen. */
+.people-table .person-line {
+  display: none;
+}
+/* The book under the recipe on a wide screen; on a phone, in the line that
+   says why (FlagRow.vue). */
+.flag-table .flag-in {
+  display: none;
+}
 .flag-table .flag-actions > button + button {
   margin-left: 0.5rem;
 }
@@ -2763,9 +2952,102 @@ main h2 {
   .import-table .numeric {
     text-align: left;
   }
-  .flag-table .flag-actions {
-    padding-top: 0.5rem;
+  /* A flag: the recipe and its two buttons, then why and where on one
+     line, then the detail. */
+  .flag-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    align-items: start;
   }
+  .flag-table td.flag-why {
+    grid-column: 1 / -1;
+  }
+  .flag-table td.flag-actions {
+    grid-area: 1 / 2;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .flag-table .flag-book {
+    display: none;
+  }
+  .flag-table .flag-in {
+    display: inline;
+  }
+  .flag-table .flag-reason {
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* More than two buttons' worth: under the rest, at full width. */
+  .flag-table tr.flag-wide td.flag-actions {
+    grid-area: auto;
+    grid-column: 1 / -1;
+    padding-top: 0.5rem;
+    white-space: normal;
+  }
+  /* A person: their name and role, then one line of the rest. */
+  .people-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    align-items: center;
+  }
+  .people-table td.person-trust {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 0.5rem;
+  }
+  .people-table td.person-more,
+  .people-table .person-trusted {
+    display: none;
+  }
+  .people-table .person-line {
+    display: inline;
+    font-size: 0.875rem;
+  }
+  .people-table select {
+    min-height: 2.75rem;
+  }
+  /* A record with numbers: two to a row, each with its label at the left
+     and the number at the right (Ray's round 4 list, B8, 2026-11-14). */
+  .recipe-table.pairs tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.5rem;
+  }
+  .recipe-table.pairs td {
+    grid-column: 1 / -1;
+  }
+  .recipe-table.pairs td.numeric {
+    grid-column: auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  /* And one with a single number: beside its name. */
+  .recipe-table.tally tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+  }
+  .recipe-table.tally td {
+    grid-column: 1 / -1;
+  }
+  .recipe-table.tally td:first-child {
+    grid-column: 1;
+  }
+  .recipe-table.tally td.numeric {
+    grid-area: 1 / 2;
+  }
+}
+.change-more {
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
 }
 .suggestion-cards {
   display: grid;
@@ -2959,6 +3241,33 @@ main h2 {
 .bulk-empty {
   margin: 0;
   padding: 1rem;
+}
+@media (max-width: 40rem) {
+  /* How the book is going, in a line. */
+  .bulk-progress {
+    gap: 0 0.5rem;
+    margin: 0.75rem 0 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .bulk-progress span:not(:last-child)::after {
+    content: " ·";
+  }
+  /* The page and the chapter on one line, then the title with the whole
+     width to itself (Ray's round 4 list, B11). The title is still the box
+     after the page for a keyboard. */
+  .bulk-title {
+    display: contents;
+  }
+  .bulk-row .bulk-title input:not(.bulk-chapter) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .bulk-row input.bulk-chapter {
+    grid-area: 1 / 2;
+    align-self: stretch;
+    font-size: inherit;
+    padding: 0.375rem 0.5rem;
+  }
 }
 @media (max-width: 48rem) {
   .bulk-row {

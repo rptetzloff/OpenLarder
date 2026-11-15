@@ -4,6 +4,13 @@ import { applyTypo, type Flag, KIND_LABELS, resolveFlag, typo } from "../flags";
 
 // One flag as a row of the flagged-recipes table, with Fixed and Dismiss.
 // FlagItem is the same on a recipe's own page.
+//
+// On a phone a row is the recipe with its two buttons beside it, then one
+// line of why and which book, then the detail if there is one (Ray's round
+// 4 list, B5, 2026-11-14: a flag was about 180px, a row of its own for each
+// part). The book is in the markup twice for that, and drawn once. A row
+// with more to it than two buttons (a change offered, a reason being
+// typed, what was decided) has that under the rest, at full width.
 const props = defineProps<{ flag: Flag }>();
 const emit = defineEmits<{ resolved: [flag: Flag] }>();
 
@@ -42,16 +49,20 @@ async function act(resolution: "fixed" | "dismissed") {
 </script>
 
 <template>
-  <tr>
-    <td>
+  <tr :class="{ 'flag-wide': dismissing || !!suggested || !!f.resolution }">
+    <td class="flag-recipe">
       <a :href="`/recipes/${f.recipe.id}`" class="strong">{{ f.recipe.title }}</a>
-      <div class="muted">
-        <span class="cell-label">In </span>
+      <div class="muted flag-book">
         <a :href="`/sources/${f.recipe.source_id}`">{{ f.recipe.source_title }}</a>
       </div>
     </td>
-    <td>
-      {{ KIND_LABELS[f.kind] ?? f.kind }}
+    <td class="flag-why">
+      <div class="flag-reason">
+        {{ KIND_LABELS[f.kind] ?? f.kind
+        }}<span class="flag-in">
+          · <a :href="`/sources/${f.recipe.source_id}`">{{ f.recipe.source_title }}</a></span
+        >
+      </div>
       <div v-if="f.detail" class="muted">{{ f.detail }}</div>
     </td>
     <td class="flag-actions">

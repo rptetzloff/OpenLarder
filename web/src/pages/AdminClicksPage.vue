@@ -76,7 +76,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
         <div class="tool-panels clicks-panels">
           <section class="tool-panel" aria-labelledby="by-shop">
             <h2 id="by-shop">By shop</h2>
-            <table class="recipe-table">
+            <table class="recipe-table pairs">
               <thead>
                 <tr>
                   <th scope="col">Shop</th>
@@ -107,7 +107,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
           </section>
         </div>
         <h2 class="section-title">Books clicked most</h2>
-        <table class="recipe-table">
+        <table class="recipe-table tally">
           <thead>
             <tr>
               <th scope="col">Book</th>
@@ -124,7 +124,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
           </tbody>
         </table>
         <h2 class="section-title">Pages the clicks came from</h2>
-        <table class="recipe-table">
+        <table class="recipe-table tally">
           <thead>
             <tr>
               <th scope="col">Page</th>
@@ -143,7 +143,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
         </table>
         <template v-if="page.grocery_clicks">
           <h2 class="section-title">Grocers</h2>
-          <table class="recipe-table">
+          <table class="recipe-table pairs">
             <thead>
               <tr>
                 <th scope="col">Grocer</th>
@@ -162,7 +162,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
             </tbody>
           </table>
           <h2 class="section-title">Ingredients clicked most</h2>
-          <table class="recipe-table">
+          <table class="recipe-table tally">
             <thead>
               <tr>
                 <th scope="col">Ingredient</th>

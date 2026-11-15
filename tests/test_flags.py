@@ -140,15 +140,21 @@ async def test_another_sites_page_cannot_resolve(client, setup) -> None:
     assert response.status_code == 403
 
 
-async def test_flags_come_fifty_to_a_page(client, setup, adb) -> None:
+async def test_flags_come_twenty_five_to_a_page(client, setup, adb) -> None:
+    """Ray's round 4 list, B5, 2026-11-14; it was fifty."""
     recipe = setup["recipes"]["Ann's Cake"]
     for _ in range(50):
         await adb.execute(
             text("INSERT INTO recipe_flags (recipe_id, kind) VALUES (:r, 'no_page')"), {"r": recipe}
         )
     first = (await client.get("/api/flags", params={"scope": "all"})).json()
+    second = (await client.get("/api/flags", params={"scope": "all", "offset": 25})).json()
     rest = (await client.get("/api/flags", params={"scope": "all", "offset": 50})).json()
-    assert (len(first["flags"]), first["total"], len(rest["flags"])) == (50, 53, 3)
+    assert (len(first["flags"]), first["total"]) == (25, 53)
+    assert (len(second["flags"]), len(rest["flags"])) == (25, 3)
+    # No flag twice, and none left out.
+    ids = [f["id"] for page in (first, second, rest) for f in page["flags"]]
+    assert len(set(ids)) == 53
 
 
 async def test_flags_need_a_session(client) -> None:

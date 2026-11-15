@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
+import FilterChoice from "../components/FilterChoice.vue";
 import { type Me, type Role, ROLE_LABELS } from "../me";
 import { type Person, findPeople, setRole, setTrust } from "../requests";
 
@@ -19,13 +20,14 @@ const busy = ref(false);
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 // Roles they may give, highest first, as the menu offers them.
 const offered = computed(() => [...(props.user?.grants ?? [])].reverse());
-const FILTERS: { role: Role | ""; label: string }[] = [
-  { role: "", label: "Everyone with a role" },
-  { role: "owner", label: "Owners" },
-  { role: "admin", label: "Administrators" },
-  { role: "moderator", label: "Moderators" },
-  { role: "contributor", label: "Contributors" },
+const FILTERS: { value: Role | ""; label: string }[] = [
+  { value: "", label: "Everyone with a role" },
+  { value: "owner", label: "Owners" },
+  { value: "admin", label: "Administrators" },
+  { value: "moderator", label: "Moderators" },
+  { value: "contributor", label: "Contributors" },
 ];
+const many = (n: number, one: string, more: string) => `${n.toLocaleString()} ${n === 1 ? one : more}`;
 
 async function load() {
   error.value = "";
@@ -100,18 +102,14 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
         />
         <button type="submit" class="primary">Find</button>
       </form>
-      <div class="kind-filter" role="group" aria-label="Show">
-        <button
-          v-for="f in FILTERS"
-          :key="f.role"
-          type="button"
-          class="secondary small"
-          :aria-pressed="!q && only === f.role"
-          @click="only === f.role ? ((q = ''), load()) : (only = f.role)"
-        >
-          {{ f.label }}
-        </button>
-      </div>
+      <FilterChoice
+        id="people-show"
+        v-model="only"
+        label="Show"
+        :options="FILTERS"
+        :none="!!q"
+        @again="(q = ''), load()"
+      />
       <details class="how">
         <summary>How this works</summary>
         <p>
@@ -137,9 +135,10 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
         </thead>
         <tbody>
           <tr v-for="p in people" :key="p.id">
-            <td>{{ p.name ?? "No name yet" }}<span v-if="p.id === user.id" class="muted"> (you)</span></td>
-            <td>
-              <span class="cell-label">Role </span>
+            <td class="person-name">
+              {{ p.name ?? "No name yet" }}<span v-if="p.id === user.id" class="muted"> (you)</span>
+            </td>
+            <td class="person-role">
               <template v-if="p.changeable">
                 <label :for="`role-${p.id}`" class="visually-hidden">Role for {{ p.name }}</label>
                 <select
@@ -153,10 +152,16 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
               </template>
               <template v-else>{{ ROLE_LABELS[p.role] }}</template>
             </td>
-            <td>
-              <span class="cell-label">Trust </span>
+            <td class="person-trust">
+              <!-- On a phone, one line for the rest of the row, with its
+                   buttons at the end where there are any. -->
+              <span class="person-line muted">
+                <template v-if="p.role === 'contributor'"
+                  >Trust: {{ (p.trust ? TRUST[p.trust] : "Waits for review").toLowerCase() }} · </template
+                >{{ many(p.claims, "claim", "claims") }} · joined {{ day(p.created_at) }}
+              </span>
               <template v-if="p.role === 'contributor'">
-                {{ p.trust ? TRUST[p.trust] : "Waits for review" }}
+                <span class="person-trusted">{{ p.trust ? TRUST[p.trust] : "Waits for review" }}</span>
                 <span v-if="p.id !== user.id" class="trust-actions">
                   <button
                     v-if="p.trust !== 'granted' && p.trust !== 'earned'"
@@ -187,10 +192,10 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
                   </button>
                 </span>
               </template>
-              <template v-else>—</template>
+              <span v-else class="person-trusted">—</span>
             </td>
-            <td class="numeric"><span class="cell-label">Claims </span>{{ p.claims }}</td>
-            <td><span class="cell-label">Joined </span>{{ day(p.created_at) }}</td>
+            <td class="numeric person-more">{{ p.claims }}</td>
+            <td class="person-more">{{ day(p.created_at) }}</td>
           </tr>
         </tbody>
       </table>
