@@ -1097,6 +1097,55 @@ a.secondary.small::after {
     white-space: normal;
   }
 }
+/* And on anything up to a small laptop, for the tables whose columns don't
+   fit one (Ray's round 5 list, item 2, 2026-11-15): the recipes using an
+   ingredient, records with numbers (Buy-link clicks, API usage), People
+   and Merged books up to 56rem, the flags up to 60rem. The four rules above, said
+   again, since a media query can't be given a list of widths; :where()
+   keeps them no stronger than those, so each table's own card rules,
+   further down, still decide. */
+@media (max-width: 56rem) {
+  .recipe-table:where(.uses-table, .pairs, .tally, .people-table, .merge-table) thead {
+    display: none;
+  }
+  .recipe-table:where(.uses-table, .pairs, .tally, .people-table, .merge-table) tr {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .recipe-table:where(.uses-table, .pairs, .tally, .people-table, .merge-table),
+  .recipe-table:where(.uses-table, .pairs, .tally, .people-table, .merge-table) tbody {
+    display: block;
+  }
+  .recipe-table:where(.uses-table, .pairs, .tally, .people-table, .merge-table) td,
+  .recipe-table:where(.uses-table, .pairs, .tally, .people-table, .merge-table) td:first-child {
+    display: block;
+    padding: 0.125rem 0;
+    border: none;
+    white-space: normal;
+  }
+}
+@media (max-width: 60rem) {
+  .recipe-table:where(.flag-table) thead {
+    display: none;
+  }
+  .recipe-table:where(.flag-table) tr {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .recipe-table:where(.flag-table),
+  .recipe-table:where(.flag-table) tbody {
+    display: block;
+  }
+  .recipe-table:where(.flag-table) td,
+  .recipe-table:where(.flag-table) td:first-child {
+    display: block;
+    padding: 0.125rem 0;
+    border: none;
+    white-space: normal;
+  }
+}
 .badge {
   display: inline-block;
   margin-left: 0.5rem;
@@ -1327,9 +1376,35 @@ a.secondary.small::after {
 .no-relations {
   margin: 1.25rem 0 0;
 }
-@media (max-width: 40rem) {
+/* The recipes using it, as a table: each column has its share (Ray's round
+   5 list, 2a). Left to the browser, and with any word free to break, the
+   book's column was given 71px of an 820px screen and a title ran down six
+   lines of it, while the recipe's took 491px. */
+.uses-table {
+  table-layout: fixed;
+}
+.uses-table th {
+  box-sizing: border-box;
+}
+.uses-table th:nth-child(1) {
+  width: 43%;
+}
+.uses-table th:nth-child(2) {
+  width: 29%;
+}
+/* 7.5rem, not the list's 5.5rem: with its padding off, that left 64px for
+   "p. 22 · 4.5 of 5 spoons", which is four lines of it. The line as
+   written has the rest: 118px on the narrowest screen that shows a table. */
+.uses-table th:nth-child(3) {
+  width: 7.5rem;
+}
+.uses-table td:first-child {
+  white-space: normal;
+}
+@media (max-width: 56rem) {
   /* A recipe using it: its title, then one line of which book and where
-     (Ray's round 4 list, B10). */
+     (Ray's round 4 list, B10); and so up to 56rem, where four columns
+     are still too many (round 5, 2a). */
   .uses-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1595,8 +1670,34 @@ a.secondary.small::after {
 .author-list .numeric {
   text-align: right;
 }
+/* Its columns have their shares too (found by the check between a phone
+   and a desktop, round 5, 2e): a name is kept on one line in a first
+   column, and one of sixty letters made the page 72px wider than a 700px
+   screen, with "Known for" in what was left. */
+.author-list {
+  table-layout: fixed;
+}
+.author-list th {
+  box-sizing: border-box;
+}
+.author-list th:nth-child(1) {
+  width: 42%;
+}
+.author-list th.numeric {
+  width: 5.5rem;
+}
+.author-list td:first-child {
+  white-space: normal;
+}
 .cell-label {
   display: none;
+}
+@media (max-width: 56rem) {
+  /* With the cards that records with numbers, and merges, are up to here. */
+  :where(.pairs, .tally, .merge-table) .cell-label {
+    display: inline;
+    color: var(--muted);
+  }
 }
 @media (max-width: 40rem) {
   .cell-label {
@@ -2720,6 +2821,16 @@ main h2 {
 .clicks-panels .numeric {
   text-align: right;
 }
+/* An ISBN is one thing: its column was 58px, and it broke in four. And
+   what's counted, a book's title or a page's address, may wrap: kept on
+   one line, as a table's first column is, a title of a hundred letters
+   made the page 66px wider than a 900px screen. */
+.tally td.isbn {
+  white-space: nowrap;
+}
+.tally td:first-child {
+  white-space: normal;
+}
 .usage-table td.warn {
   color: var(--error);
   font-weight: 700;
@@ -2752,7 +2863,7 @@ main h2 {
 .day-count {
   text-align: right;
 }
-@media (max-width: 40rem) {
+@media (max-width: 56rem) {
   .usage-table .numeric,
   .people-table .numeric,
   .clicks-panels .numeric {
@@ -2888,7 +2999,10 @@ main h2 {
 .group-layout > .tool-panel h3 {
   margin-top: 1.25rem;
 }
-@media (max-width: 56rem) {
+/* One column up to 64rem, not 56 (found by a sweep of every 20px, round 5,
+   2e): at 900px the members' table had 468px beside the invite panel, and
+   a name's column of it was 84px. */
+@media (max-width: 64rem) {
   .group-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2897,6 +3011,15 @@ main h2 {
   .group-table .numeric {
     text-align: left;
   }
+}
+/* A member's name may wrap, and "Remove" may not: beside the invite panel
+   the name's column kept its line and the button was left a column one
+   letter wide (found by the check at 1024px, round 5, 2e). */
+.member-table td:first-child {
+  white-space: normal;
+}
+.member-table button {
+  white-space: nowrap;
 }
 .member-table select {
   font: inherit;
@@ -2975,8 +3098,12 @@ main h2 {
   .import-table .numeric {
     text-align: left;
   }
+}
+@media (max-width: 60rem) {
   /* A flag: the recipe and its two buttons, then why and where on one
-     line, then the detail. */
+     line, then the detail. Up to 60rem, not only on a phone: "Why it's
+     flagged" and "Deal with it" didn't fit beside a recipe's title, and
+     the page was 141px wider than an 820px screen (round 5, 2b). */
   .flag-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -3010,7 +3137,11 @@ main h2 {
     padding-top: 0.5rem;
     white-space: normal;
   }
-  /* A person: their name and role, then one line of the rest. */
+}
+@media (max-width: 56rem) {
+  /* A person: their name and role, then one line of the rest. Up to 56rem:
+     at 700px the column of what's trusted was 71px, ten lines deep (found
+     by the check at those widths, round 5, 2e). */
   .people-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -3037,7 +3168,9 @@ main h2 {
     min-height: 2.75rem;
   }
   /* A record with numbers: two to a row, each with its label at the left
-     and the number at the right (Ray's round 4 list, B8, 2026-11-14). */
+     and the number at the right (Ray's round 4 list, B8, 2026-11-14). Up
+     to 56rem since round 5 (2c): Buy-link clicks was wider than an 860px
+     screen, its ISBNs in a column 58px wide. */
   .recipe-table.pairs tr {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

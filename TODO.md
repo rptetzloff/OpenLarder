@@ -482,7 +482,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - [ ] A display name can't be sixty letters: thirty-two is the
           most one may be (names.py), and the check's cook has one of
           those.
-        - [ ] The check looks at two widths. Between a phone and a
+        - [x] (#197, round 5's item 2.) The check looks at two widths.
+          Between a phone and a
           desktop the header doesn't fit when signed in: with a nine-letter
           name, a page is 78px too wide at 650px and 28px at 700px, and
           fits at 740px; with a thirty-two-letter one, 176px too wide at
@@ -860,12 +861,49 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           models/shops.py, routers/suggestions.py and wikidata_names.py
           (two). The test reads Python's strings apart from its
           docstrings, so it holds the rule the grep was after.
-      - [ ] 2. Between a phone and a desktop, 640 to 1100px: an
-        ingredient's recipe table squeezes its Source column; Flagged
-        recipes, My flagged recipes and Buy-link clicks are wider than
-        the screen; the signed-in header can't wrap (measured 2026-11-14,
-        below). And the overflow check at 700, 820 and 1024px, with a
-        rule for tables.
+      - [x] 2. Between a phone and a desktop, 640 to 1100px (#197).
+        - 2a. The recipes using an ingredient: each column has its share
+          (the recipe 43%, the book 29%, where it is 7.5rem, the line as
+          written the rest), and up to 56rem it's the phone's cards. The
+          book's column had 71px of an 820px screen. The list said 5.5rem
+          for "Where"; with its padding off that is 64px, and "p. 22 ·
+          4.5 of 5 spoons" was four lines of it, which the list's own
+          rule for tables (2e) fails. So 7.5rem, and the percentages give
+          up the difference (Claude's choice, 2026-11-15).
+        - 2b. Flagged recipes and My flagged recipes are cards up to
+          60rem.
+        - 2c. Buy-link clicks is cards up to 56rem, an ISBN stays whole,
+          and a title or an address in its first column may wrap. So is
+          API usage, which is the same kind of table and takes the same
+          rules.
+        - 2d. The header is the phone's (logo, Search, Menu) up to 56rem,
+          and the account button shows about twelve letters of a name,
+          with an ellipsis. The button is still called by the whole name,
+          and a name that's cut is said in full at the top of its menu.
+          Twelve by width (12ch), not by count, so nothing but how it's
+          drawn changes.
+        - 2e. The check looks at every page's layout again, signed in, at
+          700, 820, 900 and 1024px, and at every width fails a table's
+          cell under 6rem wide with more than three lines in it. On the
+          layout before this it failed 159 views. It is 916 views where it
+          was 524, and 80 seconds here where it was 47.
+        - 900px isn't in the list. A sweep of every 20px from 640 to
+          1100px (`A11Y_BETWEEN`), after the list's three widths passed,
+          found seven views on three pages that didn't, six of them from
+          900px to 960px, just past 56rem. So the check has that step too.
+        - Found by the check at those widths, and fixed, beyond the list:
+          People at 700px (a column 71px wide, ten lines deep; cards up to
+          56rem now); the Authors list at 700px (72px too wide with a long
+          name kept on one line; its columns have shares); a group's
+          members beside the invite panel at 900px and 1024px ("Remove"
+          one letter to a line; one column up to 64rem, and the name may
+          wrap); Merged books at 660px ("Into" in 92px; cards up to
+          56rem); a shop's key after a long name (broken mid-word; a box
+          of its own).
+        - The sweep's limits: the check's own planted data, in the light
+          theme, signed in. After the fixes it was 2,820 views, none with
+          a problem. It says nothing of pages with real rows, which is
+          where the list found the first of these.
       - [ ] 3. Search results and Saved recipes draw a cover in the
         source's color where there's no picture, not an empty box.
       - [ ] 4. Breadcrumbs stop at the parent, since the last one repeats

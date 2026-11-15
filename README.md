@@ -232,7 +232,10 @@ and the accessibility check below.
 
 The accessibility check (`web/a11y/check.mjs`) runs every kind of page through
 axe-core's WCAG 2.1 AA rules in light and dark, and checks that none scrolls
-sideways on a 360px touch screen or breaks an ordinary word in two. It adds
+sideways on a 360px touch screen, breaks an ordinary word in two, or squeezes
+a table's column to a few letters; and the same of each page's layout, signed
+in, at 700, 820, 900 and 1024px. `A11Y_BETWEEN=640,660,680` looks at other
+widths in their place, for a sweep. It adds
 a sample catalog through the API, so give it a throwaway database and an app
 with archiving off:
 
