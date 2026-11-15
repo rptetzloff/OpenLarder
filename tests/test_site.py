@@ -19,6 +19,7 @@ async def test_production_shows_nothing_unless_theres_a_notice(client, configure
         "production": True,
         "notice": None,
         "analytics_host": None,
+        "ad_clicks": False,
     }
     configure(_settings(environment="production", notice="  Down for   upkeep at 9pm. "))
     assert (await client.get("/api/site")).json()["notice"] == "Down for upkeep at 9pm."

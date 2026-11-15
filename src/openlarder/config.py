@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     # Both or none; none, and nothing is counted.
     umami_script_url: str | None = None
     umami_website_id: str | None = None
+    # Whether an ad's click id is kept, and a new account that follows one
+    # recorded for Google Ads (adclicks.py). *Ray, 2026-11-13.* Off unless
+    # set; it needs the session secret, which signs its cookie.
+    ad_clicks: bool = False
     # The shops' affiliate settings, as they were before the shops table
     # (shops.py; *Ray, 2026-11-13*). Migration 0073 copied each one that was
     # set onto its shop's row, which is what's read now. These are still
@@ -212,6 +216,15 @@ class Settings(BaseSettings):
             )
         if url and not url.startswith("https://"):
             raise ValueError("OPENLARDER_UMAMI_SCRIPT_URL is a web address, starting https://")
+        return self
+
+    @model_validator(mode="after")
+    def _ad_clicks_signed(self) -> "Settings":
+        if self.ad_clicks and not self.session_secret:
+            # Refuse to start rather than keep a cookie anyone could write.
+            raise ValueError(
+                "OPENLARDER_AD_CLICKS needs OPENLARDER_SESSION_SECRET, which signs its cookie"
+            )
         return self
 
     @property

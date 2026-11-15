@@ -22,6 +22,12 @@ which the analytics loader takes off again and turns into an event
 (analytics.py). It names nobody, and isn't added where nothing counts. Not
 a cookie, which the spec asked for: SCOPING.md brings a consent banner
 with any cookie that's for analytics (*Ray, 2026-11-13*).
+
+A new account that follows a click on one of the site's ads is recorded
+for Google Ads, where that's switched on (adclicks.py; *Ray, 2026-11-13*):
+one row, in the sign-in's own transaction, with nothing in it that says
+which account. A returning account never adds one. Any sign-in clears the
+ad's cookie.
 """
 
 import logging
@@ -35,7 +41,7 @@ from fastapi.responses import RedirectResponse
 from joserfc.errors import JoseError
 from pydantic import BaseModel
 
-from openlarder import agreement, analytics, roles
+from openlarder import adclicks, agreement, analytics, roles
 from openlarder.auth import (
     CALLBACK_PATH,
     FAILED,
@@ -178,6 +184,8 @@ async def callback(
     signed = await sign_in(
         session, claims["iss"], claims["sub"], suggested_name_from(claims), token.get("id_token")
     )
+    if signed.new and (click := adclicks.at_sign_up(request, settings)):
+        await adclicks.record(session, click)
     await session.commit()
 
     # Someone with no name yet is asked for one first; the page they began
@@ -196,6 +204,15 @@ async def callback(
         secure=callback_url(request, settings).startswith("https://"),
         samesite="lax",
     )
+    if adclicks.COOKIE in request.cookies:
+        # Whatever the setting is now: a cookie from when it was on goes too.
+        response.delete_cookie(
+            adclicks.COOKIE,
+            path="/",
+            httponly=True,
+            secure=adclicks.secure(settings, request.url.scheme),
+            samesite="lax",
+        )
     return response
 
 

@@ -25,6 +25,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from openlarder import (
     __version__,
+    adclicks,
     analytics,
     crawlers,
     dumps,
@@ -104,9 +105,12 @@ async def lifespan(_app: FastAPI):
     writer = asyncio.create_task(usage.keep_writing(session_factory()))
     # The weekly ODbL data dump, when it's set up (dumps.py).
     weekly = asyncio.create_task(dumps.keep_weekly(session_factory()))
+    # Sign-ups recorded for ads are deleted after 90 days (adclicks.py).
+    pruner = asyncio.create_task(adclicks.keep_pruning(session_factory()))
     yield
     writer.cancel()
     weekly.cancel()
+    pruner.cancel()
     try:
         async with session_factory()() as session:
             await usage.flush(session)
@@ -181,6 +185,9 @@ class NoIndexApi:
 
 
 app.add_middleware(NoIndexApi)
+# An ad's click id, from a page's address into a cookie; nothing unless
+# OPENLARDER_AD_CLICKS is set (adclicks.py).
+app.add_middleware(adclicks.Middleware)
 app.add_middleware(
     SessionMiddleware,
     # Without sign-in configured nothing is ever written to this cookie, so a

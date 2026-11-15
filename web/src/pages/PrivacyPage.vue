@@ -3,11 +3,18 @@ import { onMounted, ref } from "vue";
 
 // Where page views are counted, if they are (analytics.py, /api/site).
 const analyticsHost = ref<string | null>(null);
+// Whether an ad's click id is kept in a cookie (adclicks.py). What's said
+// about it shows only where it's switched on, as the counting's does: the
+// page says what this site does, and the two start at the same moment.
+// *Claude's choice, 2026-11-15; Ray's spec asked that the page say so
+// before the feature is on.*
+const adClicks = ref(false);
 onMounted(async () => {
   const site = await fetch("/api/site")
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
   analyticsHost.value = site?.analytics_host ?? null;
+  adClicks.value = site?.ad_clicks === true;
 });
 // Written from what the code does, not from a template. When what is
 // stored, who processes it, or which cookies are set changes, this page
@@ -18,7 +25,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated November 13, 2026</p>
+    <p class="updated">Last updated November 15, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -28,7 +35,13 @@ document.title = "Privacy policy · OpenLarder";
     </p>
 
     <h2>Browsing</h2>
-    <p>
+    <p v-if="adClicks">
+      You can read the catalog without an account. OpenLarder shows no advertising and loads no
+      third-party tracking scripts, and it does not sell personal information. It advertises on
+      Google, and tells Google one thing: see
+      <a href="#from-an-ad">If you arrive from an ad</a>.
+    </p>
+    <p v-else>
       You can read the catalog without an account. OpenLarder has no advertising and no
       third-party tracking, and it does not sell or share personal information.
     </p>
@@ -99,6 +112,28 @@ document.title = "Privacy policy · OpenLarder";
       never shows who asked. To count each person's vote once, OpenLarder keeps your account, or,
       signed out, the same name made from your IP address as above, never the address itself.
     </p>
+
+    <template v-if="adClicks">
+      <h2 id="from-an-ad">If you arrive from an ad</h2>
+      <p>
+        When you reach OpenLarder by clicking one of its Google ads, Google adds a click id to the
+        address. OpenLarder keeps that id in a cookie, <code>ol_ad_click</code>, for up to 90
+        days. If you create an account in that time, OpenLarder tells Google that the ad click led
+        to a sign-up, and when, to the minute. It sends nothing else: not your name, email,
+        account or what you looked at. Your browser sends Google nothing for this; OpenLarder's
+        server passes it on later.
+      </p>
+      <p>
+        The record OpenLarder keeps holds the click id, when you clicked and the minute the
+        account was created. It has nothing that says which account, and it is deleted after 90
+        days. Signing in removes the cookie.
+      </p>
+      <p>
+        None of this happens if your browser sends Do Not Track or Global Privacy Control, if you
+        are visiting from the EEA, the UK or Switzerland, if OpenLarder can't tell which country
+        you are visiting from, or if you are already signed in.
+      </p>
+    </template>
 
     <h2>Accounts</h2>
     <p>
@@ -197,8 +232,17 @@ document.title = "Privacy policy · OpenLarder";
         and protects the sign-in from being forged. It also holds the page you were on, so
         that signing in brings you back to it.
       </li>
+      <li v-if="adClicks">
+        <code>ol_ad_click</code> is set only when you arrive from one of OpenLarder's ads. It
+        holds Google's click id for up to 90 days, or until you sign in.
+      </li>
     </ul>
-    <p>
+    <p v-if="adClicks">
+      Authgear sets its own cookies on its sign-in pages, and Cloudflare may set a security
+      cookie. OpenLarder sets no cookies for analytics, and none for advertising but
+      <code>ol_ad_click</code>.
+    </p>
+    <p v-else>
       Authgear sets its own cookies on its sign-in pages, and Cloudflare may set a security
       cookie. OpenLarder sets no cookies for advertising or analytics.
     </p>
