@@ -81,9 +81,28 @@ interface Done {
 const done = ref<Done | null>(null);
 const said = ref("");
 const page = ref<HTMLElement | null>(null);
-// "About 8 seconds, or until the next action" (the same list).
+// "About 8 seconds, or until the next action" (the same list). The eight
+// seconds aren't counted while focus is on Undo, and start again, whole,
+// when it leaves. *Ray, 2026-11-15, asked whether the line should stay
+// while focus is on Undo: "Yes on undo".* WCAG 2.2.1 asks that a time
+// limit can be turned off or extended, and as the list had it the line
+// went from under a keyboard's focus at eight seconds. Focus is put on
+// Undo when a card goes, so the line now stays until the reader moves on,
+// and eight seconds after.
 const UNDO_MS = 8000;
 let timer = 0;
+function countDown() {
+  clearTimeout(timer);
+  timer = window.setTimeout(clear, UNDO_MS);
+}
+function pause() {
+  clearTimeout(timer);
+}
+// A window that loses focus sends the button the same event, with focus
+// still on it; that isn't leaving.
+function resume() {
+  if (!onUndo()) countDown();
+}
 let undoButton: HTMLButtonElement | null = null;
 function hold(el: unknown) {
   undoButton = el as HTMLButtonElement | null;
@@ -121,8 +140,9 @@ const onUndo = () => !!undoButton && document.activeElement === undoButton;
 // A card's title, where the card is there.
 const titleOf = (d: Done) =>
   page.value?.querySelector<HTMLElement>(`[data-list="${d.list}"] [data-recipe="${d.recipe.id}"] h3 a`);
-// The title of the card that came after it, the last card if none did, or
-// the tab if the list has no cards left.
+// Where focus goes when a refused change's card can't be found: the title
+// of the card that came after it, the last card if none did, or the tab if
+// the list has no cards left.
 function after(d: Done) {
   const titles = page.value?.querySelectorAll<HTMLElement>(`[data-list="${d.list}"] .hit h3 a`);
   return (
@@ -137,17 +157,12 @@ function say(words: string) {
   nextTick(() => (said.value = words));
 }
 
-// The line goes. If focus was on its Undo, it would be left on nothing, so
-// it moves to the title of the card that came after, the last card if none
-// did, or the tab if the list has no cards left. Focus that had already
-// gone somewhere else is left there.
+// The line goes: focus has been off its Undo for eight seconds, so there
+// is none to move. (Until 2026-11-15 the line could go with focus on it,
+// and focus was then moved to the next card's title, as the list said.)
 function clear() {
-  const d = done.value;
-  if (!d) return;
   clearTimeout(timer);
-  const held = onUndo();
   done.value = null;
-  if (held) nextTick(() => after(d)?.focus());
 }
 
 // Moves a recipe to the other tab, or with no state takes it off the list.
@@ -162,8 +177,14 @@ function change(l: List, r: SavedRecipe, to: State | null) {
   else l.recipes.splice(whole, 1);
   done.value = { list: l.key, owner: l.owner, recipe: { ...r, state: was }, was, at, whole, words };
   say(words);
-  nextTick(() => undoButton?.focus());
-  timer = window.setTimeout(clear, UNDO_MS);
+  countDown();
+  // Focus on Undo stops the count. Said here as well as by the button's
+  // focus event: a second card's line reuses the first's button, which
+  // has focus already and is sent no event.
+  nextTick(() => {
+    undoButton?.focus();
+    if (onUndo()) pause();
+  });
   send(() => (to ? save(r.id, to, l.owner) : unsave(r.id, l.owner)));
 }
 
@@ -305,6 +326,8 @@ watch(
                     class="link"
                     :aria-label="`Undo: ${row.done.recipe.title}`"
                     @click="undo"
+                    @focus="pause"
+                    @blur="resume"
                   >
                     Undo
                   </button>
