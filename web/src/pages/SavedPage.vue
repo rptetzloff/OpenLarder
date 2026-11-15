@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CoverThumb from "../components/CoverThumb.vue";
 import SignInLink from "../components/SignInLink.vue";
 import { computed, ref, watch } from "vue";
 import { whereItIs } from "../ingredients";
@@ -127,8 +128,7 @@ watch(
           </p>
           <ul v-else class="hits">
             <li v-for="(n, i) in notes" :key="i" class="hit">
-              <img v-if="n.cover_url" :src="n.cover_url" alt="" class="hit-cover" loading="lazy" />
-              <span v-else class="hit-cover" aria-hidden="true"></span>
+              <CoverThumb :src="n.cover_url" :title="n.source_title" />
               <div>
                 <h3><a :href="`/recipes/${n.id}`">{{ n.title }}</a></h3>
                 <p class="hit-where">
@@ -184,8 +184,7 @@ watch(
           </p>
           <ul v-else class="hits">
             <li v-for="r in of(l.recipes)" :key="r.id" class="hit">
-              <img v-if="r.cover_url" :src="r.cover_url" alt="" class="hit-cover" loading="lazy" />
-              <span v-else class="hit-cover" aria-hidden="true"></span>
+              <CoverThumb :src="r.cover_url" :title="r.source_title" />
               <div>
                 <h3><a :href="`/recipes/${r.id}`">{{ r.title }}</a></h3>
                 <p class="hit-where">

@@ -135,6 +135,39 @@ const COVER =
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAIAAAA2iEnWAAAAEElEQVR42mPY6qUDRAwoFABM4AcD1RnCuAAAAABJRU5ErkJggg==";
 // A source's page and an author's have their Top rated, which a change to
 // what it waits for could quietly take out of the check.
+// A recipe in a list has its source's cover beside it: the picture, or a
+// block of the colour its drawn cover has (Ray's round 5 list, item 3,
+// 2026-11-15). Where there was no picture it was an empty box, white on
+// the page, and nearly every source here has no picture.
+const THUMBS_DRAWN = `(() => {
+  const thumbs = [...document.querySelectorAll(".hit .hit-cover")];
+  if (!thumbs.length) return "No recipe in the list has a cover beside it";
+  const page = getComputedStyle(document.body).backgroundColor;
+  for (const thumb of thumbs) {
+    if (thumb.querySelector("img.arrived")) continue;
+    const colour = getComputedStyle(thumb).backgroundColor;
+    if (!thumb.style.getPropertyValue("--cover") || colour === page || colour === "rgba(0, 0, 0, 0)")
+      return "A recipe's cover is an empty box (" + colour + "), not its source's colour";
+  }
+  return "";
+})()`;
+// And the two books users.sql gives pictures (one that arrives, one that
+// fails) each have a recipe, so a search for both shows a thumbnail with
+// its picture and one left as its block.
+const THUMB_PICTURES = `(() => {
+  const thumb = (source) =>
+    [...document.querySelectorAll(".hit")]
+      .find((h) => [...h.querySelectorAll("a")].some((a) => a.textContent.trim() === source))
+      ?.querySelector(".hit-cover");
+  const came = thumb("Picture on the Cover");
+  const lost = thumb("Picture That Never Came");
+  if (!came || !lost) return "The recipes of the two books with pictures aren't in the results";
+  const picture = came.querySelector("img.arrived");
+  if (!picture || getComputedStyle(picture).opacity !== "1")
+    return "the cover that arrived isn't shown beside its recipe";
+  if (lost.querySelector("img")) return "the cover that failed left a picture behind beside its recipe";
+  return "";
+})()`;
 const TOP_RATED_SHOWN = `document.querySelector("#top-rated-title + .top-rated li") ? "" : "Top rated isn't shown"`;
 // The privacy page as it reads with ad clicks kept (adclicks.py), which is
 // how the check's site runs: the longer page, with a section, a cookie and
@@ -546,6 +579,19 @@ async function seed() {
     headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },
   });
   if (visit.status < 300 || visit.status >= 400) throw new Error(`The producer's link answered ${visit.status}`);
+  // A recipe in each of the two books users.sql gives a picture, for the
+  // thumbnail beside a recipe in a list.
+  for (const title of ["Picture on the Cover", "Picture That Never Came"]) {
+    const pictured = (await api(`/api/sources?q=${encodeURIComponent(title)}`, "admin")).sources.find(
+      (b) => b.title === title,
+    );
+    const picturedEdition = (await api(`/api/sources/${pictured.id}`, "admin")).editions[0].id;
+    await api(`/api/sources/${pictured.id}/recipes`, "admin", {
+      title: `Thumbnail Toast, ${title}`,
+      editions: [{ edition_id: picturedEdition, page: "1" }],
+      ingredients: ["Bread", "Butter"],
+    });
+  }
   const wordyAuthor = wordyPage.credits[0].author_id;
   // The ingredient users.sql suggests links for, and has foods like.
   const oats = (await api("/api/ingredients?q=Quick-Cooking Oats", "admin")).ingredients.find(
@@ -572,7 +618,8 @@ function pages(s) {
     ["/", "admin"],
     ["/search", null],
     [`/search?i=${s.cheddar}`, null],
-    ["/search?q=biscuits", null],
+    ["/search?q=biscuits", null, { expect: THUMBS_DRAWN }],
+    ["/search?q=thumbnail+toast", null, { expect: `(${THUMBS_DRAWN}) || (${THUMB_PICTURES})` }],
     ["/search?q=biscuits&kind=book&kind=website", null],
     [`/search?tag=${s.vegetarian}`, null],
     [`/search?q=biscuits&x=${s.cheddar}`, null, { expect: OLD_LINK }],
@@ -645,10 +692,10 @@ function pages(s) {
     ["/shelf", null],
     // The book Cy wants: its shops first, on a phone.
     [`/sources/${s.long.id}`, "cook", { phone: true, expect: WANTED_BOOK }],
-    ["/saved", "cook"],
+    ["/saved", "cook", { expect: THUMBS_DRAWN }],
     ["/saved", "admin"],
     ["/saved", null],
-    ["/saved#notes", "cook"],
+    ["/saved#notes", "cook", { expect: THUMBS_DRAWN }],
     ["/saved#notes", "admin"],
     ["/search?sv=1", "cook"],
     [`/sources/${s.book.id}`, "cook"],

@@ -904,8 +904,14 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           theme, signed in. After the fixes it was 2,820 views, none with
           a problem. It says nothing of pages with real rows, which is
           where the list found the first of these.
-      - [ ] 3. Search results and Saved recipes draw a cover in the
-        source's color where there's no picture, not an empty box.
+      - [x] 3. Search results, Saved recipes and Notes have a block of
+        the source's cover color beside a recipe where there's no picture,
+        not an empty white box (#198). The same color its drawn cover has
+        everywhere else, with no words on it: the title is beside it. The
+        block is also what shows until a picture arrives, and when one
+        fails, where the browser's broken picture was. The check plants a
+        recipe in each of its two books with pictures and looks at both
+        thumbnails.
       - [ ] 4. Breadcrumbs stop at the parent, since the last one repeats
         the title under it; on a phone, one link back.
       - [ ] 5. A page's own admin bar (ingredient, source, author) is one
