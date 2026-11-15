@@ -202,7 +202,11 @@ its own (a book's page moves its parts and shortens its list) goes through axe
 at the phone's width too, and
 an entry can click first, for a state only a click makes, or say what its page
 should be showing (a cover's picture once it arrives, its title when the
-picture fails). It starts with a
+picture fails). Its browsers are given the window's focus, as one in front of
+a person has: a headless browser has none, and then no element is ever sent a
+focus or a blur event, so what waits for one never happens (2026-11-15: the
+Undo line on Saved recipes waits for focus to leave it, and in the check it
+never left). It starts with a
 control, a page with problems planted in it, and refuses to report a clean run
 unless it catches them. It takes about a minute and a half: four browsers look at pages at
 once, each as soon as its page has stopped loading, and a page that hasn't

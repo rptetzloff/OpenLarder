@@ -959,10 +959,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - Nothing asks first. A line where the card was says "Moved to
           Cooked.", "Moved to Want to cook." or "Removed.", with Undo,
           for eight seconds or until the next button; the live region
-          says the same words, and focus goes to Undo. When the line
-          goes, focus that was still on Undo moves to the next card's
-          title, or to the tab if the list is empty; focus that had gone
-          elsewhere is left where it is (Claude's reading, 2026-11-15).
+          says the same words, and focus goes to Undo. *Superseded
+          2026-11-15 (#204), below: the eight seconds wait for focus to
+          leave Undo.* When the line goes, focus that was still on Undo
+          moves to the next card's title, or to the tab if the list is
+          empty; focus that had gone elsewhere is left where it is
+          (Claude's reading, 2026-11-15).
         - The tabs' counts move at once: the page changes first and tells
           the server after, one request at a time, so Undo can be pressed
           before the first is answered. If the server says no, the page
@@ -978,12 +980,23 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           check presses "Cooked it" and "Remove" on a phone without
           telling the server, since four browsers look at the page at
           once.
-        - [ ] For Ray: the Undo line goes after eight seconds whether or
-          not focus is on it. WCAG 2.2.1 asks that a time limit can be
-          turned off or extended; the same change can still be made
-          afterwards from the other tab, or the recipe's page, which may
-          be enough. Keeping the line while focus is on Undo would settle
-          it.
+        - [x] The Undo line stays while focus is on Undo (#204). It went
+          after eight seconds whether or not focus was on it, and WCAG
+          2.2.1 asks that a time limit can be turned off or extended.
+          *Ray, 2026-11-15, asked whether to keep the line while focus is
+          on Undo: "Yes on undo".* The eight seconds aren't counted while
+          focus is there and start again, whole, when it leaves. Focus is
+          put on Undo when a card goes, so the line stays until the
+          reader moves on, and eight seconds after; it no longer goes
+          from under focus, so nothing moves focus when it goes. Timed
+          against the running server: still there after 9.7 seconds with
+          focus on Undo, there 7 seconds after focus left, gone at 8.6.
+          - The check's browsers had no window focus, so no page in it
+            was ever sent a focus or a blur event, and this couldn't be
+            seen there. They have it now, as a browser in front of a
+            person does. The check makes the line's eight seconds pass in
+            a twentieth of one, looks for the line with focus on Undo,
+            and looks for it gone once focus has left.
       - [x] 7. A book's buy buttons are grouped by format under a heading
         and say only the shop, in the recipe page's outline style (#203):
         "Print" on a button read as printing the page. "Print book" and

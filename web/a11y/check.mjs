@@ -402,9 +402,12 @@ const OPEN_COOKED = `[...document.querySelectorAll(".saved-page .kind-filter but
 // Pressing a card's button, without the server being told: four browsers
 // look at this page at once, in both themes, and a real press would move
 // the recipe for all of them. The page changes itself first and isn't
-// loaded again after, so what it shows is what a real press shows. The
-// eight seconds the line stays are held as well, so that it is still there
-// when axe has finished with it.
+// loaded again after, so what it shows is what a real press shows. And a
+// wait of five seconds or more is over in a twentieth of one, so the line's
+// eight seconds can be seen to pass: with focus on Undo they aren't
+// counted, and the line is still there when axe has finished with it
+// (Ray, 2026-11-15: the line stays while focus is on Undo); once focus
+// has left, it goes.
 const SAVED_PRESS = (words) => `(() => {
   const real = window.fetch;
   window.fetch = (url, init) =>
@@ -412,7 +415,7 @@ const SAVED_PRESS = (words) => `(() => {
       ? Promise.resolve(new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }))
       : real(url, init);
   const later = window.setTimeout;
-  window.setTimeout = (f, ms, ...rest) => (ms >= 5000 ? 0 : later(f, ms, ...rest));
+  window.setTimeout = (f, ms, ...rest) => later(f, ms >= 5000 ? 50 : ms, ...rest);
   [...document.querySelectorAll(".saved-page .hits .hit button")].find((b) => b.textContent.trim() === ${JSON.stringify(words)}).click();
 })()`;
 // And what it shows then: a line where the card was, with the same words
@@ -427,6 +430,23 @@ const SAVED_DONE = (words) => `(() => {
   if (!line.contains(focus) || focus.textContent.trim() !== "Undo") return "Focus isn't on Undo after a saved recipe's card goes";
   if (!(focus.getAttribute("aria-label") ?? "").startsWith("Undo: ")) return "Undo isn't named with its recipe";
   return "";
+})()`;
+// Focus taken off Undo, and the line's time left to pass: the line has
+// gone, and the card it stood for hasn't come back.
+const SAVED_LEAVE = `(async () => {
+  // Once the page has put focus on Undo, which it does after it has drawn
+  // the line.
+  await new Promise((r) => setTimeout(r, 100));
+  const cards = document.querySelectorAll(".saved-page .hits .hit").length;
+  if (document.activeElement.textContent.trim() !== "Undo") throw new Error("Focus isn't on Undo to take off it");
+  document.activeElement.blur();
+  await new Promise((r) => setTimeout(r, 400));
+  window.cardsWithLine = cards;
+})()`;
+const SAVED_GONE = `(() => {
+  if (document.querySelector(".saved-page .done-line")) return "The line where a saved recipe was is still there after focus left Undo";
+  const cards = document.querySelectorAll(".saved-page .hits .hit").length;
+  return cards === window.cardsWithLine - 1 ? "" : "With the line gone there are " + cards + " cards, not one fewer than the " + window.cardsWithLine + " with it";
 })()`;
 // Search, kept to what can be made now: every recipe listed has everything,
 // and with none to list, the next step is offered.
@@ -876,6 +896,11 @@ function pages(s) {
     ["/saved", "cook", { phone: true, then: OPEN_COOKED, expect: onPhone(SAVED_CARDS("Cook again")) }],
     ["/saved", "cook", { phone: true, then: SAVED_PRESS("Cooked it"), expect: onPhone(SAVED_DONE("Moved to Cooked.")) }],
     ["/saved", "cook", { phone: true, then: SAVED_PRESS("Remove"), expect: onPhone(SAVED_DONE("Removed.")) }],
+    [
+      "/saved",
+      "cook",
+      { phone: true, then: `${SAVED_PRESS("Cooked it")}; ${SAVED_LEAVE}`, expect: onPhone(SAVED_GONE) },
+    ],
     ["/saved", null],
     ["/saved#notes", "cook", { expect: THUMBS_DRAWN }],
     ["/saved#notes", "admin"],
@@ -1080,6 +1105,11 @@ async function browser(n) {
   await send("Page.setLifecycleEventsEnabled", { enabled: true });
   await send("Runtime.enable");
   await send("Network.enable");
+  // The page has the window's focus, as it does in front of a person. A
+  // headless browser's has none, and then no element is sent a focus or a
+  // blur event whatever is focused: the Undo line on Saved recipes, which
+  // waits for focus to leave it, never saw it leave (2026-11-15).
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   await send("Fetch.enable", { patterns: [{ urlPattern: "*/covers/*" }] });
   return { send, evaluate, failures, inflight, state, close: () => (ws.close(), proc.kill()) };
 }
