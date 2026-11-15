@@ -292,22 +292,32 @@ const CRUMBS = `(() => {
   return "";
 })()`;
 // The admin bar: its links in the bar on a wide screen; on a phone one row,
-// with the page's name on a button, and the links only once it's pressed.
-const ADMIN_BAR = `(() => {
-  const bar = document.querySelector("#admin-bar nav");
-  const button = bar?.querySelector(".bar-toggle");
-  if (!bar || !button) return "the admin bar isn't shown";
-  const shown = [...bar.querySelectorAll("a")].filter((a) => a.getClientRects().length).length;
+// with a button that says `label` (the admin page's name, or "This
+// ingredient" on a page's own bar: Ray's round 5 list, item 5), and the
+// links only once it's pressed, each then tall enough for a thumb.
+const ADMIN_BAR = (label) => `(() => {
+  const bar = document.querySelector("#admin-bar .admin-bar");
+  if (!bar) return "the admin bar isn't shown";
+  const button = bar.querySelector(".bar-toggle");
+  if (!button) return "the admin bar has no button to fold its links under on a phone";
+  const links = [...bar.querySelectorAll("a")].filter((a) => a.getClientRects().length);
   if (innerWidth >= 640)
-    return shown && !button.getClientRects().length ? "" : "the admin bar's links aren't in the bar on a wide screen";
-  if (button.getAttribute("aria-expanded") === "true")
-    return shown ? "" : "the admin bar's button didn't open its links";
-  if (shown) return "the admin bar's links show on a phone before its button is pressed";
+    return links.length && !button.getClientRects().length ? "" : "the admin bar's links aren't in the bar on a wide screen";
+  if (!button.textContent.includes(${JSON.stringify(label)}))
+    return "the admin bar's button says " + JSON.stringify(button.textContent.trim()) + ", not " + ${JSON.stringify(JSON.stringify(label))};
+  if (button.getAttribute("aria-expanded") === "true") {
+    if (!links.length) return "the admin bar's button didn't open its links";
+    const low = links.find((a) => a.getBoundingClientRect().height < 44);
+    return low ? "the admin bar's link " + JSON.stringify(low.textContent.trim()) + " is " + Math.round(low.getBoundingClientRect().height) + "px tall, under 44px" : "";
+  }
+  if (links.length) return "the admin bar's links show on a phone before its button is pressed";
   const tall = Math.round(bar.getBoundingClientRect().height);
   if (tall > 56) return "the admin bar is " + tall + "px tall on a phone, more than one row";
-  if (!button.textContent.includes("Flagged recipes")) return "the admin bar's button doesn't name the page";
   return "";
 })()`;
+const OPEN_BAR = `document.querySelector(".bar-toggle").click()`;
+// An author's bar offers the other author of the same name, to merge.
+const DUPLICATE_SAID = `document.querySelector("#admin-bar").textContent.includes("Possible duplicate:") ? "" : "The author's admin bar doesn't offer the other author of that name"`;
 // Search, kept to what can be made now: every recipe listed has everything,
 // and with none to list, the next step is offered.
 const MAKE_NOW = `(() => {
@@ -636,6 +646,20 @@ async function seed() {
     });
   }
   const wordyAuthor = wordyPage.credits[0].author_id;
+  // A second author named as Ann Author is, and a second named the long
+  // word, so each one's page offers the other to merge in its admin bar:
+  // the bar's longest state, and the one with a typed name in it. A name
+  // that's already an author's means that author, so each is made under
+  // another name and then renamed, which nothing refuses. Last, so that
+  // nothing after it credits "Ann Author" and gets a third.
+  for (const [title, name] of [
+    ["The Other Ann's Book", "Ann Author"],
+    ["The Other Long Book", LONG],
+  ]) {
+    const twinBook = await api("/api/sources/manual", "admin", { title, authors: [`${title}'s author`] });
+    const twin = (await api(`/api/sources/${twinBook.id}`, "admin")).credits[0].author_id;
+    await api(`/api/authors/${twin}`, "admin", { name, kind: "person" }, "PATCH");
+  }
   // The ingredient users.sql suggests links for, and has foods like.
   const oats = (await api("/api/ingredients?q=Quick-Cooking Oats", "admin")).ingredients.find(
     (i) => i.name === "Quick-Cooking Oats",
@@ -671,7 +695,7 @@ function pages(s) {
     ["/sources", "admin"],
     ["/sources?kind=book&kind=website&sort=recipes", null],
     [`/sources/${s.book.id}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],
-    [`/sources/${s.book.id}`, "admin"],
+    [`/sources/${s.book.id}`, "admin", { expect: ADMIN_BAR("This book") }],
     [`/sources/${s.site.id}`, null],
     [`/sources/${s.magazine.id}`, null],
     [`/sources/${s.show.id}`, null],
@@ -692,19 +716,19 @@ function pages(s) {
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
     [`/ingredients/${s.cheddar}`, null, { expect: `(${COUNTS_AS}) || (${CRUMBS})` }],
-    [`/ingredients/${s.cheddar}`, "admin", { expect: COUNTS_AS }],
+    [`/ingredients/${s.cheddar}`, "admin", { expect: `(${COUNTS_AS}) || (${ADMIN_BAR("This ingredient")})` }],
     [`/ingredients/${s.cheese}`, null, { expect: `(${INCLUDES}) || (${ALLERGEN_NOTICE})` }],
     ["/authors", null],
     ["/authors?sort=recipes&kind=person", null],
     [`/authors/${s.author}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],
-    [`/authors/${s.author}`, "admin"],
+    [`/authors/${s.author}`, "admin", { expect: ADMIN_BAR("This author") }],
     ["/groups", "cook"],
     [`/groups/${s.group.id}`, "cook", { expect: CRUMBS }],
     ["/invite/not-a-real-invite", null],
     ["/account", "cook"],
     ["/account/flags", "admin"],
     ["/admin", "admin"],
-    ["/admin/flags", "admin", { expect: ADMIN_BAR }],
+    ["/admin/flags", "admin", { expect: ADMIN_BAR("Flagged recipes") }],
     ["/admin/imports", "admin"],
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],
@@ -777,8 +801,16 @@ function pages(s) {
     [
       "/admin/flags",
       "admin",
-      { phone: true, then: `document.querySelector(".bar-toggle").click()`, expect: ADMIN_BAR },
+      { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("Flagged recipes") },
     ],
+    // And the bars an ingredient's, a source's and an author's page add for
+    // themselves, opened: an ingredient with recipes, so "Delete" is a
+    // sentence and not a link, and two authors with a second of their name
+    // to merge, one of them the long word.
+    [`/ingredients/${s.cheddar}`, "admin", { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("This ingredient") }],
+    [`/sources/${s.book.id}`, "admin", { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("This book") }],
+    [`/authors/${s.author}`, "admin", { phone: true, then: OPEN_BAR, expect: `(${ADMIN_BAR("This author")}) || (${DUPLICATE_SAID})` }],
+    [`/authors/${s.wordyAuthor}`, "admin", { phone: true, then: OPEN_BAR, expect: `(${ADMIN_BAR("This author")}) || (${DUPLICATE_SAID})` }],
     [
       "/admin/suggestions",
       "admin",

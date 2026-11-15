@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminBand from "../components/AdminBand.vue";
 import Crumbs from "../components/Crumbs.vue";
 import { computed, onMounted, ref } from "vue";
 import IngredientAllergens from "../components/IngredientAllergens.vue";
@@ -165,20 +166,15 @@ onMounted(() => {
     <p v-else-if="failed" role="alert">This ingredient couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!ingredient" class="status">Loading…</p>
     <template v-else>
-      <Teleport v-if="user?.may_edit" to="#admin-bar" defer>
-        <div class="admin-bar">
-          <div class="bar">
-            <strong>Admin</strong>
-            <a href="#ingredient-name">Rename</a>
-            <a href="#merge-into">Merge into…</a>
-            <a href="#parent-of">Count it as…</a>
-            <a href="#child-of">Add an ingredient this includes…</a>
-            <a v-if="ingredient.aliases.length" href="#also-called">Edit other names</a>
-            <a v-if="ingredient.total === 0" href="#delete-ingredient">Delete</a>
-            <span v-else class="muted">Delete (only when nothing uses it)</span>
-          </div>
-        </div>
-      </Teleport>
+      <AdminBand v-if="user?.may_edit" id="admin-here" label="This ingredient" before="Admin: ">
+        <a href="#ingredient-name">Rename</a>
+        <a href="#merge-into">Merge into…</a>
+        <a href="#parent-of">Count it as…</a>
+        <a href="#child-of">Add an ingredient this includes…</a>
+        <a v-if="ingredient.aliases.length" href="#also-called">Edit other names</a>
+        <a v-if="ingredient.total === 0" href="#delete-ingredient">Delete</a>
+        <span v-else class="muted">Delete (only when nothing uses it)</span>
+      </AdminBand>
 
       <Crumbs :trail="[{ href: '/ingredients', label: 'Ingredients' }]" />
 

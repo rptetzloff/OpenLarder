@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminBand from "../components/AdminBand.vue";
 import Crumbs from "../components/Crumbs.vue";
 import SourceCover from "../components/SourceCover.vue";
 import OptionList from "../components/OptionList.vue";
@@ -156,24 +157,17 @@ onMounted(load);
     <p v-else-if="failed" role="alert">This author couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!author" class="status">Loading…</p>
     <template v-else>
-      <Teleport v-if="user?.may_edit" to="#admin-bar" defer>
-        <div class="admin-bar">
-          <div class="bar">
-            <strong>Admin</strong>
-            <a href="#author-name">Edit name and kind</a>
-            <a href="#link-url">Edit links</a>
-            <a href="#wikidata-item">Wikidata</a>
-            <template v-if="author.same_name.length">
-              <span>
-                Possible duplicate:
-                <a :href="`/authors/${author.same_name[0].id}`">{{ author.same_name[0].name }}</a>
-                ·
-                <a href="#same-name">Merge</a>
-              </span>
-            </template>
-          </div>
-        </div>
-      </Teleport>
+      <AdminBand v-if="user?.may_edit" id="admin-here" label="This author" before="Admin: ">
+        <a href="#author-name">Edit name and kind</a>
+        <a href="#link-url">Edit links</a>
+        <a href="#wikidata-item">Wikidata</a>
+        <span v-if="author.same_name.length">
+          Possible duplicate:
+          <a :href="`/authors/${author.same_name[0].id}`">{{ author.same_name[0].name }}</a>
+          ·
+          <a href="#same-name">Merge</a>
+        </span>
+      </AdminBand>
 
       <Crumbs :trail="[{ href: '/authors', label: 'Authors' }]" />
 

@@ -919,7 +919,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         have one, through one component (Crumbs.vue). On a phone it is one
         link back to the parent, with a chevron, on one line with an
         ellipsis, and 44px to tap. On a recipe's page on openlarder.com at
-        384px the trail was 135px tall and the title began 224px down.
+        384px the trail was 135px tall and the title began 224px down;
+        once this was live, the same page had 46px and 111px.
         - "Books" in "Sources / Books" is a link now, to the sources of
           that kind, so a phone has "‹ Books" above a book and not
           "‹ Sources" (Claude's choice, 2026-11-15, said to Ray before it
@@ -927,8 +928,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - Search engines are still given the whole trail, the page itself
           last (pages.py: the BreadcrumbList). The page crawlers read
           stops at the parent, as the page does.
-      - [ ] 5. A page's own admin bar (ingredient, source, author) is one
-        row on a phone, as the main one is.
+      - [x] 5. A page's own admin bar (ingredient, source, author) is one
+        row on a phone, as the main one is (#201): "Admin" and a button,
+        "This ingredient", "This book" (or "This website", by the source's
+        kind) or "This author", which opens the links two to a row, each
+        44px to tap. 49px at 384px, where an ingredient's was 99px and a
+        source's and an author's 70px. The band and its button are one
+        component now (AdminBand.vue), which the admin pages' bar uses
+        too. Above 40rem nothing moved: every part of seven pages' bars
+        is where it was at 641, 700, 900 and 1280px.
+        - A link that is followed shuts the links: most of these lead to
+          a place further down the same page, and the bar would have
+          stayed open above it. Esc shuts them and gives focus back to the
+          button, as on the admin pages.
+        - What isn't a link has a row of its own: "Delete (only when
+          nothing uses it)", and an author's "Possible duplicate: Ann
+          Author · Merge".
+        - A screen reader hears "Admin: This ingredient" on the button
+          (Claude's choice, 2026-11-15): it may come to the button without
+          the "Admin" beside it.
+        - The check opens each of the three on a phone, and plants a
+          second author of the same name for two authors, one the long
+          word, so the bar's longest state is looked at.
       - [ ] 6. Saved recipes: one button for each tab ("Cooked it", "Cook
         again") and Remove, each with an Undo. *Ray, 2026-11-15: one
         button per tab over the two pills.*
