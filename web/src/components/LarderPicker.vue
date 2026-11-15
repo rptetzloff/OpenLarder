@@ -4,14 +4,17 @@ import { computed, onMounted, ref } from "vue";
 import OptionList from "./OptionList.vue";
 import { type Item, type Larder, loadLarder } from "../larder";
 
-// "From my larder" on the search page: which lists to search with, and,
-// for a big pantry, only some things in them or all but some. *Ray,
-// 2026-11-10.* The search counts each thing as itself and what's above it.
+// The larder on the search page: which lists to search with, and, for a
+// big pantry, only some things in them or all but some. *Ray, 2026-11-10.*
+// The search counts each thing as itself and what's above it. It's under
+// "More options" there, behind "Use my larder", which ticks every list
+// (*Ray's round 4 list, C, 2026-11-14*); the page is told the lists there
+// are, so it knows whether to offer that.
 const lists = defineModel<string[]>("lists", { required: true });
 const only = defineModel<string[]>("only", { required: true });
 const leaveOut = defineModel<string[]>("leaveOut", { required: true });
 const props = defineProps<{ counted?: number | null; tickAll?: boolean }>();
-const emit = defineEmits<{ change: [] }>();
+const emit = defineEmits<{ change: []; loaded: [lists: string[]] }>();
 
 const larder = ref<Larder | null>(null);
 const findOnly = ref("");
@@ -19,6 +22,7 @@ const findOut = ref("");
 
 onMounted(async () => {
   larder.value = await loadLarder().catch(() => null);
+  emit("loaded", larder.value?.lists.map((l) => l.id) ?? []);
   // An older link's larder=1: every list.
   if (props.tickAll && larder.value && !lists.value.length && !only.value.length) {
     lists.value = larder.value.lists.map((l) => l.id);
@@ -76,7 +80,7 @@ const inUse = computed(() => !!lists.value.length || !!only.value.length);
 
 <template>
   <fieldset class="larder-picker">
-    <legend>From my larder</legend>
+    <legend>Larder lists</legend>
     <p v-if="larder && !larder.lists.length" class="help">
       <a href="/larder">Make a larder</a> of what you have, and search with it here.
     </p>

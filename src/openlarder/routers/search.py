@@ -16,6 +16,12 @@ the entry rules, so they never count as missing. A line citing another
 recipe is a component to make, not something you have, and counts as
 missing.
 
+**Only what you can make** (`missing_max`; *Ray, 2026-11-14*): with
+ingredients or a larder, keeps the recipes missing at most that many lines:
+0 for those you have everything for, or 1 or 2. What counts as missing is
+as above, and doesn't change. Without ingredients it has nothing to count,
+and does nothing.
+
 **Title words** must all appear in the title, ignoring case; accents count,
 as they do for ingredients. The trigram index on recipe titles serves them.
 The closest titles come first (title_rank.py): the words as whole words,
@@ -173,6 +179,16 @@ async def search(
     # "rating": the rated recipes first, best first, then the rest as they'd
     # come anyway (routers/ratings.py). Ray, 2026-11-12.
     sort: Literal["match", "rating"] = "match",
+    missing_max: int | None = Query(
+        None,
+        ge=0,
+        le=2,
+        description=(
+            "With ingredients or a larder: only recipes missing at most this many lines."
+            " 0 keeps those you have everything for. Left out, ingredients rank recipes"
+            " and don't filter them."
+        ),
+    ),
     offset: int = Query(0, ge=0),
 ) -> Found:
     stocked: list[uuid.UUID] = []
@@ -275,7 +291,14 @@ async def search(
     title = (words, found.q) if words else None
     if stocked:
         found.recipes, found.total = await _best_match(
-            session, known, conditions, offset, upward=stocked, by_rating=by_rating, title=title
+            session,
+            known,
+            conditions,
+            offset,
+            upward=stocked,
+            by_rating=by_rating,
+            title=title,
+            missing_max=missing_max,
         )
         return found
     if not known:
@@ -285,7 +308,13 @@ async def search(
         found.recipes = [Hit(**r.model_dump()) for r in page]
         return found
     found.recipes, found.total = await _best_match(
-        session, known, conditions, offset, by_rating=by_rating, title=title
+        session,
+        known,
+        conditions,
+        offset,
+        by_rating=by_rating,
+        title=title,
+        missing_max=missing_max,
     )
     return found
 
@@ -363,6 +392,7 @@ async def _best_match(
     upward: list[uuid.UUID] = (),
     by_rating: bool = False,
     title: tuple[list[str], str] | None = None,
+    missing_max: int | None = None,
 ):
     """Recipes covering any line with what you have: those using the most of
     your ingredients first, then by the share of their lines you have (so
@@ -371,7 +401,8 @@ async def _best_match(
     both first; ranking by share alone put one-line garlic pastes there.
     by_rating: the rated ones first, best first, then the rest that way.
     title: a title search's words and the search as typed; recipes level
-    on what you have come closest title first (title_rank.py)."""
+    on what you have come closest title first (title_rank.py).
+    missing_max: only those with at most this many lines not covered."""
     # Which of yours each match is under (or, from a larder, above): to count
     # how many of yours a recipe uses, and to say which.
     have = list(dict.fromkeys([*chosen, *upward]))
@@ -419,6 +450,8 @@ async def _best_match(
         .join(Source, Source.id == Recipe.source_id)
         .where(*conditions)
     )
+    if missing_max is not None:
+        matching = matching.where(tally.c.lines - tally.c.have <= missing_max)
     total = await session.scalar(select(func.count()).select_from(matching.subquery()))
     first, closest = (), [func.lower(Source.title), func.lower(Recipe.title)]
     if by_rating or title:

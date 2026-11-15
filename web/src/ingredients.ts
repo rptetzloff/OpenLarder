@@ -233,6 +233,7 @@ export async function searchRecipes(
     onShelf = false,
     saved = false,
     byRating = false,
+    missingMax = null,
   }: {
     offset?: number;
     sources?: string[];
@@ -252,6 +253,9 @@ export async function searchRecipes(
     saved?: boolean;
     // The rated recipes first, best first, then the rest as they'd come.
     byRating?: boolean;
+    // With ingredients or a larder: only recipes missing at most this many
+    // lines; 0 is what you can make now.
+    missingMax?: number | null;
   } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
@@ -269,6 +273,7 @@ export async function searchRecipes(
   if (onShelf) query.set("shelf", "true");
   if (saved) query.set("saved", "true");
   if (byRating) query.set("sort", "rating");
+  if (missingMax !== null) query.set("missing_max", String(missingMax));
   if (offset) query.set("offset", String(offset));
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");
