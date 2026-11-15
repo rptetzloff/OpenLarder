@@ -475,6 +475,9 @@ function pages(s) {
       "admin",
       { phone: true, then: `document.querySelector("main details.how").open = true` },
     ],
+    // Admin's diets: one being changed, and one being added.
+    ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .change").click()` }],
+    ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .add-diet").click()` }],
     // The long word's own pages. Its other places are on pages above: both
     // lists of flags, the reports, the clicks, the requests, Cy's larder,
     // shelf and saved recipes, the lists of sources, ingredients and authors.
