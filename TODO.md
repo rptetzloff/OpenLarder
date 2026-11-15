@@ -1060,6 +1060,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
+- [ ] **"Want this book".** *Ray, 2026-11-14: "Add want this book to
+      to-do", after asking when it had been removed.* It never was there:
+      nothing in the code or its history has had it. What there is beside
+      it: "I have this book" on a book's page, which puts it on your shelf
+      and has the one state; "Want to cook" and "Cooked" on a recipe; and
+      "Request it" on Sources, for a book to be indexed. Not started, and
+      what it is to do is Ray's to say. Claude's guesses at the questions:
+      whether it's a second state of the shelf (a wish list beside what's
+      owned, shared with household groups as the shelf is) or a list of
+      its own; whether Search's "Only books on my shelf" should leave
+      wanted books out; and whether a wanted book's page should put its
+      buy links first.
 - [x] **Diets from Admin: adding, renaming and removing.** *Ray,
       2026-11-14: "ability for admin to create diets"; and, asked whether
       to rename and remove them too, and to set what a diet avoids only
