@@ -107,6 +107,30 @@ const AD_PRIVACY = `(() => {
   const cookies = [...document.querySelectorAll("li code")].map((c) => c.textContent);
   return cookies.includes("ol_ad_click") ? "" : "The privacy page's cookies don't list ol_ad_click";
 })()`;
+// A book Cy wants (routers/shelf.py): "I want this book" is pressed on its
+// page, and its shops are first on a phone, above the page's buttons, and
+// beside the cover on a wide screen. And his shelf, and Ada's view of it, have
+// what he wants under what he has.
+const WANTED_BOOK = `(() => {
+  const want = [...document.querySelectorAll(".shelf-pills button")].find((b) => b.textContent.trim() === "I want this book");
+  if (!want) return "There's no “I want this book” on the book's page";
+  if (want.getAttribute("aria-pressed") !== "true") return "“I want this book” isn't pressed for a book that's wanted";
+  const buy = document.querySelector(".source-buy");
+  if (!buy) return "The wanted book has no shops to buy it from";
+  const narrow = matchMedia("(max-width: 40rem)").matches;
+  const first = !!buy.closest("#source-buy-first");
+  if (narrow && !first) return "On a phone the wanted book's shops aren't first";
+  if (!narrow && first) return "On a wide screen the wanted book's shops have left the cover's side";
+  if (narrow && !(buy.compareDocumentPosition(document.querySelector(".book-actions")) & Node.DOCUMENT_POSITION_FOLLOWING))
+    return "The wanted book's shops aren't before its buttons in the document";
+  return "";
+})()`;
+const WANTS_ON_SHELF = `(() => {
+  const heads = [...document.querySelectorAll(".shelf-wants")];
+  if (heads.length !== 1) return "The shelf page has " + heads.length + " lists of wanted books, not one";
+  const cards = heads[0].nextElementSibling?.querySelectorAll(".cover-card").length ?? 0;
+  return cards === 1 ? "" : "The wanted books' list has " + cards + " books, not the one planted";
+})()`;
 // Producers (producers.py): the check plants two, so their page has cards,
 // the footer its link, an ingredient's page its card, and the privacy page
 // and the terms their paragraphs. Without these a run that planted none
@@ -392,6 +416,8 @@ async function seed() {
   await api(`/api/recipes/${word.id}/notes`, "cook", { body: `${LONG}\n${address}`, groups: [group.id] }, "PUT");
   await api(`/api/saved/${word.id}`, "cook", { state: "want" }, "PUT");
   await api(`/api/shelf/${wordy.id}`, "cook", { edition_id: wordyEdition }, "PUT");
+  // And wants the long one, which has an ISBN and so shops to buy it from.
+  await api(`/api/shelf/${long.id}`, "cook", { state: "want" }, "PUT");
   await api(`/api/recipes/${word.id}/rating`, "cook", { spoons: 5 }, "PUT");
   await api("/api/requests", "cook", { title: LONG, author: LONG, note: `${LONG} ${address}` });
   await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: LONG });
@@ -526,9 +552,11 @@ function pages(s) {
     ["/larder", "admin"],
     ["/search?larder=1", "cook"],
     ["/larder", null],
-    ["/shelf", "cook"],
-    ["/shelf", "admin"],
+    ["/shelf", "cook", { phone: true, expect: WANTS_ON_SHELF }],
+    ["/shelf", "admin", { phone: true, expect: WANTS_ON_SHELF }],
     ["/shelf", null],
+    // The book Cy wants: its shops first, on a phone.
+    [`/sources/${s.long.id}`, "cook", { phone: true, expect: WANTED_BOOK }],
     ["/saved", "cook"],
     ["/saved", "admin"],
     ["/saved", null],

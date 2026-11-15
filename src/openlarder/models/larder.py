@@ -80,10 +80,16 @@ class LarderListGroup(Base):
 
 class ShelfBook(Timestamps, Base):
     """A book someone owns, and which edition if they've said (migration
-    0062): their shelf, which search can keep to. Private, like the larder."""
+    0062), or one they want (0078): their shelf, which search can keep to
+    the books they have. Private, like the larder."""
 
     __tablename__ = "shelf_books"
-    __table_args__ = (PrimaryKeyConstraint("user_id", "source_id"),)
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "source_id"),
+        CheckConstraint("state IN ('have', 'want')", name="state_known"),
+        # Which edition is owned is said once the book is.
+        CheckConstraint("state = 'have' OR edition_id IS NULL", name="wanted_has_no_edition"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -98,6 +104,8 @@ class ShelfBook(Timestamps, Base):
     edition_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("editions.id", ondelete="SET NULL"), index=True
     )
+    # "have", or "want" (*Ray, 2026-11-14*).
+    state: Mapped[str] = mapped_column(Text, nullable=False, server_default="have")
 
 
 class ShelfGroup(Base):

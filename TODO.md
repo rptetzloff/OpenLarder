@@ -1185,12 +1185,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
-- [ ] **"Want this book".** *Ray, 2026-11-14: "Add want this book to
-      to-do", after asking when it had been removed.* It never was there:
-      nothing in the code or its history has had it. What there is beside
-      it: "I have this book" on a book's page, which puts it on your shelf
-      and has the one state; "Want to cook" and "Cooked" on a recipe; and
-      "Request it" on Sources, for a book to be indexed. Not started.
+- [x] **"Want this book"** (#195). *Ray, 2026-11-14: "Add want this
+      book to to-do", after asking when it had been removed.* It never was
+      there: nothing in the code or its history had it. What there was
+      beside it: "I have this book" on a book's page, which puts it on
+      your shelf and had the one state; "Want to cook" and "Cooked" on a
+      recipe; and "Request it" on Sources, for a book to be indexed.
       *Ray's answers, the same day, to what Claude asked:*
       - It's a second state of the shelf, beside having the book ("Second
         shelf state"): a book on your shelf is one you have or one you
@@ -1198,10 +1198,35 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - Search's "Only books on my shelf" leaves wanted books out ("yes
         exclude").
       - A wanted book's page puts its buy links first ("yes").
-      - [ ] Not asked yet, for whoever builds it: whether a wanted book is
-        shared with household groups as the rest of a shelf is; where the
-        wanted ones show on the Shelf page; and what the count beside
-        "Only books on my shelf" counts.
+      *Built so:*
+      - "I want this book" is a second pill beside "I have this book" on a
+        book's page, there while you don't have the book. A book is had or
+        wanted, never both (migration 0078, `shelf_books.state`); a wanted
+        one has no edition.
+      - Search's "Only books on my shelf", and the count beside it, are of
+        the books had: yours and those on shelves shared with you.
+      - On a phone a wanted book's shops are above the page's buttons,
+        across the page, moved in the document itself. On a wide screen
+        they're beside the cover, where they were. They're placed as the
+        page found the book: pressing the pill doesn't move them, since
+        that would move the pill from under the finger.
+      - The Shelf page has "Books you want" under your books, each with
+        "I have it now" and "Take off"; the line at the top counts them
+        apart ("2 books, and 1 wanted").
+      - Merging two books keeps a book had over the same one wanted.
+      - Claude's answers to the three things not asked, to overrule if
+        wrong: wanted books are shared with the same groups as the rest
+        of the shelf, since a shelf is shared whole, and the group's
+        editors may take one off or say it's had; they show on the Shelf
+        page under each shelf's books, yours and each shared with you;
+        the count beside "Only books on my shelf" is of books had.
+      - The first try put the shops beside the cover on a phone,
+        under who wrote the book. The accessibility check failed it:
+        "Bookshop.org" broke in two there. Above the buttons is the
+        highest place with the page's width.
+      - [ ] Not built: a list of wanted books to share outside a group
+        (a gift list), and anything that says when a wanted book's price
+        drops.
 - [x] **Diets from Admin: adding, renaming and removing.** *Ray,
       2026-11-14: "ability for admin to create diets"; and, asked whether
       to rename and remove them too, and to set what a diet avoids only
