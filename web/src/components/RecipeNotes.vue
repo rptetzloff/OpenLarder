@@ -125,7 +125,6 @@ const when = (at: string) =>
 }
 .note-body {
   white-space: pre-line;
-  overflow-wrap: anywhere;
 }
 .note-meta {
   font-size: 0.875rem;

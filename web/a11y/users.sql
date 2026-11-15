@@ -6,9 +6,11 @@
 WITH people AS (
   -- Both have accepted the contributor agreement (its version is
 -- agreement.VERSION); Cy is a contributor, so what he adds waits for review.
+-- His name is one word as long as a name may be (names.MAX_LENGTH, 32), so
+-- the check sees every place a name is shown with nowhere to break it.
 INSERT INTO users (issuer, subject, display_name, role, agreed_at, agreed_version)
   VALUES ('a11y-check', 'admin', 'Ada Admin', 'owner', now(), '2026-11-10.2'),
-         ('a11y-check', 'cook', 'Cy Cook', 'contributor', now(), '2026-11-10.2'),
+         ('a11y-check', 'cook', 'Cylopadotemachoselachogaleokrani', 'contributor', now(), '2026-11-10.2'),
          ('a11y-check', 'new', NULL, 'user', NULL, NULL)
   ON CONFLICT (issuer, subject) DO UPDATE SET display_name = EXCLUDED.display_name
   RETURNING id, subject
@@ -82,3 +84,27 @@ WITH s AS (
 )
 INSERT INTO editions (source_id, open_library_cover_id)
 SELECT id, CASE title WHEN 'Picture on the Cover' THEN 1 ELSE 2 END FROM s;
+
+-- Foods, and links suggested to them, as FoodData Central's load and
+-- fdc_match.py leave them (nothing in the API adds a food): for Ingredient
+-- links, and for linking an ingredient by hand on its own page. The
+-- descriptions are as long as USDA writes them, which is what a phone has
+-- to fit. The numbers are made up; the check follows no link.
+INSERT INTO fdc_foods (fdc_id, data_type, description, category) VALUES
+  (1, 'sr_legacy_food', 'Cereals, oats, regular and quick, not fortified, dry', 'Breakfast Cereals'),
+  (2, 'survey_fndds_food',
+   'Oatmeal, quick-cooking oats, regular or instant, made with water, no added fat, salted in cooking',
+   'Cooked Cereals'),
+  (3, 'foundation_food', 'Oats, quick-cooking, whole grain, rolled, old fashioned', 'Cereal Grains and Pasta')
+ON CONFLICT DO NOTHING;
+INSERT INTO ingredient_link_suggestions
+  (ingredient_id, source, fdc_id, wikidata_id, label, alias, region, certainty)
+SELECT i.id, v.source, v.fdc_id, v.wikidata_id, v.label, v.alias, v.region, v.certainty
+FROM ingredients i
+JOIN (VALUES
+  ('Quick-Cooking Oats', 'fdc', 1, NULL, NULL, NULL, NULL, 'likely'),
+  ('Quick-Cook Oats', 'fdc', 2, NULL, NULL, NULL, NULL, 'unsure'),
+  ('Quick-Cooking Oats', 'wikidata', NULL, 'Q999999991', 'oat', NULL, NULL, 'unsure'),
+  ('Quick-Cooking Oats', 'alias', NULL, 'Q999999991', 'oat', 'Porridge oats', 'UK', 'likely')
+) AS v (name, source, fdc_id, wikidata_id, label, alias, region, certainty) ON v.name = i.name
+ON CONFLICT DO NOTHING;

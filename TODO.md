@@ -431,6 +431,97 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - Still to review, from the spec: the signed-in pages, and a
         keyboard and screen reader pass over the action bar, the menus
         and the home page's scrolling row.
+- [ ] **Round 4.** *Ray's spec and wireframes, 2026-11-14, measured on a
+      local build of `dev` at 360, 384, 412 and 1280px, signed in as an
+      owner; in private/ (not committed). It takes in round 3's two
+      features as its parts D and E.* A PR for each line, in this order;
+      the cleanup pass's rules still hold.
+      - [x] A. Sideways overflow on phones (#184).
+        - A1. A recipe's page, signed in, was 24px too wide at 384px and
+          48px at 360px, with "Cooked" cut off. Measured here the same,
+          and only on a touch screen: the five spoons of "Your rating" are
+          44px each under a finger, and in a row with their label and
+          Clear they were 367px, which the save buttons under them were
+          then stretched to. So the label has a line of its own on a
+          phone, Clear goes under the spoons where even that is too wide
+          (320px), and the two buttons share a row while their labels fit
+          and take one each when they don't. The spec named the buttons'
+          row as the cause; it was what showed.
+        - A2. A word may break anywhere, said once for the page, the admin
+          bar and the footer, where six rules in App.vue and seven in
+          components had each covered one place. A title, a note or a web
+          address of one long word no longer widens a page.
+        - What that costs, and what was done about it: a table no longer
+          keeps a column as wide as its longest word, and a row no longer
+          holds a heading at its width, so something squeezed breaks its
+          words where it used to run over. Found by looking for them: the
+          authors' list broke "Sources" and "Recipes" beside a long name
+          (1280px), a larder list's name broke beside its buttons
+          ("Pantry", 360px), and a moderator's allergen form had
+          "Inherited" in three lines of three letters. A column's heading
+          and a number now stay whole everywhere; the list's buttons go
+          under its name; the form is a row for each allergen on a phone.
+        - A3. Ingredient links already became a card for each row on a
+          phone, by the rule every such table shares; it was seen for the
+          first time with rows in it (the check plants three foods and
+          four suggestions), and its two buttons may now wrap. Of the two
+          components the spec names beside it, the allergen form had the
+          table, above; "The same food elsewhere" has none, and its "View"
+          links keep their width beside a long description.
+        - A4. The accessibility check looks at every page on a 360px touch
+          screen, where it was 390px with a mouse, with a word of sixty
+          letters as a book's title, its author, a recipe's title (twice,
+          so both are flagged), an ingredient, a larder item, a request,
+          and in a note and a report beside a web address as long. Before
+          the fixes it failed 88 of 400 page views. It also fails a page
+          that breaks a word of up to twenty-five letters in two, and its
+          control must catch one of each. In `web/a11y/check.mjs`, not a
+          Playwright test as the spec says (*Claude's choice*): it already
+          loads every page as each kind of person, and Playwright would be
+          a dependency for what it does without one.
+        - [ ] A display name can't be sixty letters: thirty-two is the
+          most one may be (names.py), and the check's cook has one of
+          those.
+        - [ ] The check looks at two widths. Between a phone and a
+          desktop the header doesn't fit when signed in: with a nine-letter
+          name, a page is 78px too wide at 650px and 28px at 700px, and
+          fits at 740px; with a thirty-two-letter one, 176px too wide at
+          768px and 44px at 900px. The sections, "My kitchen" and the name
+          are one row that can't wrap. Measured 2026-11-14 on the build
+          before this; not changed here.
+        - [ ] Words on a drawn cover aren't looked at for breaking: its
+          title is fitted to the cover and may break by design.
+      - [ ] B1 to B3. On a phone the admin bar is one row, with the page's
+        name on a button that opens the rest; every admin page has one
+        sentence under its heading, and the rest of its introduction
+        under "How this works" after its controls; page spacing is
+        tighter under 40rem. The aim for every admin page: the first
+        thing to act on starts within 450px of the top at 384 x 832.
+      - [ ] C. A simpler search page: one search bar that stays; "Cook
+        with what you have" under it, with "Use my larder"; a "Show"
+        choice that keeps only recipes missing nothing, or two or fewer
+        (`missing_max` in the API, `missing` in the address); the rest
+        under "More options"; the filters in use as chips with "Clear
+        all"; "Copy link" beside the count. Every search link there is
+        now still opens the same search.
+      - [ ] B4 to B12. Page by page: the admin overview as a row for each
+        tool; flagged recipes and people in fewer lines, 25 flags at a
+        time; a change set as one line with its details behind a
+        button; clicks and API usage as label and number side by side;
+        and what a moderator sees on Sources, an ingredient's page, bulk
+        entry and a book's page.
+      - [ ] D1, D2. Shops in a table of their own, read with a minute's
+        cache and seeded from today's environment variables, with no
+        visible change; then `/admin/shops`, for administrators.
+      - [ ] E. Google Ads sign-up tracking with none of Google's script:
+        the ad's click id in a cookie of the site's own, one row for a
+        new account that isn't linked to it, exported to a sheet Google
+        Ads reads. Off unless `OPENLARDER_AD_CLICKS` is set, and the
+        privacy page says so first.
+      - [ ] D3. The affiliate environment variables go, a release after
+        D1.
+      - [ ] D4. Producers, as a kind of shop: built, and none switched on
+        until Ray has the first one's leave to post its link.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the
@@ -792,6 +883,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
+- [ ] **Creating a diet from Admin.** *Ray, 2026-11-14: "ability for admin
+      to create diets".* Today a diet is made only as a side effect: a
+      moderator tagging a book or a recipe may "Add a tag to the list" of
+      kind diet, and then finds it on Admin to say what it avoids. The
+      pairs a diet avoids only together (Kosher's meat with milk) are
+      seeded, with no form at all. Not started; whether it is to rename
+      and remove diets too is Ray's to say.
 - [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*
       Anyone, signed in or not, asks for a cookbook or another source to
       be entered; contributors claim a request and queue it up; a

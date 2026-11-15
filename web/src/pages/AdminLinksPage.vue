@@ -282,13 +282,20 @@ watch(show, () => {
   gap: 0.5rem 1rem;
   margin: 0.5rem 0 1rem;
 }
-.links-table td {
-  overflow-wrap: anywhere;
-}
 .decide {
   white-space: nowrap;
 }
 .decide button + button {
   margin-left: 0.5rem;
+}
+/* A phone has each row as a card (.recipe-table): the ingredient, what's
+   suggested for it, then the two buttons, which may take a line each. */
+@media (max-width: 40rem) {
+  .decide {
+    white-space: normal;
+  }
+  .links-table td.decide {
+    padding-top: 0.375rem;
+  }
 }
 </style>

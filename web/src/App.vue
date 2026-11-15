@@ -341,6 +341,30 @@ h3 {
 main:focus {
   outline: none;
 }
+/* What a person typed can be one long word: a title, a name, a note, a web
+   address. It breaks where it must, on every page, said once here and not
+   by each place that shows one (Ray's round 4 list, A2, 2026-11-14: a web
+   address in a report's note made Reports 255px too wide on a phone, and a
+   title of one word did the same to seven other pages, where six rules of
+   this file's had each covered a place of their own). The header's own
+   words are the site's, and it shows no one's name where it's narrow. */
+main,
+.admin-bar,
+footer {
+  overflow-wrap: anywhere;
+}
+/* And what holds it may be narrower than the word, in a row or a grid. */
+main :where(td, th, li, p, h1, h2, h3, a, dd, dt) {
+  min-width: 0;
+}
+/* The other side of that: a table no longer keeps a column as wide as its
+   longest word, so one long name beside them gave "Sources" and "Recipes"
+   less than their own width and broke them in two (the authors' list at
+   1280px, 2026-11-14). A column's heading and a number stay whole. */
+main thead th,
+main .numeric {
+  white-space: nowrap;
+}
 .site-footer .bar {
   display: flex;
   flex-wrap: wrap;
@@ -1161,7 +1185,6 @@ a.secondary.small::after {
 .find-place .web-address {
   font-size: 1rem;
   font-weight: normal;
-  overflow-wrap: anywhere;
 }
 .find-edition {
   display: flex;
@@ -1750,7 +1773,6 @@ main h2 {
   display: block;
   margin-left: 1.75rem;
   color: var(--muted);
-  overflow-wrap: anywhere;
 }
 .ol-values .theirs {
   color: var(--fg);
@@ -1925,7 +1947,6 @@ main h2 {
 }
 .add-summary dd {
   margin: 0;
-  overflow-wrap: anywhere;
 }
 @media (max-width: 40rem) {
   .add-summary,
@@ -2175,8 +2196,11 @@ main h2 {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
   gap: 1rem;
 }
+/* The buttons go under the list's name when both don't fit, and don't
+   squeeze it: beside three buttons on a phone "Pantry" was broken in two. */
 .larder-list-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
   gap: 0.5rem;
@@ -2254,7 +2278,6 @@ main h2 {
   font-weight: 700;
   font-size: 12cqi;
   line-height: 1.1;
-  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
@@ -2514,7 +2537,6 @@ main h2 {
   margin: 0;
   padding-left: 1.25rem;
   font-size: 0.9375rem;
-  overflow-wrap: anywhere;
 }
 .change-fields {
   color: var(--muted);
@@ -3191,9 +3213,6 @@ button.link {
 }
 .author-link-form {
   margin-top: 1.5rem;
-}
-.web-address {
-  overflow-wrap: anywhere;
 }
 .swap-list {
   padding-left: 1.25rem;

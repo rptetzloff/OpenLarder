@@ -85,7 +85,8 @@ jobs:
 
   # Every kind of page, as the built image serves it, through axe-core's WCAG
   # 2.1 A and AA rules (contrast among them) in light and dark, and for
-  # sideways scrolling at phone width (web/a11y/check.mjs). Ray, 2026-11-08:
+  # sideways scrolling on a 360px touch screen and words broken in two
+  # (web/a11y/check.mjs). Ray, 2026-11-08:
   # accessibility and contrast checked along the way. It adds a sample
   # catalog through the API, so it runs against this job's own database, with
   # web recipes asking the Internet Archive for nothing.

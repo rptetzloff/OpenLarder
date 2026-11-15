@@ -182,7 +182,6 @@ async function save() {
 }
 .records dd {
   margin: 0.15rem 0 0;
-  overflow-wrap: anywhere;
 }
 .records-form fieldset {
   border: 0;
@@ -209,9 +208,6 @@ async function save() {
   width: 100%;
   max-width: 32rem;
 }
-.chosen {
-  overflow-wrap: anywhere;
-}
 .food-results {
   list-style: none;
   padding: 0;
@@ -231,7 +227,10 @@ async function save() {
   align-items: baseline;
   gap: 0.5rem;
   margin: 0;
-  overflow-wrap: anywhere;
+}
+/* "View" keeps its width beside a long description, which wraps. */
+.food-results li > a {
+  flex: none;
 }
 .actions {
   display: flex;

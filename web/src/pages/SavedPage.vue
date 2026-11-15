@@ -239,7 +239,6 @@ watch(
 }
 .saved-note {
   white-space: pre-line;
-  overflow-wrap: anywhere;
 }
 .saved-actions {
   display: flex;
