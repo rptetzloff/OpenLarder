@@ -1636,15 +1636,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
-- [ ] **The notice beside allergen information isn't styled.** Found
-      2026-11-15, reading App.vue for round 5. Its rule is written
-      `.used-in /* … */ .allergen-notice`, a selector left half-finished
-      when the grocery links went in (724f558), so it only matches a
-      notice inside a "Used in" row, and there is none. The notice was
-      meant to be small and muted (0.875rem, 48rem wide) and shows as an
-      ordinary paragraph on a recipe's page, an ingredient's and the diet
-      check. Not rendered and compared yet; for round 5's item 2, which
-      is in the same stylesheet.
+- [x] **The notice beside allergen information is small and muted, as
+      its rule says** (#200). Found 2026-11-15, reading App.vue for round
+      5: the rule was written `.used-in /* … */ .allergen-notice`, a
+      selector left half-finished when the grocery links went in
+      (724f558), so it matched only a notice inside a "Used in" row, and
+      there is none. The rule came later (bfe102d), so it had never
+      applied, and the notice was an ordinary paragraph: 16px, in the
+      text's color, as wide as the page. It is a safety notice, so it was
+      Ray's to say: *2026-11-15, "yes, apply the allergen style".* Now
+      14px, muted, 48rem at most. Nothing in the check recorded an
+      allergen, so no page with the notice in view was looked at; one
+      does now.
+      - With it, the button beside "Counts as “Butter”." on an
+        ingredient's form reads "Stop counting it as Butter". *Ray,
+        2026-11-15: yes.* It had been "Stop counting it as", half a
+        sentence, with the rest only in its accessible name.
 
 - [x] **Another way to say "Comes under" on an ingredient** (#196). *Ray,
       2026-11-14: "I don't like the verbiage 'comes under' for the

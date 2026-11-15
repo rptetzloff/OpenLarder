@@ -1322,14 +1322,19 @@ a.secondary.small::after {
   justify-content: space-between;
   gap: 1rem;
 }
-.used-in /* An ingredient line's grocery links (grocery.ts): quiet beside the line. */
-/* Beside allergen information, wherever it is (allergens.ts). */
+/* Beside allergen information, wherever it is (allergens.ts): small and
+   muted, as it was written to be. Until 2026-11-15 the rule began
+   ".used-in", left from an edit to the one before it, so it matched only a
+   notice inside a "Used in" row, where there is none, and the notice was an
+   ordinary paragraph from the day it was added. *Ray, 2026-11-15, shown
+   both: "yes, apply the allergen style".* */
 .allergen-notice {
   font-size: 0.875rem;
   color: var(--muted);
   margin: 0.5rem 0 0.75rem;
   max-width: 48rem;
 }
+/* An ingredient line's grocery links (grocery.ts): quiet beside the line. */
 .shop-links {
   color: var(--muted);
   font-size: 0.875rem;
