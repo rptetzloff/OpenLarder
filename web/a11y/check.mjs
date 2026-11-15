@@ -224,6 +224,24 @@ const PRODUCER_ON_INGREDIENT = `(() => {
   return cards === 2 ? "" : "The ingredient's page shows " + cards + " producers, not the two that supply it";
 })()`;
 const PRODUCERS_SAID = `document.querySelector('main a[href="/producers"]') ? "" : "The page doesn't speak of producers"`;
+// The notice beside allergen information is small and muted (Ray,
+// 2026-11-15). Its rule had a selector that matched nothing, and nothing
+// here recorded an allergen, so no page with the notice in view was looked
+// at. The check records milk on the ingredient aged cheddar counts as.
+const ALLERGEN_NOTICE = `(() => {
+  const notice = [...document.querySelectorAll(".allergen-notice")].find((p) => p.getClientRects().length);
+  if (!notice) return "The page shows no notice beside its allergen information";
+  const style = getComputedStyle(notice);
+  const muted = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim();
+  const probe = document.createElement("span");
+  probe.style.color = muted;
+  document.body.append(probe);
+  const colour = getComputedStyle(probe).color;
+  probe.remove();
+  if (style.fontSize !== "14px" || style.color !== colour)
+    return "The allergen notice is " + style.fontSize + " in " + style.color + ", not 14px in the muted colour";
+  return "";
+})()`;
 // The ingredient hierarchy's words (Ray, 2026-11-15, for "Comes under"):
 // cheddar counts as cheese, and cheese includes cheddar. A card with nothing
 // to say isn't there, and nothing says "Nothing broader yet". The check
@@ -391,6 +409,9 @@ async function seed() {
   const cheddar = ids.ingredients.find((i) => i.name === "Aged cheddar").id;
   const cheese = (await api("/api/ingredients?q=butter", "admin")).ingredients[0].id;
   await api(`/api/ingredients/${cheddar}/parent`, "admin", { parent: cheese }, "PUT");
+  // And it contains milk, so its page, aged cheddar's and a recipe's with
+  // either have allergen information, and the notice beside it.
+  await api(`/api/ingredients/${cheese}/allergens`, "admin", { statuses: { milk: "contains" } }, "PUT");
 
   // Two books whose titles the rules question as they arrive (title_rules.py),
   // for the Suggestions queue: one in sentence case, one missing an apostrophe.
@@ -672,7 +693,7 @@ function pages(s) {
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
     [`/ingredients/${s.cheddar}`, null, { expect: `(${COUNTS_AS}) || (${CRUMBS})` }],
     [`/ingredients/${s.cheddar}`, "admin", { expect: COUNTS_AS }],
-    [`/ingredients/${s.cheese}`, null, { expect: INCLUDES }],
+    [`/ingredients/${s.cheese}`, null, { expect: `(${INCLUDES}) || (${ALLERGEN_NOTICE})` }],
     ["/authors", null],
     ["/authors?sort=recipes&kind=person", null],
     [`/authors/${s.author}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],
@@ -699,7 +720,7 @@ function pages(s) {
     [`/sources/${s.waiting}`, "cook"],
     [`/recipes/${s.biscuits.id}/propose`, "cook"],
     [`/sources/${s.book.id}/propose`, "cook"],
-    [`/recipes/${s.biscuits.id}`, "cook"],
+    [`/recipes/${s.biscuits.id}`, "cook", { expect: ALLERGEN_NOTICE }],
     ["/account", "admin"],
     ["/requests", null],
     ["/requests", "cook"],

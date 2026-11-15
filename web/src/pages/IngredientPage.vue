@@ -391,16 +391,15 @@ onMounted(() => {
         </p>
         <p v-if="ingredient.parent">
           Counts as “{{ ingredient.parent.name }}”.
-          <!-- Named in full for a screen reader, which may meet the button
-               without the sentence before it. -->
+          <!-- In full (Ray, 2026-11-15): "Stop counting it as" alone was
+               half a sentence. -->
           <button
             type="button"
             class="secondary small"
             :disabled="busy"
-            :aria-label="`Stop counting it as ${ingredient.parent.name}`"
             @click="placeUnder(ingredient.id, null)"
           >
-            Stop counting it as
+            Stop counting it as {{ ingredient.parent.name }}
           </button>
         </p>
         <IngredientPicker
