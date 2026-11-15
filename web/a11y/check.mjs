@@ -90,6 +90,23 @@ const COVER =
 // A source's page and an author's have their Top rated, which a change to
 // what it waits for could quietly take out of the check.
 const TOP_RATED_SHOWN = `document.querySelector("#top-rated-title + .top-rated li") ? "" : "Top rated isn't shown"`;
+// The admin bar: its links in the bar on a wide screen; on a phone one row,
+// with the page's name on a button, and the links only once it's pressed.
+const ADMIN_BAR = `(() => {
+  const bar = document.querySelector("#admin-bar nav");
+  const button = bar?.querySelector(".bar-toggle");
+  if (!bar || !button) return "the admin bar isn't shown";
+  const shown = [...bar.querySelectorAll("a")].filter((a) => a.getClientRects().length).length;
+  if (innerWidth >= 640)
+    return shown && !button.getClientRects().length ? "" : "the admin bar's links aren't in the bar on a wide screen";
+  if (button.getAttribute("aria-expanded") === "true")
+    return shown ? "" : "the admin bar's button didn't open its links";
+  if (shown) return "the admin bar's links show on a phone before its button is pressed";
+  const tall = Math.round(bar.getBoundingClientRect().height);
+  if (tall > 56) return "the admin bar is " + tall + "px tall on a phone, more than one row";
+  if (!button.textContent.includes("Flagged recipes")) return "the admin bar's button doesn't name the page";
+  return "";
+})()`;
 // On the sources page: the cover that arrived is shown, and the one that
 // failed has left the printed face with its title, not a broken picture.
 const COVERS_SHOWN = `(() => {
@@ -393,7 +410,7 @@ function pages(s) {
     ["/account", "cook"],
     ["/account/flags", "admin"],
     ["/admin", "admin"],
-    ["/admin/flags", "admin"],
+    ["/admin/flags", "admin", { expect: ADMIN_BAR }],
     ["/admin/imports", "admin"],
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],
@@ -446,6 +463,18 @@ function pages(s) {
     ["/admin/links", "admin", { phone: true, then: press("Other names") }],
     [`/ingredients/${s.oats}`, "admin", { phone: true, then: press("+ Record") }],
     [`/ingredients/${s.oats}`, "admin", { phone: true, then: press("+ Link") }],
+    // The admin bar on a phone, opened; and an admin page's "How this
+    // works", which is closed until asked for.
+    [
+      "/admin/flags",
+      "admin",
+      { phone: true, then: `document.querySelector(".bar-toggle").click()`, expect: ADMIN_BAR },
+    ],
+    [
+      "/admin/suggestions",
+      "admin",
+      { phone: true, then: `document.querySelector("main details.how").open = true` },
+    ],
     // The long word's own pages. Its other places are on pages above: both
     // lists of flags, the reports, the clicks, the requests, Cy's larder,
     // shelf and saved recipes, the lists of sources, ingredients and authors.

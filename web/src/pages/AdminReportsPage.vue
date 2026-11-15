@@ -66,8 +66,7 @@ watch(allowed, (yes) => yes && !reports.value && load(), { immediate: true });
       <h1>Reports</h1>
       <p class="muted">
         Problems people have reported with recipes, sources, ingredients and authors, oldest
-        first. Fix what's wrong on the record's page, then mark the report fixed; or dismiss it.
-        Someone signed out is shown as no one.
+        first.
       </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
@@ -84,6 +83,13 @@ watch(allowed, (yes) => yes && !reports.value && load(), { immediate: true });
           {{ s.label }}<span class="count">{{ counts[s.state] ?? 0 }}</span>
         </button>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Fix what's wrong on the record's page, then mark the report fixed; or dismiss it.
+          Someone signed out is shown as no one.
+        </p>
+      </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="!reports" class="status">Loading…</p>
       <ul v-else-if="reports.length" class="review-items report-list">

@@ -144,20 +144,7 @@ watch(allowed, (yes) => {
       <h1>Suggestions</h1>
       <p class="muted">
         A local model compared ingredients that look alike, and read recipes for the tags they
-        could have, and suggests what to do. Accepting does it as if you'd done it by hand; a
-        merged name stays as another name for the one kept, so lines written that way still find
-        it. Those the model is certain of come first, then those it thinks likely, each with the
-        closest pairs first.
-      </p>
-      <p class="muted">
-        Allergens are suggested from ingredients' names (“butter”: contains milk), and accepting
-        one records it on the ingredient, under the crowdsourced notice. Check each: a name can
-        mislead.
-      </p>
-      <p class="muted">
-        A book's title that looks to be in sentence case, or to have lost an apostrophe, is
-        suggested with the change. Accepting changes the title; dismiss one that's styled that way
-        on purpose, and it isn't suggested for that book again.
+        could have, and suggests what to do.
       </p>
     </div>
     <p v-if="!user" class="status"><SignInLink /> to see suggestions.</p>
@@ -229,6 +216,24 @@ watch(allowed, (yes) => {
           }}
         </button>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Accepting does it as if you'd done it by hand; a merged name stays as another name for
+          the one kept, so lines written that way still find it. Those the model is certain of
+          come first, then those it thinks likely, each with the closest pairs first.
+        </p>
+        <p>
+          Allergens are suggested from ingredients' names (“butter”: contains milk), and accepting
+          one records it on the ingredient, under the crowdsourced notice. Check each: a name can
+          mislead.
+        </p>
+        <p>
+          A book's title that looks to be in sentence case, or to have lost an apostrophe, is
+          suggested with the change. Accepting changes the title; dismiss one that's styled that
+          way on purpose, and it isn't suggested for that book again.
+        </p>
+      </details>
       <p v-if="note" class="status" role="status">{{ note }}</p>
       <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
       <p v-if="failed" role="alert">The suggestions couldn't be loaded. Try reloading the page.</p>

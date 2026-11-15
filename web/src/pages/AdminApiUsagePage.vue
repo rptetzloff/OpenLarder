@@ -56,10 +56,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
     <div class="list-head">
       <h1>API usage</h1>
       <p class="muted">
-        Programs reading the public API, busiest first; the site's own pages aren't counted. A
-        caller without a key is a name made from its address, the same each day, and its network:
-        the address itself isn't kept. Search engines' crawlers, checked by their addresses, are
-        shown by name and never limited. Kept 30 days.
+        Programs reading the public API, busiest first; the site's own pages aren't counted.
       </p>
     </div>
     <p v-if="!user?.may_run" class="status">This is for administrators.</p>
@@ -76,6 +73,14 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
           {{ d === 1 ? "Today" : `${d} days` }}
         </button>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          A caller without a key is a name made from its address, the same each day, and its
+          network: the address itself isn't kept. Search engines' crawlers, checked by their
+          addresses, are shown by name and never limited. Kept 30 days.
+        </p>
+      </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!page" class="status">Loading…</p>
       <template v-else>

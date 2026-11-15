@@ -135,11 +135,7 @@ watch(show, () => {
       <h1>Ingredient links</h1>
       <p class="muted">
         The USDA FoodData Central food and the Wikidata item each ingredient is probably the same
-        as, the most used first. Likely: the food's words are the ingredient's. Unsure: one word
-        more, which is often a different food. Wikidata items come through USDA's numbers, and are
-        often the plant rather than the food: check each. Other names come from linked Wikidata
-        items; a UK one is shown only as a regional name. Nothing changes until it's accepted, and a
-        dismissed one isn't suggested again.
+        as, the most used first.
       </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
@@ -167,6 +163,16 @@ watch(show, () => {
           {{ suggesting ? "Suggesting…" : "Suggest links" }}
         </button>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Likely: the food's words are the ingredient's. Unsure: one word more, which is often a
+          different food. Wikidata items come through USDA's numbers, and are often the plant
+          rather than the food: check each. Other names come from linked Wikidata items; a UK one
+          is shown only as a regional name. Nothing changes until it's accepted, and a dismissed
+          one isn't suggested again.
+        </p>
+      </details>
       <p v-if="note" class="status" aria-live="polite">{{ note }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="rows === null && !error" class="status">Loading…</p>

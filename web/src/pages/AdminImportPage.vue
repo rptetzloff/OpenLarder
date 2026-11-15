@@ -167,8 +167,8 @@ function download() {
     <div class="list-head">
       <h1>Bulk import</h1>
       <p class="muted">
-        Books and recipes from a book list and a recipe list. Nothing is stored until you've seen
-        what's in them. <a href="/admin/imports">Import history</a>
+        Books and recipes from a book list and a recipe list.
+        <a href="/admin/imports">Import history</a>
       </p>
     </div>
     <p v-if="!user?.may_run" class="status">Only an administrator can import.</p>
@@ -223,5 +223,9 @@ function download() {
       </template>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
     </section>
+    <details v-if="user?.may_run" class="how">
+      <summary>How this works</summary>
+      <p>Nothing is stored until you've seen what's in the two lists.</p>
+    </details>
   </article>
 </template>
