@@ -57,6 +57,17 @@ const isBook = computed(() => book.value?.kind === "book");
 
 // The edition whose pages the table shows: the newest, until another is chosen.
 const editionId = ref<string | null>(null);
+// A book you want has where to buy it first (Ray, 2026-11-14). On a wide
+// screen the shops are beside the cover already; on a phone they move up,
+// from under everything about the book to above its buttons. As the page
+// found the book when it loaded: pressing "I want this book" doesn't move
+// anything, since what moved would be the button under the finger.
+const wantedFirst = ref(false);
+let shelfKnown = false;
+function shelfSays(wanted: boolean) {
+  if (!shelfKnown) wantedFirst.value = wanted;
+  shelfKnown = true;
+}
 const edition = computed(
   () => book.value?.editions.find((e) => e.id === editionId.value) ?? book.value?.editions[0],
 );
@@ -310,6 +321,11 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <!-- Having it and searching in it stay in view, side by side; what
                changes it is behind "More" on a phone (Ray's round 4 list,
                B12, 2026-11-14: five buttons, a row each, 280px). -->
+          <!-- Where the shops go on a phone, for a book you want: across the
+               page, as the buttons under them are. Beside the cover they
+               were too narrow for a shop's name (the accessibility check
+               caught "Bookshop.org" broken in two). -->
+          <div id="source-buy-first"></div>
           <div class="book-actions">
             <ShelfButton
               v-if="user && isBook"
@@ -317,6 +333,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               :editions="book.editions.map((e) => ({ id: e.id, label: editionLabel(e) }))"
               :shown="edition?.id ?? null"
               @mine="(id) => (editionId = id)"
+              @wanted="shelfSays"
             />
             <a
               v-if="book.recipes.length"
@@ -403,11 +420,14 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
              is moved below then. -->
         <div
           v-if="buyLinks.length || book.open_library_url || book.host"
-          v-show="buyLinks.length || !narrow"
+          v-show="(buyLinks.length && !(narrow && wantedFirst)) || !narrow"
           class="source-side"
         >
           <!-- The selected edition's shops, beside the cover: the tabs below
-               change which edition this is. -->
+               change which edition this is. For a book you want, on a phone,
+               they're moved up in the document itself, so Tab and a screen
+               reader meet them where they're seen. -->
+          <Teleport to="#source-buy-first" :disabled="!(narrow && wantedFirst)" defer>
           <aside v-if="edition && buyLinks.length" class="source-buy" aria-labelledby="buy-title">
             <h2 id="buy-title">Get this book</h2>
             <p v-if="book.editions.length > 1" class="buy-edition">{{ editionLabel(edition) }}</p>
@@ -424,6 +444,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             <p v-for="n in notes(buyLinks)" :key="n" class="buy-note">{{ n }}</p>
             <ShopChooser v-if="edition.buy.length > 1" :links="edition.buy" :signed-in="!!user" />
           </aside>
+          </Teleport>
           <Teleport to="#source-elsewhere-later" :disabled="!narrow" defer>
             <aside v-if="book.open_library_url || book.host" class="source-elsewhere">
               <h2>Elsewhere</h2>

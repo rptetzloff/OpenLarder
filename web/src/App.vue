@@ -883,9 +883,15 @@ a.secondary.small::after {
   }
   .source-about > .kind,
   .source-about > h1,
+  .source-about > #source-buy-first,
   .source-about > .book-actions,
   .source-about > .book-actions ~ * {
     grid-column: 1 / -1;
+  }
+  /* The shops, for a book that's wanted (BookPage.vue): empty otherwise,
+     and then it takes no room. */
+  .source-about > #source-buy-first:not(:empty) {
+    margin: 0.75rem 0 0.25rem;
   }
   .source-about > h1 {
     margin-bottom: 0.75rem;

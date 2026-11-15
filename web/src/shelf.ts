@@ -1,5 +1,8 @@
-// Your shelf (routers/shelf.py): the books you own, and which edition;
-// shared with household groups as a larder list is.
+// Your shelf (routers/shelf.py): the books you own, and which edition, and
+// the books you want (Ray, 2026-11-14); shared with household groups as a
+// larder list is.
+
+export type ShelfState = "have" | "want";
 
 export interface GroupRef {
   id: string;
@@ -11,13 +14,17 @@ export interface OtherShelf {
   owner_id: string;
   owner_name: string | null;
   editable: boolean;
+  // They have it; or they want it. Never both.
   on_shelf: boolean;
+  wanted: boolean;
   edition_id: string | null;
 }
 
 export interface OnShelf {
   source_id: string;
+  // You have it; or you want it. Never both.
   on_shelf: boolean;
+  wanted: boolean;
   edition_id: string | null;
   others: OtherShelf[];
 }
@@ -36,6 +43,7 @@ export interface ShelfBook {
   edition_id: string | null;
   edition_year: number | null;
   edition_isbn13: string | null;
+  state: ShelfState;
   added_at: string;
 }
 
@@ -77,15 +85,18 @@ export async function onShelf(sourceId: string): Promise<OnShelf> {
   return res.json();
 }
 
+// As a book had, with the edition if it's been said; or as one wanted,
+// which takes no edition.
 export async function putOnShelf(
   sourceId: string,
   editionId: string | null,
   owner?: string,
+  state: ShelfState = "have",
 ): Promise<OnShelf> {
   const res = await fetch(`/api/shelf/${sourceId}${whose(owner)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ edition_id: editionId }),
+    body: JSON.stringify({ edition_id: state === "want" ? null : editionId, state }),
   });
   if (!res.ok) await failed(res);
   return res.json();

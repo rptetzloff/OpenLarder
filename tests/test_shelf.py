@@ -28,6 +28,7 @@ async def test_a_shelf_is_its_owners(people, client, adb) -> None:
     assert (await ann.put(f"/api/shelf/{plenty}", json={"edition_id": plenty_ed})).json() == {
         "source_id": plenty,
         "on_shelf": True,
+        "wanted": False,
         "edition_id": plenty_ed,
         "others": [],
     }

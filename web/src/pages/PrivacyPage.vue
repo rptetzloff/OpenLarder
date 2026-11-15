@@ -191,7 +191,8 @@ document.title = "Privacy policy · OpenLarder";
         they aren't part of the open data, the edit history or the API;
       </li>
       <li>
-        your shelf, if you keep one: which books you have, and which edition. Only you see it,
+        your shelf, if you keep one: which books you have, and which edition, and which books
+        you want. Only you see it,
         and the members of the groups you share it with (their editors change what's on it); it
         isn't part of the open data, the edit history or the API. Leaving a group stops sharing
         your shelf, saved recipes, larder lists and family collections with it;

@@ -237,6 +237,22 @@ async def merge(
     kept_shelf = aliased(ShelfBook)
     both = exists().where(kept_shelf.user_id == ShelfBook.user_id, kept_shelf.source_id == kept.id)
     gone_shelf = aliased(ShelfBook)
+    # Had beats wanted: they have the book, whichever record said so. First,
+    # since a wanted row takes no edition and the next statement gives the
+    # kept row the edition they have.
+    await session.execute(
+        update(ShelfBook)
+        .where(
+            ShelfBook.source_id == kept.id,
+            ShelfBook.state == "want",
+            exists().where(
+                gone_shelf.user_id == ShelfBook.user_id,
+                gone_shelf.source_id == gone.id,
+                gone_shelf.state == "have",
+            ),
+        )
+        .values(state="have")
+    )
     await session.execute(
         update(ShelfBook)
         .where(ShelfBook.source_id == kept.id, ShelfBook.edition_id.is_(None))

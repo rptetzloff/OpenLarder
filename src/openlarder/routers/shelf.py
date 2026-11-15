@@ -1,10 +1,20 @@
-"""Your shelf: the books you own (migrations 0062, 0063). *SCOPING.md:
-"mark books you own, filter search to your shelf".*
+"""Your shelf: the books you own (migrations 0062, 0063), and the ones you
+want (0078). *SCOPING.md: "mark books you own, filter search to your
+shelf".*
 
 A book goes on your shelf from its page, with the edition you have if it
 has several, so a recipe's page opens at your edition's page number.
 Search's "Only my shelf" (routers/search.py, shelf=true) keeps to them.
 Books only: a website or a show isn't something you own a copy of.
+
+**A book you want** (*Ray, 2026-11-14*) is a second state of the same
+shelf: a book is on it as one you have or as one you want, never both.
+Search's "Only my shelf" leaves wanted books out, as does its count, and
+a recipe's page doesn't call a wanted book "on your shelf". A wanted book
+has no edition. *Claude's choices, 2026-11-15, where Ray wasn't asked:*
+wanted books are shared with the same groups as the rest of the shelf,
+since the shelf is shared whole, and a group's editors may take one off
+or mark it had, as they change the rest.
 
 Private, like the larder: it isn't in the edit history, the dumps or the
 API's public reads. Shared the same way too (*Ray, 2026-11-11*): its owner
@@ -17,6 +27,7 @@ to you on anyone's shelf.
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -48,19 +59,28 @@ class GroupRef(BaseModel):
     name: str
 
 
+State = Literal["have", "want"]
+
+
 class OtherShelf(BaseModel):
     """A shelf shared with you, and whether a book is on it."""
 
     owner_id: uuid.UUID
     owner_name: str | None
     editable: bool
+    # They have it.
     on_shelf: bool
+    # They want it.
+    wanted: bool = False
     edition_id: uuid.UUID | None = None
 
 
 class OnShelf(BaseModel):
     source_id: uuid.UUID
+    # You have it.
     on_shelf: bool
+    # You want it: never with on_shelf.
+    wanted: bool = False
     # The edition you have, if you've said.
     edition_id: uuid.UUID | None = None
     # The shelves shared with you.
@@ -72,6 +92,8 @@ class ShelfEntry(BookSummary):
     # The edition owned, as its year and ISBN, when it's been said.
     edition_year: int | None = None
     edition_isbn13: str | None = None
+    # Had, or wanted.
+    state: State = "have"
     added_at: datetime
 
 
@@ -96,6 +118,8 @@ class Shelf(BaseModel):
 
 class ShelfIn(BaseModel):
     edition_id: uuid.UUID | None = None
+    # A book you have, unless said: one you want takes no edition.
+    state: State = "have"
 
 
 def _sharers(user: User):
@@ -108,13 +132,15 @@ def _sharers(user: User):
 
 
 def shelf_source_ids(user: User):
-    """The books on someone's shelf, and the shelves shared with them, that
-    they can see."""
+    """The books someone has, on their shelf and the shelves shared with
+    them, that they can see. Not the ones wanted: search with your shelf
+    is for what's in the kitchen (*Ray, 2026-11-14*)."""
     return (
         select(ShelfBook.source_id)
         .join(Source, Source.id == ShelfBook.source_id)
         .where(
             or_(ShelfBook.user_id == user.id, ShelfBook.user_id.in_(_sharers(user))),
+            ShelfBook.state == "have",
             visibility.sources_seen_by(user),
         )
         .distinct()
@@ -167,6 +193,7 @@ async def _books(
                 edition_id=shelved.edition_id,
                 edition_year=edition.published_year if edition else None,
                 edition_isbn13=edition.isbn13 if edition else None,
+                state=shelved.state,
                 added_at=shelved.created_at,
             )
         )
@@ -258,8 +285,8 @@ async def _whose(session, user: User, owner: uuid.UUID | None) -> uuid.UUID:
 
 @router.get("/{source_id}", response_model=OnShelf)
 async def one(source_id: uuid.UUID, user: CurrentUser, session: Session) -> OnShelf:
-    """Whether a book is on your shelf, and on those shared with you, and
-    which edition."""
+    """Whether a book is on your shelf, as one you have or one you want,
+    and on those shared with you, and which edition."""
     others = await _others(session, user)
     rows = {
         row.user_id: row
@@ -274,16 +301,22 @@ async def one(source_id: uuid.UUID, user: CurrentUser, session: Session) -> OnSh
         )
     }
     own = rows.get(user.id)
+
+    def state_of(owner_id: uuid.UUID) -> str | None:
+        return rows[owner_id].state if owner_id in rows else None
+
     return OnShelf(
         source_id=source_id,
-        on_shelf=own is not None,
+        on_shelf=own is not None and own.state == "have",
+        wanted=own is not None and own.state == "want",
         edition_id=own.edition_id if own else None,
         others=[
             OtherShelf(
                 owner_id=o.owner_id,
                 owner_name=o.owner_name,
                 editable=o.editable,
-                on_shelf=o.owner_id in rows,
+                on_shelf=state_of(o.owner_id) == "have",
+                wanted=state_of(o.owner_id) == "want",
                 edition_id=rows[o.owner_id].edition_id if o.owner_id in rows else None,
             )
             for o in others.values()
@@ -300,9 +333,13 @@ async def put(
     # Someone else's shelf, shared with you to change.
     owner: uuid.UUID | None = None,
 ) -> OnShelf:
-    """Put a book on a shelf, or change which edition is owned."""
+    """Put a book on a shelf, as one had or one wanted; or change which
+    edition is owned; or say a wanted one is had now, or the other way."""
     owner_id = await _whose(session, user, owner)
     source = await _seen_book(session, user, source_id)
+    if body.state == "want":
+        # Which edition is said when it's owned.
+        body.edition_id = None
     if body.edition_id is not None:
         edition = await session.get(Edition, body.edition_id)
         if edition is None or edition.source_id != source.id:
@@ -322,6 +359,7 @@ async def put(
         row = ShelfBook(user_id=owner_id, source_id=source.id)
         session.add(row)
     row.edition_id = body.edition_id
+    row.state = body.state
     await session.commit()
     return await one(source.id, user, session)
 
