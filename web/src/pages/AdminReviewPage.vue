@@ -101,13 +101,19 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
     <div class="list-head">
       <h1>Review</h1>
       <p class="muted">
-        Changes contributors have suggested to published recipes and sources, then the books and recipes they've
-        added, oldest first. Until approved, only they and moderators see them. Send one back with
-        what needs fixing, and it returns here once they've changed it.
+        Changes contributors have suggested to published recipes and sources, then the books and
+        recipes they've added, oldest first.
       </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Until approved, only they and moderators see them. Send one back with what needs fixing,
+          and it returns here once they've changed it.
+        </p>
+      </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="!groups" class="status">Loading…</p>
       <p v-else-if="pending" class="status">{{ pending.toLocaleString() }} waiting.</p>

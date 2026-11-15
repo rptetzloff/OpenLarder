@@ -72,8 +72,7 @@ watch(allowed, (yes) => {
     <div class="list-head">
       <h1>{{ heading }}</h1>
       <p class="muted">
-        A flag means something about a recipe looked wrong when it was entered or imported. Fix the
-        recipe and mark the flag fixed, or dismiss it if it's wrong.
+        A flag means something about a recipe looked wrong when it was entered or imported.
       </p>
     </div>
     <p v-if="!user" class="status"><SignInLink /> to see flags.</p>
@@ -112,6 +111,12 @@ watch(allowed, (yes) => {
           </button>
         </div>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Fix the recipe and mark the flag fixed, or dismiss it if it's wrong.
+        </p>
+      </details>
       <p v-if="failed" role="alert">The flags couldn't be loaded. Try reloading the page.</p>
       <p v-else-if="!page" class="status">Loading…</p>
       <p v-else-if="flags.length === 0" class="status">

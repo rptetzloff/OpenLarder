@@ -346,8 +346,9 @@ main:focus {
    by each place that shows one (Ray's round 4 list, A2, 2026-11-14: a web
    address in a report's note made Reports 255px too wide on a phone, and a
    title of one word did the same to seven other pages, where six rules of
-   this file's had each covered a place of their own). The header's own
-   words are the site's, and it shows no one's name where it's narrow. */
+   this file's had each covered a place of their own). The header is left
+   out: its words are the site's but for the account's name, which is 32
+   letters at most, and its phone menu fitted one of those at 320px. */
 main,
 .admin-bar,
 footer {
@@ -418,6 +419,15 @@ main > article.wide {
   max-width: var(--page);
   padding: 2rem 1.5rem 0;
   box-sizing: border-box;
+}
+/* A phone has less to give to the space round a page (Ray's round 4 list,
+   B3, 2026-11-14: an admin page's first thing to act on was one to two
+   screens down). The rules that go with this one are each after the rule
+   they tighten: .crumbs, .list-head h1, .section-title and .tool-panel. */
+@media (max-width: 40rem) {
+  main > article.wide {
+    padding: 1rem 1rem 0;
+  }
 }
 /* Buttons. One primary and one secondary, on a <button> or on a link that
    is one; 44px tall, for a thumb. A link in a sentence is terracotta and
@@ -787,6 +797,7 @@ a.secondary.small::after {
 @media (max-width: 40rem) {
   .crumbs {
     row-gap: 1.5rem;
+    margin-bottom: 0.75rem;
   }
   .crumbs a {
     position: relative;
@@ -1446,6 +1457,11 @@ a.secondary.small::after {
 .list-head h1 {
   margin: 0 0 0.25rem;
 }
+@media (max-width: 40rem) {
+  .list-head h1 {
+    margin-bottom: 0.125rem;
+  }
+}
 .add-panels {
   display: flex;
   flex-wrap: wrap;
@@ -2041,6 +2057,36 @@ main h2 {
 .list-filters .kind-filter {
   margin-bottom: 0.75rem;
 }
+/* An admin page says what it is in a sentence under its heading; how it
+   works is folded away here, after its controls, for whoever wants it
+   (Ray's round 4 list, B2, 2026-11-14: Suggestions had 470px of it on a
+   phone above its first control). */
+.how {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.how > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--fg);
+}
+.how > p {
+  max-width: 44rem;
+  margin: 0.5rem 0 0;
+}
+@media (max-width: 40rem) {
+  /* 44px to tap: its line and this above and below it. */
+  .how > summary {
+    padding: 0.625rem 0;
+  }
+  .how {
+    margin-bottom: 0.5rem;
+  }
+  .how > p {
+    margin: 0 0 0.5rem;
+  }
+}
 .link-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -2086,15 +2132,26 @@ main h2 {
   margin: 2.5rem 0 1rem;
   font-size: 1.25rem;
 }
+/* A column is 20rem or the whole row, whichever is less: at 320px a page
+   has less than 20rem across, and Admin and Buy-link clicks were 24px too
+   wide there. */
 .tool-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: 1rem;
 }
 .tool-panel {
   padding: 1rem 1.25rem 1.25rem;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+@media (max-width: 40rem) {
+  .section-title {
+    margin-top: 1.5rem;
+  }
+  .tool-panel {
+    padding: 0.75rem 1rem;
+  }
 }
 .tool-panel h2,
 .tool-panel h3 {

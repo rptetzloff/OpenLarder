@@ -81,12 +81,15 @@ watch(
     </nav>
     <div class="list-head">
       <h1>Merged books</h1>
-      <p class="muted">
-        Every merge of two books, newest first, by whom. Unmerging puts the book removed back as it
-        was, with whatever it brought that's still with the other; anything added since stays where
-        it is.
-      </p>
+      <p class="muted">Every merge of two books, newest first, by whom.</p>
     </div>
+    <details v-if="user?.may_run" class="how">
+      <summary>How this works</summary>
+      <p>
+        Unmerging puts the book removed back as it was, with whatever it brought that's still with
+        the other; anything added since stays where it is.
+      </p>
+    </details>
     <p v-if="!user?.may_run" class="status">This is for administrators.</p>
     <p v-else-if="failed" role="alert">The merges couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="merges === null" class="status">Loading…</p>

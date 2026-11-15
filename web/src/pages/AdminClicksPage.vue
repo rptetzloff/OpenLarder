@@ -43,7 +43,6 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
       <h1>Buy-link clicks</h1>
       <p class="muted">
         Clicks on the shops' buy links, counted on the way through; nothing about who clicked.
-        The shops' own reports say what was bought.
       </p>
     </div>
     <p v-if="!user?.may_run" class="status">This is for administrators.</p>
@@ -60,6 +59,12 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
           {{ d }} days
         </button>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          The shops' own reports say what was bought.
+        </p>
+      </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!page" class="status">Loading…</p>
       <p v-else-if="!page.clicks && !page.grocery_clicks" class="status">No clicks in this time.</p>

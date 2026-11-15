@@ -86,14 +86,6 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
     </nav>
     <div class="list-head">
       <h1>People and roles</h1>
-      <p class="muted">
-        Contributors claim <a href="/requests">requests</a> to queue them up, and their additions
-        wait for review until they're trusted: earned by enough approved recipes, or given here.
-        Withholding it sticks; clearing it lets it be earned again. Moderators edit the
-        catalog and work the flags and suggestions. Administrators also run imports and watch the
-        API and buy links. You can give or take away only the roles below your own, and the owner
-        is set outside the site.
-      </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
     <template v-else>
@@ -120,6 +112,17 @@ watch(allowed, (yes) => yes && !people.value && load(), { immediate: true });
           {{ f.label }}
         </button>
       </div>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Contributors claim <a href="/requests">requests</a> to queue them up, and their
+          additions wait for review until they're trusted: earned by enough approved recipes, or
+          given here. Withholding it sticks; clearing it lets it be earned again. Moderators edit
+          the catalog and work the flags and suggestions. Administrators also run imports and
+          watch the API and buy links. You can give or take away only the roles below your own,
+          and the owner is set outside the site.
+        </p>
+      </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="!people" class="status">Loading…</p>
       <table v-else-if="people.length" class="recipe-table people-table">

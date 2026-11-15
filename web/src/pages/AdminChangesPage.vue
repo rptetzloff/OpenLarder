@@ -38,9 +38,7 @@ watch(allowed, (yes) => yes && !changes.value && load(), { immediate: true });
     <div class="list-head">
       <h1>Recent changes</h1>
       <p class="muted">
-        Everything added, changed or removed in the catalog, newest first, by whom. Family
-        collections aren't listed here. Each source, recipe, ingredient and author also shows its
-        own history on its page.
+        Everything added, changed or removed in the catalog, newest first, by whom.
       </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
@@ -51,6 +49,13 @@ watch(allowed, (yes) => yes && !changes.value && load(), { immediate: true });
         <button type="submit" class="primary">Show</button>
         <button v-if="by" type="button" class="secondary" @click="(by = ''), load()">Everyone's</button>
       </form>
+      <details class="how">
+        <summary>How this works</summary>
+        <p>
+          Family collections aren't listed here. Each source, recipe, ingredient and author also
+          shows its own history on its page.
+        </p>
+      </details>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!changes" class="status">Loading…</p>
       <ChangeList

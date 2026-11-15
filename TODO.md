@@ -491,12 +491,50 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           before this; not changed here.
         - [ ] Words on a drawn cover aren't looked at for breaking: its
           title is fitted to the cover and may break by design.
-      - [ ] B1 to B3. On a phone the admin bar is one row, with the page's
-        name on a button that opens the rest; every admin page has one
-        sentence under its heading, and the rest of its introduction
-        under "How this works" after its controls; page spacing is
-        tighter under 40rem. The aim for every admin page: the first
-        thing to act on starts within 450px of the top at 384 x 832.
+      - [x] B1 to B3. What every admin page spends before its first thing
+        to act on, on a phone (#185). The aim, for all of part B: that
+        thing starts within 450px of the top at 384 x 832.
+        - B1. The admin bar is one row on a phone, 49px where its thirteen
+          links took five rows and 157px: "Admin", and a button with the
+          page's name that opens the links two to a row, each 44px to
+          tap. Esc closes it and gives the button the focus back. On
+          Sources, which carries the bar and isn't one of its pages, the
+          button says "Admin pages" (*Claude's choice*). Above 40rem
+          nothing changed.
+        - B2. One sentence under each admin page's heading, and the rest
+          under "How this works", closed, after the page's controls:
+          eleven pages, Your flags among them. Nothing was dropped. Three
+          things the spec doesn't say (*Claude's choices*): People has no
+          sentence under its heading, since its paragraph's first is four
+          lines on a phone and says nothing the heading doesn't; Bulk
+          import keeps its link to the history up there; and where a page
+          has no controls (Review, Merged books) it follows the heading.
+        - B3. Under 40rem a wide page's padding is 1rem, a breadcrumb's
+          and a list page's heading's bottom margins are halved, a
+          section's title has 1.5rem above it and a panel 0.75rem and 1rem
+          inside. That's every wide page, not only Admin's.
+        - Measured on the check's own data, the development banner taken
+          off, before and after: Admin 389 to 265px, Merged books 502 to
+          318, Bulk import 521 to 356, Reports 548 to 389, Recent changes
+          557 to 398, People 764 to 407, API usage 681 to 432, Flagged
+          recipes 567 to 433.
+        - [ ] Four are still past 450px: Review 469 (was 623), Buy-link
+          clicks 483 (591), Suggestions 566 (1,063) and Ingredient links
+          624 (908). Clicks is B8's. What's left on Suggestions and
+          Ingredient links is their filter buttons, three rows of them:
+          B5 and B6 turn Flagged recipes' and People's into one choice
+          on a phone, and the same would do here, which the spec doesn't
+          ask for. Review's is its "Suggested changes" heading.
+        - [ ] "How this works" costs a row of 44px where it's closed, so
+          a page whose introduction was short gains little from B2 alone:
+          Flagged recipes' went from four lines to two and that row.
+        - Found on the way: Admin and Buy-link clicks were 24px too wide
+          at 320px, where a panel's column couldn't be narrower than
+          20rem. It can now. The check's phone is 360px, so it didn't see
+          it, and still wouldn't.
+        - The check presses the bar's button on a phone and opens a "How
+          this works", and fails if the bar is taller than a row there or
+          its links aren't in the bar on a wide screen.
       - [ ] C. A simpler search page: one search bar that stays; "Cook
         with what you have" under it, with "Use my larder"; a "Show"
         choice that keeps only recipes missing nothing, or two or fewer
