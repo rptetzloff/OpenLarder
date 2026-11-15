@@ -1047,9 +1047,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           and `/api/auth/me` has it as `agreed_at`; someone whose
           acceptance was of an older wording is asked again and shown no
           date. Before it's accepted the agreement is in full, as it was.
-      - [ ] 9. Search on a phone: the filters go inside "More options".
-        *Ray, 2026-11-15: "Filters probably makes sense under More
-        options".*
+      - [x] 9. Search on a phone: the filters go inside "More options"
+        (#206). *Ray, 2026-11-15: "Filters probably makes sense under
+        More options".* There is one button above the results, before a
+        search and after, where there were two; the "Filters" one showed
+        with nothing to filter. The filters are after the options, under
+        a "Filters" heading, each group with its own collapse and "Show
+        all diets" as before. They are moved in the document itself, so
+        on a phone they aren't a landmark, and Tab and a screen reader
+        meet them in the panel.
+        - "More options (2)" counts filters with options on a phone. A
+          link that arrives with a filter opens the panel there. On a
+          wide screen the button counts and opens for options only, the
+          filters being in the rail.
+        - Ticking a filter searches again with the panel open and focus
+          on the box; its chip above the results takes it off. Done by
+          script at 384px, with the address and the count read after
+          each.
+        - After a search the results start 438px down at 384px, where
+          they started 486px down: the "Filters" button had a row.
+        - Above 40rem nothing moved: the rail, the count's row, the sort
+          and the results are where they were at 641, 700, 900 and
+          1280px, on four searches, against a build of dev.
       - Not checked by the review, so still open: a keyboard-only and
         screen reader pass (open since round 2); signed-in pages on
         openlarder.com itself; the review queue, Ingredient links and

@@ -16,6 +16,7 @@ import {
 } from "../ingredients";
 
 import type { Me } from "../me";
+import { useNarrow } from "../narrow";
 
 defineProps<{ user?: Me | null }>();
 document.title = "Search · OpenLarder";
@@ -139,9 +140,20 @@ const failed = ref(false);
 const loading = ref(false);
 let latest = 0;
 
+// On a phone the filters are inside "More options", in the document itself
+// (Teleport), so there is one button above the results and Tab and a screen
+// reader meet the filters where they're seen. *Ray, 2026-11-15: "Filters
+// probably makes sense under More options".* There had been a second
+// button, "Filters", which showed before any search, with nothing to
+// filter. On a wide screen they stay the rail beside the results.
+const narrow = useNarrow();
 // The rest of what can be asked, closed until it's wanted, or a link
-// arrives with some of it set; the button says how many are in use.
-const moreOpen = ref(["x", "source", "book", "own", "sv", "li", "lx"].some((k) => params.has(k)));
+// arrives with some of it set (on a phone, a filter too); the button says
+// how many are in use.
+const moreOpen = ref(
+  ["x", "source", "book", "own", "sv", "li", "lx"].some((k) => params.has(k)) ||
+    (narrow.value && ["tag", "kind"].some((k) => params.has(k))),
+);
 const moreCount = computed(
   () =>
     [
@@ -156,9 +168,10 @@ const moreCount = computed(
 // way from the address, or a larder's.
 const arriving = ref(params.has("i"));
 const ranked = computed(() => !!chosen.value.length || useLarder.value || arriving.value);
-// The filters, folded on a phone; how many are narrowing the search.
-const filtersOpen = ref(false);
+// How many filters are narrowing the search; on a phone, where they are
+// in the panel, the button counts them with the options.
 const activeFilters = computed(() => tags.value.length + (narrowedKinds.value.length ? 1 : 0));
+const inPanel = computed(() => moreCount.value + (narrow.value ? activeFilters.value : 0));
 // The results' heading takes focus after a search someone asked for, and
 // the count is said; a search that follows typing leaves focus alone.
 const resultsHead = ref<HTMLElement | null>(null);
@@ -601,7 +614,7 @@ onMounted(async () => {
         aria-controls="search-more"
         @click="moreOpen = !moreOpen"
       >
-        More options{{ moreCount ? ` (${moreCount})` : "" }}
+        More options{{ inPanel ? ` (${inPanel})` : "" }}
         <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
       </button>
       <div v-show="moreOpen" id="search-more" class="more-panel">
@@ -697,6 +710,9 @@ onMounted(async () => {
             @loaded="larderLoaded"
           />
         </template>
+        <!-- Where the filters go on a phone, after the options. -->
+        <h2 v-if="narrow" class="more-filters-title">Filters</h2>
+        <div id="more-filters"></div>
       </div>
 
       <p v-if="!searching && examples.length" class="try">
@@ -750,15 +766,6 @@ onMounted(async () => {
           <span class="status" role="status">{{ copyNote }}</span>
         </div>
         <div class="results-controls">
-          <button
-            type="button"
-            class="secondary filters-toggle"
-            :aria-expanded="filtersOpen"
-            aria-controls="search-filters"
-            @click="filtersOpen = !filtersOpen"
-          >
-            Filters{{ activeFilters ? ` (${activeFilters})` : "" }}
-          </button>
           <template v-if="searching && result && !failed && result.total > 1">
             <label for="search-sort" class="visually-hidden">Sort</label>
             <select id="search-sort" v-model="sort">
@@ -769,8 +776,11 @@ onMounted(async () => {
         </div>
       </div>
 
-      <aside class="filters" aria-label="Filters">
-        <div id="search-filters" class="filters-body" :class="{ open: filtersOpen }">
+      <!-- A landmark of its own beside the results; on a phone, part of
+           the panel, and not one. -->
+      <Teleport to="#more-filters" :disabled="!narrow" defer>
+      <component :is="narrow ? 'div' : 'aside'" class="filters" :aria-label="narrow ? undefined : 'Filters'">
+        <div class="filters-body">
           <details
             v-if="diets.tags.length"
             :open="open.diet"
@@ -846,7 +856,8 @@ onMounted(async () => {
             </div>
           </details>
         </div>
-      </aside>
+      </component>
+      </Teleport>
 
       <section id="results" class="results" :aria-busy="loading">
         <!-- The count, said once a search has run; not the whole list. -->
@@ -1241,13 +1252,20 @@ onMounted(async () => {
 .nothing p {
   margin: 0;
 }
-.filters-toggle {
-  display: none;
+/* The filters' heading in "More options", on a phone: small, as the
+   headings in the header's menus are. */
+.more-filters-title {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 @media (max-width: 40rem) {
   .search-body {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "head" "rail" "list";
+    grid-template-areas: "head" "list";
     grid-template-rows: auto;
     margin-top: 1rem;
   }
@@ -1256,17 +1274,6 @@ onMounted(async () => {
   }
   /* The select beside it says the order; the count has its line. */
   .order-note {
-    display: none;
-  }
-  .filters-toggle {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
-  }
-  .filters-body.open {
-    margin-bottom: 1rem;
-  }
-  .filters-body:not(.open) {
     display: none;
   }
   .more-panel {
