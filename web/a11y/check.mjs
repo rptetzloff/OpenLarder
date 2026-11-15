@@ -15,7 +15,13 @@
 // something squeezed does now that any word may break (BROKEN_WORDS).
 //
 //   psql "$DATABASE" -f a11y/users.sql
-//   node a11y/check.mjs                 # A11Y_BASE, CHROME to override
+//   node a11y/check.mjs                 # A11Y_BASE, CHROME, A11Y_WORKERS to override
+//
+// Four browsers look at pages at once (fewer on a machine with fewer
+// processors), each its own Chrome with its own cookies, and each looks at a
+// page as soon as it has stopped (settle). Ray, 2026-11-14: "is there a way
+// we can speed up tests?" It was one browser waiting at least 1.25s for
+// every view: nine of the ten minutes it took.
 //
 // What axe can't judge (whether wording is clear, whether focus order makes
 // sense, how a screen reader actually sounds) still needs a person.
@@ -23,7 +29,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const BASE = process.env.A11Y_BASE ?? "http://localhost:8000";
@@ -41,6 +47,7 @@ const TOKENS = {
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const WORKERS = Math.max(1, Number(process.env.A11Y_WORKERS) || Math.min(4, availableParallelism()));
 // The phone the layout is checked on (Ray's round 4 list, A4, 2026-11-14):
 // 360px, the narrowest of the three widths the overflow was measured at, and
 // a touch screen, because the rating's spoons are 44px wide only for a finger
@@ -500,8 +507,9 @@ function pages(s) {
 }
 
 // Chrome over the DevTools protocol, as the render checks drive it.
-async function browser() {
-  const port = 9400 + Math.floor(Math.random() * 400);
+const PORT = 9400 + Math.floor(Math.random() * 400);
+async function browser(n) {
+  const port = PORT + n;
   const proc = spawn(CHROME, [
     "--headless=new",
     "--disable-gpu",
@@ -524,12 +532,28 @@ async function browser() {
   let id = 0;
   const pending = new Map();
   const failures = [];
+  // What the page is still waiting for (settle): its requests not yet
+  // answered, and whether the document asked for has loaded. Both are kept
+  // by the document they belong to (Chrome's loader id), since the page
+  // before can still be asking, or only now saying it has loaded, as it's
+  // left: a recipe form's check of its lines was waited ten seconds for by
+  // the page after it.
+  const inflight = new Map();
+  const state = { loader: "", loaded: new Set() };
   ws.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
     if (m.id && pending.has(m.id)) {
       pending.get(m.id)(m);
       pending.delete(m.id);
     }
+    // Not the tab's icon: Chrome asks for that itself, and was seen never
+    // to say it had come.
+    if (m.method === "Network.requestWillBeSent" && !m.params.request.url.includes("/favicon."))
+      inflight.set(m.params.requestId, { url: m.params.request.url, loader: m.params.loaderId });
+    if (m.method === "Network.loadingFinished" || m.method === "Network.loadingFailed")
+      inflight.delete(m.params.requestId);
+    if (m.method === "Page.lifecycleEvent" && m.params.name === "load")
+      state.loaded.add(m.params.loaderId);
     if (m.method === "Runtime.exceptionThrown")
       failures.push(m.params.exceptionDetails?.exception?.description?.split("\n")[0]);
     // The check answers for covers itself, so the app asks Open Library for
@@ -558,9 +582,66 @@ async function browser() {
     return m.result?.result?.value;
   };
   await send("Page.enable");
+  await send("Page.setLifecycleEventsEnabled", { enabled: true });
   await send("Runtime.enable");
+  await send("Network.enable");
   await send("Fetch.enable", { patterns: [{ urlPattern: "*/covers/*" }] });
-  return { send, evaluate, failures, close: () => (ws.close(), proc.kill()) };
+  return { send, evaluate, failures, inflight, state, close: () => (ws.close(), proc.kill()) };
+}
+
+// Pages load their data after they're drawn: "Loading…" is still up, or a
+// recipe's ingredient lines aren't checked yet. And a font not yet in, or
+// something still moving (a cover fading in), would be measured as it won't
+// stay.
+const BUSY = `[
+  document.readyState !== "complete" && "the document",
+  /Loading…/.test(document.querySelector("main")?.innerText ?? "") && "“Loading…”",
+  !!document.querySelector(".line-row input:not(:placeholder-shown)") && !document.querySelector(".line-tag") && "the ingredient lines' check",
+  document.fonts.status !== "loaded" && "a font",
+  document.getAnimations().some((a) => a.playState === "running" && Number.isFinite(a.effect?.getComputedTiming().endTime)) && "something moving",
+].filter(Boolean).join(", ")`;
+const QUIET = 3;
+
+// Waits for the page to stop: loaded, nothing asked for and not yet answered,
+// and nothing BUSY, three times running, 50ms apart. What an answer sets off
+// (another request, a redraw) starts at once, so a page quiet that long has
+// finished. Answers nothing, or what it was still waiting for after ten
+// seconds: that one is looked at as it is, and named at the end.
+async function settle(b) {
+  const until = Date.now() + 10_000;
+  let quiet = 0;
+  let busy = "";
+  while (quiet < QUIET && Date.now() < until) {
+    await sleep(50);
+    if (!b.state.loaded.has(b.state.loader)) busy = "the page to load";
+    else
+      busy = [...b.inflight.values()]
+        .filter((r) => r.loader === b.state.loader)
+        .map((r) => r.url)
+        .join(", ");
+    // Mid-load there's no page to answer, and that isn't quiet.
+    busy ||= (await b.evaluate(BUSY)) ?? "the page to answer";
+    quiet = busy ? 0 : quiet + 1;
+  }
+  return busy;
+}
+
+// Loads a page afresh, and waits for it. From /saved to /saved#notes is no
+// load at all to Chrome, and the page stays as whoever was signed in before
+// saw it: every view of the notes had been the signed-out page. That one
+// goes by way of an empty page, so it's loaded like any other.
+async function go(b, url) {
+  let went = await b.send("Page.navigate", { url });
+  if (!went.result?.loaderId) {
+    await b.send("Page.navigate", { url: "about:blank" });
+    went = await b.send("Page.navigate", { url });
+    if (!went.result?.loaderId) throw new Error(`${url} wasn't loaded afresh`);
+  }
+  // This document's from here on; what the ones before left is dropped.
+  b.state.loader = went.result.loaderId;
+  b.state.loaded = new Set([...b.state.loaded].filter((id) => id === b.state.loader));
+  for (const [id, r] of b.inflight) if (r.loader !== b.state.loader) b.inflight.delete(id);
+  return settle(b);
 }
 
 // axe's WCAG A and AA rules on the page as it is: what fails, and what it
@@ -581,8 +662,7 @@ const overflowOf = (b, width) => b.evaluate(`document.documentElement.scrollWidt
 // means nothing (the checker isn't running, or isn't looking).
 async function control(b) {
   await phone(b, PHONE);
-  await b.send("Page.navigate", { url: `${BASE}/privacy` });
-  await sleep(2000);
+  await go(b, `${BASE}/privacy`);
   // Too wide by 20px, which is less than a recipe's page was over by. (As
   // wide as the screen exactly isn't too wide at all: main has no padding
   // of its own, and the control said so.)
@@ -612,8 +692,8 @@ async function phone(b, width) {
   await b.send("Emulation.setTouchEmulationEnabled", { enabled: width < 600, maxTouchPoints: 5 });
 }
 
-const undecided = new Map();
-
+// One view: what's wrong with it, what axe couldn't decide, and what it was
+// still waiting for if it never stopped.
 async function check(b, path, who, theme, width, how = {}) {
   await b.send("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-color-scheme", value: theme }],
@@ -627,22 +707,13 @@ async function check(b, path, who, theme, width, how = {}) {
       url: `${BASE}/`,
       httpOnly: true,
     });
-  await b.send("Page.navigate", { url: `${BASE}${path}` });
-  // Pages load their data after they're drawn; wait for "Loading…" to go,
-  // and for a recipe's ingredient lines to be checked.
-  for (let i = 0; i < 40; i++) {
-    await sleep(250);
-    const busy = await b.evaluate(
-      `document.readyState !== "complete" || /Loading…/.test(document.querySelector("main")?.innerText ?? "")` +
-        ` || (!!document.querySelector(".line-row input:not(:placeholder-shown)") && !document.querySelector(".line-tag"))`,
-    );
-    if (!busy && i > 3) break;
-  }
+  let busy = await go(b, `${BASE}${path}`);
   if (how.then && width < 600) {
     await b.evaluate(how.then);
-    await sleep(500);
+    busy = (await settle(b)) || busy;
   }
   const problems = [];
+  const undecided = [];
   // What the page should be showing, where an entry says: its answer is
   // what's wrong, or nothing.
   if (how.expect) {
@@ -659,41 +730,58 @@ async function check(b, path, who, theme, width, how = {}) {
     for (const v of violations)
       problems.push(`${v.id} (${v.impact}): ${v.help}\n      ${v.nodes.join("\n      ")}`);
     for (const v of incomplete)
-      for (const node of v.nodes)
-        undecided.set(`${v.id}: ${path} (${theme}) ${node}`, true);
+      for (const node of v.nodes) undecided.push(`${v.id}: ${path} (${theme}) ${node}`);
   }
-  return problems;
+  return { problems, undecided, busy };
 }
 
 const s = await seed();
-const b = await browser();
+const views = [];
+for (const theme of ["light", "dark"])
+  for (const [path, who, how] of pages(s))
+    for (const width of [1280, PHONE]) views.push({ path, who, theme, width, how });
+const browsers = await Promise.all(
+  Array.from({ length: Math.min(WORKERS, views.length) }, (_, n) => browser(n)),
+);
+// Each browser takes the next view not yet taken; what they find is kept by
+// the view's place, so it's printed in the order it always was.
+const found = new Array(views.length);
+let next = 0;
 let failed = 0;
-let checked = 0;
 try {
-  await control(b);
-  for (const theme of ["light", "dark"]) {
-    for (const [path, who, how] of pages(s)) {
-      for (const width of [1280, PHONE]) {
-        const problems = await check(b, path, who, theme, width, how);
-        checked++;
-        if (problems.length) {
-          failed++;
-          console.log(`✗ ${path} (${who ?? "signed out"}, ${theme}, ${width}px)`);
-          for (const p of problems) console.log(`    ${p}`);
-        }
+  await control(browsers[0]);
+  await Promise.all(
+    browsers.map(async (b) => {
+      for (let n = next++; n < views.length; n = next++) {
+        const v = views[n];
+        found[n] = await check(b, v.path, v.who, v.theme, v.width, v.how);
       }
+    }),
+  );
+  for (const b of browsers)
+    for (const f of b.failures) {
+      failed++;
+      console.log(`✗ script error: ${f}`);
     }
-  }
-  for (const f of b.failures) {
-    failed++;
-    console.log(`✗ script error: ${f}`);
-  }
 } finally {
-  b.close();
+  for (const b of browsers) b.close();
 }
+const checked = views.length;
+const named = (v) => `${v.path} (${v.who ?? "signed out"}, ${v.theme}, ${v.width}px)`;
+views.forEach((v, n) => {
+  if (!found[n].problems.length) return;
+  failed++;
+  console.log(`✗ ${named(v)}`);
+  for (const p of found[n].problems) console.log(`    ${p}`);
+});
+const undecided = new Set(found.flatMap((f) => f.undecided));
 if (undecided.size) {
   console.log("For a person to look at, where axe couldn't decide:");
-  for (const where of undecided.keys()) console.log(`    ${where}`);
+  for (const where of undecided) console.log(`    ${where}`);
+}
+if (found.some((f) => f.busy)) {
+  console.log("Still busy after ten seconds, and looked at as they were:");
+  views.forEach((v, n) => found[n].busy && console.log(`    ${named(v)}: waiting for ${found[n].busy}`));
 }
 console.log(
   `${checked} page views checked (axe at 1280px, and at ${PHONE}px where a phone has its own; layout at ${PHONE}px, as a touch screen), ${failed} with problems.`,
