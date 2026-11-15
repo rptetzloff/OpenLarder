@@ -31,6 +31,7 @@ ad's cookie.
 """
 
 import logging
+from datetime import datetime
 from typing import Annotated
 
 import httpx2
@@ -86,6 +87,10 @@ class Me(BaseModel):
     # Whether they've accepted the contributor agreement as it reads now,
     # which adding to the catalog needs (agreement.py).
     agreed: bool = False
+    # When they accepted it as it reads now, which their account's page
+    # says ("Accepted on …"); None when they haven't, or what they
+    # accepted was an older wording.
+    agreed_at: datetime | None = None
     # A contributor whose additions publish without review (trust.py).
     trusted: bool = False
     # Their buy-link shops: {"order": [...], "hidden": [...]}, or None.
@@ -107,6 +112,7 @@ def me_for(user: User, settings: Settings) -> Me:
         may_claim=user.may_claim,
         grants=roles.grantable(user.role),
         agreed=agreement.has_agreed(user),
+        agreed_at=user.agreed_at if agreement.has_agreed(user) else None,
         trusted=user.trusted,
         shops=(
             {k: prefs[k] for k in ("order", "hidden")}

@@ -66,6 +66,8 @@ const shelves = computed(() =>
     : [],
 );
 const every = computed(() => shelves.value.flatMap((s) => [...s.books, ...s.wants]));
+// Nothing on the page: signed out, or no book on any shelf shown.
+const empty = computed(() => props.user === null || (!!shelf.value && !every.value.length));
 // Of the books had: what search with your shelf looks in.
 const count = computed(() => new Set(shelves.value.flatMap((s) => s.books).map((b) => b.id)).size);
 const wantCount = computed(
@@ -118,12 +120,21 @@ watch(
     <div class="list-head">
       <h1>Your shelf</h1>
       <p class="muted">
-        The cookbooks you own. Search can keep to them, and a recipe's page opens at the page in
-        the edition you have. Only you see your shelf, and the household
-        <a href="/groups">groups</a> you share it with. To add a book, open its page and choose “I
-        have this book”, or “I want this book” for one you don't have yet.
+        Only you see your shelf, and the household <a href="/groups">groups</a> you share it with.
       </p>
     </div>
+    <!-- One sentence under the heading, who can see it, and the rest here,
+         closed (Ray's round 5 list, item 8, 2026-11-15: seven lines on a phone, and
+         the first book 476px down). Open when there's nothing on
+         the page, which is when it's wanted. -->
+    <details class="how" :open="empty">
+      <summary>How this works</summary>
+      <p>
+        The cookbooks you own. Search can keep to them, and a recipe's page opens at the page in
+        the edition you have. To add a book, open its page and choose “I have this book”, or “I
+        want this book” for one you don't have yet.
+      </p>
+    </details>
     <p v-if="user === null" class="status">
       <SignInLink /> to keep a shelf.
     </p>

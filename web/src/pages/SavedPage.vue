@@ -43,6 +43,10 @@ const lists = computed(() =>
     : [],
 );
 const every = computed(() => lists.value.flatMap((l) => l.recipes));
+// Nothing on the page: signed out, or no recipe on any list and no note.
+const empty = computed(
+  () => props.user === null || (!!saved.value && !every.value.length && !notes.value.length),
+);
 const count = (state: State) => new Set(every.value.filter((r) => r.state === state).map((r) => r.id)).size;
 const of = (recipes: SavedRecipe[]) => recipes.filter((r) => r.state === tab.value);
 
@@ -227,11 +231,20 @@ watch(
     <div class="list-head">
       <h1>Saved recipes</h1>
       <p class="muted">
-        The recipes you want to cook, the ones you have, and your notes. Only you see them, and the household
-        <a href="/groups">groups</a> you share them with. To save one, open its page and choose
-        “Want to cook”.
+        Only you see them, and the household <a href="/groups">groups</a> you share them with.
       </p>
     </div>
+    <!-- One sentence under the heading, who can see it, and the rest here,
+         closed (Ray's round 5 list, item 8, 2026-11-15: four lines on a phone, and
+         the first recipe 459px down). Open when there's nothing on
+         the page, which is when it's wanted. -->
+    <details class="how" :open="empty">
+      <summary>How this works</summary>
+      <p>
+        The recipes you want to cook, the ones you have, and your notes. To save one, open its
+        page and choose “Want to cook”.
+      </p>
+    </details>
     <p v-if="user === null" class="status">
       <SignInLink /> to save recipes.
     </p>
