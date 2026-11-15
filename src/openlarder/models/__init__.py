@@ -47,6 +47,7 @@ from openlarder.models.proposals import Proposal
 from openlarder.models.ratings import RecipeRating
 from openlarder.models.reports import Report
 from openlarder.models.requests import BookRequest, RequestVote
+from openlarder.models.shops import Shop
 from openlarder.models.suggestions import IngredientEmbedding, Suggestion
 from openlarder.models.usage import ApiUsage
 
@@ -89,6 +90,7 @@ __all__ = [
     "SavedRecipe",
     "ShelfBook",
     "ShelfGroup",
+    "Shop",
     "Issue",
     "Proposal",
     "PurchaseClick",

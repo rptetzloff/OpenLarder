@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import text
 
 from fake_broker import _settings
-from openlarder import grocery
+from openlarder import shops
 
 BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0"}
 TEMPLATE = "https://partner.example/deeplink?murl={url}"
@@ -15,8 +15,10 @@ TEMPLATE = "https://partner.example/deeplink?murl={url}"
 
 @pytest.fixture
 def grocers(monkeypatch):
+    # The variables the grocers' settings were in before the shops table,
+    # which an unchanged row still reads for one release (shops.py).
     monkeypatch.setattr(
-        grocery,
+        shops,
         "get_settings",
         lambda: _settings(
             instacart_link=TEMPLATE, amazon_tag="openlarder-20", walmart_link=TEMPLATE

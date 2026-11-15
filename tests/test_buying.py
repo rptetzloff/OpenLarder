@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 
 from fake_broker import _settings
-from openlarder import buying
+from openlarder import buying, shops
 
 ISBN = "9780393541113"
 
@@ -31,9 +31,14 @@ async def book(adb):
     return {"work": work, "edition": edition, "recipe": recipe}
 
 
+# The shops' settings here are the environment variables they were in
+# before the shops table (migration 0073), which a row nobody has changed
+# still takes its setting from, for one release (shops.py). So these are
+# the links as they were, and what proves they haven't changed;
+# test_shops.py has the same from the rows.
 @pytest.fixture
 def affiliate(monkeypatch):
-    monkeypatch.setattr(buying, "get_settings", lambda: _settings(bookshop_affiliate_id="12345"))
+    monkeypatch.setattr(shops, "get_settings", lambda: _settings(bookshop_affiliate_id="12345"))
 
 
 BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0"}
@@ -134,7 +139,7 @@ def every_shop(monkeypatch):
         bookoutlet_link=TEMPLATE,
         kobo_link=TEMPLATE,
     )
-    monkeypatch.setattr(buying, "get_settings", lambda: settings)
+    monkeypatch.setattr(shops, "get_settings", lambda: settings)
 
 
 async def test_each_shop_set_shows_in_order(client, book, every_shop, adb) -> None:
@@ -195,9 +200,22 @@ def test_amazon_uses_isbn10_or_searches_a_979() -> None:
     assert buying.isbn10("9781861972712") == "1861972717"
     assert buying.isbn10("9780804429573") == "080442957X"
     assert buying.isbn10("9791032300824") is None
-    settings = _settings(amazon_tag="openlarder-20")
+    amazon = shops.Shop(
+        key="amazon",
+        kind="bookseller",
+        label="Amazon",
+        builder="amazon",
+        affiliate_id="openlarder-20",
+        wrapper_template=None,
+        product_template=None,
+        format="print",
+        earns="affiliate",
+        note=None,
+        enabled=True,
+        position=4,
+    )
     book = buying.Book(isbn13="9791032300824", title="X", author=None)
-    assert buying.BY_KEY["amazon"].destination(settings, book) == (
+    assert shops.for_book(amazon, book) == (
         "https://www.amazon.com/s?k=9791032300824&i=stripbooks&tag=openlarder-20"
     )
 

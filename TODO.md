@@ -655,9 +655,41 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - [ ] Where one of an ingredient's three cards has something, the
           other two still say they have nothing: the spec folds them only
           when all three are empty.
-      - [ ] D1, D2. Shops in a table of their own, read with a minute's
-        cache and seeded from today's environment variables, with no
-        visible change; then `/admin/shops`, for administrators.
+      - [x] D1. Shops in a table of their own (#190), with no visible
+        change. Migration 0073 makes `shops` with a row for each of the
+        six booksellers and three grocers, each one's setting copied from
+        the variable it was in and the shop switched on where that was
+        set. buying.py and grocery.py read the rows (shops.py), kept a
+        minute in the process. Its own PR, ahead of `/admin/shops`
+        (*Claude's choice*: the spec has them on one line), so the move
+        could be seen to change nothing before anything is built on it.
+        - That nothing changed: on one database, the build before and
+          this one gave the same buy list for every edition and the same
+          address from every `/go/` link, all nine shops, 54 of 54; and
+          so did this build started with none of the variables set.
+        - A key is unique among its kind, not among all shops as the spec
+          has it: Amazon and Amazon Fresh are both `amazon`, at
+          `/go/amazon/…` and `/go/grocer/amazon/…`, and both are on the
+          web already.
+        - `{words}` (a book's title and author, for a search) is a
+          placeholder the spec doesn't list: Kobo is searched that way,
+          and with it Kobo's address is in its row like the others'.
+          Amazon's is still made in code, as the spec says.
+        - For one release a row nobody has changed that has no setting
+          still takes it from its variable, with a warning in the log
+          naming it. D3 takes that out with the variables.
+        - A reset keeps the shops, of the catalog or of everything
+          (reset.py): they're the site's configuration. With
+          `--everything`, who last changed one goes with the accounts.
+          The reset's own test, that every table is named as emptied or
+          kept, is what asked.
+        - [ ] Ray: nothing to do in Coolify for this. After it's deployed,
+          the log should have no line saying a shop "has no setting in
+          the shops table"; one would mean a variable the migration didn't
+          see.
+      - [ ] D2. `/admin/shops`, for administrators: the list, the form,
+        the test link, and each change in the edit history. `shops` has
+        no history yet: nothing can change a row until this.
       - [ ] E. Google Ads sign-up tracking with none of Google's script:
         the ad's click id in a cookie of the site's own, one row for a
         new account that isn't linked to it, exported to a sheet Google

@@ -535,7 +535,8 @@ async def get_book(source_id: uuid.UUID, session: Session, viewer: Viewer) -> Bo
                     if e.open_library_edition_id
                     else None
                 ),
-                buy=buying.links(
+                buy=await buying.links(
+                    session,
                     e.id,
                     e.isbn13,
                     work.kind,

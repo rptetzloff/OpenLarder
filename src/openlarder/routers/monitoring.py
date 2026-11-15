@@ -212,7 +212,7 @@ async def clicks(
     by_day = (
         await session.execute(select(day, func.count()).where(window).group_by(day).order_by(day))
     ).all()
-    labels = {r.key: r.label for r in buying.RETAILERS}
+    labels = await buying.labels(session)
     in_window = GroceryClick.clicked_at >= since
     grocers = (
         await session.execute(
@@ -237,7 +237,7 @@ async def clicks(
             .limit(TOP)
         )
     ).all()
-    grocer_labels = {g.key: g.label for g in grocery.GROCERS}
+    grocer_labels = await grocery.labels(session)
     return ClicksPage(
         grocery_clicks=sum(n for _, n, _ in grocers),
         grocers=[

@@ -75,7 +75,7 @@ class User(Timestamps, Base):
     # (roles.py). *Ray, 2026-11-10.*
     role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
     # Buy-link shops in the order the person wants them, and those they've
-    # hidden: {"order": [...], "hidden": [...]} (buying.RETAILERS' keys).
+    # hidden: {"order": [...], "hidden": [...]} (the booksellers' keys, shops.py).
     # None until they choose. *Ray, 2026-11-09.*
     shop_preferences: Mapped[dict | None] = mapped_column(JSONB)
     # When they accepted the contributor agreement, and which version

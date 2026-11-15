@@ -88,9 +88,12 @@ class Settings(BaseSettings):
     # Both or none; none, and nothing is counted.
     umami_script_url: str | None = None
     umami_website_id: str | None = None
-    # Buy links (buying.py), each shown only once its setting is here: a link
-    # that earns nothing isn't shown. *Ray, 2026-11-09.* Bookshop.org's
-    # affiliate ID, and Amazon's Associates tag ("openlarder-20").
+    # The shops' affiliate settings, as they were before the shops table
+    # (shops.py; *Ray, 2026-11-13*). Migration 0073 copied each one that was
+    # set onto its shop's row, which is what's read now. These are still
+    # read for a row nobody has changed that has no setting, for one release,
+    # and then go. Bookshop.org's affiliate ID, and Amazon's Associates tag
+    # ("openlarder-20").
     bookshop_affiliate_id: str | None = None
     amazon_tag: str | None = None
     # The others come through affiliate networks: each is the network's
