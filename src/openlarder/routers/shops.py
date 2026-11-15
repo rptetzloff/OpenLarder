@@ -57,9 +57,6 @@ class ShopOut(BaseModel):
     shown: bool
     # Switched on and not shown: what it still needs.
     needs: str | None
-    # Its setting is still in this environment variable and not on the shop;
-    # saving it here puts it on the shop.
-    variable: str | None
     clicks_30_days: int
     # Clicks ever: with any, it's switched off and not deleted.
     clicks: int
@@ -103,7 +100,7 @@ def _clean(value: str | None) -> str | None:
 
 def _checked(kind: str, body: Fields) -> dict:
     """The fields as they'll be stored, or a refusal that says what's wrong:
-    what config.py asked of the environment variables these replace."""
+    what config.py asked of the environment variables these replaced."""
     label = " ".join(body.label.split())
     if not label:
         raise _refuse("Give the shop a name.")
@@ -200,7 +197,6 @@ async def _out(session: AsyncSession) -> list[Group]:
     groups = []
     for kind, label in KINDS.items():
         listed = []
-        # As the site has them: with a setting still in its variable.
         for s in await shops.listed(session, kind):
             row = rows[kind, s.key]
             needs = shops.lacks(s) if s.enabled else None
@@ -220,7 +216,6 @@ async def _out(session: AsyncSession) -> list[Group]:
                     enabled=s.enabled,
                     shown=s.enabled and shops.sample(s) is not None,
                     needs=needs,
-                    variable=s.variable,
                     clicks_30_days=lately.get((kind, s.key), 0),
                     clicks=ever.get((kind, s.key), 0),
                     updated_at=row.updated_at,
@@ -304,12 +299,9 @@ class Switch(BaseModel):
 async def switch_shop(
     shop_id: uuid.UUID, body: Switch, admin: AdminUser, session: Session
 ) -> list[Group]:
-    """On or off, without the rest of the form. Switched on from a setting
-    still in its environment variable, the setting is put on the shop."""
+    """On or off, without the rest of the form."""
     row = await _row_or_404(session, shop_id)
     now = await shops.find(session, row.kind, row.key)
-    if now and now.variable:
-        row.affiliate_id, row.wrapper_template = now.affiliate_id, now.wrapper_template
     row.enabled = body.enabled
     if now:
         _must_be_whole(replace(now, enabled=body.enabled))

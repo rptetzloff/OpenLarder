@@ -1,6 +1,7 @@
 """The shops table (migration 0073; shops.py): the booksellers and grocers
-read from their rows, kept a minute, with the environment variables they
-used to be in still read for a row nobody has changed. *Ray, 2026-11-13.*"""
+read from their rows, kept a minute. The environment variables their
+settings used to be in aren't read any more: migration 0076 copied the last
+of them onto the rows. *Ray, 2026-11-13.*"""
 
 import importlib.util
 import pathlib
@@ -9,8 +10,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from fake_broker import _settings
 from openlarder import dumps, shops
+from openlarder.config import Settings
 
 ISBN = "9780393541113"
 BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0"}
@@ -78,9 +79,9 @@ async def test_the_shops_there_were_are_rows_in_their_order(adb) -> None:
     assert blank == 9
 
 
-def _migration():
-    path = pathlib.Path(__file__).parent.parent / "migrations" / "versions" / "0073_shops.py"
-    spec = importlib.util.spec_from_file_location("migration_0073", path)
+def _migration(name: str = "0073_shops"):
+    path = pathlib.Path(__file__).parent.parent / "migrations" / "versions" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(f"migration_{name}", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -143,32 +144,123 @@ async def test_switched_off_it_isnt_shown_or_followed(client, adb, book) -> None
     assert await _buy(client, book) == []
 
 
-async def test_a_row_nobody_changed_still_takes_its_variable(
-    client, adb, book, people, monkeypatch
+# The variables go (migration 0076, then nothing reads them)
+
+LAST = "0076_shops_last_of_the_variables"
+EVERY_VARIABLE = {
+    "OPENLARDER_BOOKSHOP_AFFILIATE_ID": " 12345 ",
+    "OPENLARDER_AMAZON_TAG": "openlarder-20",
+    "OPENLARDER_BARNES_NOBLE_LINK": WRAPPER,
+    "OPENLARDER_THRIFTBOOKS_LINK": WRAPPER,
+    "OPENLARDER_BOOKOUTLET_LINK": WRAPPER,
+    "OPENLARDER_KOBO_LINK": WRAPPER,
+    "OPENLARDER_INSTACART_LINK": WRAPPER,
+    "OPENLARDER_WALMART_LINK": WRAPPER,
+}
+
+
+async def _copy(adb, environ) -> None:
+    """Migration 0076's own statements, run here."""
+    for statement, values in _migration(LAST).updates(environ):
+        await adb.execute(text(statement), values)
+    shops.reset()
+
+
+async def _settings_of(adb) -> dict:
+    rows = await adb.execute(
+        text("SELECT kind, key, affiliate_id, wrapper_template, enabled FROM shops")
+    )
+    return {(r.kind, r.key): (r.affiliate_id or r.wrapper_template, r.enabled) for r in rows}
+
+
+async def test_a_variable_set_since_the_table_came_is_copied_onto_its_shop(
+    client, adb, book
 ) -> None:
-    """For one release: a variable set after the migration ran still works,
-    and the log says to move it."""
-    monkeypatch.setattr(shops, "get_settings", lambda: _settings(bookshop_affiliate_id="12345"))
-    # The tests run without pytest's logging, so the warning is caught here.
-    said = []
-    monkeypatch.setattr(shops.log, "warning", lambda message, *args: said.append(message % args))
+    """What the app did for one release, made standing: a shop nobody has
+    changed, with no setting, takes its variable's and is switched on."""
+    assert await _buy(client, book) == []
+    await _copy(adb, EVERY_VARIABLE)
+
+    now = await _settings_of(adb)
+    assert now["bookseller", "bookshop"] == ("12345", True)
+    # The one tag is Amazon's for books and for groceries.
+    assert now["bookseller", "amazon"] == ("openlarder-20", True)
+    assert now["grocer", "amazon"] == ("openlarder-20", True)
+    for shop in (
+        ("bookseller", "bn"),
+        ("bookseller", "thriftbooks"),
+        ("bookseller", "bookoutlet"),
+        ("bookseller", "kobo"),
+        ("grocer", "instacart"),
+        ("grocer", "walmart"),
+    ):
+        assert now[shop] == (WRAPPER, True), shop
+    # Nobody's change still: the admin page goes on saying so.
+    assert not await adb.scalar(text("SELECT count(*) FROM shops WHERE updated_by IS NOT NULL"))
+    # And the links are the ones the variables gave.
+    assert await _buy(client, book) == [
+        "bookshop",
+        "bn",
+        "thriftbooks",
+        "bookoutlet",
+        "amazon",
+        "kobo",
+    ]
     assert await _goes(client, f"/go/bookshop/{book['edition']}") == (
         f"https://bookshop.org/a/12345/{ISBN}"
     )
-    assert await _buy(client, book) == ["bookshop"]
-    # Once, however often it's read.
-    assert len(said) == 1 and "OPENLARDER_BOOKSHOP_AFFILIATE_ID" in said[0]
 
-    # The row's own setting wins over the variable.
-    await _set(adb, "bookseller", "bookshop", affiliate_id="777", enabled=True)
-    assert await _goes(client, f"/go/bookshop/{book['edition']}") == (
-        f"https://bookshop.org/a/777/{ISBN}"
-    )
-    # And a row someone has changed is as they left it: switched off, with no
-    # setting, it stays off whatever the variable says.
+
+async def test_a_shop_with_a_setting_or_somebodys_change_is_left_alone(adb, people) -> None:
     await people("ann", admin=True)
     ann = await adb.scalar(text("SELECT id FROM users WHERE display_name = 'ann'"))
-    await _set(adb, "bookseller", "bookshop", by=ann, affiliate_id=None, enabled=False)
+    # Its own setting, switched off since: the row wins, as it did.
+    await _set(adb, "bookseller", "bookshop", affiliate_id="777", enabled=False)
+    # Somebody emptied this one and switched it off: it stays as they left it.
+    await _set(adb, "bookseller", "kobo", by=ann, wrapper_template=None, enabled=False)
+    await _copy(adb, EVERY_VARIABLE)
+
+    now = await _settings_of(adb)
+    assert now["bookseller", "bookshop"] == ("777", False)
+    assert now["bookseller", "kobo"] == (None, False)
+
+
+async def test_a_variable_not_set_or_of_the_wrong_shape_copies_nothing(adb) -> None:
+    before = await _settings_of(adb)
+    await _copy(
+        adb,
+        {
+            "OPENLARDER_BOOKSHOP_AFFILIATE_ID": "12345/../x",
+            "OPENLARDER_AMAZON_TAG": "openlarder 20",
+            "OPENLARDER_KOBO_LINK": "https://click.example/deeplink?id=7",
+            "OPENLARDER_BOOKOUTLET_LINK": "http://click.example/?u={url}",
+            "OPENLARDER_WALMART_LINK": "  ",
+        },
+    )
+    assert await _settings_of(adb) == before
+    assert _migration(LAST).updates({}) == []
+
+
+async def test_the_variables_arent_read_any_more(client, adb, book, monkeypatch) -> None:
+    """One left behind in Coolify does nothing, and one of the wrong shape
+    doesn't stop the app starting, as it did while they were settings."""
+    monkeypatch.setenv("OPENLARDER_BOOKSHOP_AFFILIATE_ID", "12345")
+    monkeypatch.setenv("OPENLARDER_AMAZON_TAG", "not a tag!")
+    settings = Settings()
+    for gone in (
+        "bookshop_affiliate_id",
+        "amazon_tag",
+        "barnes_noble_link",
+        "thriftbooks_link",
+        "bookoutlet_link",
+        "kobo_link",
+        "instacart_link",
+        "walmart_link",
+    ):
+        assert not hasattr(settings, gone), gone
+    # Nor does the shops' own module ask for the settings at all.
+    assert not hasattr(shops, "get_settings")
+    # A shop nobody has changed, with no setting of its own, shows nothing.
     assert await _buy(client, book) == []
     assert await _goes(client, f"/go/bookshop/{book['edition']}") is None
 

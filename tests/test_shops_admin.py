@@ -5,9 +5,6 @@ changed, added, put in order and switched on and off from the site.
 import pytest
 from sqlalchemy import text
 
-from fake_broker import _settings
-from openlarder import shops
-
 ISBN = "9780393541113"
 BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0"}
 WRAPPER = "https://click.example/deeplink?id=7&murl={url}"
@@ -393,33 +390,3 @@ async def test_a_link_is_tried_without_saving_or_counting(people, adb) -> None:
     # Nothing saved, nothing counted.
     assert (await _shops(ann))["bookseller", "bn"]["wrapper_template"] is None
     assert await adb.scalar(text("SELECT count(*) FROM purchase_clicks")) == 0
-
-
-async def test_a_setting_still_in_its_variable_is_shown_and_saved_to_the_shop(
-    people, client, adb, book, monkeypatch
-) -> None:
-    """For one release (shops.py): the list says where the setting is, and
-    switching the shop on or off from here puts it on the shop."""
-    monkeypatch.setattr(shops, "get_settings", lambda: _settings(bookshop_affiliate_id="12345"))
-    ann = await people("ann", admin=True)
-    bookshop = (await _shops(ann))["bookseller", "bookshop"]
-    assert (bookshop["enabled"], bookshop["shown"], bookshop["affiliate_id"]) == (
-        True,
-        True,
-        "12345",
-    )
-    assert bookshop["variable"] == "OPENLARDER_BOOKSHOP_AFFILIATE_ID"
-
-    off = await ann.put(f"/api/admin/shops/{bookshop['id']}/enabled", json={"enabled": False})
-    now = _all(off.json())["bookseller", "bookshop"]
-    assert (now["enabled"], now["affiliate_id"], now["variable"]) == (False, "12345", None)
-    assert await _buy(client, book) == []
-    row = (
-        await adb.execute(
-            text(
-                "SELECT affiliate_id, enabled FROM shops"
-                " WHERE kind = 'bookseller' AND key = 'bookshop'"
-            )
-        )
-    ).one()
-    assert tuple(row) == ("12345", False)

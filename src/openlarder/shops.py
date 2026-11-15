@@ -33,26 +33,22 @@ title and author, and without it that search stayed in code.
 or a grocer is offered when it's switched on and its builder has what it
 needs.
 
-**The variables, for one more release.** A row nobody has changed that has
-no setting takes it from the environment variable it used to be in, and is
-offered, with a warning in the log naming the variable. That's for a
-variable set after the migration ran. The release after drops it, and the
-variables.
+**The variables are gone.** For the one release after the table came, a
+row nobody had changed that had no setting took it from the environment
+variable it used to be in. Migration 0076 copied any such setting onto its
+row, and nothing here reads the environment now: a shop is what its row
+says. An OPENLARDER_AMAZON_TAG left behind does nothing.
 """
 
-import logging
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import quote, quote_plus
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder.config import Settings, get_settings
 from openlarder.models import Shop as ShopRow
-
-log = logging.getLogger(__name__)
 
 Kind = Literal["bookseller", "grocer", "producer"]
 # How long the rows are kept before they're read again.
@@ -82,26 +78,8 @@ class Shop:
     note: str | None
     enabled: bool
     position: int
-    # Nobody has changed it since the migration seeded it.
-    seeded: bool = False
-    # Its setting is from this environment variable, not its row (for one
-    # release; see above).
-    variable: str | None = None
 
 
-# (kind, key): the setting it used to be in, and the column that holds it now.
-_VARIABLES = {
-    ("bookseller", "bookshop"): ("bookshop_affiliate_id", "affiliate_id"),
-    ("bookseller", "amazon"): ("amazon_tag", "affiliate_id"),
-    ("bookseller", "bn"): ("barnes_noble_link", "wrapper_template"),
-    ("bookseller", "thriftbooks"): ("thriftbooks_link", "wrapper_template"),
-    ("bookseller", "bookoutlet"): ("bookoutlet_link", "wrapper_template"),
-    ("bookseller", "kobo"): ("kobo_link", "wrapper_template"),
-    ("grocer", "instacart"): ("instacart_link", "wrapper_template"),
-    ("grocer", "amazon"): ("amazon_tag", "affiliate_id"),
-    ("grocer", "walmart"): ("walmart_link", "wrapper_template"),
-}
-_warned: set[str] = set()
 # When they were read, and the rows.
 _kept: tuple[float, list[Shop]] | None = None
 
@@ -110,7 +88,6 @@ def reset() -> None:
     """Forget the rows kept, so the next asking reads them again."""
     global _kept
     _kept = None
-    _warned.clear()
 
 
 async def _rows(session: AsyncSession) -> list[Shop]:
@@ -133,7 +110,6 @@ async def _rows(session: AsyncSession) -> list[Shop]:
                     note=r.note,
                     enabled=r.enabled,
                     position=r.position,
-                    seeded=r.updated_by is None,
                 )
                 for r in found
             ],
@@ -141,33 +117,9 @@ async def _rows(session: AsyncSession) -> list[Shop]:
     return _kept[1]
 
 
-def _from_variable(shop: Shop, settings: Settings) -> Shop:
-    """The shop with its setting from the environment variable, where the
-    row has none and nobody has changed it; else as it is."""
-    variable, column = _VARIABLES.get((shop.kind, shop.key), (None, None))
-    if not variable or not shop.seeded or getattr(shop, column) is not None:
-        return shop
-    value = getattr(settings, variable)
-    if value is None:
-        return shop
-    if variable not in _warned:
-        _warned.add(variable)
-        log.warning(
-            "%s (%s) has no setting in the shops table; using OPENLARDER_%s for this"
-            " release. Set it on the shop: the variable goes in the next.",
-            shop.label,
-            shop.kind,
-            variable.upper(),
-        )
-    return replace(
-        shop, **{column: value, "enabled": True, "variable": f"OPENLARDER_{variable.upper()}"}
-    )
-
-
 async def listed(session: AsyncSession, kind: Kind) -> list[Shop]:
     """Every shop of a kind, in the order they're shown, switched on or not."""
-    settings = get_settings()
-    return [_from_variable(s, settings) for s in await _rows(session) if s.kind == kind]
+    return [s for s in await _rows(session) if s.kind == kind]
 
 
 async def find(session: AsyncSession, kind: Kind, key: str) -> Shop | None:

@@ -21,8 +21,6 @@ export interface Shop {
   shown: boolean;
   // Switched on and not shown: what it still needs.
   needs: string | null;
-  // Its setting is still in this environment variable, not on the shop.
-  variable: string | null;
   clicks_30_days: number;
   clicks: number;
   updated_at: string;

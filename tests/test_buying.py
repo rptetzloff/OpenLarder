@@ -1,10 +1,8 @@
 """Buy links (buying.py) and counting their clicks (routers/go.py)."""
 
 import pytest
-from pydantic import ValidationError
 from sqlalchemy import text
 
-from fake_broker import _settings
 from openlarder import buying, shops
 
 ISBN = "9780393541113"
@@ -31,14 +29,26 @@ async def book(adb):
     return {"work": work, "edition": edition, "recipe": recipe}
 
 
-# The shops' settings here are the environment variables they were in
-# before the shops table (migration 0073), which a row nobody has changed
-# still takes its setting from, for one release (shops.py). So these are
-# the links as they were, and what proves they haven't changed;
-# test_shops.py has the same from the rows.
+async def _switch_on(adb, kind: str, key: str, column: str, value: str) -> None:
+    """A shop as migration 0073 seeds it where its variable was set: its
+    setting on its row, switched on, changed by nobody."""
+    await adb.execute(
+        text(
+            f"UPDATE shops SET {column} = :value, enabled = true WHERE kind = :kind AND key = :key"
+        ),
+        {"value": value, "kind": kind, "key": key},
+    )
+    shops.reset()
+
+
+# The shops' settings here are on their rows, as the migration seeds them
+# from the variables they were in before the shops table (0073). Until the
+# variables went (*Ray, 2026-11-13*) these fixtures set the variables
+# themselves, and every address asserted below is as it was then: the
+# links didn't change when the settings moved.
 @pytest.fixture
-def affiliate(monkeypatch):
-    monkeypatch.setattr(shops, "get_settings", lambda: _settings(bookshop_affiliate_id="12345"))
+async def affiliate(adb):
+    await _switch_on(adb, "bookseller", "bookshop", "affiliate_id", "12345")
 
 
 BROWSER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/140.0"}
@@ -116,11 +126,10 @@ def test_the_page_is_a_path_on_this_site(asked, referer, page) -> None:
     assert buying.page_of(asked, referer) == page
 
 
-def test_the_affiliate_id_is_a_number() -> None:
-    assert _settings(bookshop_affiliate_id=" 12345 ").bookshop_affiliate_id == "12345"
-    assert _settings(bookshop_affiliate_id="").bookshop_affiliate_id is None
-    with pytest.raises(ValidationError):
-        _settings(bookshop_affiliate_id="12345/../x")
+# What a setting may look like (an id that's a number, a tag that's a tag, a
+# deep link with {url}) was config.py's to refuse while the settings were
+# variables. The administrator's form refuses the same now:
+# test_shops_admin.py, test_what_cant_work_is_refused_and_says_why.
 
 
 # More shops (Ray, 2026-11-09): Amazon by its tag; the rest by a network's
@@ -130,16 +139,11 @@ TEMPLATE = "https://click.example/deeplink?id=7&murl={url}"
 
 
 @pytest.fixture
-def every_shop(monkeypatch):
-    settings = _settings(
-        bookshop_affiliate_id="12345",
-        amazon_tag="openlarder-20",
-        barnes_noble_link=TEMPLATE,
-        thriftbooks_link=TEMPLATE,
-        bookoutlet_link=TEMPLATE,
-        kobo_link=TEMPLATE,
-    )
-    monkeypatch.setattr(shops, "get_settings", lambda: settings)
+async def every_shop(adb):
+    await _switch_on(adb, "bookseller", "bookshop", "affiliate_id", "12345")
+    await _switch_on(adb, "bookseller", "amazon", "affiliate_id", "openlarder-20")
+    for key in ("bn", "thriftbooks", "bookoutlet", "kobo"):
+        await _switch_on(adb, "bookseller", key, "wrapper_template", TEMPLATE)
 
 
 async def test_each_shop_set_shows_in_order(client, book, every_shop, adb) -> None:
@@ -218,17 +222,3 @@ def test_amazon_uses_isbn10_or_searches_a_979() -> None:
     assert shops.for_book(amazon, book) == (
         "https://www.amazon.com/s?k=9791032300824&i=stripbooks&tag=openlarder-20"
     )
-
-
-@pytest.mark.parametrize(
-    ("setting", "value"),
-    [
-        ("amazon_tag", "openlarder 20"),
-        ("amazon_tag", "tag&x=1"),
-        ("kobo_link", "https://click.example/deeplink?id=7"),
-        ("bookoutlet_link", "http://click.example/?u={url}"),
-    ],
-)
-def test_a_shop_setting_of_the_wrong_shape_is_refused(setting, value) -> None:
-    with pytest.raises(ValidationError):
-        _settings(**{setting: value})
