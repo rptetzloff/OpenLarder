@@ -194,7 +194,7 @@ cd web && A11Y_BASE=http://localhost:8001 npm run a11y
 ```
 
 It needs Chrome (`CHROME` points at it if it isn't where the script looks), and
-takes under a minute with four browsers at once (`A11Y_WORKERS` for another
+takes about a minute with four browsers at once (`A11Y_WORKERS` for another
 number).
 
 For speed, `scripts/perf/scale.sql` turns a copy of the catalog into one the

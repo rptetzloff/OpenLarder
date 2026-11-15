@@ -1227,6 +1227,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         as. They're loaded afresh now, and pass.
       - A page that hasn't stopped in ten seconds is looked at as it is,
         and named at the end with what it was waiting for. None does.
+      - In CI, on this change's own run: the check 64 seconds where it
+        was 611, and its job 1m58s where it was eleven minutes.
       - [ ] Now the longest of a pull request's checks is pytest: 2m16s
         in CI, of which the tests are 1m47s. Not looked at.
 
