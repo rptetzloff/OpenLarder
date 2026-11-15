@@ -1065,13 +1065,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       nothing in the code or its history has had it. What there is beside
       it: "I have this book" on a book's page, which puts it on your shelf
       and has the one state; "Want to cook" and "Cooked" on a recipe; and
-      "Request it" on Sources, for a book to be indexed. Not started, and
-      what it is to do is Ray's to say. Claude's guesses at the questions:
-      whether it's a second state of the shelf (a wish list beside what's
-      owned, shared with household groups as the shelf is) or a list of
-      its own; whether Search's "Only books on my shelf" should leave
-      wanted books out; and whether a wanted book's page should put its
-      buy links first.
+      "Request it" on Sources, for a book to be indexed. Not started.
+      *Ray's answers, the same day, to what Claude asked:*
+      - It's a second state of the shelf, beside having the book ("Second
+        shelf state"): a book on your shelf is one you have or one you
+        want.
+      - Search's "Only books on my shelf" leaves wanted books out ("yes
+        exclude").
+      - A wanted book's page puts its buy links first ("yes").
+      - [ ] Not asked yet, for whoever builds it: whether a wanted book is
+        shared with household groups as the rest of a shelf is; where the
+        wanted ones show on the Shelf page; and what the count beside
+        "Only books on my shelf" counts.
 - [x] **Diets from Admin: adding, renaming and removing.** *Ray,
       2026-11-14: "ability for admin to create diets"; and, asked whether
       to rename and remove them too, and to set what a diet avoids only
