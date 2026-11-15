@@ -950,9 +950,40 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - The check opens each of the three on a phone, and plants a
           second author of the same name for two authors, one the long
           word, so the bar's longest state is looked at.
-      - [ ] 6. Saved recipes: one button for each tab ("Cooked it", "Cook
-        again") and Remove, each with an Undo. *Ray, 2026-11-15: one
-        button per tab over the two pills.*
+      - [x] 6. Saved recipes: one button for each tab ("Cooked it", "Cook
+        again") and Remove, each with an Undo (#202). *Ray, 2026-11-15:
+        one button per tab over the two pills.* The pills only repeated
+        the tab, and removing a recipe meant pressing the one already on.
+        A card with a one-line title is 144px at 384px, where it was
+        209px. The recipe's page keeps its pills.
+        - Nothing asks first. A line where the card was says "Moved to
+          Cooked.", "Moved to Want to cook." or "Removed.", with Undo,
+          for eight seconds or until the next button; the live region
+          says the same words, and focus goes to Undo. When the line
+          goes, focus that was still on Undo moves to the next card's
+          title, or to the tab if the list is empty; focus that had gone
+          elsewhere is left where it is (Claude's reading, 2026-11-15).
+        - The tabs' counts move at once: the page changes first and tells
+          the server after, one request at a time, so Undo can be pressed
+          before the first is answered. If the server says no, the page
+          shows the error and what the server has.
+        - Undo puts a recipe back in the same tab and place. One that had
+          been removed gets a new saved date, which no page shows.
+        - After Undo the live region says "Put back." and focus is on the
+          card's title (Claude's choice, 2026-11-15; the list didn't say).
+        - Checked by hand against the running server, at 384px: each of
+          the three and its Undo, the line clearing by itself, the last
+          card of a tab, and a request the server refuses. The buttons
+          were pressed by script; real key presses weren't sent. The
+          check presses "Cooked it" and "Remove" on a phone without
+          telling the server, since four browsers look at the page at
+          once.
+        - [ ] For Ray: the Undo line goes after eight seconds whether or
+          not focus is on it. WCAG 2.2.1 asks that a time limit can be
+          turned off or extended; the same change can still be made
+          afterwards from the other tab, or the recipe's page, which may
+          be enough. Keeping the line while focus is on Undo would settle
+          it.
       - [ ] 7. A book's buy buttons are grouped by format under a heading
         and say only the shop, in the recipe page's outline style: "Print"
         on a button read as printing the page.

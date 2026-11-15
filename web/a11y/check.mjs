@@ -318,6 +318,64 @@ const ADMIN_BAR = (label) => `(() => {
 const OPEN_BAR = `document.querySelector(".bar-toggle").click()`;
 // An author's bar offers the other author of the same name, to merge.
 const DUPLICATE_SAID = `document.querySelector("#admin-bar").textContent.includes("Possible duplicate:") ? "" : "The author's admin bar doesn't offer the other author of that name"`;
+// Saved recipes (Ray's round 5 list, item 6, 2026-11-15): a card has its
+// tab's one move and "Remove", on one row; both are plain buttons, not
+// toggles, named with the recipe; and on a phone a card whose title is one
+// line is under 150px tall (it was 209px, with the two pills stacked).
+const SAVED_CARDS = (move) => `(() => {
+  const cards = [...document.querySelectorAll(".saved-page .hits .hit")].filter((c) => c.querySelector("h3") && c.querySelector("button"));
+  if (!cards.length) return "Saved recipes shows no card with buttons";
+  for (const card of cards) {
+    const heading = card.querySelector("h3");
+    const title = heading.textContent.trim();
+    const buttons = [...card.querySelectorAll("button")];
+    const words = buttons.map((b) => b.textContent.trim()).join(", ");
+    if (words !== ${JSON.stringify(move + ", Remove")}) return "A saved recipe's buttons are " + JSON.stringify(words) + ", not " + ${JSON.stringify(JSON.stringify(move + ", Remove"))};
+    const wrong = buttons.find((b) => b.hasAttribute("aria-pressed") || b.getAttribute("aria-label") !== b.textContent.trim() + ": " + title);
+    if (wrong) return "A saved recipe's button " + JSON.stringify(wrong.textContent.trim()) + " is a toggle, or isn't named with its recipe";
+    const middles = buttons.map((b) => b.getBoundingClientRect()).map((r) => r.top + r.height / 2);
+    if (Math.abs(middles[0] - middles[1]) > 2) return "A saved recipe's two buttons aren't on one row";
+    const lines = Math.round(heading.getBoundingClientRect().height / parseFloat(getComputedStyle(heading).lineHeight));
+    const tall = Math.round(card.getBoundingClientRect().height);
+    if (innerWidth < 640 && lines === 1 && tall >= 150) return "A saved recipe's card with a one-line title is " + tall + "px tall on a phone, not under 150px";
+  }
+  return "";
+})()`;
+// A list shared with you that you can't change has no buttons.
+const SAVED_READ_ONLY = `document.querySelector(".saved-page .hits .hit") && !document.querySelector(".saved-page .hits button") ? "" : "A saved list that can't be changed shows no cards, or shows buttons"`;
+// A click is only made on a phone (how.then), so what it should leave is
+// only asked there.
+const onPhone = (expect) => `innerWidth >= 640 ? "" : (${expect})`;
+const OPEN_COOKED = `[...document.querySelectorAll(".saved-page .kind-filter button")].find((b) => b.textContent.trim().startsWith("Cooked")).click()`;
+// Pressing a card's button, without the server being told: four browsers
+// look at this page at once, in both themes, and a real press would move
+// the recipe for all of them. The page changes itself first and isn't
+// loaded again after, so what it shows is what a real press shows. The
+// eight seconds the line stays are held as well, so that it is still there
+// when axe has finished with it.
+const SAVED_PRESS = (words) => `(() => {
+  const real = window.fetch;
+  window.fetch = (url, init) =>
+    init?.method && init.method !== "GET" && String(url).startsWith("/api/saved/")
+      ? Promise.resolve(new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }))
+      : real(url, init);
+  const later = window.setTimeout;
+  window.setTimeout = (f, ms, ...rest) => (ms >= 5000 ? 0 : later(f, ms, ...rest));
+  [...document.querySelectorAll(".saved-page .hits .hit button")].find((b) => b.textContent.trim() === ${JSON.stringify(words)}).click();
+})()`;
+// And what it shows then: a line where the card was, with the same words
+// in the live region, and focus on its Undo.
+const SAVED_DONE = (words) => `(() => {
+  const line = document.querySelector(".saved-page .done-line");
+  if (!line) return "Saved recipes shows no line where the card was";
+  if (line.innerText.trim() !== ${JSON.stringify(words + " Undo")}) return "The line where a saved recipe was says " + JSON.stringify(line.innerText.trim());
+  const live = document.querySelector(".saved-page [aria-live]").textContent.trim();
+  if (live !== ${JSON.stringify(words)}) return "The live region says " + JSON.stringify(live) + ", not the line's words";
+  const focus = document.activeElement;
+  if (!line.contains(focus) || focus.textContent.trim() !== "Undo") return "Focus isn't on Undo after a saved recipe's card goes";
+  if (!(focus.getAttribute("aria-label") ?? "").startsWith("Undo: ")) return "Undo isn't named with its recipe";
+  return "";
+})()`;
 // Search, kept to what can be made now: every recipe listed has everything,
 // and with none to list, the next step is offered.
 const MAKE_NOW = `(() => {
@@ -759,8 +817,13 @@ function pages(s) {
     ["/shelf", null],
     // The book Cy wants: its shops first, on a phone.
     [`/sources/${s.long.id}`, "cook", { phone: true, expect: WANTED_BOOK }],
-    ["/saved", "cook", { expect: THUMBS_DRAWN }],
-    ["/saved", "admin"],
+    ["/saved", "cook", { expect: `(${THUMBS_DRAWN}) || (${SAVED_CARDS("Cooked it")})` }],
+    ["/saved", "admin", { expect: SAVED_READ_ONLY }],
+    // Its other tab, and a card's two buttons pressed, each of which leaves
+    // a line with Undo where the card was.
+    ["/saved", "cook", { phone: true, then: OPEN_COOKED, expect: onPhone(SAVED_CARDS("Cook again")) }],
+    ["/saved", "cook", { phone: true, then: SAVED_PRESS("Cooked it"), expect: onPhone(SAVED_DONE("Moved to Cooked.")) }],
+    ["/saved", "cook", { phone: true, then: SAVED_PRESS("Remove"), expect: onPhone(SAVED_DONE("Removed.")) }],
     ["/saved", null],
     ["/saved#notes", "cook", { expect: THUMBS_DRAWN }],
     ["/saved#notes", "admin"],
