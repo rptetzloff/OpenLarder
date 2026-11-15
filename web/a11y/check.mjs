@@ -197,6 +197,58 @@ const WANTED_BOOK = `(() => {
     return "The wanted book's shops aren't before its buttons in the document";
   return "";
 })()`;
+// A link to a shop is an outline button, on a recipe's page and a book's
+// alike (Ray's round 5 list, item 7, 2026-11-15: a book's were dark bars,
+// and the two pages disagreed).
+const BUY_OUTLINED = `(() => {
+  const links = [...document.querySelectorAll("main a.buy-button")].filter((a) => a.getClientRects().length);
+  if (!links.length) return "The page has no links to shops";
+  const token = (name) => {
+    const probe = document.createElement("span");
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    document.body.append(probe);
+    const colour = getComputedStyle(probe).color;
+    probe.remove();
+    return colour;
+  };
+  for (const link of links) {
+    const style = getComputedStyle(link);
+    if (style.backgroundColor !== token("--surface") || style.color !== token("--fg") || style.borderTopWidth !== "1px" || style.borderTopColor !== token("--border"))
+      return "The link to " + link.textContent.trim() + " isn't an outline button: " + style.backgroundColor + " with a " + style.borderTopWidth + " border";
+    if (link.getBoundingClientRect().height < 44) return "The link to " + link.textContent.trim() + " is under 44px tall";
+  }
+  return "";
+})()`;
+// And on a book's page they are under a heading for each format, each only
+// its shop's name, and named in full for a screen reader: "Print" on a
+// button read as printing the page. Two to a row on a phone, where the box
+// is the screen's width, and one to a row beside the cover.
+const BUY_BY_FORMAT = `(() => {
+  const box = document.querySelector(".source-buy");
+  if (!box) return "The book has no shops to buy it from";
+  const said = { "Print book": "print book", "Ebook": "ebook" };
+  const heads = [...box.querySelectorAll("h3")];
+  if (!heads.length) return "The book's shops aren't under a heading for their format";
+  let links = 0;
+  for (const head of heads) {
+    const format = said[head.textContent.trim()];
+    if (!format) return "The book's shops are under a heading that says " + JSON.stringify(head.textContent.trim());
+    const shops = [...(head.nextElementSibling?.querySelectorAll("a.buy-button") ?? [])];
+    if (!shops.length) return "The heading " + JSON.stringify(head.textContent.trim()) + " has no shop under it";
+    links += shops.length;
+    const wrong = shops.find((a) => a.getAttribute("aria-label") !== "Buy the " + format + " at " + a.textContent.trim());
+    if (wrong) return "The link to " + wrong.textContent.trim() + " is named " + JSON.stringify(wrong.getAttribute("aria-label"));
+    if (shops.length > 1) {
+      const beside = Math.abs(shops[0].getBoundingClientRect().top - shops[1].getBoundingClientRect().top) < 2;
+      const narrow = matchMedia("(max-width: 40rem)").matches;
+      if (narrow && !beside) return "On a phone the book's shops aren't two to a row";
+      if (!narrow && beside) return "Beside the cover the book's shops aren't one to a row";
+    }
+  }
+  if (links !== box.querySelectorAll("a.buy-button").length) return "A link to a shop isn't under a format's heading";
+  if (![...box.querySelectorAll(".buy-note a")].some((a) => a.textContent.trim() === "How this works")) return "The book's shops don't say how the links work";
+  return "";
+})()`;
 const WANTS_ON_SHELF = `(() => {
   const heads = [...document.querySelectorAll(".shelf-wants")];
   if (heads.length !== 1) return "The shelf page has " + heads.length + " lists of wanted books, not one";
@@ -752,7 +804,7 @@ function pages(s) {
     ["/sources", "cook"],
     ["/sources", "admin"],
     ["/sources?kind=book&kind=website&sort=recipes", null],
-    [`/sources/${s.book.id}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],
+    [`/sources/${s.book.id}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS}) || (${BUY_BY_FORMAT}) || (${BUY_OUTLINED})` }],
     [`/sources/${s.book.id}`, "admin", { expect: ADMIN_BAR("This book") }],
     [`/sources/${s.site.id}`, null],
     [`/sources/${s.magazine.id}`, null],
@@ -763,7 +815,7 @@ function pages(s) {
     [`/sources/${s.show.id}/recipes/new`, "admin"],
     [`/sources/${s.box.id}/recipes/new`, "cook"],
     [`/sources/${s.book.id}/bulk`, "admin"],
-    [`/recipes/${s.biscuits.id}`, null, { expect: CRUMBS }],
+    [`/recipes/${s.biscuits.id}`, null, { expect: `(${CRUMBS}) || (${BUY_OUTLINED})` }],
     [`/recipes/${s.biscuits.id}`, "admin"],
     [`/recipes/${s.web.id}`, null],
     [`/recipes/${s.issue.id}`, null],
@@ -816,7 +868,7 @@ function pages(s) {
     ["/shelf", "admin", { phone: true, expect: WANTS_ON_SHELF }],
     ["/shelf", null],
     // The book Cy wants: its shops first, on a phone.
-    [`/sources/${s.long.id}`, "cook", { phone: true, expect: WANTED_BOOK }],
+    [`/sources/${s.long.id}`, "cook", { phone: true, expect: `(${WANTED_BOOK}) || (${BUY_BY_FORMAT})` }],
     ["/saved", "cook", { expect: `(${THUMBS_DRAWN}) || (${SAVED_CARDS("Cooked it")})` }],
     ["/saved", "admin", { expect: SAVED_READ_ONLY }],
     // Its other tab, and a card's two buttons pressed, each of which leaves

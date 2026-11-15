@@ -984,9 +984,25 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           afterwards from the other tab, or the recipe's page, which may
           be enough. Keeping the line while focus is on Undo would settle
           it.
-      - [ ] 7. A book's buy buttons are grouped by format under a heading
-        and say only the shop, in the recipe page's outline style: "Print"
-        on a button read as printing the page.
+      - [x] 7. A book's buy buttons are grouped by format under a heading
+        and say only the shop, in the recipe page's outline style (#203):
+        "Print" on a button read as printing the page. "Print book" and
+        "Ebook" are small headings, a format with no shop has none, and a
+        screen reader hears "Buy the print book at Bookshop.org". The
+        outline is one rule now, for both pages; a recipe's buttons
+        measure as they did.
+        - As many buttons to a row as the box has room for: one beside
+          the cover, two on a phone (one at 320px), four or five between,
+          where the box is the page's width. With six shops the box is
+          447px at 384px, where it was 553px, and 595px beside the cover,
+          where it was 553px: the headings are new there.
+        - A format comes where its first shop does in the reader's order
+          of shops, so someone who put Kobo first sees "Ebook" first
+          (Claude's choice, 2026-11-15).
+        - A book's page says "OpenLarder may earn a commission", with
+          "How this works", as a recipe's does and as the drawing has it.
+          It said "earns", which isn't so of a shop with no affiliate ID
+          set. The sentence is one constant for both pages.
       - [ ] 8. Your shelf, Your larder and Saved recipes keep one sentence
         under the heading and fold the rest into "How this works", open
         only when the page is empty; Your account says when the agreement
