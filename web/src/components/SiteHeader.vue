@@ -6,7 +6,10 @@ import HeaderMenu from "./HeaderMenu.vue";
 
 // The site's header (Ray's cleanup pass, section 3, 2026-11-11): the logo
 // and four sections; signed in, two menus, "My kitchen" and the account.
-// On a phone, the logo, Search and one Menu with everything in it.
+// On a phone, the logo, Search and one Menu with everything in it; and on
+// anything up to 56rem, where the row of sections and menus doesn't fit
+// (Ray's round 5 list, 2d, 2026-11-15: signed in with a name of nine
+// letters it was 39px too wide at 700px, and it can't wrap).
 // Requests is in the footer: it doesn't need to be prominent.
 const props = defineProps<{
   // undefined while asking, null when signed out.
@@ -34,6 +37,9 @@ const account = computed(() => [
 const here = (href: string) =>
   props.path === href || props.path.startsWith(`${href}/`) ? "page" : undefined;
 const name = computed(() => props.user?.display_name ?? "Account");
+// The account menu's button shows about twelve letters of a name; a longer
+// one is said in full inside the menu.
+const cut = computed(() => name.value.length > 12);
 </script>
 
 <template>
@@ -46,7 +52,7 @@ const name = computed(() => props.user?.display_name ?? "Account");
         <img class="for-dark" src="/logo-dark.svg" alt="OpenLarder" width="150" height="44" />
       </a>
 
-      <!-- Wider than a phone: the sections, then the menus. -->
+      <!-- Where there's room for the row: the sections, then the menus. -->
       <nav class="sections wide-only" aria-label="Main">
         <a v-for="s in SECTIONS" :key="s.href" :href="s.href" :aria-current="here(s.href)">{{
           s.label
@@ -61,8 +67,9 @@ const name = computed(() => props.user?.display_name ?? "Account");
               </li>
             </ul>
           </HeaderMenu>
-          <HeaderMenu id="account-menu" :label="name">
-            <ul>
+          <HeaderMenu id="account-menu" :label="name" clipped>
+            <h2 v-if="cut" id="wide-account">{{ name }}</h2>
+            <ul :aria-labelledby="cut ? 'wide-account' : undefined">
               <li v-for="a in account" :key="a.href">
                 <a :href="a.href" :aria-current="here(a.href)">{{ a.label }}</a>
               </li>
@@ -79,7 +86,8 @@ const name = computed(() => props.user?.display_name ?? "Account");
         <SignInLink v-else-if="user === null" class="secondary" />
       </div>
 
-      <!-- A phone: Search, and one menu with the rest. -->
+      <!-- A phone, and anything too narrow for the row: Search, and one
+           menu with the rest. -->
       <div class="menus phone-only">
         <a href="/search" class="search-link" :aria-current="here('/search')">Search</a>
         <HeaderMenu id="phone-menu" label="Menu" outlined full>
@@ -166,19 +174,21 @@ const name = computed(() => props.user?.display_name ?? "Account");
 .phone-only {
   display: none;
 }
-@media (max-width: 40rem) {
-  .bar {
-    padding: 0.5rem 1rem;
-  }
-  .brand img {
-    height: 2.25rem;
-  }
+@media (max-width: 56rem) {
   .wide-only {
     display: none;
   }
   .phone-only {
     display: flex;
     gap: 0.25rem 1rem;
+  }
+}
+@media (max-width: 40rem) {
+  .bar {
+    padding: 0.5rem 1rem;
+  }
+  .brand img {
+    height: 2.25rem;
   }
 }
 </style>

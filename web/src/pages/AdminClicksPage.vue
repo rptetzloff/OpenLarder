@@ -126,7 +126,7 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
           <tbody>
             <tr v-for="b in page.books" :key="`${b.source_id}-${b.isbn13}`">
               <td><a :href="`/sources/${b.source_id}`" class="strong">{{ b.title }}</a></td>
-              <td><span class="cell-label">ISBN </span>{{ b.isbn13 ?? "—" }}</td>
+              <td class="isbn"><span class="cell-label">ISBN </span>{{ b.isbn13 ?? "—" }}</td>
               <td class="numeric"><span class="cell-label">Clicks </span>{{ n(b.clicks) }}</td>
             </tr>
           </tbody>

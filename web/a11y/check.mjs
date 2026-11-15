@@ -54,6 +54,19 @@ const WORKERS = Math.max(1, Number(process.env.A11Y_WORKERS) || Math.min(4, avai
 // (pointer: coarse). At 390px with a mouse, as this was until then, a recipe's
 // page passed while it was 24px too wide on a 384px phone.
 const PHONE = 360;
+// Between a phone and a desktop (Ray's round 5 list, item 2, 2026-11-15): a
+// tablet, a small laptop window, a phone held sideways. Nothing looked
+// there, and an ingredient's table, the flags, Buy-link clicks and the
+// signed-in header were all too wide or squeezed somewhere from 640px to
+// 1100px. Layout only, in one theme (a page is as wide in the dark), and
+// signed in, since the header with a name in it is the widest: Cy's name
+// is thirty-two letters. A small tablet, a large one and a small laptop,
+// which are the list's three; and 900px, the first step past 56rem, where
+// the header's full row and the tables come back with the least room they
+// will ever have (a sweep of every 20px found three pages the other three
+// widths passed, nearly all of it from 900px to 960px).
+// A11Y_BETWEEN=640,660,… looks at others, for a sweep.
+const BETWEEN = process.env.A11Y_BETWEEN?.split(",").map(Number) ?? [700, 820, 900, 1024];
 // One word of sixty letters, which nothing but the page can break: what
 // anyone may type as a title, a name or a note. (The dish in Aristophanes'
 // Assemblywomen, cut short.) users.sql gives Cy a name of the same kind.
@@ -89,6 +102,32 @@ const BROKEN_WORDS = `(() => {
     }
   }
   return [...broken].slice(0, 5);
+})()`;
+// A table's cells that are squeezed: narrower than 6rem and holding more
+// than three lines (Ray's round 5 list, 2e). A column can be left almost no
+// room and still not run over, now that any word may break: an ingredient's
+// Source column was 71px at 820px, with a book's title down six lines of it.
+// Lines are counted by where the text's boxes sit, so two sizes of text on
+// one line are one line.
+const SQUEEZED_CELLS = `(() => {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const squeezed = [];
+  const range = document.createRange();
+  for (const cell of document.querySelectorAll("td, th")) {
+    const box = cell.getBoundingClientRect();
+    if (box.width === 0 || box.width >= 6 * rem) continue;
+    range.selectNodeContents(cell);
+    const boxes = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0).sort((a, b) => a.top - b.top);
+    let lines = 0;
+    let bottom = -Infinity;
+    for (const r of boxes) {
+      if (r.top >= bottom - 1) lines++;
+      bottom = Math.max(bottom, r.bottom);
+    }
+    if (lines > 3)
+      squeezed.push(JSON.stringify(cell.textContent.trim().replace(/\\s+/g, " ").slice(0, 40)) + " is " + lines + " lines in a cell " + Math.round(box.width) + "px wide");
+  }
+  return squeezed.slice(0, 5);
 })()`;
 // A cover's picture, two pixels by three, for the one book users.sql gives a
 // cover that arrives.
@@ -285,9 +324,13 @@ async function seed() {
   await api(`/api/sources/${book.id}/tags`, "admin", { tags: [tagged("Gluten-Free")] }, "PUT");
   // A long title, so a table that can't wrap shows up at phone width (the
   // ingredient page's did, with real titles, before this was here).
+  // It names a recipe the book hasn't got, so it's flagged: Flagged
+  // recipes was wider than a tablet with a title this long in it (Ray's
+  // round 5 list, 2b), and had only a short one to show here.
   const slow = await recipe("Slow-Roasted Aged Cheddar and Caramelised Onion Biscuits with Brown Butter", "30", [
     "Aged cheddar",
     "Onion",
+    "Shortcrust pastry (p. 98)",
   ]);
   const ids = await api("/api/ingredients?q=cheddar", "admin");
   const cheddar = ids.ingredients.find((i) => i.name === "Aged cheddar").id;
@@ -456,6 +499,22 @@ async function seed() {
     headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },
   });
   if (click.status < 300 || click.status >= 400) throw new Error(`The buy link answered ${click.status}`);
+  // And a click on a book with a title of many ordinary words, which is
+  // what a real one has: Buy-link clicks kept such a title on one line and
+  // was wider than a tablet (Ray's round 5 list, 2c).
+  const windy = await api("/api/sources/manual", "admin", {
+    title: "The Long Way Round the Kitchen: Three Hundred Unhurried Recipes for Cold Evenings and Slow Weekends",
+    authors: ["Ann Author"],
+    year: 2021,
+    isbn: "9780393541151",
+  });
+  const windyEdition = (await api(`/api/sources/${windy.id}`, "admin")).editions[0].id;
+  const windyClick = await fetch(`${BASE}/go/bookshop/${windyEdition}?from=/sources/${windy.id}`, {
+    redirect: "manual",
+    headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },
+  });
+  if (windyClick.status < 300 || windyClick.status >= 400)
+    throw new Error(`The buy link answered ${windyClick.status}`);
   // Two producers, switched on (producers.py): one as a farm would be set
   // up, one with the long word wherever an administrator types, earning
   // nothing and shipping everywhere. Both supply what aged cheddar is
@@ -866,13 +925,14 @@ async function control(b) {
   // wide as the screen exactly isn't too wide at all: main has no padding
   // of its own, and the control said so.)
   await b.evaluate(
-    `document.querySelector("main").insertAdjacentHTML("beforeend", '<p style="color:#ccc;background:#fff">faint</p><img src="/x.png"><div style="width:${PHONE + 20}px">wide</div><p style="width:2rem">Breakfast</p>')`,
+    `document.querySelector("main").insertAdjacentHTML("beforeend", '<p style="color:#ccc;background:#fff">faint</p><img src="/x.png"><div style="width:${PHONE + 20}px">wide</div><p style="width:2rem">Breakfast</p><table><tr><td style="width:4rem">a title of a good many words in a column left no room</td></tr></table>')`,
   );
   const found = (await runAxe(b)).violations.map((v) => v.id);
   const wide = await overflowOf(b, PHONE);
   const missed = ["color-contrast", "image-alt"].filter((id) => !found.includes(id));
   if (wide <= 0) missed.push("overflow");
   if (!(await b.evaluate(BROKEN_WORDS)).some((w) => w.startsWith('"Breakfast"'))) missed.push("a broken word");
+  if (!(await b.evaluate(SQUEEZED_CELLS)).some((c) => c.startsWith('"a title of a good many words'))) missed.push("a squeezed cell");
   if (missed.length)
     throw new Error(`The control wasn't caught (missed ${missed.join(", ")}); the check proves nothing.`);
   // What's only too wide under a finger is missed if the phone has a mouse.
@@ -915,16 +975,20 @@ async function check(b, path, who, theme, width, how = {}) {
   const undecided = [];
   // What the page should be showing, where an entry says: its answer is
   // what's wrong, or nothing.
-  if (how.expect) {
+  // (Not between a phone and a desktop: those views are for layout, and
+  // are signed in whoever the entry was written for.)
+  const between = BETWEEN.includes(width);
+  if (how.expect && !between) {
     const wrong = await b.evaluate(how.expect);
     if (wrong) problems.push(wrong);
   }
   const overflow = await overflowOf(b, width);
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px at ${width}px wide`);
   for (const word of await b.evaluate(BROKEN_WORDS)) problems.push(`breaks ${word} in two`);
+  for (const cell of await b.evaluate(SQUEEZED_CELLS)) problems.push(`squeezes a table: ${cell}`);
   // axe once per theme and page, at desktop width; the phone pass is for
   // layout, unless the page shows a phone something of its own.
-  if (width >= 600 || how.phone) {
+  if (!between && (width >= 600 || how.phone)) {
     const { violations, incomplete } = await runAxe(b);
     for (const v of violations)
       problems.push(`${v.id} (${v.impact}): ${v.help}\n      ${v.nodes.join("\n      ")}`);
@@ -939,6 +1003,13 @@ const views = [];
 for (const theme of ["light", "dark"])
   for (const [path, who, how] of pages(s))
     for (const width of [1280, PHONE]) views.push({ path, who, theme, width, how });
+// Between the two, each page once at each width, signed in: as Cy where the
+// entry is signed out or his, as Ada where only she may see it.
+const middle = new Map(
+  pages(s).map(([path, who]) => [`${path} ${who ?? "cook"}`, { path, who: who ?? "cook" }]),
+);
+for (const { path, who } of middle.values())
+  for (const width of BETWEEN) views.push({ path, who, theme: "light", width, how: {} });
 const browsers = await Promise.all(
   Array.from({ length: Math.min(WORKERS, views.length) }, (_, n) => browser(n)),
 );
@@ -983,6 +1054,6 @@ if (found.some((f) => f.busy)) {
   views.forEach((v, n) => found[n].busy && console.log(`    ${named(v)}: waiting for ${found[n].busy}`));
 }
 console.log(
-  `${checked} page views checked (axe at 1280px, and at ${PHONE}px where a phone has its own; layout at ${PHONE}px, as a touch screen), ${failed} with problems.`,
+  `${checked} page views checked (axe at 1280px, and at ${PHONE}px where a phone has its own; layout at ${PHONE}px, as a touch screen, and signed in at ${BETWEEN.join(", ")}px), ${failed} with problems.`,
 );
 process.exit(failed ? 1 : 0);

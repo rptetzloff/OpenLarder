@@ -13,6 +13,9 @@ defineProps<{
   outlined?: boolean;
   // The panel spans the header's width, under it: the phone's menu.
   full?: boolean;
+  // The label is cut short with an ellipsis where it's long: someone's
+  // name. Only what's drawn: the button is still called by all of it.
+  clipped?: boolean;
 }>();
 
 const open = ref(false);
@@ -46,7 +49,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onClickAway));
       :aria-controls="id"
       @click="open = !open"
     >
-      {{ label }}
+      <span class="label" :class="{ clipped }">{{ label }}</span>
       <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
     </button>
     <div v-show="open" :id="id" class="panel">
@@ -84,7 +87,17 @@ button:hover,
 button[aria-expanded="true"] {
   border-color: var(--fg);
 }
+/* About twelve letters of a name (Ray's round 5 list, 2d): one of
+   thirty-two made the header 44px wider than a 900px screen, and a header
+   can't wrap. */
+.label.clipped {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 svg {
+  flex: none;
   width: 0.625rem;
   height: 0.375rem;
   fill: none;

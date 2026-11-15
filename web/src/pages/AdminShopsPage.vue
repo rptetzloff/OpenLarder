@@ -293,7 +293,12 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
 .shop-what p {
   margin: 0;
 }
+/* A box of its own, so a line ends before the key and not inside it:
+   there's no space between a name and its key, and after a long name the
+   key was broken wherever the line ran out ("lo", "ng-mill"). */
 .shop-name code {
+  display: inline-block;
+  max-width: 100%;
   margin-left: 0.5rem;
   color: var(--muted);
   font-size: 0.875rem;
