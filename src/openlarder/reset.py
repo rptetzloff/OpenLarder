@@ -19,8 +19,9 @@ books, to link again as each comes back (migration 0050).
 
 `--everything` empties those too: every account with its sessions, API keys,
 larder lists and group memberships, every group, request and vote, all edit
-history, and the list of published data dumps (the files stay in their
-bucket; a fresh dump is built within the hour). Anyone signing in after it
+history, the sign-ups recorded for ads (adclicks.py), and the list of
+published data dumps (the files stay in their bucket; a fresh dump is built
+within the hour). Anyone signing in after it
 starts again as a new user, the owner too: make yourself owner again by
 hand (roles.py).
 
@@ -108,6 +109,7 @@ PEOPLE = (
     "request_votes",
     "dumps",
     "daily_counts",
+    "ad_conversions",
     "revisions",
 )
 # Never emptied. A new table must be named in one of the three lists

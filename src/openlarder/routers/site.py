@@ -25,6 +25,9 @@ class Site(BaseModel):
     # Where page views are counted (Umami's host), for the privacy page;
     # None when they aren't.
     analytics_host: str | None = None
+    # Whether an ad's click id is kept in a cookie (adclicks.py), for the
+    # privacy page, which says so only where it's true.
+    ad_clicks: bool = False
 
 
 @router.get("/api/site", response_model=Site)
@@ -43,4 +46,5 @@ async def site(settings: Config) -> Site:
         production=production,
         notice=notice,
         analytics_host=settings.analytics_host,
+        ad_clicks=settings.ad_clicks,
     )

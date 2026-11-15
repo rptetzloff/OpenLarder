@@ -97,6 +97,16 @@ const COVER =
 // A source's page and an author's have their Top rated, which a change to
 // what it waits for could quietly take out of the check.
 const TOP_RATED_SHOWN = `document.querySelector("#top-rated-title + .top-rated li") ? "" : "Top rated isn't shown"`;
+// The privacy page as it reads with ad clicks kept (adclicks.py), which is
+// how the check's site runs: the longer page, with a section, a cookie and
+// two sentences the other hasn't. Without this, a run with the setting
+// left off would look at the shorter page and say nothing.
+const AD_PRIVACY = `(() => {
+  const section = document.querySelector("#from-an-ad");
+  if (!section) return "The privacy page doesn't say what's kept from an ad click: is OPENLARDER_AD_CLICKS set?";
+  const cookies = [...document.querySelectorAll("li code")].map((c) => c.textContent);
+  return cookies.includes("ol_ad_click") ? "" : "The privacy page's cookies don't list ol_ad_click";
+})()`;
 // The admin bar: its links in the bar on a wide screen; on a phone one row,
 // with the page's name on a button, and the links only once it's pressed.
 const ADMIN_BAR = `(() => {
@@ -475,7 +485,8 @@ function pages(s) {
     ["/search?sv=1", "cook"],
     [`/sources/${s.book.id}`, "cook"],
     ["/search?own=1&q=biscuit", "cook"],
-    ["/privacy", null],
+    ["/privacy", null, { expect: AD_PRIVACY }],
+    ["/privacy", null, { phone: true, expect: AD_PRIVACY }],
     ["/terms", null],
     ["/welcome", "new"],
     ["/sign-in-failed", null],

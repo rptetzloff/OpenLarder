@@ -719,11 +719,47 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - [ ] Producers aren't on the page: D4.
         - [ ] `OPENLARDER_META_TAGS` (site verification for affiliate
           programmes) could move here later; the spec leaves it out.
-      - [ ] E. Google Ads sign-up tracking with none of Google's script:
-        the ad's click id in a cookie of the site's own, one row for a
-        new account that isn't linked to it, exported to a sheet Google
-        Ads reads. Off unless `OPENLARDER_AD_CLICKS` is set, and the
-        privacy page says so first.
+      - [x] E. Google Ads sign-up tracking with none of Google's script
+        (#192): built, and off unless `OPENLARDER_AD_CLICKS` is set.
+        - An ad's click id (`gclid`, `gbraid`, `wbraid`) on a page's
+          address goes into the signed cookie `ol_ad_click` for 90 days.
+          Not for Do Not Track or Global Privacy Control, the EEA, the UK
+          or Switzerland, or someone signed in.
+        - A new account in that time adds one row to `ad_conversions`
+          (migration 0075), in the sign-in's transaction: no user column,
+          and the sign-up's time to the minute, so not the account's own
+          to the microsecond. A returning account adds none. Any sign-in
+          clears the cookie.
+        - Rows go after 90 days; they're in no data dump and no edit
+          history; `reset --everything` empties them.
+        - `scripts/ads_role.sql` makes the `ads_exporter` role, which may
+          read the table and mark a row exported and nothing else;
+          `scripts/ads_export.sql` has the export's two statements. Both
+          are tested as that role.
+        - The privacy page has the section, the cookie and two changed
+          sentences, shown only while it's on. README.md has the set-up.
+        - Claude's choices, to overrule if wrong: no country header, no
+          cookie; the rules asked again at sign-up; the time to the
+          minute, rounded up; the privacy wording shown with the switch
+          and not ahead of it; in the page's voice ("OpenLarder", not
+          "we").
+        - [ ] Ray: have the privacy wording checked before switching it
+          on, with the lawyer review already planned. With it on, the
+          page stops saying OpenLarder doesn't "share" personal
+          information, and says what it tells Google.
+        - [ ] Ray: Cloudflare's IP Geolocation on (without the country
+          header nothing is kept); Google Ads auto-tagging and the
+          conversion action; the role, the sheet and the n8n workflow;
+          then the setting. README.md, "Sign-ups from ads".
+        - [ ] Not checked from here: the n8n workflow, and whether Google
+          takes a row. One real ad click and a new account shows both.
+        - [ ] The accessibility check now looks at the privacy page with
+          ad clicks on, the longer of its two; the shorter isn't looked
+          at any more.
+        - [ ] Later, each its own decision: buy-link clicks as a second
+          conversion (changes what the privacy page says of them);
+          Microsoft Ads' `msclkid`; a direct push to Google's Data
+          Manager API in place of the sheet.
       - [ ] D3. The affiliate environment variables go, a release after
         D1.
       - [ ] D4. Producers, as a kind of shop: built, and none switched on

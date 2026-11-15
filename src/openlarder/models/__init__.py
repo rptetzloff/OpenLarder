@@ -1,4 +1,5 @@
 from openlarder.models.accounts import ApiKey, User, UserSession
+from openlarder.models.ads import AdConversion
 from openlarder.models.allergens import Allergen, DietAllergen, IngredientAllergen
 from openlarder.models.base import Base
 from openlarder.models.catalog import (
@@ -52,6 +53,7 @@ from openlarder.models.suggestions import IngredientEmbedding, Suggestion
 from openlarder.models.usage import ApiUsage
 
 __all__ = [
+    "AdConversion",
     "Allergen",
     "ApiUsage",
     "ApiKey",

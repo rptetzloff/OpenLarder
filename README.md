@@ -64,6 +64,58 @@ is new or returning and no page: the callback marks the address it goes to
 (`#signed-in=new`) and the loader takes the mark off, so no cookie is set
 for it. The privacy page names the Umami host when it's set.
 
+### Sign-ups from ads
+
+Google Ads can be told which ad clicks led to a new account, with none of
+Google's script on the site (adclicks.py; *Ray, 2026-11-13*). Off unless
+set.
+
+| Variable | Value |
+| --- | --- |
+| `OPENLARDER_AD_CLICKS` | `true` to switch it on; `false` unless set. It needs `OPENLARDER_SESSION_SECRET`, which signs its cookie: without that the app refuses to start |
+
+Switched on: an ad's click id (`?gclid=`, `gbraid` or `wbraid`) on a
+page's address is kept in the cookie `ol_ad_click` for 90 days; a new
+account made by that browser in that time adds one row to `ad_conversions`
+(the click id, when it was clicked, the minute the account was made, and
+nothing that says which account); the row is deleted 90 days later. The
+privacy page says all this only while it's on.
+
+Nothing is kept for a browser sending `Sec-GPC: 1` or `DNT: 1`, for
+someone signed in, or for a visitor in the EEA, the UK or Switzerland.
+The country is Cloudflare's `CF-IPCountry` header, **and without it
+nothing is kept at all**: Cloudflare's IP Geolocation (Network → IP
+Geolocation) has to be on, and a test from a machine that isn't behind
+Cloudflare has to send the header itself.
+
+Setting it up, in order:
+
+1. **Google Ads.** Auto-tagging on (Admin → Account settings). A
+   conversion action for offline conversions: category Sign-up, named
+   `OpenLarder sign-up` exactly, count One, click-through window 90 days.
+   Leave those countries out of the campaigns too. Wait four to six hours
+   before the first import.
+2. **The role.** Once, as a superuser, after migration 0075:
+   `psql "$SUPERUSER_URL" -v role=ads_exporter -v password="$ADS_DB_PASSWORD" -f scripts/ads_role.sql`.
+   It may read `ad_conversions` and mark a row exported, and nothing else.
+3. **The sheet.** One tab, with this header row, shared only with the
+   Google account that owns the Google Ads connection:
+   `gclid | gbraid | wbraid | conversion_name | conversion_time | order_id`.
+4. **n8n, every six hours**, as `ads_exporter`, with the two statements in
+   `scripts/ads_export.sql`: run `pending`; append its rows to the sheet;
+   then run `exported` once for each row the sheet confirmed, with its
+   `order_id`. Once a day, delete the sheet's rows older than 90 days.
+   The statements are tested as that role; the workflow around them isn't
+   something this repo can run.
+5. **Google Ads again.** Connect the sheet as a data source (Tools → Data
+   manager), map the columns, and schedule the import. `conversion_time`
+   is written as `2026-11-13 16:03:00+00:00`, UTC; if the mapping wants
+   another format, change it in `pending`.
+6. **Switch it on**, then check: `curl -si "https://openlarder.com/?gclid=TeSt_abc-123456" | grep -i set-cookie`
+   shows `ol_ad_click`; with `-H "Sec-GPC: 1"`, or a malformed id, it
+   shows nothing. Google refuses a made-up click id, so the whole path is
+   checked with one real click on an ad and a new account.
+
 ### Data dumps
 
 The weekly ODbL dumps (dumps.py) go to S3-compatible object storage, and
@@ -188,12 +240,15 @@ with archiving off:
 docker compose exec -T db psql -U openlarder -d postgres -c "CREATE DATABASE openlarder_a11y"
 docker run -d --name openlarder-a11y --network openlarder_default -p 8001:8000 \
   -e OPENLARDER_DATABASE_URL=postgresql+psycopg://openlarder:openlarder@db:5432/openlarder_a11y \
-  -e OPENLARDER_ARCHIVE_WEB_PAGES=false openlarder-api
+  -e OPENLARDER_ARCHIVE_WEB_PAGES=false -e OPENLARDER_AD_CLICKS=true \
+  -e OPENLARDER_SESSION_SECRET=only-for-this-check openlarder-api
 docker compose exec -T db psql -U openlarder -d openlarder_a11y < web/a11y/users.sql
 cd web && A11Y_BASE=http://localhost:8001 npm run a11y
 ```
 
-It needs Chrome (`CHROME` points at it if it isn't where the script looks), and
+Ad clicks are on so that the privacy page is the one that says so, the longer
+of its two; the check fails if it finds the other. It needs Chrome (`CHROME`
+points at it if it isn't where the script looks), and
 takes about a minute with four browsers at once (`A11Y_WORKERS` for another
 number).
 
