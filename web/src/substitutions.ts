@@ -81,6 +81,32 @@ export async function setDietAllergens(id: string, allergens: string[]): Promise
   return send(`/api/diets/${id}/allergens`, "PUT", { allergens });
 }
 
+// A new diet with what it avoids, from Admin: refused when the name is taken.
+export async function createDiet(name: string, allergens: string[]): Promise<Diet> {
+  return send("/api/diets", "POST", { name, allergens });
+}
+
+export async function renameDiet(id: string, name: string): Promise<Diet> {
+  return send(`/api/diets/${id}`, "PATCH", { name });
+}
+
+// What removing a diet would take with it, in the catalog; and the swaps
+// that hold it where it is, with the ingredients whose pages they're on.
+export interface DietUse {
+  recipes: number;
+  sources: number;
+  swaps: number;
+  swap_ingredients: Thing[];
+}
+
+export async function dietUse(id: string): Promise<DietUse> {
+  return send(`/api/diets/${id}/use`, "GET");
+}
+
+export async function removeDiet(id: string): Promise<void> {
+  await send(`/api/diets/${id}`, "DELETE");
+}
+
 export async function checkDiet(recipeId: string, dietId: string): Promise<DietCheck> {
   return send(`/api/recipes/${recipeId}/diets/${dietId}`, "GET");
 }

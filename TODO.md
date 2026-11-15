@@ -921,13 +921,35 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
-- [ ] **Creating a diet from Admin.** *Ray, 2026-11-14: "ability for admin
-      to create diets".* Today a diet is made only as a side effect: a
-      moderator tagging a book or a recipe may "Add a tag to the list" of
-      kind diet, and then finds it on Admin to say what it avoids. The
-      pairs a diet avoids only together (Kosher's meat with milk) are
-      seeded, with no form at all. Not started; whether it is to rename
-      and remove diets too is Ray's to say.
+- [x] **Diets from Admin: adding, renaming and removing.** *Ray,
+      2026-11-14: "ability for admin to create diets"; and, asked whether
+      to rename and remove them too, and to set what a diet avoids only
+      together: the first two, not the third ("B is fine").* (#186)
+      - On Admin, under "Diets and what they avoid": "Add a diet" takes a
+        name and what it avoids; "Change" on a diet now has its name as
+        well, and "Remove…". Moderators, as for the rest of that panel.
+      - A new diet's name that's taken is refused there (“Vegan” is a diet
+        already), where a swap's form still gets the diet by that name.
+      - Renaming keeps the tag, so recipes, sources and swaps have it
+        under its new name.
+      - Removing asks first, saying how many of the catalog's recipes and
+        sources it comes off. It's one change in Recent changes, with what
+        the diet avoided and where it was, and undoing that puts all of it
+        back.
+      - A diet with a swap recorded for it can't be removed: the form says
+        how many, and links the ingredients whose pages they're on.
+      - [ ] Undoing a removal is refused when a family's own recipe had the
+        diet: a change that touched a family's collection isn't a
+        moderator's to undo (routers/history.py). The question says so
+        before removing, without saying whether one does; the count leaves
+        families' recipes out for the same reason. Their recipes lose the
+        tag like the catalog's. Splitting the removal in two, so the
+        catalog's half could still be undone, would mend most of it.
+      - [ ] What a diet avoids only together (Kosher: meat with milk) still
+        has no form; Ray left it out of this.
+      - A "Tag a recipe" suggestion for a diet since removed stays open,
+        and accepting it is refused with "its recipe or its tag has gone.
+        Dismiss it." (routers/suggestions.py, as it was).
 - [ ] **Requests: ask for a cookbook to be indexed.** *Ray, 2026-11-09.*
       Anyone, signed in or not, asks for a cookbook or another source to
       be entered; contributors claim a request and queue it up; a
