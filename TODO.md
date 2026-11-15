@@ -687,9 +687,38 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           the log should have no line saying a shop "has no setting in
           the shops table"; one would mean a variable the migration didn't
           see.
-      - [ ] D2. `/admin/shops`, for administrators: the list, the form,
-        the test link, and each change in the edit history. `shops` has
-        no history yet: nothing can change a row until this.
+      - [x] D2. `/admin/shops`, for administrators (#191): Shops, linked
+        from the admin bar and Admin, for an administrator and not a
+        moderator, the page and its API both.
+        - Booksellers and Grocers, each in the order shown. A shop has an
+          "On" tick, "Move up" and "Move down", and "Edit"; its name and
+          key, what it earns, its clicks in 30 days, and when it was last
+          changed and by whom.
+        - The form's fields follow how the shop's address is made. What
+          couldn't work is refused in words: an id that isn't a number
+          for Bookshop.org, a tag that isn't an Associates tag, an address
+          or deep link not starting https://, a deep link without {url},
+          a placeholder the kind of shop hasn't. A shop switched on must
+          have what its address needs.
+        - "Test link" shows where a click would go for a sample book or
+          ingredient, its host marked, with nothing saved or counted.
+        - "Add a bookseller" and "Add a grocer": a key is for good, and
+          unique among its kind.
+        - A shop with clicks recorded has no "Delete…"; one without does.
+        - A change is on the site at once for the process that made it
+          and within a minute for the others. It's in Recent changes
+          (migration 0074), where only an administrator can undo it:
+          undoing a shop's change is changing a shop.
+        - By keyboard: moving a shop keeps focus on its button, or on its
+          other one at an end; a form that closes gives focus back to
+          the button that opened it; and each change is said ("Kobo moved
+          up: now 5 of 6.").
+        - For the release the variables are still read: a shop whose
+          setting is in one says which, and switching it on or off, or
+          saving it, puts the setting on the shop.
+        - [ ] Producers aren't on the page: D4.
+        - [ ] `OPENLARDER_META_TAGS` (site verification for affiliate
+          programmes) could move here later; the spec leaves it out.
       - [ ] E. Google Ads sign-up tracking with none of Google's script:
         the ad's click id in a cookie of the site's own, one row for a
         new account that isn't linked to it, exported to a sheet Google

@@ -90,6 +90,7 @@ const tools = computed(() => {
     { href: "/admin/import", name: "Bulk import", run: true },
     { href: "/admin/api", name: "API usage", run: true },
     { href: "/admin/clicks", name: "Buy-link clicks", run: true },
+    { href: "/admin/shops", name: "Shops", run: true },
     { href: "/admin/changes", name: "Recent changes" },
     { href: "/admin/merges", name: "Merged books", run: true },
     { href: "/admin/people", name: "People and roles" },

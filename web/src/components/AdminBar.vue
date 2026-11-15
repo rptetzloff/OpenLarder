@@ -26,6 +26,7 @@ const LINKS = [
   ["/admin/people", "People", false],
   ["/admin/api", "API usage", true],
   ["/admin/clicks", "Buy-link clicks", true],
+  ["/admin/shops", "Shops", true],
 ] as const;
 const links = computed(() => LINKS.filter(([, , run]) => !run || props.user.may_run));
 // Sources carries the bar and isn't one of its pages: there the button says
