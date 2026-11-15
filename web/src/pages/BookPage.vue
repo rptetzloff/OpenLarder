@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminBand from "../components/AdminBand.vue";
 import Crumbs from "../components/Crumbs.vue";
 import BookMerge from "../components/BookMerge.vue";
 import ReviewNotice from "../components/ReviewNotice.vue";
@@ -253,19 +254,21 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
     <p v-else-if="failed" role="alert">This couldn't be loaded. Try reloading the page.</p>
     <p v-else-if="!book" class="status">Loading…</p>
     <template v-else>
-      <Teleport v-if="adminTools" to="#admin-bar" defer>
-        <div class="admin-bar">
-          <div class="bar">
-            <strong>Admin</strong>
-            <a :href="`/sources/${book.id}/edit`">Edit {{ KIND_NAMES[book.kind] }}</a>
-            <a v-if="isBook" href="#open-library">
-              {{ book.open_library_url ? "Check Open Library" : "Link to Open Library" }}
-            </a>
-            <a v-if="isBook" href="#merge">Merge</a>
-            <a href="/admin/flags">Flagged recipes</a>
-          </div>
-        </div>
-      </Teleport>
+      <!-- "This book", "This website": the kind's name, as "Edit book" has
+           it beside it. -->
+      <AdminBand
+        v-if="adminTools"
+        id="admin-here"
+        :label="`This ${KIND_NAMES[book.kind] ?? 'source'}`"
+        before="Admin: "
+      >
+        <a :href="`/sources/${book.id}/edit`">Edit {{ KIND_NAMES[book.kind] }}</a>
+        <a v-if="isBook" href="#open-library">
+          {{ book.open_library_url ? "Check Open Library" : "Link to Open Library" }}
+        </a>
+        <a v-if="isBook" href="#merge">Merge</a>
+        <a href="/admin/flags">Flagged recipes</a>
+      </AdminBand>
 
       <Crumbs
         :trail="[
