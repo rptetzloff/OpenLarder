@@ -197,8 +197,12 @@ an entry can click first, for a state only a click makes, or say what its page
 should be showing (a cover's picture once it arrives, its title when the
 picture fails). It starts with a
 control, a page with problems planted in it, and refuses to report a clean run
-unless it catches them. A new page or page state goes into its list in the same
-PR. What axe can't decide it lists for a person; what no tool sees (whether
+unless it catches them. It takes about a minute: four browsers look at pages at
+once, each as soon as its page has stopped loading, and a page that hasn't
+stopped in ten seconds is named at the end with what it was waiting for (*Ray,
+2026-11-14: "is there a way we can speed up tests?"*; it had been ten minutes,
+nine of them a fixed wait before every view). A new page or page state goes
+into its list in the same PR. What axe can't decide it lists for a person; what no tool sees (whether
 wording is clear, focus order, how a screen reader sounds) still needs one.
 
 ## Dependencies default to none

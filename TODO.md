@@ -1205,6 +1205,33 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Found along the way
 
+- [x] **The accessibility check takes 40 seconds here, not thirteen minutes** (#187).
+      *Ray, 2026-11-14, of a pull request's checks: "is there a way we can
+      speed up tests?"* The check was the eleven minutes: one browser, and
+      before every one of its 432 views a wait of at least 1.25s, which was
+      nine of its ten minutes. Now four browsers look at once, and each
+      looks when its page has stopped: loaded, every request it made
+      answered, no "Loading…", fonts in, nothing still moving, three
+      times running 50ms apart.
+      - That it sees the same pages was measured, not supposed. Both
+        checks were run on the same build with a count kept of each view's
+        elements, words, height and width: 424 of 432 views the same.
+        Both were run on a build with faults planted (faint words in the
+        dark theme, and cells that don't wrap once their rows arrive): the
+        old one failed 190 views, the new one those 190 with the same
+        problems, and four more.
+      - The eight views that differ are the notes on Saved, signed in.
+        The old check had never seen them: going from /saved to
+        /saved#notes is no load at all to Chrome, so the page stayed the
+        signed-out one it already had, whoever the check then signed in
+        as. They're loaded afresh now, and pass.
+      - A page that hasn't stopped in ten seconds is looked at as it is,
+        and named at the end with what it was waiting for. None does.
+      - In CI, on this change's own run: the check 64 seconds where it
+        was 611, and its job 1m58s where it was eleven minutes.
+      - [ ] Now the longest of a pull request's checks is pytest: 2m16s
+        in CI, of which the tests are 1m47s. Not looked at.
+
 - [x] **Backspace and Delete in the search boxes** (#177). *Ray,
       2026-11-13: "we also need to be able to back space and delete in
       the search fields... it doesn't work today".* Tried with real key
