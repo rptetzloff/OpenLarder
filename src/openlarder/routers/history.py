@@ -17,10 +17,10 @@ from pydantic import BaseModel
 from sqlalchemy import and_, false, func, or_, select, true
 from sqlalchemy.orm import aliased
 
-from openlarder import revert, visibility
+from openlarder import revert, shops, visibility
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Author, Ingredient, Recipe, Revision, Source, Tag, User
+from openlarder.models import Author, Ingredient, Recipe, Revision, Shop, Source, Tag, User
 
 router = APIRouter(tags=["history"])
 
@@ -47,6 +47,7 @@ WHAT = {
     "ingredient_allergens": "allergen",
     "diet_allergens": "allergen a diet avoids",
     "tags": "tag",
+    "shops": "shop",
 }
 # The column that names a row, first found wins.
 NAMED_BY = (
@@ -61,7 +62,16 @@ NAMED_BY = (
     "allergen",
 )
 # Not worth showing: keys, and what the database keeps for itself.
-HIDDEN_FIELDS = {"id", "source_id", "recipe_id", "recipe_ingredient_id", "owner_id", "created_by"}
+HIDDEN_FIELDS = {
+    "id",
+    "source_id",
+    "recipe_id",
+    "recipe_ingredient_id",
+    "owner_id",
+    "created_by",
+    # Who changed a shop: the change says who made it.
+    "updated_by",
+}
 # Names for ids, looked up as the reader may see them.
 LOOKUPS = {
     "ingredient_id": Ingredient,
@@ -139,6 +149,7 @@ NAMED_TABLES = {
     "ingredients": (Ingredient, Ingredient.name),
     "authors": (Author, Author.name),
     "tags": (Tag, Tag.name),
+    "shops": (Shop, Shop.label),
 }
 
 
@@ -411,10 +422,23 @@ async def revert_change(
     )
     if hidden is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such change.")
+    # Undoing a change to a shop changes the shop, which is an
+    # administrator's to do (routers/shops.py).
+    of_a_shop = await session.scalar(
+        select(Revision.id)
+        .where(Revision.change_id == change_id, Revision.table_name == "shops")
+        .limit(1)
+    )
+    if of_a_shop is not None and not moderator.at_least("admin"):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only an administrator can undo a change to a shop."
+        )
     try:
         undone = await revert.revert(session, change_id)
     except revert.CantRevert as exc:
         await session.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
     await session.commit()
+    if of_a_shop is not None:
+        shops.reset()
     return Reverted(undone=undone)

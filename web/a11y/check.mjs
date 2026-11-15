@@ -444,6 +444,8 @@ function pages(s) {
     ["/admin/api", "admin"],
     ["/admin/clicks", "admin"],
     ["/admin/merges", "admin"],
+    ["/admin/shops", "admin"],
+    ["/admin/shops", "cook"],
     ["/admin/links", "admin"],
     ["/admin/people", "admin"],
     ["/admin/changes", "admin"],
@@ -528,6 +530,20 @@ function pages(s) {
     ["/admin/changes", "admin", { phone: true, then: `document.querySelector(".change-more").click()` }],
     ["/sources", "admin", { phone: true, then: `document.querySelector(".add-toggle").click()` }],
     [`/sources/${s.book.id}`, "admin", { phone: true, then: `document.querySelector(".fold-toggle").click()` }],
+    // Shops: one being changed, with a link tried; and one being added.
+    [
+      "/admin/shops",
+      "admin",
+      {
+        phone: true,
+        then: `(async () => {
+          document.querySelector(".shop-controls [data-edit]").click();
+          await new Promise((r) => setTimeout(r, 100));
+          [...document.querySelectorAll(".shop-form button")].find((b) => b.textContent.trim() === "Test link").click();
+        })()`,
+      },
+    ],
+    ["/admin/shops", "admin", { phone: true, then: `document.querySelector("[data-add]").click()` }],
     // Admin's diets: one being changed, and one being added.
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .change").click()` }],
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .add-diet").click()` }],

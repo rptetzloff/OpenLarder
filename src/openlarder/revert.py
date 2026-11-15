@@ -30,6 +30,7 @@ ORDER = [
     "authors",
     "ingredients",
     "tags",
+    "shops",
     "sources",
     "author_links",
     "ingredient_aliases",

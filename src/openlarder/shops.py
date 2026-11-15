@@ -84,6 +84,9 @@ class Shop:
     position: int
     # Nobody has changed it since the migration seeded it.
     seeded: bool = False
+    # Its setting is from this environment variable, not its row (for one
+    # release; see above).
+    variable: str | None = None
 
 
 # (kind, key): the setting it used to be in, and the column that holds it now.
@@ -156,7 +159,9 @@ def _from_variable(shop: Shop, settings: Settings) -> Shop:
             shop.kind,
             variable.upper(),
         )
-    return replace(shop, **{column: value, "enabled": True})
+    return replace(
+        shop, **{column: value, "enabled": True, "variable": f"OPENLARDER_{variable.upper()}"}
+    )
 
 
 async def listed(session: AsyncSession, kind: Kind) -> list[Shop]:
@@ -167,6 +172,40 @@ async def listed(session: AsyncSession, kind: Kind) -> list[Shop]:
 
 async def find(session: AsyncSession, kind: Kind, key: str) -> Shop | None:
     return next((s for s in await listed(session, kind) if s.key == key), None)
+
+
+# What a shop's own address may ask for, by the kind of shop.
+PLACEHOLDERS = {
+    "bookseller": ("isbn13", "isbn10", "title", "author", "words", "id"),
+    "grocer": ("term", "id"),
+}
+# The builders a kind of shop may have.
+BUILDERS = {
+    "bookseller": ("bookshop", "amazon", "wrapped", "template"),
+    "grocer": ("amazon", "wrapped", "template"),
+}
+# What's shown for "Test link": a book and an ingredient that are no one's.
+SAMPLE_BOOK = Book(isbn13="9780393541113", title="A Sample Cookbook", author="Ann Author")
+SAMPLE_TERM = "olive oil"
+
+
+def lacks(shop: Shop) -> str | None:
+    """What its builder still needs before a link can be made, in words to
+    finish "It needs …"; None when it has all it needs."""
+    if shop.builder == "amazon":
+        return None if shop.affiliate_id else "its Associates tag"
+    if shop.builder == "bookshop" and not shop.affiliate_id:
+        return "its affiliate id"
+    if shop.builder == "wrapped" and not shop.wrapper_template:
+        return "the affiliate network's deep link"
+    return None if shop.product_template else "the shop's own address"
+
+
+def sample(shop: Shop) -> str | None:
+    """Where a click would go for the sample book or ingredient."""
+    if shop.kind == "bookseller":
+        return for_book(shop, SAMPLE_BOOK)
+    return for_term(shop, SAMPLE_TERM)
 
 
 def _filled(template: str, values: dict[str, str | None]) -> str | None:
