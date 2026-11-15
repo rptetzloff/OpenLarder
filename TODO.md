@@ -535,13 +535,54 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - The check presses the bar's button on a phone and opens a "How
           this works", and fails if the bar is taller than a row there or
           its links aren't in the bar on a wide screen.
-      - [ ] C. A simpler search page: one search bar that stays; "Cook
-        with what you have" under it, with "Use my larder"; a "Show"
-        choice that keeps only recipes missing nothing, or two or fewer
-        (`missing_max` in the API, `missing` in the address); the rest
-        under "More options"; the filters in use as chips with "Clear
-        all"; "Copy link" beside the count. Every search link there is
-        now still opens the same search.
+      - [x] C. A simpler search page (#188), laid out from the two
+        wireframes. On a 384px phone the form is 241px before a search
+        where it was about 1,000px, and after a title search the first
+        recipe starts 400px down.
+        - One bar that stays: the title words and Search. The heading is
+          still there for whoever goes by headings, not drawn. The form
+          no longer folds to a line with "Edit search".
+        - "Cook with what you have" under it, with "Use my larder" beside
+          it for someone who has one: it ticks every list, or the ones
+          ticked before it was last unticked.
+        - "Show", when there are ingredients or a larder: anything using
+          them (as before), missing 2 or fewer, or only what can be made
+          now. `missing_max` in the API (0, 1 or 2), `missing` in the
+          address. What counts as missing didn't change. Kept to it, a
+          recipe says "You have everything" or "Missing: …", the count
+          says "you can make now", and an empty list offers the next
+          step as a button.
+        - "More options (n)": what to leave out, which sources, only my
+          shelf, only saved, and which larder lists with the rest of the
+          larder's picker. Closed until wanted, open for a link that uses
+          one, and n is how many are in use.
+        - What's narrowing the results is a row of chips over them, each
+          a button that takes itself off, with "Clear all": the Show
+          choice, tags, kinds of source, my shelf, saved, what's left
+          out and which sources. Focus goes to the next chip, or the
+          count.
+        - "Copy link" is beside the count.
+        - Beside the results Diet and Course are open, and Source kind and
+          Cuisine and technique closed unless something in them is ticked.
+          On a phone they're under "Filters (n)", beside the order.
+        - Every link made before opens the same search: tried with
+          `larder=1`, `own`, `sv`, `kind`, `x`, `sort` and `page`, and the
+          check now holds one of them to it.
+        - Where this leaves the spec (*Claude's choices*): the count and
+          its controls come before the filters for a keyboard, so that a
+          phone reads count, then Filters and the order, then recipes, as
+          the wireframe has it; how the ingredient box works ("cheese
+          finds cheddar") shows while the box is in use, and is said to a
+          screen reader always; a link's `missing=1` is offered as a
+          choice only while it's the one chosen; and with the list kept
+          to what can be made, "Uses your …" isn't said, as in the
+          wireframe.
+        - [ ] The spec's "about 300px" to the first recipe after a search
+          is 400px for a title alone, and 591px with two ingredients, the
+          Show choice and a chip. What's between is all in the wireframe.
+        - [ ] A link for a filter opens "More options" as the spec asks,
+          which on a phone puts the recipes a screen further down for
+          whoever follows one.
       - [ ] B4 to B12. Page by page: the admin overview as a row for each
         tool; flagged recipes and people in fewer lines, 25 flags at a
         time; a change set as one line with its details behind a

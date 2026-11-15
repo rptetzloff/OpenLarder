@@ -114,6 +114,27 @@ const ADMIN_BAR = `(() => {
   if (!button.textContent.includes("Flagged recipes")) return "the admin bar's button doesn't name the page";
   return "";
 })()`;
+// Search, kept to what can be made now: every recipe listed has everything,
+// and with none to list, the next step is offered.
+const MAKE_NOW = `(() => {
+  if (document.querySelector("#search-show")?.value !== "0") return "a link's missing=0 isn't the choice shown";
+  const hits = [...document.querySelectorAll(".hit")];
+  if (hits.some((h) => !h.querySelector(".hit-have")?.textContent.includes("You have everything")))
+    return "“Only what I can make now” lists a recipe that's missing something";
+  if (!hits.length && !document.querySelector(".nothing button")?.textContent.includes("missing 2 or fewer"))
+    return "an empty “Only what I can make now” doesn't offer two or fewer";
+  return "";
+})()`;
+// A search link made before the form was rearranged opens the same search:
+// its words in the bar, and what it leaves out shown where that now is.
+const OLD_LINK = `(() => {
+  if (document.querySelector("#search-title")?.value !== "biscuits") return "the link's title words aren't in the bar";
+  if (document.querySelector(".more-toggle")?.getAttribute("aria-expanded") !== "true")
+    return "More options isn't open for a link that uses one";
+  if (![...document.querySelectorAll(".filter-chip")].some((c) => c.textContent.includes("Without Aged cheddar")))
+    return "what the link leaves out isn't among the filters in use";
+  return "";
+})()`;
 // On the sources page: the cover that arrived is shown, and the one that
 // failed has left the printed face with its title, not a broken picture.
 const COVERS_SHOWN = `(() => {
@@ -380,7 +401,7 @@ function pages(s) {
     ["/search?q=biscuits", null],
     ["/search?q=biscuits&kind=book&kind=website", null],
     [`/search?tag=${s.vegetarian}`, null],
-    [`/search?q=biscuits&x=${s.cheddar}`, null],
+    [`/search?q=biscuits&x=${s.cheddar}`, null, { expect: OLD_LINK }],
     ["/sources", null, { expect: COVERS_SHOWN }],
     ["/sources", "cook"],
     ["/sources", "admin"],
@@ -482,6 +503,18 @@ function pages(s) {
       "admin",
       { phone: true, then: `document.querySelector("main details.how").open = true` },
     ],
+    // Search: "More options" opened, signed out and with a larder; the
+    // filters opened on a phone; and kept to what can be made now, with
+    // recipes to list and with none.
+    ["/search", null, { phone: true, then: `document.querySelector(".more-toggle").click()` }],
+    ["/search?larder=1", "cook", { phone: true, then: `document.querySelector(".more-toggle").click()` }],
+    [
+      `/search?tag=${s.vegetarian}`,
+      null,
+      { phone: true, then: `document.querySelector(".filters-toggle").click()` },
+    ],
+    [`/search?i=${s.cheddar}&missing=0`, null, { phone: true, expect: MAKE_NOW }],
+    [`/search?i=${s.cheddar}&missing=0&tag=${s.vegetarian}`, null, { phone: true, expect: MAKE_NOW }],
     // Admin's diets: one being changed, and one being added.
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .change").click()` }],
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .add-diet").click()` }],

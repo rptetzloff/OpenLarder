@@ -3,7 +3,8 @@ import SourceRow from "../components/SourceRow.vue";
 import { onMounted, ref } from "vue";
 import { type BookSummary, listSources } from "../books";
 import IngredientPicker from "../components/IngredientPicker.vue";
-import { ingredientsNamed, type Named } from "../ingredients";
+import { type Example, findExamples } from "../examples";
+import type { Named } from "../ingredients";
 
 // Search starts here: words of a title go to the Search page as q, chosen
 // ingredients as i, as its own links do.
@@ -21,25 +22,8 @@ function findRecipes() {
   location.href = `/search?${query}`;
 }
 
-// Finished searches to try, under "Cook with what you have" (Ray's cleanup
-// pass, section 11): well-used ingredients, so each finds plenty. Checked
-// against the catalog on 2026-11-12: at least twenty recipes use all three
-// of each. One shows only when every ingredient of it is in the catalog.
-const EXAMPLES = [
-  ["chicken", "lemon", "garlic"],
-  ["egg", "butter", "flour"],
-  ["onion", "olive oil", "tomato"],
-  ["carrot", "onion", "celery"],
-];
-const examples = ref<{ label: string; href: string }[]>([]);
-async function findExamples() {
-  const found = await ingredientsNamed([...new Set(EXAMPLES.flat())]).catch(() => []);
-  const ids = new Map(found.map((i) => [i.name.toLowerCase(), i.id]));
-  examples.value = EXAMPLES.filter((names) => names.every((n) => ids.has(n))).map((names) => ({
-    label: names.join(" + "),
-    href: `/search?${new URLSearchParams(names.map((n) => ["i", ids.get(n)!]))}`,
-  }));
-}
+// Finished searches to try (examples.ts).
+const examples = ref<Example[]>([]);
 
 // The row of sources: a row's worth to scroll through, and none that
 // opens on an empty page (Ray's cleanup pass, sections 4 and 9). The newest
@@ -50,7 +34,7 @@ const recent = ref<BookSummary[] | null>(null);
 const rowTitle = ref("Recently added sources");
 onMounted(async () => {
   document.title = "OpenLarder";
-  findExamples();
+  findExamples().then((found) => (examples.value = found));
   const newest = await listSources("", 0, ROW, "recent", [], 1).catch(() => null);
   if (newest && newest.total < ENOUGH) {
     const most = await listSources("", 0, ROW, "recipes", [], 1).catch(() => null);

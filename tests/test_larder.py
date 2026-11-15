@@ -143,6 +143,29 @@ async def test_a_larder_item_counts_as_itself_and_whats_above_it(people, adb) ->
     assert (await ann.get("/api/search", params={"larder": "true"})).json()["recipes"]
 
 
+async def test_only_what_the_larder_can_make(people, adb) -> None:
+    """missing_max with a larder (Ray, 2026-11-14): the recipes it has
+    everything for, or all but a line or two."""
+    mo, ann = await people("mo", role="moderator"), await people("ann")
+    sauce = await _ingredient(adb, "Hot Sauce")
+    await _recipes(
+        mo,
+        adb,
+        ("Wings", ["Hot Sauce"]),
+        ("Hot Wings", ["Hot Sauce", "Chicken Wings"]),
+        ("Feast", ["Hot Sauce", "Chicken Wings", "Celery", "Blue Cheese"]),
+    )
+    await _item(ann, await _list(ann), "Cholula", ingredient_id=str(sauce))
+
+    async def titles(**more) -> list[str]:
+        found = (await ann.get("/api/search", params={"larder": "true", **more})).json()
+        return sorted(r["title"] for r in found["recipes"])
+
+    assert await titles() == ["Feast", "Hot Wings", "Wings"]
+    assert await titles(missing_max=0) == ["Wings"]
+    assert await titles(missing_max=1) == ["Hot Wings", "Wings"]
+
+
 async def test_searching_with_a_larder_needs_signing_in(client, people) -> None:
     assert (await client.get("/api/search", params={"larder": "true"})).status_code == 401
     empty = (await (await people("ann")).get("/api/search", params={"larder": "true"})).json()

@@ -598,104 +598,12 @@ a.secondary.small::after {
   font-size: 0.9375rem;
 }
 
-/* Search. */
-.search-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  padding: 1rem 1.25rem 1.25rem;
-  border-radius: 8px;
-  background: var(--surface);
-}
-.search-panel label,
-.filters legend {
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-.search-panel .panel-gap {
-  margin-top: 0.75rem;
-}
+/* Search: what its page shares with others. Its form's rules are its own
+   (pages/SearchPage.vue). */
 /* What you're leaving out: struck through, so it reads as "not this". */
 .chip-unwanted {
   text-decoration: line-through;
   text-decoration-thickness: 1px;
-}
-.search-panel .help {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-.search-panel .optional {
-  font-weight: normal;
-  color: var(--muted);
-}
-.panel-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 0.75rem 1rem;
-  margin-top: 0.75rem;
-}
-.panel-row > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-.panel-row > div > input {
-  font: inherit;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
-}
-.panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-.search-body {
-  display: grid;
-  grid-template-columns: 12rem minmax(0, 1fr);
-  gap: 2rem;
-  margin-top: 1.5rem;
-}
-@media (max-width: 40rem) {
-  .search-body {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-  }
-}
-.filters fieldset {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0;
-  border: none;
-}
-.filters legend {
-  margin-bottom: 0.375rem;
-  padding: 0;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.filters .check {
-  font-weight: normal;
-}
-/* The tag filters, after the source kinds. */
-.filters fieldset + fieldset {
-  margin-top: 1.25rem;
-}
-.filters > button.link {
-  margin-top: 0.75rem;
-}
-.results-head {
-  margin: 0 0 0.75rem;
-  font-size: 1.125rem;
 }
 .muted {
   color: var(--muted);

@@ -501,3 +501,65 @@ async def test_an_unwanted_ingredient_gone_is_reported(admin, work, adb, client)
     gone = uuid.uuid4()
     found = await _search(client, await _id(adb, "Flour"), without=[str(gone)])
     assert (found["missing"], _titles(found)) == ([str(gone)], ["Cake"])
+
+
+async def test_only_what_you_can_make(admin, work, adb, client) -> None:
+    """missing_max keeps the recipes missing at most that many lines (Ray,
+    2026-11-14); without it, ingredients rank and don't filter."""
+    await _add(admin, work, "Ginger Biscuits", "30", ["Ginger", "Rhubarb"])
+    await _add(admin, work, "Rhubarb Fool", "14", ["Rhubarb", "Cream"])
+    await _add(admin, work, "Rhubarb Crumble", "12", ["Rhubarb", "Butter", "Ginger", "Oats"])
+    await _add(admin, work, "Rhubarb Trifle", "16", ["Rhubarb", "Cream", "Sponge", "Custard"])
+    # Either of its choices covers the line.
+    await _add(admin, work, "Rhubarb Syrup", "18", ["Rhubarb", "Ginger or Vanilla"])
+    await _add(admin, work, "Toast", "32", ["Bread"])
+    rhubarb, ginger = await _id(adb, "Rhubarb"), await _id(adb, "Ginger")
+
+    everything = await _search(client, rhubarb, ginger)
+    assert everything["total"] == 5
+    make_now = await _search(client, rhubarb, ginger, missing_max=0)
+    assert sorted(_titles(make_now)) == ["Ginger Biscuits", "Rhubarb Syrup"]
+    assert make_now["total"] == 2
+    assert all(r["needs"] == [] and r["have"] == r["lines"] for r in make_now["recipes"])
+    one = await _search(client, rhubarb, ginger, missing_max=1)
+    assert sorted(_titles(one)) == ["Ginger Biscuits", "Rhubarb Fool", "Rhubarb Syrup"]
+    two = await _search(client, rhubarb, ginger, missing_max=2)
+    assert sorted(_titles(two)) == [
+        "Ginger Biscuits",
+        "Rhubarb Crumble",
+        "Rhubarb Fool",
+        "Rhubarb Syrup",
+    ]
+    assert two["total"] == 4
+    # In the order they'd come anyway.
+    assert _titles(two) == [t for t in _titles(everything) if t in _titles(two)]
+    # With title words too.
+    fool = await _search(client, rhubarb, ginger, missing_max=1, q="fool")
+    assert _titles(fool) == ["Rhubarb Fool"]
+
+
+async def test_a_component_counts_as_missing(admin, work, adb, client) -> None:
+    await _add(admin, work, "Flour Blend", "10", ["Rice Flour"])
+    await _add(admin, work, "Bread", "50", ["Flour Blend (p. 10)", "Egg"])
+    await _add(admin, work, "Omelette", "51", ["Egg"])
+    egg = await _id(adb, "Egg")
+    assert _titles(await _search(client, egg, missing_max=0)) == ["Omelette"]
+    assert sorted(_titles(await _search(client, egg, missing_max=1))) == ["Bread", "Omelette"]
+
+
+async def test_missing_max_is_nought_one_or_two_and_needs_ingredients(
+    admin, work, adb, client
+) -> None:
+    await _add(admin, work, "Rhubarb Fool", "14", ["Rhubarb", "Cream"])
+    rhubarb = await _id(adb, "Rhubarb")
+    for wrong in (3, -1, "few"):
+        response = await client.get(
+            "/api/search", params={"ingredient": str(rhubarb), "missing_max": wrong}
+        )
+        assert response.status_code == 422
+    # A title alone has nothing to count: it finds what it would.
+    by_title = (await client.get("/api/search", params={"q": "fool", "missing_max": 0})).json()
+    assert _titles(by_title) == ["Rhubarb Fool"]
+    # And it isn't something to search by.
+    alone = await client.get("/api/search", params={"missing_max": 0})
+    assert alone.status_code == 422
