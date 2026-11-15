@@ -655,9 +655,41 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         - [ ] Where one of an ingredient's three cards has something, the
           other two still say they have nothing: the spec folds them only
           when all three are empty.
-      - [ ] D1, D2. Shops in a table of their own, read with a minute's
-        cache and seeded from today's environment variables, with no
-        visible change; then `/admin/shops`, for administrators.
+      - [x] D1. Shops in a table of their own (#190), with no visible
+        change. Migration 0073 makes `shops` with a row for each of the
+        six booksellers and three grocers, each one's setting copied from
+        the variable it was in and the shop switched on where that was
+        set. buying.py and grocery.py read the rows (shops.py), kept a
+        minute in the process. Its own PR, ahead of `/admin/shops`
+        (*Claude's choice*: the spec has them on one line), so the move
+        could be seen to change nothing before anything is built on it.
+        - That nothing changed: on one database, the build before and
+          this one gave the same buy list for every edition and the same
+          address from every `/go/` link, all nine shops, 54 of 54; and
+          so did this build started with none of the variables set.
+        - A key is unique among its kind, not among all shops as the spec
+          has it: Amazon and Amazon Fresh are both `amazon`, at
+          `/go/amazon/…` and `/go/grocer/amazon/…`, and both are on the
+          web already.
+        - `{words}` (a book's title and author, for a search) is a
+          placeholder the spec doesn't list: Kobo is searched that way,
+          and with it Kobo's address is in its row like the others'.
+          Amazon's is still made in code, as the spec says.
+        - For one release a row nobody has changed that has no setting
+          still takes it from its variable, with a warning in the log
+          naming it. D3 takes that out with the variables.
+        - A reset keeps the shops, of the catalog or of everything
+          (reset.py): they're the site's configuration. With
+          `--everything`, who last changed one goes with the accounts.
+          The reset's own test, that every table is named as emptied or
+          kept, is what asked.
+        - [ ] Ray: nothing to do in Coolify for this. After it's deployed,
+          the log should have no line saying a shop "has no setting in
+          the shops table"; one would mean a variable the migration didn't
+          see.
+      - [ ] D2. `/admin/shops`, for administrators: the list, the form,
+        the test link, and each change in the edit history. `shops` has
+        no history yet: nothing can change a row until this.
       - [ ] E. Google Ads sign-up tracking with none of Google's script:
         the ad's click id in a cookie of the site's own, one row for a
         new account that isn't linked to it, exported to a sheet Google
@@ -1028,6 +1060,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
+- [ ] **"Want this book".** *Ray, 2026-11-14: "Add want this book to
+      to-do", after asking when it had been removed.* It never was there:
+      nothing in the code or its history has had it. What there is beside
+      it: "I have this book" on a book's page, which puts it on your shelf
+      and has the one state; "Want to cook" and "Cooked" on a recipe; and
+      "Request it" on Sources, for a book to be indexed. Not started, and
+      what it is to do is Ray's to say. Claude's guesses at the questions:
+      whether it's a second state of the shelf (a wish list beside what's
+      owned, shared with household groups as the shelf is) or a list of
+      its own; whether Search's "Only books on my shelf" should leave
+      wanted books out; and whether a wanted book's page should put its
+      buy links first.
 - [x] **Diets from Admin: adding, renaming and removing.** *Ray,
       2026-11-14: "ability for admin to create diets"; and, asked whether
       to rename and remove them too, and to set what a diet avoids only
@@ -1311,6 +1355,19 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       the "Run now" webhook.
 
 ## Found along the way
+
+- [ ] **Another way to say "Comes under" on an ingredient.** *Ray,
+      2026-11-14: "I don't like the verbiage 'comes under' for the
+      ingredients".* Which words instead is his to say. Where it's said to
+      a reader: the card's heading on an ingredient's page ("Comes
+      under", beside "Includes" and "Also called"); the same page as
+      crawlers and link previews read it ("Comes under …", "counting what
+      comes under it", pages.py); and the refusal when one ingredient is
+      put above another that's over it (ingredients.py). Its neighbours
+      say the same thing other ways and would want to agree with it:
+      "Put under…", "Add under this…", "Take it out from under",
+      "counting what's under it", and Search's "also finds what's under
+      it".
 
 - [x] **The accessibility check takes 40 seconds here, not thirteen minutes** (#187).
       *Ray, 2026-11-14, of a pull request's checks: "is there a way we can

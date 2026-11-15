@@ -26,13 +26,15 @@ hand (roles.py).
 
 Never emptied: the tag list (the seeded diets, courses, cuisines and
 techniques, and any added since, which the app expects), FoodData
-Central's foods (reference data, not the catalog's), and the schema's
-version.
+Central's foods (reference data, not the catalog's), the shops and their
+affiliate settings (the site's configuration, not its catalog), and the
+schema's version.
 
 One transaction: TRUNCATE, which neither fires the history triggers nor
 takes long. It refuses a table something kept still points at, so the one
 such link, a request's book, is let go for the length of a catalog reset
-and put back.
+and put back; and with `--everything` so is a shop's link to whoever last
+changed it, who goes with the accounts.
 """
 
 import argparse
@@ -110,11 +112,12 @@ PEOPLE = (
 )
 # Never emptied. A new table must be named in one of the three lists
 # (tests/test_reset.py), so the reset never misses one.
-KEPT = ("alembic_version", "tags", "fdc_foods", "allergens", "diet_allergens")
+KEPT = ("alembic_version", "tags", "fdc_foods", "allergens", "diet_allergens", "shops")
 # A catalog reset's history kept: the tag list's, and what diets avoid.
 HISTORY_KEPT = ("tags", "diet_allergens")
 
 _REQUEST_LINK = "fk_book_requests_source_id_sources"
+_SHOP_LINK = "fk_shops_updated_by_users"
 
 
 async def _count(session: AsyncSession, table: str) -> int:
@@ -137,7 +140,18 @@ async def counts(session: AsyncSession, everything: bool = False) -> dict[str, i
 async def reset(session: AsyncSession, everything: bool = False) -> None:
     """Empty the catalog, or with everything all but KEPT. The caller commits."""
     if everything:
+        # A shop stays, as it was set; who set it goes with the accounts.
+        await session.execute(
+            text("UPDATE shops SET updated_by = NULL WHERE updated_by IS NOT NULL")
+        )
+        await session.execute(text(f"ALTER TABLE shops DROP CONSTRAINT {_SHOP_LINK}"))
         await session.execute(text(f"TRUNCATE {', '.join(CATALOG + PEOPLE)}"))
+        await session.execute(
+            text(
+                f"ALTER TABLE shops ADD CONSTRAINT {_SHOP_LINK}"
+                " FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL"
+            )
+        )
         return
     await session.execute(
         text("UPDATE book_requests SET source_id = NULL WHERE source_id IS NOT NULL")

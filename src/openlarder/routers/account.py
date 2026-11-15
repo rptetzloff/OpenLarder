@@ -46,7 +46,7 @@ async def set_display_name(
 
 
 class Shops(BaseModel):
-    # Shop keys (buying.RETAILERS), the preferred first.
+    # Booksellers' keys (shops.py), the preferred first.
     order: list[str] = Field(default=[], max_length=50)
     hidden: list[str] = Field(default=[], max_length=50)
 
@@ -57,9 +57,10 @@ async def set_shops(body: Shops, user: CurrentUser, session: Session, settings: 
     every shop can't be hidden. *Ray, 2026-11-09.*"""
     order = list(dict.fromkeys(body.order))
     hidden = list(dict.fromkeys(body.hidden))
-    if unknown := [k for k in order + hidden if k not in buying.BY_KEY]:
+    known = await buying.keys(session)
+    if unknown := [k for k in order + hidden if k not in known]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such shop: {unknown[0]}.")
-    if len(hidden) >= len(buying.RETAILERS):
+    if len(hidden) >= len(known):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Leave at least one shop showing."
         )
@@ -73,7 +74,7 @@ async def set_shops(body: Shops, user: CurrentUser, session: Session, settings: 
 
 
 class GrocerIn(BaseModel):
-    # A grocer's key (grocery.GROCERS); None, the first offered.
+    # A grocer's key (shops.py); None, the first offered.
     grocer: str | None = None
 
 
@@ -81,7 +82,7 @@ class GrocerIn(BaseModel):
 async def set_grocer(body: GrocerIn, user: CurrentUser, session: Session, settings: Config) -> Me:
     """Which grocer ingredients' links go to: Instacart unless another is
     chosen, as it may have nothing near them. *Ray, 2026-11-11.*"""
-    if body.grocer is not None and body.grocer not in grocery.BY_KEY:
+    if body.grocer is not None and body.grocer not in await grocery.keys(session):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such grocer: {body.grocer}."
         )

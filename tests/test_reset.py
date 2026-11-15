@@ -29,16 +29,17 @@ async def test_nothing_kept_points_into_the_catalog_but_a_requests_book(adb) -> 
         {"catalog": list(reset.CATALOG)},
     )
     assert links.all() == [("book_requests", "fk_book_requests_source_id_sources")]
-    # Nothing never emptied points at anything emptied, for --everything.
+    # Nothing never emptied points at anything emptied, for --everything,
+    # but a shop at whoever last changed it: let go the same way.
     kept = await adb.execute(
         text(
-            "SELECT conrelid::regclass::text FROM pg_constraint"
+            "SELECT conrelid::regclass::text, conname FROM pg_constraint"
             " WHERE contype = 'f' AND conrelid::regclass::text = ANY(:kept)"
             " AND NOT confrelid::regclass::text = ANY(:kept)"
         ),
         {"kept": list(reset.KEPT)},
     )
-    assert kept.all() == []
+    assert kept.all() == [("shops", "fk_shops_updated_by_users")]
 
 
 async def test_the_catalog_goes_and_the_rest_stays(people, adb) -> None:
@@ -122,6 +123,13 @@ async def test_everything_leaves_only_the_tag_list(people, adb) -> None:
     await ann.post("/api/requests", json={"title": "Plenty"})
     await ann.post("/api/larder/lists", json={"name": "Pantry"})
     await adb.execute(text("INSERT INTO sources (title) VALUES ('Plenty')"))
+    await adb.execute(
+        text(
+            "UPDATE shops SET affiliate_id = '777', enabled = true, updated_by ="
+            " (SELECT id FROM users WHERE display_name = 'ann')"
+            " WHERE kind = 'bookseller' AND key = 'bookshop'"
+        )
+    )
     tags_before = await adb.scalar(text("SELECT count(*) FROM tags"))
     found = await reset.counts(adb, everything=True)
     assert (found["users"], found["book_requests"], found["larder_lists"]) == (1, 1, 1)
@@ -131,4 +139,23 @@ async def test_everything_leaves_only_the_tag_list(people, adb) -> None:
     for table in reset.CATALOG + reset.PEOPLE:
         assert await adb.scalar(text(f"SELECT count(*) FROM {table}")) == 0, table
     assert await adb.scalar(text("SELECT count(*) FROM tags")) == tags_before
+    # The shops stay as they were set, without who set them; and the link
+    # to an account is there again for the next to change one.
+    kept = (
+        await adb.execute(
+            text(
+                "SELECT affiliate_id, enabled, updated_by FROM shops"
+                " WHERE kind = 'bookseller' AND key = 'bookshop'"
+            )
+        )
+    ).one()
+    assert tuple(kept) == ("777", True, None)
+    assert await adb.scalar(text("SELECT count(*) FROM shops")) == 9
+    link = await adb.scalar(
+        text(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint"
+            " WHERE conname = 'fk_shops_updated_by_users'"
+        )
+    )
+    assert link == "FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL"
     assert await adb.scalar(text("SELECT count(*) FROM alembic_version")) == 1

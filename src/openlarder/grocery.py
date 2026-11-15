@@ -3,8 +3,9 @@
 the affiliate ID, the same way as the book shops' links (buying.py).
 
 *Ray, 2026-11-11:* Instacart first; anyone may choose another grocer, as
-Instacart may have nothing near them. Each grocer shows only once its
-affiliate setting is in Coolify. A link is a search at the grocer for the
+Instacart may have nothing near them. The grocers are rows of the shops
+table (shops.py; *Ray, 2026-11-13*), and each shows only once it's switched
+on with its affiliate setting. A link is a search at the grocer for the
 ingredient (its shopping term, or its name), and the visitor picks their
 store there: Instacart's Developer Platform, which fills a cart with a
 whole recipe's ingredients, takes no new applications (November 2026).
@@ -18,56 +19,13 @@ whole recipe's ingredients, takes no new applications (November 2026).
 
 The search addresses are the grocers' own, as their sites use them; none
 documents them, so a grocer changing one breaks its links until it's
-changed here.
+changed on the shop.
 """
 
-from collections.abc import Callable
-from dataclasses import dataclass
-from urllib.parse import quote_plus
-
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder.buying import _wrapped
-from openlarder.config import Settings, get_settings
-
-
-@dataclass(frozen=True)
-class Grocer:
-    key: str
-    label: str
-    destination: Callable[[Settings, str], str | None]
-    # What the grocer's programme asks to be said beside its link.
-    note: str | None = None
-
-
-def _amazon(s: Settings, term: str) -> str | None:
-    if not s.amazon_tag:
-        return None
-    return f"https://www.amazon.com/s?k={quote_plus(term)}&i=amazonfresh&tag={s.amazon_tag}"
-
-
-# In the order they're offered: Instacart first (Ray, 2026-11-11).
-GROCERS = [
-    Grocer(
-        "instacart",
-        "Instacart",
-        lambda s, t: _wrapped(
-            s.instacart_link, f"https://www.instacart.com/store/s?k={quote_plus(t)}"
-        ),
-    ),
-    Grocer(
-        "amazon",
-        "Amazon Fresh",
-        _amazon,
-        note="As an Amazon Associate, OpenLarder earns from qualifying purchases.",
-    ),
-    Grocer(
-        "walmart",
-        "Walmart",
-        lambda s, t: _wrapped(s.walmart_link, f"https://www.walmart.com/search?q={quote_plus(t)}"),
-    ),
-]
-BY_KEY = {g.key: g for g in GROCERS}
+from openlarder import shops
 
 
 class GrocerOut(BaseModel):
@@ -76,17 +34,26 @@ class GrocerOut(BaseModel):
     note: str | None = None
 
 
-def offered() -> list[GrocerOut]:
-    """The grocers whose affiliate setting is in place, in order."""
-    settings = get_settings()
+async def offered(session: AsyncSession) -> list[GrocerOut]:
+    """The grocers switched on with their affiliate setting in place, in order."""
     return [
         GrocerOut(key=g.key, label=g.label, note=g.note)
-        for g in GROCERS
-        if g.destination(settings, "onion")
+        for g in await shops.listed(session, "grocer")
+        if g.enabled and shops.for_term(g, "onion")
     ]
 
 
-def destination(grocer: str, term: str) -> str | None:
-    """Where a click goes; None while the grocer has no setting."""
-    found = BY_KEY.get(grocer)
-    return found.destination(get_settings(), term) if found else None
+async def keys(session: AsyncSession) -> list[str]:
+    """Every grocer's key, switched on or not."""
+    return [g.key for g in await shops.listed(session, "grocer")]
+
+
+async def labels(session: AsyncSession) -> dict[str, str]:
+    return {g.key: g.label for g in await shops.listed(session, "grocer")}
+
+
+async def destination(session: AsyncSession, grocer: str, term: str) -> str | None:
+    """Where a click goes; None while the grocer is switched off or has no
+    setting."""
+    shop = await shops.find(session, "grocer", grocer)
+    return shops.for_term(shop, term) if shop and shop.enabled else None

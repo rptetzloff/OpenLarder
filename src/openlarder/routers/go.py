@@ -55,7 +55,8 @@ async def go(
                 .limit(1)
             )
         ).first()
-        target = buying.destination(
+        target = await buying.destination(
+            session,
             retailer,
             buying.Book(
                 isbn13=edition.isbn13,
@@ -78,10 +79,10 @@ async def go(
 
 
 @router.get("/api/grocers", response_model=list[grocery.GrocerOut], include_in_schema=True)
-async def grocers() -> list[grocery.GrocerOut]:
+async def grocers(session: Session) -> list[grocery.GrocerOut]:
     """The grocers an ingredient's link can go to, in the order offered:
-    those whose affiliate setting is in place."""
-    return grocery.offered()
+    those switched on with their affiliate setting in place."""
+    return await grocery.offered(session)
 
 
 @router.get("/go/grocer/{grocer}/{ingredient_id}")
@@ -100,7 +101,7 @@ async def go_grocer(
         )
     )
     target = (
-        grocery.destination(grocer, ingredient.shopping_term or ingredient.name)
+        await grocery.destination(session, grocer, ingredient.shopping_term or ingredient.name)
         if ingredient
         else None
     )
