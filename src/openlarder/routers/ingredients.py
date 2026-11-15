@@ -46,6 +46,8 @@ from openlarder.models import (
     Substitution,
     WebPage,
 )
+from openlarder.producers import ProducerCard
+from openlarder.producers import for_ingredient as producers_of
 from openlarder.routers.allergens import IngredientAllergenOut, for_ingredient
 from openlarder.routers.substitutions import SwapOut, swap_out
 from openlarder.wikidata import WikidataTransport
@@ -150,6 +152,9 @@ class IngredientOut(BaseModel):
     # What it records about allergens, or inherits from a broader one
     # (allergens.py); shown with allergens.NOTICE.
     allergens: list[IngredientAllergenOut] = []
+    # Producers that supply it, or a broader ingredient it's under: at most
+    # two (producers.py).
+    producers: list[ProducerCard] = []
 
 
 def contains_pattern(q: str) -> str:
@@ -492,6 +497,7 @@ async def get_ingredient(
         ),
         same_records=same,
         allergens=await for_ingredient(session, ingredient.id, viewer),
+        producers=await producers_of(session, ingredient.id),
         aliases=[AliasOut(id=a, name=n) for a, n in aliases],
         parent=Related(id=parent.id, name=parent.name) if parent else None,
         children=children,

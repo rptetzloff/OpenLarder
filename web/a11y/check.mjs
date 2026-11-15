@@ -107,6 +107,27 @@ const AD_PRIVACY = `(() => {
   const cookies = [...document.querySelectorAll("li code")].map((c) => c.textContent);
   return cookies.includes("ol_ad_click") ? "" : "The privacy page's cookies don't list ol_ad_click";
 })()`;
+// Producers (producers.py): the check plants two, so their page has cards,
+// the footer its link, an ingredient's page its card, and the privacy page
+// and the terms their paragraphs. Without these a run that planted none
+// would look at the emptier pages and say nothing.
+const PRODUCERS_SHOWN = `(() => {
+  const cards = document.querySelectorAll(".producer-list .producer-card").length;
+  if (cards !== 2) return "The Producers page shows " + cards + " producers, not the two planted";
+  if (!document.querySelector('.site-footer a[href="/producers"]')) return "The footer doesn't link the Producers page";
+  for (const card of document.querySelectorAll(".producer-card")) {
+    const link = card.querySelector('a[href^="/go/producer/"]');
+    if (!link) return "A producer's card has no link";
+    if (!link.nextElementSibling?.matches(".buy-note") || !link.nextElementSibling.textContent.trim())
+      return "A producer's link doesn't say beside it what it earns";
+  }
+  return "";
+})()`;
+const PRODUCER_ON_INGREDIENT = `(() => {
+  const cards = document.querySelectorAll(".from-producer .producer-card").length;
+  return cards === 2 ? "" : "The ingredient's page shows " + cards + " producers, not the two that supply it";
+})()`;
+const PRODUCERS_SAID = `document.querySelector('main a[href="/producers"]') ? "" : "The page doesn't speak of producers"`;
 // The admin bar: its links in the bar on a wide screen; on a phone one row,
 // with the page's name on a button, and the links only once it's pressed.
 const ADMIN_BAR = `(() => {
@@ -382,6 +403,37 @@ async function seed() {
     headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },
   });
   if (click.status < 300 || click.status >= 400) throw new Error(`The buy link answered ${click.status}`);
+  // Two producers, switched on (producers.py): one as a farm would be set
+  // up, one with the long word wherever an administrator types, earning
+  // nothing and shipping everywhere. Both supply what aged cheddar is
+  // under, so its page has both; and one has a click, for Buy-link clicks.
+  for (const producer of [
+    {
+      key: "green-acre",
+      label: "Green Acre Farm",
+      description:
+        "Grass-fed beef, pastured pork and farmstead butter from a family farm, sent frozen to your door.",
+      offer: "New customers get $10 off their first order",
+      ships_to: ["WI", "MN", "IL", "IA", "MI", "IN", "OH"],
+      earns: "referral",
+      note: "If you order through this link you get $10 off your first order, and the person who runs OpenLarder gets $20 in store credit at Green Acre Farm.",
+    },
+    { key: "long-mill", label: LONG, description: `${LONG} ${LONG}`, offer: LONG, ships_to: [], earns: "none", note: null },
+  ]) {
+    await api("/api/admin/shops", "admin", {
+      ...producer,
+      kind: "producer",
+      builder: "direct",
+      product_template: `https://producer.example/${producer.key}?ref=openlarder`,
+      enabled: true,
+      supplies: [cheese],
+    });
+  }
+  const visit = await fetch(`${BASE}/go/producer/green-acre?from=/producers`, {
+    redirect: "manual",
+    headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },
+  });
+  if (visit.status < 300 || visit.status >= 400) throw new Error(`The producer's link answered ${visit.status}`);
   const wordyAuthor = wordyPage.credits[0].author_id;
   // The ingredient users.sql suggests links for, and has foods like.
   const oats = (await api("/api/ingredients?q=Quick-Cooking Oats", "admin")).ingredients.find(
@@ -485,9 +537,19 @@ function pages(s) {
     ["/search?sv=1", "cook"],
     [`/sources/${s.book.id}`, "cook"],
     ["/search?own=1&q=biscuit", "cook"],
-    ["/privacy", null, { expect: AD_PRIVACY }],
-    ["/privacy", null, { phone: true, expect: AD_PRIVACY }],
-    ["/terms", null],
+    ["/privacy", null, { expect: `(${AD_PRIVACY}) || (${PRODUCERS_SAID})` }],
+    ["/privacy", null, { phone: true, expect: `(${AD_PRIVACY}) || (${PRODUCERS_SAID})` }],
+    ["/terms", null, { expect: PRODUCERS_SAID }],
+    // Producers: their page, with a card's list of states opened on a phone;
+    // and on the page of an ingredient under what they supply.
+    ["/producers", null, { expect: PRODUCERS_SHOWN }],
+    ["/producers", "cook", { expect: PRODUCERS_SHOWN }],
+    [
+      "/producers",
+      null,
+      { phone: true, then: `document.querySelector(".producer-card details summary").click()`, expect: PRODUCERS_SHOWN },
+    ],
+    [`/ingredients/${s.cheddar}`, null, { phone: true, expect: PRODUCER_ON_INGREDIENT }],
     ["/welcome", "new"],
     ["/sign-in-failed", null],
     // A long book: on a phone its parts are in another order, with the
@@ -555,6 +617,13 @@ function pages(s) {
       },
     ],
     ["/admin/shops", "admin", { phone: true, then: `document.querySelector("[data-add]").click()` }],
+    // A producer being changed, with what it supplies; and one being added.
+    [
+      "/admin/shops",
+      "admin",
+      { phone: true, then: `document.querySelector('section[aria-labelledby="shops-producer"] [data-edit]').click()` },
+    ],
+    ["/admin/shops", "admin", { phone: true, then: `document.querySelector('[data-add="producer"]').click()` }],
     // Admin's diets: one being changed, and one being added.
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .change").click()` }],
     ["/admin", "admin", { phone: true, then: `document.querySelector(".diet-avoids .add-diet").click()` }],

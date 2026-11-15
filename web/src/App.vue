@@ -41,6 +41,7 @@ import SignInFailedPage from "./pages/SignInFailedPage.vue";
 import SuggestionsPage from "./pages/SuggestionsPage.vue";
 import DataPage from "./pages/DataPage.vue";
 import PrivacyPage from "./pages/PrivacyPage.vue";
+import ProducersPage from "./pages/ProducersPage.vue";
 import TermsPage from "./pages/TermsPage.vue";
 import WelcomePage from "./pages/WelcomePage.vue";
 import SiteHeader from "./components/SiteHeader.vue";
@@ -53,6 +54,7 @@ const pages: Record<string, unknown> = {
   "/privacy": PrivacyPage,
   "/terms": TermsPage,
   "/data": DataPage,
+  "/producers": ProducersPage,
 };
 // Books became sources (migration 0019): an old /books address, saved or
 // shared, goes to the same page under /sources.
@@ -119,6 +121,9 @@ const needsName = computed(
 
 // The band above the header: this isn't production, or a notice.
 const notice = ref<string | null>(null);
+// Whether any producer is listed (producers.py): the footer links their
+// page only then, so it never leads to an empty one.
+const anyProducers = ref(false);
 
 // "Skip to content": focus goes to the page, without the address changing.
 const content = ref<HTMLElement | null>(null);
@@ -127,7 +132,10 @@ const skip = () => content.value?.focus();
 onMounted(async () => {
   fetch("/api/site")
     .then((r) => (r.ok ? r.json() : null))
-    .then((site) => (notice.value = site?.notice ?? null))
+    .then((site) => {
+      notice.value = site?.notice ?? null;
+      anyProducers.value = site?.producers === true;
+    })
     .catch(() => {});
   try {
     const res = await fetch("/api/auth/me");
@@ -201,6 +209,12 @@ onMounted(async () => {
         <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a></span
       >
       <a href="/requests" :aria-current="onRequests ? 'page' : undefined">Requests</a>
+      <a
+        v-if="anyProducers"
+        href="/producers"
+        :aria-current="path === '/producers' ? 'page' : undefined"
+        >Producers</a
+      >
       <a href="/api/docs">API</a>
       <a href="/data">Open data</a>
       <a href="/privacy">Privacy</a>

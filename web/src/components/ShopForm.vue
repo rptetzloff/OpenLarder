@@ -2,8 +2,10 @@
 // A shop's form on Admin's Shops page: a new one's, or one being changed.
 // Its fields follow how its address is made, and "Test link" shows where a
 // click would go for a sample, without saving or counting anything (Ray's
-// round 4 list, part D, 2026-11-13).
-import { computed, ref } from "vue";
+// round 4 list, part D, 2026-11-13). A producer's has what a shop's hasn't:
+// what it is, its offer, where it ships and which ingredients it supplies.
+import { computed, nextTick, ref } from "vue";
+import IngredientPicker from "./IngredientPicker.vue";
 import {
   BUILDERS,
   type Builder,
@@ -23,16 +25,37 @@ const props = defineProps<{ kind: ShopKind; shop?: Shop }>();
 const emit = defineEmits<{ saved: [groups: ShopGroup[], said: string]; cancel: [] }>();
 
 const s = props.shop;
+const producer = props.kind === "producer";
 const key = ref(s?.key ?? "");
 const label = ref(s?.label ?? "");
-const builder = ref<Builder>(s?.builder ?? "wrapped");
+const builder = ref<Builder>(s?.builder ?? BUILDERS[props.kind][0][0]);
 const affiliate = ref(s?.affiliate_id ?? "");
 const wrapper = ref(s?.wrapper_template ?? "");
 const product = ref(s?.product_template ?? "");
 const format = ref<"print" | "ebook">(s?.format ?? "print");
-const earns = ref(s?.earns ?? "affiliate");
+// A producer's link is a referral more often than not.
+const earns = ref(s?.earns ?? (producer ? "referral" : "affiliate"));
 const note = ref(s?.note ?? "");
 const enabled = ref(s?.enabled ?? false);
+const description = ref(s?.description ?? "");
+const offer = ref(s?.offer ?? "");
+// The states it ships to, as their codes: "WI, MN, IL". Empty, everywhere.
+const ships = ref((s?.ships_to ?? []).join(", "));
+const supplies = ref([...(s?.supplies ?? [])]);
+// What picking or taking off an ingredient did, for a screen reader.
+const supplied = ref("");
+function supply(i: { id: string; name: string }) {
+  supplies.value = [...supplies.value, i].sort((a, b) => a.name.localeCompare(b.name));
+  supplied.value = `${i.name} added: ${supplies.value.length} in all.`;
+}
+async function unsupply(i: { id: string; name: string }) {
+  supplies.value = supplies.value.filter((x) => x.id !== i.id);
+  supplied.value = `${i.name} taken off: ${supplies.value.length} left.`;
+  // Its button went with it, and focus with the button: to the box that
+  // adds one, which is where the next thing is done.
+  await nextTick();
+  document.getElementById(id("supply"))?.focus();
+}
 
 const busy = ref(false);
 const error = ref("");
@@ -50,6 +73,14 @@ const fields = computed<ShopFields>(() => ({
   earns: earns.value,
   note: note.value.trim() || null,
   enabled: enabled.value,
+  ...(producer
+    ? {
+        description: description.value.trim() || null,
+        offer: offer.value.trim() || null,
+        ships_to: ships.value.split(/[\s,]+/).filter(Boolean),
+        supplies: supplies.value.map((i) => i.id),
+      }
+    : {}),
 }));
 // The address tried, with its host apart, to look at: that's who gets the click.
 const parts = computed(() => {
@@ -131,10 +162,15 @@ async function remove() {
     <label :for="id('label')">Name</label>
     <input :id="id('label')" v-model="label" required maxlength="100" />
 
-    <label :for="id('builder')">How its address is made</label>
-    <select :id="id('builder')" v-model="builder">
-      <option v-for="[value, words] in BUILDERS[kind]" :key="value" :value="value">{{ words }}</option>
-    </select>
+    <!-- A producer's is made one way, so there's nothing to choose. -->
+    <template v-if="BUILDERS[kind].length > 1">
+      <label :for="id('builder')">How its address is made</label>
+      <select :id="id('builder')" v-model="builder">
+        <option v-for="[value, words] in BUILDERS[kind]" :key="value" :value="value">
+          {{ words }}
+        </option>
+      </select>
+    </template>
 
     <template v-if="builder === 'wrapped'">
       <label :for="id('wrapper')">The network's deep link</label>
@@ -152,7 +188,7 @@ async function remove() {
     </template>
 
     <template v-if="builder !== 'amazon'">
-      <label :for="id('product')">The shop's address</label>
+      <label :for="id('product')">{{ producer ? "Its referral link" : "The shop's address" }}</label>
       <input
         :id="id('product')"
         v-model="product"
@@ -162,28 +198,92 @@ async function remove() {
         :aria-describedby="id('product-help')"
       />
       <p :id="id('product-help')" class="help">
-        Starts https://, and may have {{ PLACEHOLDERS[kind].join(", ") }}.
+        <template v-if="producer">Starts https://. It's used exactly as written.</template>
+        <template v-else>Starts https://, and may have {{ PLACEHOLDERS[kind].join(", ") }}.</template>
       </p>
     </template>
 
-    <label :for="id('affiliate')">
-      {{ builder === "amazon" ? "Associates tag" : "Affiliate id" }}
-      <span v-if="builder === 'wrapped' || builder === 'template'" class="optional">(optional)</span>
-    </label>
-    <input
-      :id="id('affiliate')"
-      v-model="affiliate"
-      maxlength="200"
-      autocomplete="off"
-      autocapitalize="none"
-      spellcheck="false"
-      :aria-describedby="id('affiliate-help')"
-    />
-    <p :id="id('affiliate-help')" class="help">
-      <template v-if="builder === 'amazon'">Like openlarder-20.</template>
-      <template v-else-if="builder === 'bookshop'">A number, like 12345.</template>
-      <template v-else>What {id} in the shop's address stands for, if it has one.</template>
-    </p>
+    <template v-if="!producer">
+      <label :for="id('affiliate')">
+        {{ builder === "amazon" ? "Associates tag" : "Affiliate id" }}
+        <span v-if="builder === 'wrapped' || builder === 'template'" class="optional"
+          >(optional)</span
+        >
+      </label>
+      <input
+        :id="id('affiliate')"
+        v-model="affiliate"
+        maxlength="200"
+        autocomplete="off"
+        autocapitalize="none"
+        spellcheck="false"
+        :aria-describedby="id('affiliate-help')"
+      />
+      <p :id="id('affiliate-help')" class="help">
+        <template v-if="builder === 'amazon'">Like openlarder-20.</template>
+        <template v-else-if="builder === 'bookshop'">A number, like 12345.</template>
+        <template v-else>What {id} in the shop's address stands for, if it has one.</template>
+      </p>
+    </template>
+
+    <template v-if="producer">
+      <label :for="id('description')">What it is <span class="optional">(optional)</span></label>
+      <textarea
+        :id="id('description')"
+        v-model="description"
+        rows="3"
+        maxlength="600"
+        :aria-describedby="id('description-help')"
+      ></textarea>
+      <p :id="id('description-help')" class="help">
+        A sentence or two. An ingredient's page shows the first line of it.
+      </p>
+
+      <label :for="id('offer')">Its offer <span class="optional">(optional)</span></label>
+      <input :id="id('offer')" v-model="offer" maxlength="200" :aria-describedby="id('offer-help')" />
+      <p :id="id('offer-help')" class="help">Like “New customers get $10 off”.</p>
+
+      <label :for="id('ships')">States it ships to <span class="optional">(optional)</span></label>
+      <input
+        :id="id('ships')"
+        v-model="ships"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        :aria-describedby="id('ships-help')"
+      />
+      <p :id="id('ships-help')" class="help">
+        Two-letter codes with commas between, like WI, MN, IL. Leave it empty if it ships
+        everywhere.
+      </p>
+
+      <!-- Enter in the search box picks an ingredient; it mustn't save the form. -->
+      <div class="supplies" @keydown.enter.prevent>
+        <h3 :id="id('supplies')">Ingredients it supplies</h3>
+        <ul v-if="supplies.length" class="supplied" :aria-labelledby="id('supplies')">
+          <li v-for="i in supplies" :key="i.id">
+            <span>{{ i.name }}</span>
+            <button type="button" class="secondary small" :disabled="busy" @click="unsupply(i)">
+              Remove<span class="visually-hidden"> {{ i.name }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="help">None yet.</p>
+        <p class="visually-hidden" role="status">{{ supplied }}</p>
+        <IngredientPicker
+          :input-id="id('supply')"
+          label="Add an ingredient"
+          placeholder="Search ingredients"
+          :exclude="supplies.map((i) => i.id)"
+          :disabled="busy"
+          @pick="supply"
+        />
+        <p class="help">
+          A broad one covers what's under it: Beef puts it on ground beef's page too. An
+          ingredient's page shows two producers at most.
+        </p>
+      </div>
+    </template>
 
     <div class="shop-pair">
       <div v-if="kind === 'bookseller'">
@@ -203,9 +303,18 @@ async function remove() {
       </div>
     </div>
 
-    <label :for="id('note')">Said beside its link <span class="optional">(optional)</span></label>
+    <label :for="id('note')"
+      >Said beside its link
+      <span v-if="!producer || earns === 'none'" class="optional">(optional)</span></label
+    >
     <input :id="id('note')" v-model="note" maxlength="300" :aria-describedby="id('note-help')" />
-    <p :id="id('note-help')" class="help">What the shop's program asks to be said, if anything.</p>
+    <p :id="id('note-help')" class="help">
+      <template v-if="producer">
+        What is earned and by whom, said plainly: what the customer gets, and what OpenLarder or
+        whoever runs it gets. If a click earns nothing, the site says so itself.
+      </template>
+      <template v-else>What the shop's program asks to be said, if anything.</template>
+    </p>
 
     <label class="check">
       <input v-model="enabled" type="checkbox" /> On: its links show on the site
@@ -269,7 +378,36 @@ async function remove() {
   color: var(--muted);
   font-weight: normal;
 }
+.supplies {
+  display: grid;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+}
+.supplies h3 {
+  margin: 0.375rem 0 0;
+  font-size: 1rem;
+}
+.supplied {
+  display: grid;
+  gap: 0.25rem;
+  max-width: 40rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.supplied li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+/* The picker is a form's own elsewhere, with room under it for the next. */
+.supplies :deep(.isbn-form) {
+  max-width: 40rem;
+  margin-bottom: 0;
+}
 input:not([type="checkbox"]),
+textarea,
 select {
   box-sizing: border-box;
   width: 100%;

@@ -10,18 +10,24 @@ document.title = "Terms of service · OpenLarder";
 // The agreement's wording is the server's (agreement.py), so it's shown as
 // what was actually accepted.
 const agreement = ref<Agreement | null>(null);
+// Whether any producer is listed (producers.py): said only where there is.
+const anyProducers = ref(false);
 onMounted(async () => {
   // A link to a section ("How this works" goes to #commissions): the page
   // is drawn after the browser looked for it, so go there now.
   if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   agreement.value = await readAgreement().catch(() => null);
+  const site = await fetch("/api/site")
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+  anyProducers.value = site?.producers === true;
 });
 </script>
 
 <template>
   <article>
     <h1>Terms of service</h1>
-    <p class="updated">Last updated November 11, 2026</p>
+    <p class="updated">Last updated November 15, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks: which book, which page, and
@@ -103,6 +109,14 @@ onMounted(async () => {
       catalog is there because of a commission. As an Amazon Associate, OpenLarder earns from
       qualifying purchases. What a link counts is in the
       <a href="/privacy">privacy policy</a>.
+    </p>
+    <p v-if="anyProducers">
+      Some ingredients, and the <a href="/producers">Producers</a> page, link to a farm, a mill or
+      a maker that sells ingredients itself. A producer is listed because someone running
+      OpenLarder chose to list it, not from the ingredient's name as a grocer's link is. Each
+      producer's link says beside it what following it earns and for whom, which may be a
+      referral reward to the person who runs OpenLarder and not to OpenLarder; one that earns
+      nothing says so.
     </p>
 
     <h2>Copyright</h2>

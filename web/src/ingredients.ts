@@ -2,6 +2,7 @@
 
 import type { IngredientAllergen } from "./allergens";
 import { issueName } from "./books";
+import type { ProducerCard } from "./producers";
 import type { Swap } from "./substitutions";
 
 export interface IngredientSummary {
@@ -42,6 +43,8 @@ export interface Ingredient {
   same_records: { id: string; name: string }[];
   // What it records about allergens, or inherits (allergens.ts).
   allergens: IngredientAllergen[];
+  // Producers that supply it, or a broader ingredient it's under: two at most.
+  producers: ProducerCard[];
 }
 
 // A generic food in USDA FoodData Central (fdc.py).

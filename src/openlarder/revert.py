@@ -36,6 +36,7 @@ ORDER = [
     "ingredient_aliases",
     "ingredient_allergens",
     "diet_allergens",
+    "producer_ingredients",
     "editions",
     "issues",
     "episodes",

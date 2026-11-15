@@ -712,6 +712,14 @@ LISTS = {
         description="The people and kitchens behind the indexed cookbooks, and what each made.",
         path="/authors",
     ),
+    "producers": Page(
+        title=f"Producers · {SITE}",
+        description=(
+            "Farms, mills and makers that sell ingredients themselves, and what following"
+            " each link earns."
+        ),
+        path="/producers",
+    ),
 }
 
 

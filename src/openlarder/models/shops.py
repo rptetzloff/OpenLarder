@@ -14,7 +14,9 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
+    PrimaryKeyConstraint,
     Text,
     UniqueConstraint,
     func,
@@ -77,4 +79,42 @@ class Shop(Base):
     # Who last changed it; None while it's as the migration seeded it.
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class ProducerIngredient(Base):
+    """An ingredient a producer supplies (producers.py). A broad one, "Beef",
+    covers what comes under it. Site configuration, like the shop: in no
+    data dump."""
+
+    __tablename__ = "producer_ingredients"
+    __table_args__ = (
+        PrimaryKeyConstraint("shop_id", "ingredient_id"),
+        Index("ix_producer_ingredients_ingredient_id", "ingredient_id"),
+    )
+
+    shop_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE")
+    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ingredients.id", ondelete="CASCADE")
+    )
+
+
+class ProducerClick(Base):
+    """A click on a producer's link (routers/go.py): which producer, when,
+    and from which OpenLarder page. Nothing about who clicked."""
+
+    __tablename__ = "producer_clicks"
+    __table_args__ = (
+        CheckConstraint("producer <> ''", name="producer_not_empty"),
+        Index("ix_producer_clicks_clicked_at", "clicked_at"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    # The shop's key, as the other click tables keep it.
+    producer: Mapped[str] = mapped_column(Text, nullable=False)
+    page: Mapped[str | None] = mapped_column(Text)
+    clicked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
     )

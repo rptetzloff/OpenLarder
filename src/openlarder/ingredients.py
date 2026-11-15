@@ -29,6 +29,7 @@ from openlarder.models import (
     IngredientOption,
     LarderItem,
     MergedRecord,
+    ProducerIngredient,
     Recipe,
     RecipeIngredient,
     Substitution,
@@ -234,6 +235,19 @@ async def merge(session: AsyncSession, source: Ingredient, target: Ingredient) -
     )
     await _merge_substitutions(session, s, t)
     await allergens.merge(session, s, t)
+    # A producer that supplied it supplies the one kept (producers.py); one
+    # that supplied both keeps the one row.
+    both = select(ProducerIngredient.shop_id).where(ProducerIngredient.ingredient_id == t)
+    await session.execute(
+        delete(ProducerIngredient).where(
+            ProducerIngredient.ingredient_id == s, ProducerIngredient.shop_id.in_(both)
+        )
+    )
+    await session.execute(
+        update(ProducerIngredient)
+        .where(ProducerIngredient.ingredient_id == s)
+        .values(ingredient_id=t)
+    )
     await session.execute(
         update(Ingredient).where(Ingredient.parent_id == s, Ingredient.id != t).values(parent_id=t)
     )

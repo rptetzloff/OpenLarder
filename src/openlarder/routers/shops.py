@@ -1,6 +1,6 @@
-"""Shops, for administrators: the booksellers and grocers a link out of the
-site can go to, added, changed, put in order and switched on and off from
-the site, with no redeploy (shops.py; round 4, part D).
+"""Shops, for administrators: the booksellers, grocers and producers a link
+out of the site can go to, added, changed, put in order and switched on
+and off from the site, with no redeploy (shops.py; round 4, part D).
 
 *Decided by Ray, 2026-11-13.* Administrators only, not moderators: an
 affiliate id or a deep link is no secret, since every link the site sends
@@ -10,6 +10,13 @@ Every change is in the edit history, with who and when (migration 0074),
 and this process reads the shops again at once; the others within a minute.
 A shop with clicks recorded is switched off, never deleted, so the clicks
 keep their meaning.
+
+A producer (producers.py) has what the others haven't: a description, an
+offer, the states it ships to and the ingredients it supplies. Its address
+is its referral link, as written. Switched on, it must say beside its link
+what is earned and by whom, unless nothing is. The ingredients it supplies
+are ones everyone can see: one that only a private family collection uses
+is refused, so its name can't reach a public page from here.
 """
 
 import re
@@ -21,23 +28,33 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import shops
+from openlarder import producers, shops, visibility
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import GroceryClick, PurchaseClick, User
+from openlarder.models import (
+    GroceryClick,
+    Ingredient,
+    ProducerClick,
+    ProducerIngredient,
+    PurchaseClick,
+    User,
+)
 from openlarder.models import Shop as ShopRow
 
 router = APIRouter(prefix="/api/admin/shops", tags=["admin"])
 
-Kind = Literal["bookseller", "grocer"]
-Builder = Literal["bookshop", "amazon", "wrapped", "template"]
+Kind = Literal["bookseller", "grocer", "producer"]
+Builder = Literal["bookshop", "amazon", "wrapped", "template", "direct"]
 _KEY = re.compile(r"[a-z0-9-]{1,40}")
 _TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}")
 _PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
-KINDS = {"bookseller": "Booksellers", "grocer": "Grocers"}
+KINDS = {"bookseller": "Booksellers", "grocer": "Grocers", "producer": "Producers"}
+# Not a bookseller's key: /go/producer/<key> is the producers' address, and
+# /go/<bookseller>/<edition> would be shadowed by it.
+RESERVED = {"bookseller": {"producer"}}
 
 
 class ShopOut(BaseModel):
@@ -57,6 +74,12 @@ class ShopOut(BaseModel):
     shown: bool
     # Switched on and not shown: what it still needs.
     needs: str | None
+    # Producers only: what it is, what a new customer gets, the states it
+    # ships to (none: everywhere), and the ingredients it supplies.
+    description: str | None = None
+    offer: str | None = None
+    ships_to: list[str] | None = None
+    supplies: list[producers.Named] = []
     clicks_30_days: int
     # Clicks ever: with any, it's switched off and not deleted.
     clicks: int
@@ -83,6 +106,11 @@ class Fields(BaseModel):
     earns: Literal["affiliate", "referral", "none"] = "affiliate"
     note: str | None = Field(default=None, max_length=300)
     enabled: bool = False
+    # Producers only.
+    description: str | None = Field(default=None, max_length=600)
+    offer: str | None = Field(default=None, max_length=200)
+    ships_to: list[str] | None = Field(default=None, max_length=60)
+    supplies: list[uuid.UUID] = Field(default=[], max_length=200)
 
 
 class NewShop(Fields):
@@ -123,8 +151,16 @@ def _checked(kind: str, body: Fields) -> dict:
     if product is not None:
         if not product.startswith("https://"):
             raise _refuse("The shop's address starts https://.")
+        if re.search(r"\s", product):
+            raise _refuse("The shop's address has no spaces in it.")
         allowed = shops.PLACEHOLDERS[kind]
-        if unknown := [p for p in _PLACEHOLDER.findall(product) if p not in allowed]:
+        unknown = [p for p in _PLACEHOLDER.findall(product) if p not in allowed]
+        if unknown and not allowed:
+            raise _refuse(
+                "A producer's address is its referral link, used as written: it has no"
+                f" {{{unknown[0]}}} in it."
+            )
+        if unknown:
             raise _refuse(
                 f"The shop's address has {{{unknown[0]}}}, which isn't one of"
                 f" {', '.join('{' + p + '}' for p in allowed)}."
@@ -135,6 +171,12 @@ def _checked(kind: str, body: Fields) -> dict:
     if body.builder != "wrapped":
         wrapper = None
     format_ = (body.format or "print") if kind == "bookseller" else None
+    description = offer = ships_to = None
+    if kind == "producer":
+        affiliate = None
+        description = " ".join((body.description or "").split()) or None
+        offer = " ".join((body.offer or "").split()) or None
+        ships_to = _states(body.ships_to)
     return {
         "label": label,
         "builder": body.builder,
@@ -145,11 +187,29 @@ def _checked(kind: str, body: Fields) -> dict:
         "earns": body.earns,
         "note": note,
         "enabled": body.enabled,
+        "description": description,
+        "offer": offer,
+        "ships_to": ships_to,
     }
 
 
+def _states(given: list[str] | None) -> list[str] | None:
+    """The states a producer ships to, as their codes in order; None for
+    none given, which is everywhere."""
+    codes = sorted({code.strip().upper() for code in given or [] if code.strip()})
+    if unknown := [code for code in codes if code not in producers.STATES]:
+        raise _refuse(f"“{unknown[0]}” isn't a state's two-letter code. Give them like WI, MN, IL.")
+    return codes or None
+
+
 def _as_shop(kind: str, key: str, fields: dict) -> shops.Shop:
-    return shops.Shop(key=key, kind=kind, position=0, **fields)
+    ships_to = fields["ships_to"]
+    return shops.Shop(
+        key=key,
+        kind=kind,
+        position=0,
+        **{**fields, "ships_to": tuple(ships_to) if ships_to is not None else None},
+    )
 
 
 def _must_be_whole(shop: shops.Shop) -> None:
@@ -159,6 +219,49 @@ def _must_be_whole(shop: shops.Shop) -> None:
         raise _refuse(f"Switched on, it needs {needs}. Give it that, or leave it off.")
     if shop.enabled and shops.sample(shop) is None:
         raise _refuse("Its address can't be made for a book. Check what the address asks for.")
+    if shop.enabled and shop.kind == "producer" and shop.earns != "none" and not shop.note:
+        raise _refuse(
+            "Switched on, a producer says beside its link what is earned and by whom."
+            " Write that, or say a click earns nothing."
+        )
+
+
+async def _may_supply(session: AsyncSession, wanted: list[uuid.UUID]) -> set[uuid.UUID]:
+    """The ingredients asked for, if each is one everyone can see. Asked
+    before anything is written, so a refusal leaves nothing half done."""
+    asked = set(wanted)
+    if asked:
+        seen = set(
+            await session.scalars(
+                select(Ingredient.id).where(
+                    Ingredient.id.in_(asked), visibility.ingredients_seen_by(None)
+                )
+            )
+        )
+        if seen != asked:
+            raise _refuse(
+                "One of those ingredients isn't in the catalog everyone sees. Take it off"
+                " and pick it again."
+            )
+    return asked
+
+
+async def _supply(session: AsyncSession, shop_id: uuid.UUID, asked: set[uuid.UUID]) -> None:
+    """The ingredients a producer supplies, made to be these."""
+    had = set(
+        await session.scalars(
+            select(ProducerIngredient.ingredient_id).where(ProducerIngredient.shop_id == shop_id)
+        )
+    )
+    if gone := had - asked:
+        await session.execute(
+            delete(ProducerIngredient).where(
+                ProducerIngredient.shop_id == shop_id,
+                ProducerIngredient.ingredient_id.in_(gone),
+            )
+        )
+    for ingredient_id in sorted(asked - had):
+        session.add(ProducerIngredient(shop_id=shop_id, ingredient_id=ingredient_id))
 
 
 async def _clicks(
@@ -169,6 +272,7 @@ async def _clicks(
     for kind, model, column in (
         ("bookseller", PurchaseClick, PurchaseClick.retailer),
         ("grocer", GroceryClick, GroceryClick.grocer),
+        ("producer", ProducerClick, ProducerClick.producer),
     ):
         query = select(column, func.count()).group_by(column)
         if since is not None:
@@ -178,7 +282,23 @@ async def _clicks(
     return found
 
 
-async def _out(session: AsyncSession) -> list[Group]:
+async def _supplied(session: AsyncSession, viewer: User) -> dict[uuid.UUID, list]:
+    """What each producer supplies, by name, as this administrator may see
+    them: an ingredient that has become a private collection's alone since
+    it was picked isn't named to someone who can't see that collection."""
+    found: dict[uuid.UUID, list] = {}
+    rows = await session.execute(
+        select(ProducerIngredient.shop_id, Ingredient.id, Ingredient.name)
+        .join(Ingredient, Ingredient.id == ProducerIngredient.ingredient_id)
+        .where(visibility.ingredients_seen_by(viewer))
+        .order_by(Ingredient.name)
+    )
+    for shop_id, ingredient_id, name in rows:
+        found.setdefault(shop_id, []).append(producers.Named(id=ingredient_id, name=name))
+    return found
+
+
+async def _out(session: AsyncSession, viewer: User) -> list[Group]:
     rows = {
         (r.kind, r.key): r
         for r in await session.scalars(select(ShopRow).where(ShopRow.kind.in_(KINDS)))
@@ -194,6 +314,7 @@ async def _out(session: AsyncSession) -> list[Group]:
     )
     ever = await _clicks(session)
     lately = await _clicks(session, datetime.now(UTC) - timedelta(days=30))
+    supplied = await _supplied(session, viewer)
     groups = []
     for kind, label in KINDS.items():
         listed = []
@@ -216,6 +337,10 @@ async def _out(session: AsyncSession) -> list[Group]:
                     enabled=s.enabled,
                     shown=s.enabled and shops.sample(s) is not None,
                     needs=needs,
+                    description=s.description,
+                    offer=s.offer,
+                    ships_to=list(s.ships_to) if s.ships_to is not None else None,
+                    supplies=supplied.get(row.id, []),
                     clicks_30_days=lately.get((kind, s.key), 0),
                     clicks=ever.get((kind, s.key), 0),
                     updated_at=row.updated_at,
@@ -226,11 +351,11 @@ async def _out(session: AsyncSession) -> list[Group]:
     return groups
 
 
-async def _fresh(session: AsyncSession) -> list[Group]:
+async def _fresh(session: AsyncSession, viewer: User) -> list[Group]:
     """After a change: saved, this process's shops forgotten, and the list."""
     await session.commit()
     shops.reset()
-    return await _out(session)
+    return await _out(session, viewer)
 
 
 async def _row_or_404(session: AsyncSession, shop_id: uuid.UUID) -> ShopRow:
@@ -242,9 +367,9 @@ async def _row_or_404(session: AsyncSession, shop_id: uuid.UUID) -> ShopRow:
 
 @router.get("", response_model=list[Group])
 async def list_shops(admin: AdminUser, session: Session) -> list[Group]:
-    """Every bookseller and grocer, in the order shown, with its clicks in
-    the last 30 days and who last changed it."""
-    return await _out(session)
+    """Every bookseller, grocer and producer, in the order shown, with its
+    clicks in the last 30 days and who last changed it."""
+    return await _out(session, admin)
 
 
 @router.post("", response_model=list[Group], dependencies=[SameOrigin])
@@ -254,6 +379,8 @@ async def add_shop(body: NewShop, admin: AdminUser, session: Session) -> list[Gr
     key = body.key.strip()
     if not _KEY.fullmatch(key):
         raise _refuse("A key is lowercase letters, digits and hyphens, like corner-shop.")
+    if key in RESERVED.get(body.kind, ()):
+        raise _refuse(f"“{key}” is taken by the site's own addresses. Choose another.")
     taken = await session.scalar(
         select(ShopRow).where(ShopRow.kind == body.kind, ShopRow.key == key)
     )
@@ -263,17 +390,20 @@ async def add_shop(body: NewShop, admin: AdminUser, session: Session) -> list[Gr
         )
     fields = _checked(body.kind, body)
     _must_be_whole(_as_shop(body.kind, key, fields))
+    supplies = await _may_supply(session, body.supplies) if body.kind == "producer" else set()
     last = await session.scalar(select(func.max(ShopRow.position)).where(ShopRow.kind == body.kind))
-    session.add(
-        ShopRow(
-            key=key,
-            kind=body.kind,
-            position=(last if last is not None else -1) + 1,
-            updated_by=admin.id,
-            **fields,
-        )
+    row = ShopRow(
+        key=key,
+        kind=body.kind,
+        position=(last if last is not None else -1) + 1,
+        updated_by=admin.id,
+        **fields,
     )
-    return await _fresh(session)
+    session.add(row)
+    if body.kind == "producer":
+        await session.flush()
+        await _supply(session, row.id, supplies)
+    return await _fresh(session, admin)
 
 
 @router.put("/{shop_id}", response_model=list[Group], dependencies=[SameOrigin])
@@ -284,11 +414,14 @@ async def change_shop(
     row = await _row_or_404(session, shop_id)
     fields = _checked(row.kind, body)
     _must_be_whole(_as_shop(row.kind, row.key, fields))
+    supplies = await _may_supply(session, body.supplies) if row.kind == "producer" else set()
     for name, value in fields.items():
         setattr(row, name, value)
+    if row.kind == "producer":
+        await _supply(session, row.id, supplies)
     row.updated_by = admin.id
     row.updated_at = datetime.now(UTC)
-    return await _fresh(session)
+    return await _fresh(session, admin)
 
 
 class Switch(BaseModel):
@@ -307,7 +440,7 @@ async def switch_shop(
         _must_be_whole(replace(now, enabled=body.enabled))
     row.updated_by = admin.id
     row.updated_at = datetime.now(UTC)
-    return await _fresh(session)
+    return await _fresh(session, admin)
 
 
 class Move(BaseModel):
@@ -335,7 +468,7 @@ async def move_shop(
                 r.position = n
         row.updated_by = admin.id
         row.updated_at = datetime.now(UTC)
-    return await _fresh(session)
+    return await _fresh(session, admin)
 
 
 @router.delete("/{shop_id}", response_model=list[Group], dependencies=[SameOrigin])
@@ -351,7 +484,7 @@ async def remove_shop(shop_id: uuid.UUID, admin: AdminUser, session: Session) ->
             " Switch it off instead, so they keep their meaning.",
         )
     await session.delete(row)
-    return await _fresh(session)
+    return await _fresh(session, admin)
 
 
 class Tried(BaseModel):
@@ -378,9 +511,9 @@ async def test_link(body: NewShop, admin: AdminUser) -> Tried | Response:
     return Tried(
         url=url,
         host=urlsplit(url).hostname or "",
-        sample=(
-            f"“{book.title}” by {book.author}, ISBN {book.isbn13}"
-            if body.kind == "bookseller"
-            else f"the ingredient “{shops.SAMPLE_TERM}”"
-        ),
+        sample={
+            "bookseller": f"“{book.title}” by {book.author}, ISBN {book.isbn13}",
+            "grocer": f"the ingredient “{shops.SAMPLE_TERM}”",
+            "producer": "anyone who follows it",
+        }[body.kind],
     )

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import Date, Text, cast, delete, func, select
 
-from openlarder import buying, grocery, usage, visibility
+from openlarder import buying, grocery, producers, usage, visibility
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -17,6 +17,7 @@ from openlarder.models import (
     Edition,
     GroceryClick,
     Ingredient,
+    ProducerClick,
     PurchaseClick,
     Source,
     User,
@@ -164,6 +165,9 @@ class ClicksPage(BaseModel):
     grocery_clicks: int = 0
     grocers: list[ShopClicks] = []
     ingredients: list[IngredientClicks] = []
+    # Producers' links (producers.py), by producer.
+    producer_clicks: int = 0
+    producers: list[ShopClicks] = []
 
 
 @router.get("/clicks", response_model=ClicksPage)
@@ -238,7 +242,25 @@ async def clicks(
         )
     ).all()
     grocer_labels = await grocery.labels(session)
+    by_producer = (
+        await session.execute(
+            select(
+                ProducerClick.producer,
+                func.count(),
+                func.count().filter(ProducerClick.clicked_at >= week),
+            )
+            .where(ProducerClick.clicked_at >= since)
+            .group_by(ProducerClick.producer)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    producer_labels = await producers.labels(session)
     return ClicksPage(
+        producer_clicks=sum(n for _, n, _ in by_producer),
+        producers=[
+            ShopClicks(retailer=p, label=producer_labels.get(p, p), clicks=n, last_7_days=w)
+            for p, n, w in by_producer
+        ],
         grocery_clicks=sum(n for _, n, _ in grocers),
         grocers=[
             ShopClicks(retailer=g, label=grocer_labels.get(g, g), clicks=n, last_7_days=w)

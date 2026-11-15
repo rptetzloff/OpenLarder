@@ -4,7 +4,9 @@
 // on and off, put in order, changed and added from here, with no redeploy.
 // Their settings were environment variables. Moving one is by buttons, so
 // it works from a keyboard; what each change did is said for a screen
-// reader, and focus stays on the button that did it.
+// reader, and focus stays on the button that did it. Producers (part D4)
+// are the third kind: farms, mills and makers, on the ingredients they
+// supply and on their own page.
 import { computed, nextTick, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import ShopForm from "../components/ShopForm.vue";
@@ -26,7 +28,14 @@ const adding = ref<ShopKind | null>(null);
 const allowed = computed(() => !!props.user?.may_run);
 
 const EARNS = { affiliate: "Affiliate", referral: "Referral", none: "Earns nothing" };
-const ONE = { bookseller: "bookseller", grocer: "grocer" };
+const ONE = { bookseller: "bookseller", grocer: "grocer", producer: "producer" };
+// What a producer supplies and where it ships, in a line.
+const supplying = (s: Shop) =>
+  `${s.supplies.length ? `Supplies ${s.supplies.map((i) => i.name.toLowerCase()).join(", ")}` : "Supplies nothing yet"} · ${
+    s.ships_to?.length
+      ? `ships to ${s.ships_to.length} ${s.ships_to.length === 1 ? "state" : "states"}`
+      : "ships everywhere"
+  }`;
 const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -113,7 +122,8 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
     <div class="list-head">
       <h1>Shops</h1>
       <p class="muted">
-        The booksellers on a book's page and the grocers on an ingredient's, in the order shown.
+        The booksellers on a book's page, the grocers on an ingredient's and the producers, in the
+        order shown.
       </p>
     </div>
     <p v-if="!allowed" class="status">This is for administrators.</p>
@@ -129,6 +139,13 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
           A shop's key is in its /go/ addresses and its clicks, so it can't be changed. A shop
           with clicks recorded can be switched off and not deleted, so they keep their meaning.
           An affiliate id or a deep link is no secret: every link the site sends shows it.
+        </p>
+        <p>
+          A producer is a farm, a mill or a maker that sells ingredients itself. It shows on the
+          Producers page, which the footer links once there's one switched on, and on the pages of
+          the ingredients it supplies, two producers to a page at most, in this order. Switched
+          on, it has to say beside its link what is earned and by whom, unless a click earns
+          nothing.
         </p>
       </details>
       <p v-if="failed" role="alert">The shops couldn't be loaded. Try reloading the page.</p>
@@ -166,6 +183,7 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
                     >
                     <template v-else>as first set up, {{ when(s.updated_at) }}</template>
                   </p>
+                  <p v-if="s.kind === 'producer'" class="muted shop-facts">{{ supplying(s) }}</p>
                   <p v-if="s.enabled && !s.shown" class="shop-warn">
                     On, and not shown: it needs {{ s.needs ?? "an address that can be made" }}.
                   </p>
