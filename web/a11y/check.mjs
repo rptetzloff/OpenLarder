@@ -502,6 +502,46 @@ const MAKE_NOW = `(() => {
     return "an empty “Only what I can make now” doesn't offer two or fewer";
   return "";
 })()`;
+// Search's filters (Ray's round 5 list, item 9, 2026-11-15: "Filters
+// probably makes sense under More options"). On a phone they are inside
+// that panel and not a landmark, and above the results there is one button
+// that opens anything, before a search and after. On a wide screen they
+// are the rail beside the results, a landmark called "Filters", as before.
+const FILTERS_IN_MORE = `(() => {
+  const results = document.querySelector("#results");
+  const panel = document.querySelector("#search-more");
+  const filters = document.querySelector("main .filters");
+  if (!filters || !filters.querySelector("input[type=checkbox]")) return "Search has no filters";
+  if (!matchMedia("(max-width: 40rem)").matches)
+    return filters.tagName === "ASIDE" && filters.getAttribute("aria-label") === "Filters" && !panel.contains(filters)
+      ? ""
+      : "On a wide screen the filters aren't the rail beside the results";
+  if (!panel.contains(filters)) return "On a phone the filters aren't inside “More options”";
+  if (filters.tagName === "ASIDE" || filters.hasAttribute("aria-label") || document.querySelector("main aside")) return "On a phone the filters are still a landmark";
+  const openers = [...document.querySelectorAll("main [aria-expanded], main summary")].filter(
+    (e) => e.getClientRects().length && !panel.contains(e) && e.compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  if (openers.length !== 1 || !openers[0].textContent.trim().startsWith("More options"))
+    return "On a phone " + openers.length + " things open something above the results (" + openers.map((e) => e.textContent.trim()).join(", ") + "), not “More options” alone";
+  if (openers[0].getAttribute("aria-controls") !== panel.id) return "“More options” doesn't say which panel it opens";
+  const title = panel.querySelector("h2");
+  if (title?.textContent.trim() !== "Filters" || !(title.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING)) return "In “More options” the filters have no “Filters” heading over them";
+  return "";
+})()`;
+// A link that arrives with a filter set: on a phone "More options" is open
+// and counts it, with its box ticked inside; on a wide screen the panel
+// stays shut and counts nothing, the filter being in the rail. Either way
+// it is among the filters in use, above the results.
+const FILTER_ARRIVED = `(() => {
+  const more = document.querySelector(".more-toggle");
+  const narrow = matchMedia("(max-width: 40rem)").matches;
+  const words = more.textContent.trim();
+  const ticked = [...document.querySelectorAll("main .filters input:checked")].filter((i) => i.getClientRects().length);
+  if (!ticked.some((i) => i.closest("label").textContent.trim() === "Vegetarian")) return "The link's filter isn't shown ticked";
+  if (![...document.querySelectorAll(".filter-chip")].some((c) => c.textContent.trim() === "Vegetarian")) return "The link's filter isn't among the filters in use";
+  if (narrow) return more.getAttribute("aria-expanded") === "true" && words === "More options (1)" ? "" : "On a phone a link with a filter leaves “More options” " + (more.getAttribute("aria-expanded") === "true" ? "open" : "shut") + ", saying " + JSON.stringify(words);
+  return more.getAttribute("aria-expanded") === "false" && words === "More options" ? "" : "On a wide screen a link with a filter has “More options” saying " + JSON.stringify(words);
+})()`;
 // A search link made before the form was rearranged opens the same search:
 // its words in the bar, and what it leaves out shown where that now is.
 const OLD_LINK = `(() => {
@@ -856,12 +896,12 @@ function pages(s) {
   return [
     ["/", null],
     ["/", "admin"],
-    ["/search", null],
+    ["/search", null, { expect: FILTERS_IN_MORE }],
     [`/search?i=${s.cheddar}`, null],
-    ["/search?q=biscuits", null, { expect: THUMBS_DRAWN }],
+    ["/search?q=biscuits", null, { expect: `(${THUMBS_DRAWN}) || (${FILTERS_IN_MORE})` }],
     ["/search?q=thumbnail+toast", null, { expect: `(${THUMBS_DRAWN}) || (${THUMB_PICTURES})` }],
     ["/search?q=biscuits&kind=book&kind=website", null],
-    [`/search?tag=${s.vegetarian}`, null],
+    [`/search?tag=${s.vegetarian}`, null, { expect: `(${FILTERS_IN_MORE}) || (${FILTER_ARRIVED})` }],
     [`/search?q=biscuits&x=${s.cheddar}`, null, { expect: OLD_LINK }],
     ["/sources", null, { expect: COVERS_SHOWN }],
     ["/sources", "cook"],
@@ -1004,16 +1044,12 @@ function pages(s) {
       "admin",
       { phone: true, then: OPEN_HOW },
     ],
-    // Search: "More options" opened, signed out and with a larder; the
-    // filters opened on a phone; and kept to what can be made now, with
-    // recipes to list and with none.
+    // Search: "More options" opened, signed out and with a larder, which
+    // on a phone has the filters in it; opened by a link with a filter set;
+    // and kept to what can be made now, with recipes to list and with none.
     ["/search", null, { phone: true, then: `document.querySelector(".more-toggle").click()` }],
     ["/search?larder=1", "cook", { phone: true, then: `document.querySelector(".more-toggle").click()` }],
-    [
-      `/search?tag=${s.vegetarian}`,
-      null,
-      { phone: true, then: `document.querySelector(".filters-toggle").click()` },
-    ],
+    [`/search?tag=${s.vegetarian}`, null, { phone: true, expect: FILTER_ARRIVED }],
     [`/search?i=${s.cheddar}&missing=0`, null, { phone: true, expect: MAKE_NOW }],
     [`/search?i=${s.cheddar}&missing=0&tag=${s.vegetarian}`, null, { phone: true, expect: MAKE_NOW }],
     // What a phone folds away, opened: a flag being dismissed, a change's
