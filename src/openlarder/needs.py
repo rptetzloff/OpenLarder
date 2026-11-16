@@ -183,6 +183,36 @@ def as_typed(detail: str | None, things: list[Equipment]) -> str:
     return f"{detail} {named}" if detail else named
 
 
+# Said for a recipe that needs nothing special, where its needs are one
+# cell (Ray's spec, 2026-11-15: bulk entry takes "none").
+NONE_SAID = ("none", "nothing", "nothing special")
+_BETWEEN = re.compile(r"[,;\n]")
+
+
+def from_cell(cell: str) -> tuple[list[str], bool]:
+    """A row's needs typed into one cell: the needs, and whether it was said
+    to need nothing special. Commas, semicolons and new lines part them.
+    "none" alone is nothing special; an empty cell is neither, which leaves
+    the recipe not recorded."""
+    parts = [" ".join(part.split()) for part in _BETWEEN.split(cell)]
+    parts = [part for part in parts if part]
+    said_none = [part for part in parts if part.casefold() in NONE_SAID]
+    if said_none and len(parts) > 1:
+        raise Refused(
+            f"“{said_none[0]}” is for a recipe that needs nothing special. Take it out, or"
+            " the equipment beside it."
+        )
+    return ([], True) if said_none else (parts, False)
+
+
+def as_cell(checked: bool, read: list[tuple[uuid.UUID, str | None, list[Equipment]]]) -> str:
+    """A recipe's needs as their cell takes them back: "Stand mixer or Hand
+    mixer, 9-inch Springform pan"; "none"; or nothing, not recorded."""
+    if not read:
+        return "none" if checked else ""
+    return ", ".join(as_typed(detail, things) for _, detail, things in read)
+
+
 async def write(
     session: AsyncSession,
     recipe: Recipe,

@@ -409,3 +409,79 @@ async def test_adding_a_recipes_thing_to_the_list_lists_it(mo, people, client, a
     refused = await mo.post("/api/equipment", json={"name": "Trifle bowl", "assumed": True})
     assert refused.status_code == 409 and "1 recipe lists" in refused.json()["detail"]
     assert _needs(await _shown(client, other)) == [(None, ["Trifle bowl"])]
+
+
+# A recipe's needs as one cell, as bulk entry has them
+
+
+@pytest.mark.parametrize(
+    ("cell", "typed", "nothing_special"),
+    [
+        ("", [], False),
+        ("   ", [], False),
+        ("none", [], True),
+        (" None ", [], True),
+        ("Nothing special", [], True),
+        ("stand mixer", ["stand mixer"], False),
+        (
+            "stand mixer or hand mixer, 9-inch springform pan; wok\n kitchen  scale ,",
+            ["stand mixer or hand mixer", "9-inch springform pan", "wok", "kitchen scale"],
+            False,
+        ),
+    ],
+)
+def test_a_cell_is_its_needs_or_none_or_nothing_said(cell, typed, nothing_special) -> None:
+    assert needs.from_cell(cell) == (typed, nothing_special)
+
+
+def test_none_beside_a_need_is_neither() -> None:
+    with pytest.raises(needs.Refused) as refused:
+        needs.from_cell("none, wok")
+    assert "needs nothing special" in str(refused.value)
+
+
+async def test_a_rows_cell_saves_and_comes_back_as_typed(mo, client, adb) -> None:
+    book = await _book(mo)
+    cake = await _recipe(
+        mo, book, "Sponge", equipment_cell="stand mixer or hand mixer, 9-inch springform pan"
+    )
+    toast = await _recipe(mo, book, "Toast", equipment_cell="none")
+    plain = await _recipe(mo, book, "Plain", equipment_cell="")
+    assert _needs(await _shown(client, cake)) == [
+        (None, ["Stand mixer", "Hand mixer"]),
+        ("9-inch", ["Springform pan"]),
+    ]
+    states = {
+        title: (await _shown(client, recipe))["equipment_checked"]
+        for title, recipe in (("Sponge", cake), ("Toast", toast), ("Plain", plain))
+    }
+    assert states == {"Sponge": True, "Toast": True, "Plain": False}
+    # Each row's cell, for entering a whole book.
+    lines = (await client.get(f"/api/sources/{book}/recipe-lines")).json()
+    cells = {row["id"]: row["equipment_cell"] for row in lines}
+    assert cells == {
+        cake: "Stand mixer or Hand mixer, 9-inch Springform pan",
+        toast: "none",
+        plain: "",
+    }
+    # Sent back as it came, nothing is written again.
+    before = await adb.scalar(text("SELECT max(id) FROM revisions"))
+    for recipe, title in ((cake, "Sponge"), (toast, "Toast"), (plain, "Plain")):
+        again = await _body(mo, book, title, equipment_cell=cells[recipe])
+        assert (await mo.put(f"/api/recipes/{recipe}", json=again)).status_code == 200
+    written = await adb.scalar(
+        text(
+            "SELECT count(*) FROM revisions WHERE id > :b AND (table_name LIKE '%equipment%'"
+            " OR changes ? 'equipment_checked')"
+        ),
+        {"b": before},
+    )
+    assert written == 0
+    # A cell and a list are two ways to say one thing: not both.
+    both = await _body(mo, book, "Sponge", equipment_cell="wok", equipment=["wok"])
+    refused = await mo.put(f"/api/recipes/{cake}", json=both)
+    assert refused.status_code == 422 and "not both" in refused.json()["detail"]
+    # What a cell holds is refused as a box's is.
+    bowl = await _body(mo, book, "Sponge", equipment_cell="wok, mixing bowl")
+    refused = await mo.put(f"/api/recipes/{cake}", json=bowl)
+    assert refused.status_code == 422 and "expected in any kitchen" in refused.json()["detail"]

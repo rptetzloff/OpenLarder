@@ -6,6 +6,9 @@ import { checkLines, type LineReview, recipeLines, saveRecipe } from "../recipes
 
 // Entering a whole book (Ray's wireframe): a row per recipe, page, title and
 // ingredients, each saving when you leave it, with the line checks under it.
+// Under the ingredients, the row's equipment in one cell (Ray's equipment
+// spec, 2026-11-15): needs with commas between, "none" for nothing special,
+// empty for not recorded yet.
 const props = defineProps<{ id: string }>();
 
 const book = ref<Book | null>(null);
@@ -23,8 +26,10 @@ interface Row {
   // go a chapter at a time.
   chapter: string;
   text: string;
+  // Its equipment, as one cell.
+  equipment: string;
   // What was last saved, to tell whether it needs saving again.
-  saved: { page: string; title: string; chapter: string; text: string } | null;
+  saved: { page: string; title: string; chapter: string; text: string; equipment: string } | null;
   // The recipe's pages in every edition, kept when the row saves.
   editions: { edition_id: string; page: string | null }[];
   status: "idle" | "saving" | "saved" | "error";
@@ -46,6 +51,7 @@ function newRow(fields: Partial<Row> = {}): Row {
     title: "",
     chapter: "",
     text: "",
+    equipment: "",
     saved: null,
     editions: [],
     status: "idle",
@@ -89,12 +95,19 @@ onMounted(async () => {
         id: r.id,
         title: r.title,
         chapter: r.chapter ?? "",
-        text: join(lines.get(r.id) ?? []),
+        text: join(lines.get(r.id)?.lines ?? []),
+        equipment: lines.get(r.id)?.equipment ?? "",
         editions: r.editions,
         page: "",
       };
       fields.page = pageOf(r.editions);
-      const saved = { page: fields.page, title: r.title, chapter: fields.chapter, text: fields.text };
+      const saved = {
+        page: fields.page,
+        title: r.title,
+        chapter: fields.chapter,
+        text: fields.text,
+        equipment: fields.equipment,
+      };
       return newRow({ ...fields, saved });
     });
     rows.value.push(nextRow());
@@ -111,7 +124,13 @@ function changeEdition() {
   for (const row of rows.value) {
     if (!row.id || dirty(row)) continue;
     row.page = pageOf(row.editions);
-    row.saved = { page: row.page, title: row.title, chapter: row.chapter, text: row.text };
+    row.saved = {
+      page: row.page,
+      title: row.title,
+      chapter: row.chapter,
+      text: row.text,
+      equipment: row.equipment,
+    };
   }
 }
 
@@ -120,9 +139,11 @@ const dirty = (row: Row) =>
     ? row.page !== row.saved.page ||
       row.title !== row.saved.title ||
       row.chapter !== row.saved.chapter ||
-      row.text !== row.saved.text
-    : !!(row.page.trim() || row.title.trim() || row.text.trim());
-const blank = (row: Row) => !row.id && !row.page.trim() && !row.title.trim() && !row.text.trim();
+      row.text !== row.saved.text ||
+      row.equipment !== row.saved.equipment
+    : !!(row.page.trim() || row.title.trim() || row.text.trim() || row.equipment.trim());
+const blank = (row: Row) =>
+  !row.id && !row.page.trim() && !row.title.trim() && !row.text.trim() && !row.equipment.trim();
 
 async function check(row: Row) {
   const text = row.text;
@@ -150,7 +171,13 @@ async function save(row: Row) {
     row.error = "A title is needed.";
     return;
   }
-  const sent = { page: row.page, title: row.title, chapter: row.chapter, text: row.text };
+  const sent = {
+    page: row.page,
+    title: row.title,
+    chapter: row.chapter,
+    text: row.text,
+    equipment: row.equipment,
+  };
   const page = row.page.trim() || null;
   // A new recipe is in every edition, with its page in this one; a saved one
   // keeps its other editions' pages.
@@ -172,6 +199,7 @@ async function save(row: Row) {
         editions,
         chapter: row.chapter.trim() || null,
         ingredients: split(row.text),
+        equipment_cell: row.equipment,
       },
       row.id ? { recipeId: row.id } : { bookId: props.id },
     );
@@ -400,7 +428,10 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
             <strong>Enter</strong> in the ingredients saves and starts the next row
             (<strong>Shift+Enter</strong> for a new line). Separate ingredients with
             <strong>;</strong> or a new line, and write a recipe printed elsewhere in the book as
-            <strong>Name (p. 14)</strong>. Names only, no amounts.
+            <strong>Name (p. 14)</strong>. Names only, no amounts. Under them, the equipment it
+            can't be made without, with commas between: <strong>stand mixer or hand mixer, 9-inch
+            springform pan</strong>; <strong>none</strong> if it needs nothing special; empty if
+            you don't know.
           </p>
         </details>
         <div class="table-head">
@@ -426,7 +457,7 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
         </datalist>
         <div class="bulk-grid">
           <div class="bulk-row bulk-labels" aria-hidden="true">
-            <span>Page</span><span>Recipe title and chapter</span><span>Ingredients</span
+            <span>Page</span><span>Recipe title and chapter</span><span>Ingredients and equipment</span
             ><span>Status</span>
           </div>
           <p v-if="!visible.length" class="bulk-empty">No rows have checks.</p>
@@ -472,6 +503,15 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
                 spellcheck="false"
                 placeholder="Ingredient; ingredient; Sub-recipe (p. 14)"
                 @keydown.enter="enter(rows.indexOf(row), $event)"
+              />
+              <input
+                v-model="row.equipment"
+                class="bulk-equipment"
+                aria-label="Equipment"
+                maxlength="2000"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="Equipment, or none"
               />
               <p v-if="summary(row)" class="bulk-summary">{{ summary(row) }}</p>
               <ul v-if="rowChips.get(row.key)!.length" class="bulk-chips">
