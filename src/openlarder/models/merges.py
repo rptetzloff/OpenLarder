@@ -44,14 +44,15 @@ class BookMerge(Base):
 
 
 class MergedRecord(Base):
-    """Where a merged ingredient or author went (migration 0070): the id
+    """Where a merged ingredient, author or piece of equipment went
+    (migrations 0070 and 0080): the id
     that's gone and the one kept, so the page of the one that went can say
     where it is now (pages.py). These merges can't be undone, so unlike a
     book's there is nothing else to keep."""
 
     __tablename__ = "merged_records"
     __table_args__ = (
-        CheckConstraint("kind IN ('ingredient', 'author')", name="kind_known"),
+        CheckConstraint("kind IN ('ingredient', 'author', 'equipment')", name="kind_known"),
         CheckConstraint("gone_id <> kept_id", name="not_into_itself"),
     )
 

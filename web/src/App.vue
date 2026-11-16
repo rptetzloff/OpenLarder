@@ -175,8 +175,8 @@ onMounted(async () => {
     <AuthorsPage v-else-if="onAuthors" />
     <AuthorPage v-else-if="authorId" :id="authorId" :user="user" />
     <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
-    <EquipmentListPage v-else-if="onEquipment" />
-    <EquipmentItemPage v-else-if="equipmentId" :id="equipmentId" />
+    <EquipmentListPage v-else-if="onEquipment" :user="user" />
+    <EquipmentItemPage v-else-if="equipmentId" :id="equipmentId" :user="user" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <GroupsPage v-else-if="onGroups" :user="user" />
     <GroupPage v-else-if="groupId" :id="groupId" :user="user" />
@@ -546,15 +546,19 @@ button.remove:disabled {
   opacity: 0.45;
   cursor: default;
 }
-/* A name in running text with the × that takes it away: on one line, so
-   the × never wraps away from what it removes, and 44px tall, so where
+/* A name in running text with the × that takes it away: one box, so the
+   × never wraps away from what it removes, and 44px tall, so where
    several wrap, one line's × doesn't lie over the next line's (three
-   other names in a narrow card did, by 19px). */
+   other names in a narrow card did, by 19px). The box is as wide as its
+   name, and moves to the next line whole; only a name wider than the
+   page breaks inside it. It was `nowrap`, and a name of sixty letters
+   that a moderator typed put its × 147px past a phone's edge (found
+   2026-11-15 by the check, on a piece of equipment's tools). */
 .with-remove {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 2.75rem;
-  white-space: nowrap;
 }
 /* In a row of a table or a list: drawn smaller, and still 44px to tap. */
 button.primary.small,

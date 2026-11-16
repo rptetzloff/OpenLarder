@@ -150,3 +150,26 @@ async def test_a_removal_now_keeps_the_whole_row(adb) -> None:
         )
     )
     assert changes["match_key"] == ["sumac", None] and "created_at" in changes
+
+
+async def test_undoing_a_rename_puts_the_key_back_with_the_name(people, adb) -> None:
+    """A key is made from a name (ingredients.match_key), and the history
+    leaves it out of a change as noise. Undone without it, an ingredient
+    had its old name and was matched by its new one. Found 2026-11-15,
+    building the same for equipment."""
+    mo = await people("mo", role="moderator")
+    sumac = await adb.scalar(
+        text("INSERT INTO ingredients (name, match_key) VALUES ('Sumac', 'sumac') RETURNING id")
+    )
+    renamed = await mo.patch(f"/api/ingredients/{sumac}", json={"name": "Ground Sumac"})
+    assert renamed.status_code == 200, renamed.text
+    # The newest: the rename. (Under it, the row's own arrival.)
+    change = (await mo.get(f"/api/ingredients/{sumac}/history")).json()[0]
+    undone = await mo.post(f"/api/changes/{change['id']}/revert")
+    assert undone.status_code == 200, undone.text
+    row = (
+        await adb.execute(
+            text("SELECT name, match_key FROM ingredients WHERE id = :i"), {"i": sumac}
+        )
+    ).one()
+    assert tuple(row) == ("Sumac", "sumac")

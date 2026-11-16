@@ -20,7 +20,17 @@ from sqlalchemy.orm import aliased
 from openlarder import revert, shops, visibility
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Author, Ingredient, Recipe, Revision, Shop, Source, Tag, User
+from openlarder.models import (
+    Author,
+    Equipment,
+    Ingredient,
+    Recipe,
+    Revision,
+    Shop,
+    Source,
+    Tag,
+    User,
+)
 
 router = APIRouter(tags=["history"])
 
@@ -45,6 +55,11 @@ WHAT = {
     "ingredients": "ingredient",
     "ingredient_aliases": "ingredient name",
     "ingredient_allergens": "allergen",
+    "equipment": "equipment",
+    "equipment_aliases": "equipment name",
+    "equipment_counts_as": "thing it counts as",
+    "recipe_equipment": "need",
+    "equipment_options": "equipment choice",
     "diet_allergens": "allergen a diet avoids",
     "tags": "tag",
     "shops": "shop",
@@ -80,10 +95,15 @@ LOOKUPS = {
     "from_ingredient_id": Ingredient,
     "to_ingredient_id": Ingredient,
     "author_id": Author,
+    "equipment_id": Equipment,
+    "counts_as_id": Equipment,
     "tag_id": Tag,
     "diet_tag_id": Tag,
     "shop_id": Shop,
 }
+# A row that is only a link has no name of its own: it is called by what
+# it links to. "Removed thing it counts as" didn't say which.
+LINK_NAMED_BY = {"equipment_counts_as": "counts_as_id"}
 LIMIT = 200
 
 
@@ -140,6 +160,8 @@ async def _names(session, viewer: User | None, revisions: list[Revision]) -> dic
         query = select(model.id, called).where(model.id.in_([uuid.UUID(i) for i in ids]))
         if model is Ingredient:
             query = query.where(visibility.ingredients_seen_by(viewer))
+        elif model is Equipment:
+            query = query.where(visibility.equipment_seen_by(viewer))
         elif model is Author:
             query = query.where(visibility.authors_seen_by(viewer))
         names.update({str(i): n for i, n in (await session.execute(query)).all()})
@@ -151,6 +173,7 @@ NAMED_TABLES = {
     "sources": (Source, Source.title),
     "recipes": (Recipe, Recipe.title),
     "ingredients": (Ingredient, Ingredient.name),
+    "equipment": (Equipment, Equipment.name),
     "authors": (Author, Author.name),
     "tags": (Tag, Tag.name),
     "shops": (Shop, Shop.label),
@@ -172,6 +195,7 @@ async def _current_names(session, viewer: User | None, revisions: list[Revision]
                 "sources": visibility.sources_seen_by(viewer),
                 "recipes": visibility.recipes_seen_by(viewer),
                 "ingredients": visibility.ingredients_seen_by(viewer),
+                "equipment": visibility.equipment_seen_by(viewer),
                 "authors": visibility.authors_seen_by(viewer),
             }.get(table, true())
         )
@@ -241,6 +265,10 @@ async def _changes(session, viewer: User | None, query) -> list[Change]:
             return names.get(value, "something you can't see")
         return value
 
+    def linked(table: str, values: dict) -> str | None:
+        before, after = values.get(LINK_NAMED_BY.get(table, ""), (None, None))
+        return names.get(after or before)
+
     out: dict[uuid.UUID, Change] = {}
     # Each change's revisions, newest first, made into entries below.
     gathered: dict[uuid.UUID, list[Revision]] = {}
@@ -289,7 +317,9 @@ async def _changes(session, viewer: User | None, query) -> list[Change]:
                     table=r.table_name,
                     what=WHAT.get(r.table_name, r.table_name),
                     action={"i": "added", "u": "changed", "d": "removed"}[r.action],
-                    name=_name(values) or current.get((r.table_name, r.record_id)),
+                    name=_name(values)
+                    or linked(r.table_name, values)
+                    or current.get((r.table_name, r.record_id)),
                     fields=fields,
                 )
             )
@@ -345,6 +375,34 @@ async def ingredient_history(
                 and_(
                     Revision.table_name.in_(("ingredient_aliases", "ingredient_allergens")),
                     Revision.parent_id == ingredient_id,
+                ),
+            )
+        ),
+    )
+
+
+@router.get("/api/equipment/{equipment_id}/history", response_model=list[Change])
+async def equipment_history(
+    equipment_id: uuid.UUID, session: Session, viewer: Viewer
+) -> list[Change]:
+    """A thing's own changes, its other names', and what it was made to
+    count as."""
+    seen = await session.scalar(
+        select(Equipment.id).where(
+            Equipment.id == equipment_id, visibility.equipment_seen_by(viewer)
+        )
+    )
+    if seen is None:
+        raise _not_found("equipment")
+    return await _changes(
+        session,
+        viewer,
+        select(Revision).where(
+            or_(
+                and_(Revision.table_name == "equipment", Revision.record_id == equipment_id),
+                and_(
+                    Revision.table_name.in_(("equipment_aliases", "equipment_counts_as")),
+                    Revision.parent_id == equipment_id,
                 ),
             )
         ),

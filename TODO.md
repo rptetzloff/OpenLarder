@@ -1112,10 +1112,46 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [ ] `equipment.wikidata_id` and `shopping_term` are in the
             table, as the spec has them, with nothing yet that sets
             either.
-        - [ ] The moderators' tools: add, rename, merge into, count as,
-          also called, mark as any kitchen's, delete when unused; every
-          change in the edit history and revertible; a merged thing's old
-          address going to the one kept.
+        - [x] The moderators' tools (#210; migration 0080): "Add
+          equipment" on the list, and on a thing's page rename, merge
+          into, count as (several, each stopped by its own button), add
+          something that counts as this, another name, mark as any
+          kitchen's or let recipes list it, delete when nothing uses it.
+          Every change is in the edit history and undone from it; a merged
+          thing's old address goes to the one kept.
+          - Refused, in words: a name another thing has (with the way to
+            merge into it, or to open it); a thing counting as itself or
+            round in a ring; marking as any kitchen's a thing a recipe
+            lists, or merging one into such a thing; deleting one a recipe
+            lists or that something counts as.
+          - A merge moves the recipes' needs (a need that offered both
+            offers the one kept, once), the other names, and what counted
+            as what; a link it would turn into a ring is dropped.
+          - [x] Undoing a rename left the new key under the old name, for
+            an ingredient too: the history leaves a key out of a change as
+            noise, since it's made from the name, so the undo had only the
+            name to put back. It makes the key again now (revert.py), for
+            ingredients, equipment, their other names and authors. Found
+            building this; an ingredient renamed and put back before it
+            may still be matched by the name it had for a while, until renamed
+            again.
+          - [x] A name with its × to remove it couldn't wrap, so one of
+            sixty letters a moderator typed put its × 147px past a phone's
+            edge, on an ingredient's page as on equipment's. The check
+            found it once it had such a name among "Includes now".
+          - [ ] A change to what a thing counts as is in that thing's
+            history, and not in the history of the thing it was made to
+            count as.
+          - [ ] The History panel says "History began on November 10,
+            2026" under a thing with no changes; equipment's began with
+            migration 0080.
+          - [ ] No test opens a History panel in the accessibility check
+            but equipment's one: the other pages' are the same component,
+            unlooked at.
+          - [ ] `tests/test_history.py` fails three tests when run straight
+            after `tests/test_catalog_schema.py` alone (on `dev` too): the
+            schema tests' own rows, deleted at the end, are in the history
+            the other tests then read. The whole suite passes.
       - [ ] 2. The recipe form's field, bulk entry's and the import's; the
         "Needs" block on a recipe's page; the flag reason; how many
         recipes have equipment recorded, on the admin overview.

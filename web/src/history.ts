@@ -25,7 +25,7 @@ export interface Change {
   entries: Entry[];
 }
 
-export type Kind = "sources" | "recipes" | "ingredients" | "authors";
+export type Kind = "sources" | "recipes" | "ingredients" | "equipment" | "authors";
 
 async function get(url: string): Promise<Change[]> {
   const res = await fetch(url);

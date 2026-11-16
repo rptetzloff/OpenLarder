@@ -133,8 +133,15 @@ KEPT = (
     "equipment_aliases",
     "equipment_counts_as",
 )
-# A catalog reset's history kept: the tag list's, and what diets avoid.
-HISTORY_KEPT = ("tags", "diet_allergens")
+# A catalog reset's history kept: the tag list's, what diets avoid, and the
+# equipment list's.
+HISTORY_KEPT = (
+    "tags",
+    "diet_allergens",
+    "equipment",
+    "equipment_aliases",
+    "equipment_counts_as",
+)
 
 _REQUEST_LINK = "fk_book_requests_source_id_sources"
 _SHOP_LINK = "fk_shops_updated_by_users"
