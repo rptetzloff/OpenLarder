@@ -550,6 +550,57 @@ const BULK_CHECKS = `(async () => {
   if (!summed.endsWith("· 2 pieces of equipment")) return "The row says “" + summed + "”";
   return "";
 })()`;
+// A misspelt ingredient and a misspelt piece of equipment typed into a row
+// and the row left, which saves it. Saving makes each a thing of its own
+// that every later check finds matched to itself, so the row has to be
+// asked before it saves (Ray, 2026-11-16) and keep the question after:
+// each with what it's named like, Use and It's new, and the row not said
+// to be all matched. It's new takes the question away.
+//
+// The server isn't told of the save: the browsers looking at once would
+// each change the book for the rest. The save is answered here, and each
+// check after it is answered as the server answers once a row has saved,
+// a name nothing matched now matched to itself. The checks before it are
+// the server's own.
+const TYPE_MISSPELT = `(async () => {
+  const real = window.fetch;
+  let saved = false;
+  const answer = (body) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  window.fetch = async (url, init) => {
+    const path = String(url);
+    if (init?.method === "PUT" && /\\/api\\/recipes\\/[^/]+$/.test(path)) {
+      saved = true;
+      return answer({ id: path.split("/").pop() });
+    }
+    const res = await real(url, init);
+    if (!saved || !/\\/api\\/(ingredient-lines\\/check|equipment\\/check-cell)$/.test(path)) return res;
+    const body = await res.json();
+    const itself = (o) => ({ id: "00000000-0000-4000-8000-000000000000", name: o.name });
+    for (const line of body.lines ?? []) for (const o of line.options) if (!o.ingredient && o.page === null) { o.ingredient = itself(o); o.similar = []; }
+    for (const need of body.needs ?? []) for (const o of need.options) if (!o.equipment) { o.equipment = itself(o); o.similar = []; }
+    return answer(body);
+  };
+  const row = [...document.querySelectorAll(".bulk-row[role=group]")].find((r) => r.getAttribute("aria-label").startsWith("Slow-Roasted"));
+  const type = (box, words) => { box.focus(); box.value = words; box.dispatchEvent(new Event("input", { bubbles: true })); };
+  type(row.querySelector("textarea"), row.querySelector("textarea").value + "; aged chedar");
+  type(row.querySelector("textarea.bulk-equipment"), "8-inch wafle iron");
+  row.querySelector("textarea.bulk-equipment").blur();
+  for (let i = 0; i < 80 && !(row.querySelector(".bulk-status").textContent.includes("Saved") && row.querySelector(".bulk-summary")?.textContent.includes("equipment")); i++) await new Promise((r) => setTimeout(r, 100));
+})()`;
+const BULK_ASKED = `(async () => {
+  const row = [...document.querySelectorAll(".bulk-row[role=group]")].find((r) => r.getAttribute("aria-label").startsWith("Slow-Roasted"));
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  if (!words(row.querySelector(".bulk-status")).includes("Saved")) return "The row with misspelt names in it didn't save: “" + words(row.querySelector(".bulk-status")) + "”";
+  const chips = () => [...row.querySelectorAll(".bulk-chips li.tone-warn")].map(words);
+  for (const asked of ["“aged chedar” → Aged cheddar? Use It's new", "“wafle iron” → Waffle iron? Use It's new"])
+    if (!chips().includes(asked)) return "A saved row's chips are “" + chips().join(" | ") + "”, without " + asked;
+  if (words(row.querySelector(".bulk-summary")).includes("all matched")) return "A row with a question open says “" + words(row.querySelector(".bulk-summary")) + "”";
+  [...row.querySelectorAll(".bulk-chips li.tone-warn")].find((li) => words(li).includes("wafle")).querySelectorAll("button")[1].click();
+  await new Promise((r) => setTimeout(r, 100));
+  if (chips().some((c) => c.includes("wafle"))) return "“It's new” leaves the question there";
+  if (!words(row.querySelector(".bulk-summary")).endsWith("· 1 piece of equipment, all matched")) return "With its equipment answered the row says “" + words(row.querySelector(".bulk-summary")) + "”";
+  return "";
+})()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused). Each of the bar's links leads to
@@ -1155,6 +1206,7 @@ function pages(s) {
     [`/sources/${s.box.id}/recipes/new`, "cook"],
     [`/sources/${s.book.id}/bulk`, "admin", { phone: true, expect: BULK_EQUIPMENT }],
     [`/sources/${s.book.id}/bulk`, "admin", { phone: true, then: TYPE_KIT, expect: onPhone(BULK_CHECKS) }],
+    [`/sources/${s.book.id}/bulk`, "admin", { phone: true, then: TYPE_MISSPELT, expect: onPhone(BULK_ASKED) }],
     [`/recipes/${s.biscuits.id}`, null, { phone: true, expect: `(${CRUMBS}) || (${BUY_OUTLINED}) || (${NEEDS(["Biscuit cutter", "Stand mixer or Hand mixer", "Cast-iron skillet 10-inch"])})` }],
     [`/recipes/${s.blend.id}`, null, { expect: NEEDS_LINE("No special equipment.", false) }],
     [`/recipes/${s.biscuits.id}`, "admin"],

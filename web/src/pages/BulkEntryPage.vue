@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import Crumbs from "../components/Crumbs.vue";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import type { Book } from "../books";
 import { type CellRead, checkCell, needNamed } from "../equipment";
+import { deleteIngredient } from "../ingredients";
 import { checkLines, type LineReview, recipeLines, saveRecipe } from "../recipes";
 
 // Entering a whole book (Ray's wireframe): a row per recipe, page, title and
@@ -42,13 +43,9 @@ interface Row {
   // The lines' check, for the text it was given.
   reviews: LineReview[] | null;
   checked: string;
-  // Check chips answered "it's new", by line.
-  kept: Set<string>;
-  // The same for its equipment: the cell's check, for the cell it was given,
-  // and the needs answered "it's new".
+  // The same for its equipment: the cell's check, for the cell it was given.
   needReads: CellRead | null;
   needsChecked: string;
-  keptNeeds: Set<string>;
 }
 
 let nextKey = 0;
@@ -68,10 +65,8 @@ function newRow(fields: Partial<Row> = {}): Row {
     error: "",
     reviews: null,
     checked: "",
-    kept: new Set(),
     needReads: null,
     needsChecked: "",
-    keptNeeds: new Set(),
     ...fields,
   };
 }
@@ -157,6 +152,28 @@ const dirty = (row: Row) =>
 const blank = (row: Row) =>
   !row.id && !row.page.trim() && !row.title.trim() && !row.text.trim() && !row.equipment.trim();
 
+// A name nothing matched that something is named like: "did you mean".
+// It has to be asked of a row before the row saves (Ray, 2026-11-16: "yes",
+// to checking a row first, "should have a fix button for equipment as
+// well"). Saving makes a name nothing matched an ingredient, or a piece of
+// equipment, of its own, and every check after that finds it matched to
+// itself: measured on the check's site, "sweet rice flower" had no
+// ingredient before its row saved and was its own after. So what a check
+// finds is kept here for as long as the page is open, by box and by what was
+// typed, whichever row typed it, and a row shows the question until it's
+// answered: Use, or It's new, which answers it for every row.
+interface Question {
+  // What the name is like, and what the line becomes if that was meant.
+  like: string;
+  to: string;
+}
+type Box = "ingredients" | "equipment";
+const asked = reactive(new Map<string, Question>());
+const answeredNew = reactive(new Set<string>());
+const about = (box: Box, line: string) => `${box}\n${line.toLowerCase()}`;
+const question = (box: Box, line: string) =>
+  answeredNew.has(about(box, line)) ? undefined : asked.get(about(box, line));
+
 async function checkEquipment(row: Row) {
   const cell = row.equipment;
   if (!cell.trim()) {
@@ -166,6 +183,13 @@ async function checkEquipment(row: Row) {
   }
   try {
     const found = await checkCell(cell);
+    for (const need of found.needs) {
+      const o = need.options[0];
+      if (!need.problem && need.options.length === 1 && !o.equipment && o.similar.length) {
+        const like = o.similar[0].name;
+        asked.set(about("equipment", need.text), { like, to: needNamed(need, like) });
+      }
+    }
     if (row.equipment !== cell) return;
     row.needReads = found;
     row.needsChecked = cell;
@@ -186,6 +210,14 @@ async function checkIngredients(row: Row) {
   }
   try {
     const found = await checkLines(lines, { sourceId: props.id, recipeId: row.id ?? undefined });
+    found.forEach((r, i) => {
+      const o = r.options[0];
+      if (r.problems.length || r.options.length !== 1 || o.page !== null) return;
+      if (!o.ingredient && o.similar.length) {
+        const like = o.similar[0].name;
+        asked.set(about("ingredients", lines[i]), { like, to: like });
+      }
+    });
     if (row.text !== text) return;
     row.reviews = found;
     row.checked = text;
@@ -224,13 +256,17 @@ async function save(row: Row) {
   row.status = "saving";
   row.error = "";
   try {
+    // Asked first, while a name nothing matches still matches nothing. It
+    // never holds the row back: what was typed saves as typed, and the
+    // question stays under the row.
+    await check(row);
     const id = await saveRecipe(
       {
-        title: row.title,
+        title: sent.title,
         editions,
-        chapter: row.chapter.trim() || null,
-        ingredients: split(row.text),
-        equipment_cell: row.equipment,
+        chapter: sent.chapter.trim() || null,
+        ingredients: split(sent.text),
+        equipment_cell: sent.equipment,
       },
       row.id ? { recipeId: row.id } : { bookId: props.id },
     );
@@ -337,13 +373,15 @@ function needChips(row: Row): Omit<Chip, "of">[] {
         line,
       });
     } else {
-      const o = need.options[0];
-      if (o && !o.equipment && o.similar.length && !row.keptNeeds.has(line)) {
+      const q = question("equipment", line);
+      if (q) {
         out.push({
-          text: `“${o.name}” → ${o.similar[0].name}?`,
+          // This row's typing, without its size; the question may be from
+          // another row that typed it in other capitals.
+          text: `“${need.options[0]?.name ?? line}” → ${q.like}?`,
           warn: true,
           line,
-          fix: { label: "Use", to: needNamed(need, o.similar[0].name) },
+          fix: { label: "Use", to: q.to },
           keep: true,
         });
       }
@@ -386,14 +424,17 @@ function lineChips(row: Row): Omit<Chip, "of">[] {
               line,
             },
       );
-    } else if (!o.ingredient && o.similar.length && !row.kept.has(line)) {
-      out.push({
-        text: `“${o.name}” → ${o.similar[0].name}?`,
-        warn: true,
-        line,
-        fix: { label: "Use", to: o.similar[0].name },
-        keep: true,
-      });
+    } else {
+      const q = question("ingredients", line);
+      if (q) {
+        out.push({
+          text: `“${line}” → ${q.like}?`,
+          warn: true,
+          line,
+          fix: { label: "Use", to: q.to },
+          keep: true,
+        });
+      }
     }
   });
   return out;
@@ -409,7 +450,9 @@ function needSummary(row: Row): string {
   if (!row.needReads || row.needsChecked !== row.equipment) return "";
   if (row.needReads.nothing_special) return "No special equipment";
   const needs = row.needReads.needs;
-  const matched = needs.every((n) => !n.problem && n.options.every((o) => o.equipment));
+  const matched = needs.every(
+    (n) => !n.problem && n.options.every((o) => o.equipment) && !question("equipment", n.text),
+  );
   return `${needs.length} piece${needs.length === 1 ? "" : "s"} of equipment${matched ? ", all matched" : ""}`;
 }
 
@@ -419,7 +462,13 @@ function summary(row: Row): string {
   const count = split(row.text).length;
   if (!count) return row.id ? "No ingredients yet" : "";
   if (!row.reviews || row.checked !== row.text) return `${count} ingredient${count === 1 ? "" : "s"}`;
-  const matched = row.reviews.every((r) => !r.problems.length && r.options.every((o) => o.ingredient || o.recipe));
+  const lines = split(row.text);
+  const matched = row.reviews.every(
+    (r, i) =>
+      !r.problems.length &&
+      r.options.every((o) => o.ingredient || o.recipe) &&
+      !question("ingredients", lines[i]),
+  );
   return `${count} ingredient${count === 1 ? "" : "s"}${matched ? ", all matched" : ""}`;
 }
 
@@ -430,15 +479,29 @@ async function apply(row: Row, chip: Chip) {
   const lines = ofNeeds ? (row.needReads?.needs ?? []).map((n) => n.text) : split(row.text);
   const at = lines.indexOf(chip.line);
   if (at < 0 || !chip.fix) return;
+  // A misspelt ingredient the row's save made, to take away once nothing
+  // uses it. (The server does as much for equipment a recipe brought in.)
+  // Only one named exactly as the line was typed: matched by another name,
+  // it's somebody's real ingredient that has since been given this one.
+  const made = !ofNeeds && chip.keep && row.reviews && row.checked === row.text ? row.reviews[at]?.options[0] : undefined;
+  const misspelt =
+    made?.ingredient && !made.alias && made.ingredient.name.toLowerCase() === chip.line.toLowerCase()
+      ? made.ingredient.id
+      : undefined;
   if (chip.fix.to === null) lines.splice(at, 1);
   else lines[at] = chip.fix.to;
   if (ofNeeds) row.equipment = join(lines);
   else row.text = join(lines);
   await save(row);
+  if (misspelt && row.status === "saved") {
+    // Refused when another recipe uses it, or when whoever is typing may
+    // not delete an ingredient: then it stays, and nothing is said.
+    await deleteIngredient(misspelt).catch(() => {});
+  }
 }
 
-function keep(row: Row, chip: Chip) {
-  (chip.of === "equipment" ? row.keptNeeds : row.kept).add(chip.line);
+function keep(_row: Row, chip: Chip) {
+  answeredNew.add(about(chip.of, chip.line));
 }
 
 // Showing every row or only those with checks; in page order or as entered.
@@ -527,7 +590,8 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
             can't be made without, typed the same way (a comma works between them too):
             <strong>stand mixer or hand mixer; 9-inch springform pan</strong>. Type
             <strong>none</strong> if it needs nothing special, and leave it empty if you don't
-            know.
+            know. A name nothing matches saves as typed, and the row asks if you meant one
+            it's like: <strong>Use</strong> puts that in, <strong>It's new</strong> keeps yours.
           </p>
         </details>
         <div class="table-head">
