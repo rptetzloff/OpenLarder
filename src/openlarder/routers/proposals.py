@@ -2,8 +2,9 @@
 0044). *Ray, 2026-11-10: review first; contributors' edits to published
 records next; then "suggest changes to books".*
 
-A contributor who'd change a published recipe (a page, a line, a title) or
-a source's details (its title, subtitle, credits, editions) proposes the
+A contributor who'd change a published recipe (a page, a line, a title,
+what it can't be made without) or a source's details (its title, subtitle,
+credits, editions) proposes the
 edit, as the form sends it, with why. It's checked as a save would be,
 without saving. A moderator sees what it would change and applies it,
 which saves it as the contributor's edit through "proposal:<id>" in the
@@ -12,6 +13,14 @@ was proposed, applying needs saying so: it would replace that change.
 
 Only the proposer and moderators see a proposal. A record they can't see
 (private, or waiting for review) has none for them.
+
+A recipe's equipment is proposed as its ingredients are (*Ray's equipment
+spec, 2026-11-15: "Add it" on a recipe's page "goes through the existing
+proposals flow if they aren't trusted yet"; Ray, 2026-11-16: equipment is
+treated as ingredients are*): checked as a save would check it, shown
+beside what's recorded now in its three states, with what it would add to
+the catalog named for the moderator. A proposal that says nothing of
+equipment, as all did before this, leaves it as it is.
 """
 
 import uuid
@@ -22,12 +31,12 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import history, ingredients, lines, recipes, references, visibility
+from openlarder import history, ingredients, lines, needs, recipes, references, visibility
 from openlarder.agreement import Contributing
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Edition, Proposal, Recipe, Revision, Source, User
-from openlarder.routers.recipes import RecipeIn, _clean, _out, _recipe_or_404
+from openlarder.models import Edition, Equipment, Proposal, Recipe, Revision, Source, User
+from openlarder.routers.recipes import RecipeIn, _clean, _needs, _out, _recipe_or_404
 from openlarder.routers.sources import BookIn, apply_book_edit, get_book
 
 router = APIRouter(tags=["proposals"])
@@ -75,6 +84,8 @@ class ProposalOut(BaseModel):
     differences: list[Difference]
     # A recipe change's ingredients that would be new to the catalog.
     new_ingredients: list[NewIngredient] = []
+    # And its equipment that isn't in the list, the same way.
+    new_equipment: list[NewIngredient] = []
 
 
 def _squash(text: str | None) -> str | None:
@@ -112,9 +123,39 @@ async def _recipe_newest(session, recipe_id: uuid.UUID) -> int | None:
     )
 
 
+# A recipe's equipment where it has no needs: which of the two it is.
+NOTHING_SPECIAL = "Nothing special"
+NOT_RECORDED = "Not recorded"
+
+
+async def _proposed_equipment(
+    session, viewer: User, edit: RecipeIn
+) -> tuple[list[str], list[str]] | None:
+    """What a change would make a recipe's equipment, worded as saving
+    would word it, and the names in it that would be new things; None for
+    a change that says nothing of equipment."""
+    try:
+        typed, nothing_special = _needs(edit)
+    except (HTTPException, needs.Refused):
+        # Refused when it was proposed, and so never stored; if one is
+        # here all the same, it changes nothing.
+        return None
+    if typed is None and nothing_special is None:
+        return None
+    seen = set(
+        await session.scalars(select(Equipment.id).where(visibility.equipment_seen_by(viewer)))
+    )
+    said, new = await needs.as_saved(session, typed or [], seen)
+    return said or [NOTHING_SPECIAL if nothing_special else NOT_RECORDED], new
+
+
 async def _recipe_differences(session, recipe: Recipe, viewer: User, body: dict):
     now = await _out(session, recipe, viewer)
     edit = RecipeIn.model_validate(body)
+    equipment_now = [need.text for need in now.equipment] or [
+        NOTHING_SPECIAL if now.equipment_checked else NOT_RECORDED
+    ]
+    proposed = await _proposed_equipment(session, viewer, edit)
     labels = await _editions(
         session, [p.edition_id for p in now.pages] + [p.edition_id for p in edit.editions]
     )
@@ -144,12 +185,14 @@ async def _recipe_differences(session, recipe: Recipe, viewer: User, body: dict)
             "Chapter": [now.chapter] if now.chapter else [],
             "Where": places_now,
             "Ingredients": now.ingredients,
+            "Equipment": equipment_now,
         },
         {
             "Title": [" ".join(edit.title.split())],
             "Chapter": [c] if (c := _squash(edit.chapter)) else [],
             "Where": places,
             "Ingredients": [" ".join(line.split()) for line in edit.ingredients if line.strip()],
+            "Equipment": proposed[0] if proposed else equipment_now,
         },
     )
 
@@ -225,6 +268,24 @@ async def _new_ingredients(session, viewer: User, body: dict) -> list[NewIngredi
     return new
 
 
+async def _new_equipment(session, viewer: User, body: dict) -> list[NewIngredient]:
+    """The proposed needs' things that nothing the viewer can see has the
+    name (or another name) of: applying the change makes each a new thing,
+    not in the list. With what's named most like each, as an ingredient
+    has, in case it's one of them written differently."""
+    proposed = await _proposed_equipment(session, viewer, RecipeIn.model_validate(body))
+    if not proposed:
+        return []
+    seen = visibility.equipment_seen_by(viewer)
+    return [
+        NewIngredient(
+            name=name,
+            similar=[Similar(id=i, name=n) for i, n in await needs.like(session, name, seen)],
+        )
+        for name in proposed[1][:MAX_NEW]
+    ]
+
+
 async def _out_one(session, p: Proposal, viewer: User) -> ProposalOut:
     by = await session.scalar(select(User.display_name).where(User.id == p.proposed_by))
     common = {
@@ -251,6 +312,9 @@ async def _out_one(session, p: Proposal, viewer: User) -> ProposalOut:
             differences=await _recipe_differences(session, recipe, viewer, p.body),
             new_ingredients=(
                 await _new_ingredients(session, viewer, p.body) if p.status == "open" else []
+            ),
+            new_equipment=(
+                await _new_equipment(session, viewer, p.body) if p.status == "open" else []
             ),
         )
     source = await session.get_one(Source, p.source_id)
@@ -313,11 +377,13 @@ async def propose(
         raise HTTPException(status.HTTP_409_CONFLICT, "Change it directly instead.")
     edit = RecipeIn.model_validate(body.model_dump(exclude={"reason"}))
     entry = _clean(edit)
-    # Checked as saving it would be, then not saved.
+    # Checked as saving it would be, its equipment with it, then not saved.
     checking = await session.begin_nested()
     try:
+        typed, nothing_special = _needs(edit)
         await recipes.replace(session, recipe, entry)
-    except recipes.InvalidRecipe as exc:
+        await needs.write(session, recipe, typed, nothing_special)
+    except (recipes.InvalidRecipe, needs.Refused) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     finally:
         await checking.rollback()
@@ -454,9 +520,12 @@ async def decide(
         await history.acting(session, row.proposed_by)
         await history.via(session, f"proposal:{row.id}")
         if row.recipe_id is not None:
+            edit = RecipeIn.model_validate(row.body)
             try:
-                await recipes.replace(session, recipe, _clean(RecipeIn.model_validate(row.body)))
-            except recipes.InvalidRecipe as exc:
+                typed, nothing_special = _needs(edit)
+                await recipes.replace(session, recipe, _clean(edit))
+                await needs.write(session, recipe, typed, nothing_special)
+            except (recipes.InvalidRecipe, needs.Refused) as exc:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
             await references.relink(session, recipe.source_id)
         else:

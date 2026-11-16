@@ -37,6 +37,18 @@ const error = ref("");
 // Only whoever may deal with them gets any back: an admin, or who added it.
 const flags = ref<Flag[]>([]);
 const openFlags = computed(() => flags.value.filter((f) => !f.resolution));
+// Whoever can't change this recipe and may suggest a change to it, which a
+// moderator applies: "Suggest a change", and "Add it" where its equipment
+// isn't recorded (Ray's equipment spec, 2026-11-15: anyone signed in can
+// use "Add it", through the proposals flow if they aren't trusted yet).
+const maySuggest = computed(
+  () =>
+    !!recipe.value &&
+    !recipe.value.editable &&
+    !!props.user?.may_claim &&
+    recipe.value.review === "published" &&
+    recipe.value.source.kind !== "family",
+);
 
 // A flag dealt with. One whose change was made ("Change to …", for a
 // possible typo in an ingredient or in equipment) changed the recipe too,
@@ -412,6 +424,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
           <p v-else class="status recipe-needs">
             Equipment not recorded yet.
             <a v-if="recipe.editable" :href="`/recipes/${recipe.id}/edit#equipment`">Add it</a>
+            <a v-else-if="maySuggest" :href="`/recipes/${recipe.id}/propose#equipment`">Add it</a>
           </p>
 
           <section class="recipe-section">
@@ -572,15 +585,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </ul>
           </section>
           <!-- A contributor suggests a change to a published recipe; a moderator applies it. -->
-          <div
-            v-if="
-              !recipe.editable &&
-              user?.may_claim &&
-              recipe.review === 'published' &&
-              recipe.source.kind !== 'family'
-            "
-            class="recipe-actions"
-          >
+          <div v-if="maySuggest" class="recipe-actions">
             <p v-if="proposed" class="status" role="status">
               Thanks: your suggestion is with the moderators.
             </p>

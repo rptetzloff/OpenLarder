@@ -265,6 +265,43 @@ def as_cell(checked: bool, read: list[tuple[uuid.UUID, str | None, list[Equipmen
     return "; ".join(as_typed(detail, things) for _, detail, things in read)
 
 
+async def as_saved(
+    session: AsyncSession, typed: list[str], seen: set[uuid.UUID]
+) -> tuple[list[str], list[str]]:
+    """Needs as saving would word them, to show a change before it's made:
+    each thing by the list's name for it, its size before it, each need
+    once. And the names among them that nothing the asker sees has, which
+    saving would make new things of. A need saving would refuse stays as
+    typed. A thing the asker can't see is worded as they typed it and
+    counted new: that it exists isn't theirs to learn."""
+    said: list[str] = []
+    new: list[str] = []
+    for text in typed:
+        try:
+            need = read(text)
+        except Refused:
+            said.append(" ".join(text.split()))
+            continue
+        if need is None:
+            continue
+        names: list[str] = []
+        for name in need.names:
+            found = await held_by(session, match_key(name))
+            if found and found[0].id in seen:
+                named = found[0].name
+            else:
+                named = _as_named(name)
+                if named not in new:
+                    new.append(named)
+            if named not in names:
+                names.append(named)
+        worded = " or ".join(names)
+        worded = f"{need.detail} {worded}" if need.detail else worded
+        if worded not in said:
+            said.append(worded)
+    return said, new
+
+
 async def sift(session: AsyncSession, typed: list[str]) -> tuple[list[str], list[str]]:
     """The needs saving would take, and for each of the rest why not, in
     the words saving would refuse it with. For an import, which keeps what

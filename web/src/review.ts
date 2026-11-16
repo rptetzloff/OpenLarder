@@ -88,6 +88,8 @@ export interface Proposal {
   differences: Difference[];
   // A recipe change's ingredients new to the catalog.
   new_ingredients: NewIngredient[];
+  // And its equipment that isn't in the list.
+  new_equipment: NewIngredient[];
 }
 
 export const openProposals = () => send<Proposal[]>("/api/review/proposals");

@@ -436,13 +436,28 @@ const NEEDS = (rows) => `(() => {
   if (plain) return "A thing in “" + named(plain) + "” isn't a link to its equipment";
   return "";
 })()`;
+// addIt: nothing for whoever can't add it; true for whoever may change the
+// recipe, whose "Add it" leads to its form; "propose" for whoever may only
+// suggest a change, whose "Add it" leads to the same boxes in that form.
 const NEEDS_LINE = (words, addIt) => `(() => {
   if (document.querySelector("section.recipe-needs")) return "The recipe's page lists needs";
   const line = document.querySelector("p.recipe-needs");
   const said = line?.textContent.replace(/\\s+/g, " ").trim() ?? "";
-  if (said !== ${JSON.stringify(words)} + (${addIt} ? " Add it" : "")) return "Under the title the page says “" + said + "”";
+  if (said !== ${JSON.stringify(words)} + (${!!addIt} ? " Add it" : "")) return "Under the title the page says “" + said + "”";
   const link = line.querySelector("a");
-  if (${addIt} && (!link?.getAttribute("href").endsWith("/edit#equipment") || link.getBoundingClientRect().height < 44)) return "“Add it” doesn't lead to the form's Equipment, or isn't 44px to tap";
+  if (${!!addIt} && (!link?.getAttribute("href").endsWith(${JSON.stringify(addIt === "propose" ? "/propose#equipment" : "/edit#equipment")}) || link.getBoundingClientRect().height < 44)) return "“Add it” leads to " + link?.getAttribute("href") + ", or isn't 44px to tap";
+  return "";
+})()`;
+// What a moderator is shown of a suggested change to a recipe's equipment:
+// what's recorded now beside what's proposed, and what it would add that
+// isn't in the list, with what that's named like, as for an ingredient.
+const PROPOSED_EQUIPMENT = `(() => {
+  const row = [...document.querySelectorAll(".proposal-diff tbody tr")].find((tr) => tr.querySelector("th")?.textContent.trim() === "Equipment");
+  const cells = [...(row?.querySelectorAll("td") ?? [])].map((td) => td.textContent.replace(/\\s+/g, " ").replace(/^(Now|Proposed) /, "").trim());
+  if (cells.join(" | ") !== "Biscuit cutter; Stand mixer or Hand mixer; 10-inch Cast-iron skillet | Biscuit cutter; Stand mixer or Hand mixer; 10-inch Cast-iron skillet; Bisquit tin") return "The suggestion's equipment reads “" + cells.join(" | ") + "”";
+  const added = [...document.querySelectorAll(".review-new")].find((d) => d.textContent.includes("isn't in the list"));
+  const named = added?.querySelector("li")?.textContent.replace(/\\s+/g, " ").trim();
+  if (!named?.startsWith("Bisquit tin")) return "What the suggestion would add to the equipment reads “" + named + "”";
   return "";
 })()`;
 // The recipe form's Equipment, after the ingredients: a box a need, each
@@ -989,6 +1004,8 @@ async function seed() {
     title: biscuitPage.title,
     editions: biscuitPage.pages.map((p) => ({ edition_id: p.edition_id, page: "31" })),
     ingredients: [...biscuitPage.ingredients, "Chives"],
+    // And to its equipment: one thing more, which isn't in the list.
+    equipment: [...biscuitPage.equipment.map((n) => n.text), "bisquit tin"],
     reason: "Page 31 in my printing.",
   });
   // And one to the book's details.
@@ -1250,6 +1267,7 @@ function pages(s) {
     [`/recipes/${s.biscuits.id}`, "admin"],
     [`/recipes/${s.web.id}`, null, { expect: NEEDS_LINE("Equipment not recorded yet.", false) }],
     [`/recipes/${s.web.id}`, "admin", { phone: true, expect: NEEDS_LINE("Equipment not recorded yet.", true) }],
+    [`/recipes/${s.web.id}`, "cook", { phone: true, expect: NEEDS_LINE("Equipment not recorded yet.", "propose") }],
     [`/recipes/${s.issue.id}`, null],
     [`/recipes/${s.episode.id}`, null],
     [`/recipes/${s.pie.id}`, "cook"],
@@ -1306,10 +1324,10 @@ function pages(s) {
     ["/admin/links", "admin"],
     ["/admin/people", "admin"],
     ["/admin/changes", "admin"],
-    ["/admin/review", "admin"],
+    ["/admin/review", "admin", { phone: true, expect: PROPOSED_EQUIPMENT }],
     ["/admin/reports", "admin"],
     [`/sources/${s.waiting}`, "cook"],
-    [`/recipes/${s.biscuits.id}/propose`, "cook"],
+    [`/recipes/${s.biscuits.id}/propose`, "cook", { phone: true, expect: FORM_NEEDS(["Matched: Biscuit cutter", "2 options, in the book's order", "Matched: Cast-iron skillet, 10-inch"]) }],
     [`/sources/${s.book.id}/propose`, "cook"],
     [`/recipes/${s.biscuits.id}`, "cook", { expect: ALLERGEN_NOTICE }],
     ["/account", "admin", { expect: AGREEMENT_FOLDED }],
