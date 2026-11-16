@@ -192,14 +192,15 @@ It fails as well on a page that breaks an ordinary word in two: any word may
 break now, so that the long one can, and what is squeezed no longer runs over
 where the layout check would see it. And on a table's cell that is squeezed:
 under 6rem wide with more than three lines in it. Between the phone and the
-desktop it looks at each page again, signed in, at 700, 820, 900 and 1024px,
-for layout only (*Ray's round 5 list, 2026-11-15*: nothing looked there, and
-an ingredient's table gave its book 71px of an 820px screen; 900px is the
-first step past 56rem, where the header's row and the tables come back with
-the least room they will have, and where a sweep of every 20px found three
-pages the list's three widths missed). A page that shows a phone something of
-its own (a book's page moves its parts and shortens its list) goes through axe
-at the phone's width too, and
+desktop it looks at each page again, signed in, at 700, 820, 900, 996 and
+1024px, for layout only (*Ray's round 5 list, 2026-11-15*: nothing looked
+there, and an ingredient's table gave its book 71px of an 820px screen; 900px
+is the first step past 56rem, where the tables come back with the least room
+they will have, and where a sweep of every 20px found three pages the list's
+three widths missed; 996px is the first past 62rem, where the header's row
+comes back, since Equipment made its sections five). A page that shows a
+phone something of its own (a book's page moves its parts and shortens its
+list) goes through axe at the phone's width too, and
 an entry can click first, for a state only a click makes, or say what its page
 should be showing (a cover's picture once it arrives, its title when the
 picture fails). Its browsers are given the window's focus, as one in front of

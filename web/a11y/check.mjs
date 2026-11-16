@@ -61,12 +61,13 @@ const PHONE = 360;
 // 1100px. Layout only, in one theme (a page is as wide in the dark), and
 // signed in, since the header with a name in it is the widest: Cy's name
 // is thirty-two letters. A small tablet, a large one and a small laptop,
-// which are the list's three; and 900px, the first step past 56rem, where
-// the header's full row and the tables come back with the least room they
-// will ever have (a sweep of every 20px found three pages the other three
-// widths passed, nearly all of it from 900px to 960px).
+// which are the list's three; 900px, the first step past 56rem, where the
+// tables come back with the least room they will ever have (a sweep of
+// every 20px found three pages the other three widths passed, nearly all
+// of it from 900px to 960px); and 996px, the first past 62rem, where the
+// header's full row does, since it has five sections.
 // A11Y_BETWEEN=640,660,… looks at others, for a sweep.
-const BETWEEN = process.env.A11Y_BETWEEN?.split(",").map(Number) ?? [700, 820, 900, 1024];
+const BETWEEN = process.env.A11Y_BETWEEN?.split(",").map(Number) ?? [700, 820, 900, 996, 1024];
 // One word of sixty letters, which nothing but the page can break: what
 // anyone may type as a title, a name or a note. (The dish in Aristophanes'
 // Assemblywomen, cut short.) users.sql gives Cy a name of the same kind.
@@ -364,9 +365,10 @@ const COUNTS_AS = HIERARCHY(["Counts as"], ["Includes"]);
 const INCLUDES = HIERARCHY(["Includes"], ["Counts as"]);
 const NEITHER = HIERARCHY([], ["Counts as", "Includes"]);
 // Equipment (Ray's spec, 2026-11-15). Ingredients and Equipment are a pair
-// of tabs over each list, since the header has no room for a fifth section:
-// two links, the page's own marked and its heading the same word, each 44px
-// to tap; and the footer leads to Equipment from anywhere.
+// of tabs over each list: two links, the page's own marked and its heading
+// the same word, each 44px to tap. And Equipment is a section of the
+// header, beside Ingredients, in the row or in the Menu, whichever shows;
+// not a link in the footer, where the spec had it (Ray, the same day).
 const CATALOG_TABS = (here) => `(() => {
   const nav = document.querySelector('main nav[aria-label="Ingredients and equipment"]');
   if (!nav) return "The list has no tabs for Ingredients and Equipment";
@@ -379,7 +381,10 @@ const CATALOG_TABS = (here) => `(() => {
   if (short) return "The " + short.textContent.trim() + " tab is " + Math.round(short.getBoundingClientRect().height) + "px to tap";
   const heading = document.querySelector("main h1")?.textContent.trim();
   if (heading !== ${JSON.stringify(here)}) return "Under the ${here} tab the heading is " + heading;
-  if (!document.querySelector('footer a[href="/equipment"]')) return "The footer has no link to Equipment";
+  const sections = [...document.querySelectorAll('.site-header nav[aria-label="Main"]')].map((nav) => [...nav.querySelectorAll("a")].map((a) => a.textContent.trim()).join(", "));
+  const without = sections.find((said) => !said.includes("Ingredients, Equipment"));
+  if (!sections.length || without !== undefined) return "The header's sections read “" + (without ?? "") + "”, without Equipment after Ingredients";
+  if (document.querySelector('footer a[href="/equipment"]')) return "Equipment is a link in the footer";
   return "";
 })()`;
 // The Equipment list is what a recipe can list. What any kitchen has is

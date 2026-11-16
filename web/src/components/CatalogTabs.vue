@@ -1,9 +1,8 @@
 <script setup lang="ts">
 // Ingredients and Equipment, the two lists of what a recipe takes, as a
-// pair of tabs over each (Ray's equipment spec, 2026-11-15): the header
-// has no room for a fifth section at tablet widths, so Equipment is
-// reached from here and from the footer. They are links to two pages, so
-// a nav with the page it's on marked, not a tablist.
+// pair of tabs over each (Ray's equipment spec, 2026-11-15), beside the
+// header's own link to each. They are links to two pages, so a nav with
+// the page it's on marked, not a tablist.
 defineProps<{ here: "ingredients" | "equipment" }>();
 </script>
 

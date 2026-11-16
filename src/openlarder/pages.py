@@ -912,6 +912,7 @@ async def front(session: AsyncSession) -> Page:
         _a("/search", "Search recipes"),
         _a("/sources", "Sources"),
         _a("/ingredients", "Ingredients"),
+        _a("/equipment", "Equipment"),
         _a("/authors", "Authors"),
     ]
     newest = "".join(_listed_source(s) for s in found.sources)

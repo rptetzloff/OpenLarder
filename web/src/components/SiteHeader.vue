@@ -5,11 +5,17 @@ import type { Me } from "../me";
 import HeaderMenu from "./HeaderMenu.vue";
 
 // The site's header (Ray's cleanup pass, section 3, 2026-11-11): the logo
-// and four sections; signed in, two menus, "My kitchen" and the account.
+// and its sections; signed in, two menus, "My kitchen" and the account.
+// Equipment is the fifth section (Ray, 2026-11-15: not the footer, where
+// his spec had put it to spare the row).
 // On a phone, the logo, Search and one Menu with everything in it; and on
-// anything up to 56rem, where the row of sections and menus doesn't fit
+// anything up to 62rem, where the row of sections and menus doesn't fit
 // (Ray's round 5 list, 2d, 2026-11-15: signed in with a name of nine
-// letters it was 39px too wide at 700px, and it can't wrap).
+// letters it was 39px too wide at 700px, and it can't wrap). It was 56rem
+// with four sections. With five, and a name of twelve letters or more,
+// which is all the button shows, the row fits whole from 972px: at 961px
+// nothing ran over, but "My kitchen" was squeezed from 122px to 111px.
+// 62rem (992px) leaves 20px to spare; 61rem would leave 4px.
 // Requests is in the footer: it doesn't need to be prominent.
 const props = defineProps<{
   // undefined while asking, null when signed out.
@@ -22,6 +28,7 @@ const SECTIONS = [
   { href: "/search", label: "Search" },
   { href: "/sources", label: "Sources" },
   { href: "/ingredients", label: "Ingredients" },
+  { href: "/equipment", label: "Equipment" },
   { href: "/authors", label: "Authors" },
 ];
 const KITCHEN = [
@@ -174,7 +181,7 @@ const cut = computed(() => name.value.length > 12);
 .phone-only {
   display: none;
 }
-@media (max-width: 56rem) {
+@media (max-width: 62rem) {
   .wide-only {
     display: none;
   }

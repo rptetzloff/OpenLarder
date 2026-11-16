@@ -214,9 +214,6 @@ onMounted(async () => {
         >Catalog data under the
         <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a></span
       >
-      <!-- Here and over the Ingredients list, not in the header, which has
-           no room for a fifth section (Ray's equipment spec, 2026-11-15). -->
-      <a href="/equipment" :aria-current="onEquipment ? 'page' : undefined">Equipment</a>
       <a href="/requests" :aria-current="onRequests ? 'page' : undefined">Requests</a>
       <a
         v-if="anyProducers"

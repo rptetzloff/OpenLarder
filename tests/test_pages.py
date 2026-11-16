@@ -706,7 +706,7 @@ async def test_the_front_page_names_the_ways_in_and_the_newest_sources(admin, ad
     ways = (
         '<ul><li><a href="/search">Search recipes</a></li>'
         '<li><a href="/sources">Sources</a></li><li><a href="/ingredients">Ingredients</a></li>'
-        '<li><a href="/authors">Authors</a></li></ul>'
+        '<li><a href="/equipment">Equipment</a></li><li><a href="/authors">Authors</a></li></ul>'
     )
     opening = (
         f'<main><article class="wide"><h1>{pages.FRONT_HEADING}</h1><p>{pages.FRONT_LEDE}</p>{ways}'

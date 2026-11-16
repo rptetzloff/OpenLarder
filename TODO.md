@@ -1083,8 +1083,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         requests:
         - [x] The tables, the list and the public pages (#208; migration
           0079). 140 things to start: 32 any kitchen has, 108 a recipe can
-          list. `/equipment`, a page for each thing, the footer's link and
-          the tabs over the Ingredients list; the server fills both pages
+          list. `/equipment`, a page for each thing, its section in the
+          header and the tabs over the Ingredients list; the server fills both pages
           and the sitemap lists them; `/api/equipment`; the dumps. A
           recipe's needs have their tables and `recipes.equipment_checked`,
           and nothing writes to them yet.
@@ -1122,9 +1122,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] 3. My equipment, and search's three filters.
       - [ ] 4. The suggestion queue, from titles, tags and sources.
       - [ ] 5. Shop links, with their clicks and the disclosure.
+      - [x] Equipment is a section of the header, not a link in the
+        footer (#208). *Ray, 2026-11-15*, of the footer the spec had put
+        it in. Measured with five sections and a name of twelve letters
+        or more: the row fits whole from 972px. So it starts at 62rem
+        (992px), where it started at 56rem, and from 897px to 992px the
+        header is the Menu, as on a tablet. The check looks at 996px
+        too, where the row is tightest now.
       - [ ] Not decided (the spec's list): whether a household group can
-        share one equipment list; whether the header should say
-        "Equipment".
+        share one equipment list.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the
