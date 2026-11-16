@@ -61,12 +61,13 @@ const PHONE = 360;
 // 1100px. Layout only, in one theme (a page is as wide in the dark), and
 // signed in, since the header with a name in it is the widest: Cy's name
 // is thirty-two letters. A small tablet, a large one and a small laptop,
-// which are the list's three; and 900px, the first step past 56rem, where
-// the header's full row and the tables come back with the least room they
-// will ever have (a sweep of every 20px found three pages the other three
-// widths passed, nearly all of it from 900px to 960px).
+// which are the list's three; 900px, the first step past 56rem, where the
+// tables come back with the least room they will ever have (a sweep of
+// every 20px found three pages the other three widths passed, nearly all
+// of it from 900px to 960px); and 996px, the first past 62rem, where the
+// header's full row does, since it has five sections.
 // A11Y_BETWEEN=640,660,… looks at others, for a sweep.
-const BETWEEN = process.env.A11Y_BETWEEN?.split(",").map(Number) ?? [700, 820, 900, 1024];
+const BETWEEN = process.env.A11Y_BETWEEN?.split(",").map(Number) ?? [700, 820, 900, 996, 1024];
 // One word of sixty letters, which nothing but the page can break: what
 // anyone may type as a title, a name or a note. (The dish in Aristophanes'
 // Assemblywomen, cut short.) users.sql gives Cy a name of the same kind.
@@ -340,7 +341,7 @@ const ALLERGEN_NOTICE = `(() => {
 // cheddar counts as cheese, and cheese includes cheddar. A card with nothing
 // to say isn't there, and nothing says "Nothing broader yet". The check
 // puts Aged cheddar under another ingredient, so one page has each card.
-const HIERARCHY = (has, hasnt) => `(() => {
+const HIERARCHY = (has, hasnt, to = "/ingredients/") => `(() => {
   const main = document.querySelector("main");
   const old = /comes under|nothing broader|nothing narrower|what's under/i.exec(main.textContent);
   if (old) return 'The page still says "' + old[0] + '"';
@@ -348,7 +349,7 @@ const HIERARCHY = (has, hasnt) => `(() => {
   const card = (words) => cards.find((c) => c.querySelector("h2")?.textContent.trim() === words);
   for (const words of ${JSON.stringify(has)}) {
     if (!card(words)) return 'The page has no "' + words + '" card';
-    if (!card(words).querySelector('a[href^="/ingredients/"]')) return 'The "' + words + '" card links no ingredient';
+    if (!card(words).querySelector('a[href^="${to}"]')) return 'The "' + words + '" card links nothing under ${to}';
   }
   for (const words of ${JSON.stringify(hasnt)})
     if (card(words)) return 'The page has a "' + words + '" card with nothing to say';
@@ -363,6 +364,53 @@ const COUNT_SAID = (words) => `(() => {
 const COUNTS_AS = HIERARCHY(["Counts as"], ["Includes"]);
 const INCLUDES = HIERARCHY(["Includes"], ["Counts as"]);
 const NEITHER = HIERARCHY([], ["Counts as", "Includes"]);
+// Equipment (Ray's spec, 2026-11-15). Ingredients and Equipment are a pair
+// of tabs over each list: two links, the page's own marked and its heading
+// the same word, each 44px to tap. And Equipment is a section of the
+// header, beside Ingredients, in the row or in the Menu, whichever shows;
+// not a link in the footer, where the spec had it (Ray, the same day).
+const CATALOG_TABS = (here) => `(() => {
+  const nav = document.querySelector('main nav[aria-label="Ingredients and equipment"]');
+  if (!nav) return "The list has no tabs for Ingredients and Equipment";
+  const tabs = [...nav.querySelectorAll("a")];
+  const words = tabs.map((a) => a.textContent.trim());
+  if (words.join("|") !== "Ingredients|Equipment") return "The tabs read " + words.join(", ");
+  const marked = tabs.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.textContent.trim());
+  if (marked.join() !== ${JSON.stringify(here)}) return "The tab marked as this page is " + (marked.join() || "none") + ", not ${here}";
+  const short = tabs.find((a) => a.getBoundingClientRect().height < 44);
+  if (short) return "The " + short.textContent.trim() + " tab is " + Math.round(short.getBoundingClientRect().height) + "px to tap";
+  const heading = document.querySelector("main h1")?.textContent.trim();
+  if (heading !== ${JSON.stringify(here)}) return "Under the ${here} tab the heading is " + heading;
+  const sections = [...document.querySelectorAll('.site-header nav[aria-label="Main"]')].map((nav) => [...nav.querySelectorAll("a")].map((a) => a.textContent.trim()).join(", "));
+  const without = sections.find((said) => !said.includes("Ingredients, Equipment"));
+  if (!sections.length || without !== undefined) return "The header's sections read “" + (without ?? "") + "”, without Equipment after Ingredients";
+  if (document.querySelector('footer a[href="/equipment"]')) return "Equipment is a link in the footer";
+  return "";
+})()`;
+// The Equipment list is what a recipe can list. What any kitchen has is
+// there only when asked for (the switch, or its name typed), and says so.
+// A thing that counts as two says both, each a link. How many recipes
+// need each is a column only once any does, and nothing here records a
+// need yet: so no column, and no way to sort by it.
+const EQUIPMENT_LIST = (assumed, atLeast = 50) => `(() => {
+  const rows = [...document.querySelectorAll(".equipment-list tbody tr")];
+  if (rows.length < ${atLeast}) return "The equipment list has " + rows.length + " rows";
+  const said = (r) => r.textContent.replace(/\\s+/g, " ").trim();
+  const any = rows.filter((r) => said(r).includes("Expected in any kitchen"));
+  if (${assumed} !== any.length > 0) return any.length + " rows are of what any kitchen has";
+  if (document.querySelector(".equipment-list .numeric, #equipment-sort")) return "The list counts recipes, or sorts by them, when none is recorded as needing anything";
+  if (rows.length < 50) return "";
+  const multi = rows.find((r) => r.querySelector("a.strong").textContent.trim() === "Multicooker");
+  if (!multi) return "Multicooker isn't in the list";
+  if (multi.querySelectorAll('.more a[href^="/equipment/"]').length !== 2 || !said(multi).includes("Counts as Pressure cooker and Slow cooker"))
+    return "Multicooker's line reads “" + said(multi) + "”";
+  return "";
+})()`;
+// What a piece of equipment's page says under its name.
+const EQUIPMENT_SAYS = (words) => `(() => {
+  const said = [...document.querySelectorAll(".equipment-page .status")].map((p) => p.textContent.replace(/\\s+/g, " ").trim());
+  return said.includes(${JSON.stringify(words)}) ? "" : "The page says “" + said.join("” and “") + "”, not “${words}”";
+})()`;
 // A breadcrumb stops at the page's parent (Ray's round 5 list, item 4,
 // 2026-11-15): its last part had been the page's own title, above the same
 // words as the heading. On a phone it's one link back, with its chevron,
@@ -880,7 +928,14 @@ async function seed() {
   const wordyIngredient = (await api(`/api/recipes/${word.id}`, "admin")).lines
     .flatMap((l) => l.options)
     .find((o) => o.ingredient?.name.toLowerCase() === LONG.toLowerCase()).ingredient.id;
-  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese };
+  // The equipment list is there from the start (migration 0079): one thing
+  // that counts as two others, one that includes it, one with nothing to
+  // say, and one any kitchen has.
+  const kit = (await api("/api/equipment?assumed=true", "admin")).equipment;
+  const [multicooker, slowCooker, wok, stovetop] = ["Multicooker", "Slow cooker", "Wok", "Stovetop"].map(
+    (name) => kit.find((e) => e.name === name).id,
+  );
+  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop };
 }
 
 // Script that presses the button whose words begin so; with none, it throws,
@@ -925,12 +980,20 @@ function pages(s) {
     [`/recipes/${s.episode.id}`, null],
     [`/recipes/${s.pie.id}`, "cook"],
     [`/recipes/${s.biscuits.id}/edit`, "admin"],
-    ["/ingredients", null],
+    ["/ingredients", null, { expect: CATALOG_TABS("Ingredients") }],
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
     [`/ingredients/${s.cheddar}`, null, { expect: `(${COUNTS_AS}) || (${CRUMBS})` }],
     [`/ingredients/${s.cheddar}`, "admin", { expect: `(${COUNTS_AS}) || (${ADMIN_BAR("This ingredient")})` }],
     [`/ingredients/${s.cheese}`, null, { expect: `(${INCLUDES}) || (${ALLERGEN_NOTICE})` }],
+    ["/equipment", null, { phone: true, expect: `(${CATALOG_TABS("Equipment")}) || (${EQUIPMENT_LIST(false)}) || (${COUNT_SAID("/^\\d+ pieces of equipment\\.$/")})` }],
+    ["/equipment?assumed=true&sort=name", null, { phone: true, expect: EQUIPMENT_LIST(true) }],
+    ["/equipment?q=frying+pan", null, { expect: `(${EQUIPMENT_LIST(true, 1)}) || (${COUNT_SAID("/^1 piece of equipment matches “frying pan”\\.$/")})` }],
+    ["/equipment?q=no+such+thing", null],
+    [`/equipment/${s.multicooker}`, null, { expect: `(${HIERARCHY(["Counts as"], ["Includes"], "/equipment/")}) || (${CRUMBS}) || (${EQUIPMENT_SAYS("No recipe lists it yet.")})` }],
+    [`/equipment/${s.slowCooker}`, null, { expect: HIERARCHY(["Includes"], ["Counts as", "Also called"], "/equipment/") }],
+    [`/equipment/${s.wok}`, null, { expect: `(${HIERARCHY([], ["Counts as", "Includes", "Also called"], "/equipment/")}) || (${EQUIPMENT_SAYS("Nothing it counts as, includes or is also called yet.")})` }],
+    [`/equipment/${s.stovetop}`, null, { expect: EQUIPMENT_SAYS("Expected in any kitchen, so recipes don't list it.") }],
     ["/authors", null],
     ["/authors?sort=recipes&kind=person", null],
     [`/authors/${s.author}`, null, { expect: `(${TOP_RATED_SHOWN}) || (${CRUMBS})` }],

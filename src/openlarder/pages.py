@@ -42,7 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import visibility
 from openlarder.models import Author, BookMerge, Ingredient, MergedRecord, Recipe, Source
-from openlarder.routers import authors, ingredients, recipes, sources
+from openlarder.routers import authors, equipment, ingredients, recipes, sources
 
 SITE = "OpenLarder"
 # A search result's snippet is cut at about this; the spec says under 160.
@@ -421,6 +421,52 @@ def ingredient_summary(shown: ingredients.IngredientOut) -> str:
     )
 
 
+def equipment_description(shown: equipment.EquipmentOut) -> str:
+    """As "Stand mixer is needed for 120 recipes indexed on OpenLarder, 480
+    including everything that counts as it. Also called electric mixer."
+    Of something any kitchen has, that no recipe lists it."""
+    if shown.assumed:
+        first = (
+            f"{shown.name} is expected in any kitchen, so recipes indexed on OpenLarder"
+            " don't list it."
+        )
+    elif shown.family_total == 0:
+        first = (
+            f"{shown.name} is equipment a recipe indexed on OpenLarder can be recorded as"
+            " needing. None is yet."
+        )
+    else:
+        count = shown.total
+        needed = f"{count:,} recipe{'' if count == 1 else 's'} indexed on OpenLarder"
+        if shown.family_total > count:
+            whole = f"{shown.family_total:,} recipe{'' if shown.family_total == 1 else 's'}"
+            first = (
+                f"{shown.name} is needed for {whole} indexed on OpenLarder, including"
+                " everything that counts as it."
+                if count == 0
+                else f"{shown.name} is needed for {needed}, {shown.family_total:,} including"
+                " everything that counts as it."
+            )
+        else:
+            first = f"{shown.name} is needed for {needed}."
+    return _fitted(first, "Also called", [a.name for a in shown.aliases])
+
+
+def equipment_summary(shown: equipment.EquipmentOut) -> str:
+    about = ""
+    if shown.assumed:
+        about += "<p>Expected in any kitchen, so recipes don't list it.</p>"
+    if shown.counts_as:
+        broader = _listed([_a(f"/equipment/{c.id}", c.name) for c in shown.counts_as])
+        about += f"<p>Counts as {broader}.</p>"
+    if shown.aliases:
+        about += f"<p>Also called {_e(', '.join(a.name for a in shown.aliases))}.</p>"
+    if shown.includes:
+        narrower = _listed([_a(f"/equipment/{c.id}", c.name) for c in shown.includes])
+        about += f"<p>Includes {narrower}.</p>"
+    return _summary([_a("/equipment", "Equipment")], f"<h1>{_e(shown.name)}</h1>", about)
+
+
 def author_description(shown: authors.AuthorOut) -> str:
     """As "Danielle Walker is credited on 3 sources indexed on OpenLarder:
     Against All Grain, Meals Made Simple, and 1 more."
@@ -553,6 +599,10 @@ def ingredient_data(shown: ingredients.IngredientOut) -> list[dict]:
     return [_trail(("Ingredients", "/ingredients"), (shown.name, f"/ingredients/{shown.id}"))]
 
 
+def equipment_data(shown: equipment.EquipmentOut) -> list[dict]:
+    return [_trail(("Equipment", "/equipment"), (shown.name, f"/equipment/{shown.id}"))]
+
+
 def author_data(shown: authors.AuthorOut) -> list[dict]:
     """A person or an organisation, and the same one elsewhere: Wikidata,
     Open Library, their own site."""
@@ -669,6 +719,21 @@ async def ingredient(session: AsyncSession, ingredient_id: uuid.UUID) -> Page:
     )
 
 
+async def equipment_page(session: AsyncSession, equipment_id: uuid.UUID) -> Page:
+    """A piece of equipment's page. Each is everyone's so far
+    (visibility.equipment_seen_by), so one that isn't there is not found."""
+    shown = await equipment.as_signed_out(session, equipment_id)
+    if shown is None:
+        return NOT_FOUND
+    return Page(
+        title=f"{shown.name} · Equipment · {SITE}",
+        description=equipment_description(shown),
+        path=f"/equipment/{shown.id}",
+        body=equipment_summary(shown),
+        data=tuple(equipment_data(shown)),
+    )
+
+
 async def author(session: AsyncSession, author_id: uuid.UUID) -> Page:
     shown = await authors.as_signed_out(session, author_id)
     if shown is None:
@@ -706,6 +771,14 @@ LISTS = {
             "Every ingredient the indexed recipes use. Open one to see the recipes that use it."
         ),
         path="/ingredients",
+    ),
+    "equipment": Page(
+        title=f"Equipment · {SITE}",
+        description=(
+            "What some recipes can't be made without, from a stand mixer to a springform pan,"
+            " and what no recipe lists because any kitchen has it."
+        ),
+        path="/equipment",
     ),
     "authors": Page(
         title=f"Authors · {SITE}",
@@ -781,6 +854,20 @@ async def ingredients_list(session: AsyncSession) -> Page:
     return _list_page("ingredients", "Ingredients", items, found.total, "ingredients")
 
 
+async def equipment_list(session: AsyncSession) -> Page:
+    """Equipment a recipe can list, the most needed first, as its page first
+    shows it. How many recipes need each is said once any does."""
+    found = await equipment.list_equipment(
+        session, None, q="", offset=0, sort="uses", assumed=False
+    )
+    items = [
+        f"<li>{_a(f'/equipment/{e.id}', e.name)}"
+        f"{', ' + _n(e.recipes, 'recipe') if e.recipes else ''}</li>"
+        for e in found.equipment
+    ]
+    return _list_page("equipment", "Equipment", items, found.total, "pieces of equipment")
+
+
 async def authors_list(session: AsyncSession) -> Page:
     """Authors, A to Z as their names read, as its page first shows them."""
     found = await authors.list_authors(session, None, q="", offset=0, sort="name", kind=None)
@@ -825,6 +912,7 @@ async def front(session: AsyncSession) -> Page:
         _a("/search", "Search recipes"),
         _a("/sources", "Sources"),
         _a("/ingredients", "Ingredients"),
+        _a("/equipment", "Equipment"),
         _a("/authors", "Authors"),
     ]
     newest = "".join(_listed_source(s) for s in found.sources)

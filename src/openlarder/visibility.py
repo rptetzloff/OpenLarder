@@ -21,6 +21,11 @@ What a contributor adds is hidden the same way until a moderator approves
 it (migration 0041): from everyone but them and moderators, ingredients and
 authors only it uses included.
 
+Equipment (migration 0079) is everyone's so far: the list was seeded, and
+nothing a recipe's form does adds to it. What a recipe needs is hidden
+with the recipe, so a count of the recipes needing a thing is of those
+the viewer can see.
+
 The database does not enforce any of this; tests/test_privacy.py asks every
 GET route in the app as other people and fails on anything private it
 finds, so a new route has to answer it.
@@ -32,6 +37,7 @@ from sqlalchemy.orm import aliased
 
 from openlarder.models import (
     Author,
+    EquipmentOption,
     GroupMember,
     Ingredient,
     IngredientOption,
@@ -137,6 +143,21 @@ def ingredients_seen_by(viewer: User | None) -> ColumnElement[bool]:
         seen_use.recipe_id.not_in(_hidden_recipe_ids(viewer)),
     )
     return Ingredient.id.not_in(used_in_hidden.except_(used_where_seen))
+
+
+def needs_seen_by(viewer: User | None) -> ColumnElement[bool]:
+    """What meets a need of a recipe the viewer can see (equipment_options)."""
+    return EquipmentOption.recipe_id.not_in(_hidden_recipe_ids(viewer))
+
+
+def equipment_seen_by(viewer: User | None) -> ColumnElement[bool]:
+    """Every piece of equipment, for anyone: the list is seeded (migration
+    0079), not made from what recipes say, so a thing only a private recipe
+    needs is still one everyone knows of. Every read of equipment asks
+    here all the same, so that when a recipe's form can bring a thing into
+    being, hiding one only a hidden recipe needs is a change to this
+    function and not to each of them."""
+    return true()
 
 
 def authors_seen_by(viewer: User | None) -> ColumnElement[bool]:

@@ -169,6 +169,75 @@ async def test_the_json_nests_each_recipe(store, catalog, people) -> None:
     assert source["editions"][0]["id"] == catalog["edition"]
 
 
+async def _needs(adb, title: str, thing: str, detail: str | None = None) -> None:
+    """A need of the recipe so titled, as the recipe form will record one."""
+    recipe = await adb.scalar(text("SELECT id FROM recipes WHERE title = :t"), {"t": title})
+    need = await adb.scalar(
+        text(
+            "INSERT INTO recipe_equipment (recipe_id, position, detail)"
+            " VALUES (:r, 1, :d) RETURNING id"
+        ),
+        {"r": recipe, "d": detail},
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO equipment_options (recipe_equipment_id, recipe_id, rank, equipment_id)"
+            " SELECT :n, :r, 1, id FROM equipment WHERE name = :e"
+        ),
+        {"n": need, "r": recipe, "e": thing},
+    )
+
+
+async def test_equipment_is_in_them_and_a_hidden_recipes_needs_arent(
+    store, catalog, people, adb
+) -> None:
+    await _needs(adb, "Shakshuka", "Cast-iron skillet", "10-inch")
+    await _needs(adb, "Secret Stew", "Tagine")
+    await _needs(adb, "Waiting Pie", "Pie plate")
+    await adb.execute(text("UPDATE recipes SET equipment_checked = true WHERE title = 'Shakshuka'"))
+    admin = await people("ad", admin=True)
+    await admin.post("/api/admin/dumps")
+    csv_zip, json_zip = (store.files[p] for p in sorted(store.files))
+    tables = _unzip(csv_zip)
+
+    def rows(name: str) -> list[dict]:
+        return list(csv.DictReader(io.StringIO(tables[f"{name}.csv"])))
+
+    # The whole list, what any kitchen has too, marked.
+    things = {e["name"]: e for e in rows("equipment")}
+    assert len(things) == await adb.scalar(text("SELECT count(*) FROM equipment"))
+    assert (things["Knife"]["assumed"], things["Tagine"]["assumed"]) == ("True", "False")
+    assert "Instant Pot" in {a["name"] for a in rows("equipment_aliases")}
+    multicooker = things["Multicooker"]["id"]
+    assert {
+        c["counts_as_id"] for c in rows("equipment_counts_as") if c["equipment_id"] == multicooker
+    } == {
+        things["Pressure cooker"]["id"],
+        things["Slow cooker"]["id"],
+    }
+    # One recipe is everyone's, and its need is the only one.
+    [need] = rows("recipe_equipment")
+    assert (need["recipe_id"], need["detail"]) == (catalog["recipe"], "10-inch")
+    [option] = rows("equipment_options")
+    assert option["equipment_id"] == things["Cast-iron skillet"]["id"]
+    assert [r["equipment_checked"] for r in rows("recipes")] == ["True"]
+    assert "equipment_checked" in tables["README.txt"]
+
+    files = _unzip(json_zip)
+    [recipe] = [json.loads(line) for line in files["recipes.jsonl"].splitlines()]
+    assert recipe["equipment_checked"] is True
+    assert recipe["equipment"] == [
+        {"detail": "10-inch", "options": [things["Cast-iron skillet"]["id"]]}
+    ]
+    listed = {e["name"]: e for e in map(json.loads, files["equipment.jsonl"].splitlines())}
+    assert set(listed["Multicooker"]["counts_as"]) == {
+        things["Pressure cooker"]["id"],
+        things["Slow cooker"]["id"],
+    }
+    assert "Instant Pot" in {a["name"] for a in listed["Multicooker"]["aliases"]}
+    assert "equipment.jsonl" in files["README.txt"]
+
+
 async def test_a_rating_is_the_average_and_how_many_never_who(store, catalog, people, adb) -> None:
     """As a recipe's page shows it. The ratings themselves say who gave
     what, and no dump does."""

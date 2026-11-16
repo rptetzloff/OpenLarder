@@ -38,6 +38,7 @@ from openlarder.models import (
     Author,
     Base,
     Dump,
+    Equipment,
     Ingredient,
     Recipe,
     RecipeRating,
@@ -70,7 +71,7 @@ COLUMNS = {
     ],
     "author_links": ["id", "author_id", "url", "label"],
     "source_credits": ["source_id", "author_id", "position", "role", "credited_as"],
-    "recipes": ["id", "source_id", "title", "chapter", "online_url"],
+    "recipes": ["id", "source_id", "title", "chapter", "online_url", "equipment_checked"],
     "recipe_locations": [
         "recipe_id", "source_id", "edition_id", "page", "web_page_id", "issue_id",
         "episode_id", "at_seconds",
@@ -81,6 +82,11 @@ COLUMNS = {
     ],
     "ingredients": ["id", "name", "shopping_term", "parent_id", "fdc_id", "wikidata_id"],
     "ingredient_aliases": ["id", "ingredient_id", "name", "region"],
+    "equipment": ["id", "name", "assumed", "shopping_term", "wikidata_id"],
+    "equipment_aliases": ["id", "equipment_id", "name", "region"],
+    "equipment_counts_as": ["equipment_id", "counts_as_id"],
+    "recipe_equipment": ["id", "recipe_id", "position", "detail"],
+    "equipment_options": ["recipe_equipment_id", "recipe_id", "rank", "equipment_id"],
     "allergens": ["key", "label"],
     "ingredient_allergens": ["id", "ingredient_id", "allergen", "status"],
     "diet_allergens": ["diet_tag_id", "allergen", "with_allergen"],
@@ -105,6 +111,9 @@ ORDER = {
     "recipe_locations": ["recipe_id", "edition_id"],
     "recipe_ingredients": ["recipe_id", "position"],
     "ingredient_options": ["recipe_ingredient_id", "rank"],
+    "equipment_counts_as": ["equipment_id", "counts_as_id"],
+    "recipe_equipment": ["recipe_id", "position"],
+    "equipment_options": ["recipe_equipment_id", "rank"],
     "source_tags": ["source_id", "tag_id"],
     "recipe_tags": ["recipe_id", "tag_id"],
     "allergens": ["position"],
@@ -120,7 +129,12 @@ ABOUT = {
     "authors": "People and organizations credited on sources.",
     "author_links": "Authors' own sites and pages.",
     "source_credits": "Who each source credits, in order, as it prints them.",
-    "recipes": "Recipes: their titles, and the source and chapter they're in.",
+    "recipes": (
+        "Recipes: their titles, and the source and chapter they're in. equipment_checked"
+        " says whether what a recipe needs has been recorded: false is not recorded yet,"
+        " which is not the same as needing nothing; true with no rows in recipe_equipment"
+        " is nothing special; rows with false are at least those."
+    ),
     "recipe_locations": "Where each recipe is: an edition's page, a web page, an issue, a show.",
     "recipe_ingredients": "Each recipe's ingredient lines as written, in order; no amounts.",
     "ingredient_options": "Each line read into its options, matched to an ingredient or a recipe.",
@@ -130,6 +144,22 @@ ABOUT = {
         " Wikidata item, where linked."
     ),
     "ingredient_aliases": "Other names for ingredients.",
+    "equipment": (
+        "Equipment a recipe can't be made without. assumed marks what any kitchen has"
+        " (a knife, a mixing bowl), which is never recorded on a recipe."
+    ),
+    "equipment_aliases": "Other names for equipment.",
+    "equipment_counts_as": (
+        "What counts as what: a stand mixer counts as a mixer. One thing can count as"
+        " several (a multicooker: a pressure cooker and a slow cooker)."
+    ),
+    "recipe_equipment": (
+        "Each recipe's needs, in order, with a size where the source gives one; never a method."
+    ),
+    "equipment_options": (
+        "What meets each need, the source's first choice at rank 1: a stand mixer or a"
+        " hand mixer is one need with two options."
+    ),
     "allergens": "The allergens ingredients record.",
     "ingredient_allergens": (
         "What each ingredient records about an allergen: contains, may_contain, or free"
@@ -162,6 +192,7 @@ def _seen() -> dict:
         Base.metadata.tables["source_credits"].c.source_id.in_(sources)
     )
     authors = select(Author.id).where(visibility.authors_seen_by(None), Author.id.in_(credited))
+    equipment = select(Equipment.id).where(visibility.equipment_seen_by(None))
     t = Base.metadata.tables
 
     def by(table: str, column: str, ids):
@@ -183,6 +214,14 @@ def _seen() -> dict:
         "ingredient_options": by("ingredient_options", "recipe_id", recipes),
         "ingredients": by("ingredients", "id", ingredients),
         "ingredient_aliases": by("ingredient_aliases", "ingredient_id", ingredients),
+        "equipment": by("equipment", "id", equipment),
+        "equipment_aliases": by("equipment_aliases", "equipment_id", equipment),
+        "equipment_counts_as": and_(
+            by("equipment_counts_as", "equipment_id", equipment),
+            by("equipment_counts_as", "counts_as_id", equipment),
+        ),
+        "recipe_equipment": by("recipe_equipment", "recipe_id", recipes),
+        "equipment_options": by("equipment_options", "recipe_id", recipes),
         "allergens": text("true"),
         "diet_allergens": text("true"),
         "ingredient_allergens": by("ingredient_allergens", "ingredient_id", ingredients),
@@ -280,8 +319,9 @@ def readme(day: str, rows: dict[str, list[dict]], kind: str) -> str:
         lines.append(
             "JSON Lines, one record a line: sources.jsonl (with their credits and"
             " editions), recipes.jsonl (with their places, ingredient lines, tags and"
-            " rating),"
-            " ingredients.jsonl (with other names and allergens), authors.jsonl, tags.jsonl,"
+            " rating; and what each needs),"
+            " ingredients.jsonl (with other names and allergens), equipment.jsonl (with other"
+            " names and what each counts as), authors.jsonl, tags.jsonl,"
             " substitutions.jsonl, allergens.jsonl."
         )
     lines.append("")
@@ -328,6 +368,10 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
     lines = _group(rows["recipe_ingredients"], "recipe_id")
     options = _group(rows["ingredient_options"], "recipe_ingredient_id")
     tags_of_recipe = _group(rows["recipe_tags"], "recipe_id")
+    needs = _group(rows["recipe_equipment"], "recipe_id")
+    meeting = _group(rows["equipment_options"], "recipe_equipment_id")
+    other_names = _group(rows["equipment_aliases"], "equipment_id")
+    broader = _group(rows["equipment_counts_as"], "equipment_id")
     rating = {r["recipe_id"]: r for r in rows["recipe_ratings"]}
     aliases = _group(rows["ingredient_aliases"], "ingredient_id")
     recorded = _group(rows["ingredient_allergens"], "ingredient_id")
@@ -358,6 +402,16 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
                 }
                 for line in lines.get(r["id"], [])
             ],
+            # In order, each with what meets it, first choice first. Read
+            # with equipment_checked: none here isn't "nothing special"
+            # unless that is true.
+            "equipment": [
+                {
+                    "detail": need["detail"],
+                    "options": [o["equipment_id"] for o in meeting.get(need["id"], [])],
+                }
+                for need in needs.get(r["id"], [])
+            ],
             "tags": [t["tag_id"] for t in tags_of_recipe.get(r["id"], [])],
             # As a listing has them: no average until someone rates it.
             "spoons": rating[r["id"]]["spoons"] if r["id"] in rating else None,
@@ -369,6 +423,14 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
         {**i, "aliases": aliases.get(i["id"], []), "allergens": recorded.get(i["id"], [])}
         for i in rows["ingredients"]
     ]
+    equipment = [
+        {
+            **e,
+            "aliases": other_names.get(e["id"], []),
+            "counts_as": [c["counts_as_id"] for c in broader.get(e["id"], [])],
+        }
+        for e in rows["equipment"]
+    ]
     authors = [{**a, "links": links.get(a["id"], [])} for a in rows["authors"]]
     return _zip(
         {
@@ -376,6 +438,7 @@ def json_zip(day: str, rows: dict[str, list[dict]]) -> bytes:
             "sources.jsonl": _jsonl(sources),
             "recipes.jsonl": _jsonl(recipes),
             "ingredients.jsonl": _jsonl(ingredients),
+            "equipment.jsonl": _jsonl(equipment),
             "authors.jsonl": _jsonl(authors),
             "tags.jsonl": _jsonl(
                 [

@@ -22,7 +22,7 @@ from sqlalchemy import func, select
 from openlarder import visibility
 from openlarder.config import Settings, get_settings
 from openlarder.db import Session
-from openlarder.models import Author, Ingredient, Recipe, Source
+from openlarder.models import Author, Equipment, Ingredient, Recipe, Source
 
 router = APIRouter(tags=["sitemap"])
 
@@ -41,6 +41,7 @@ def _kinds():
         "recipes": (Recipe, visibility.recipes_seen_by(None)),
         "sources": (Source, visibility.sources_seen_by(None)),
         "ingredients": (Ingredient, visibility.ingredients_seen_by(None)),
+        "equipment": (Equipment, visibility.equipment_seen_by(None)),
         "authors": (Author, visibility.authors_seen_by(None)),
     }
 

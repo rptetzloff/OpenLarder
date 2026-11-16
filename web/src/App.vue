@@ -19,6 +19,8 @@ import AdminShopsPage from "./pages/AdminShopsPage.vue";
 import AdminPage from "./pages/AdminPage.vue";
 import AuthorPage from "./pages/AuthorPage.vue";
 import AuthorsPage from "./pages/AuthorsPage.vue";
+import EquipmentItemPage from "./pages/EquipmentItemPage.vue";
+import EquipmentListPage from "./pages/EquipmentListPage.vue";
 import FlagsPage from "./pages/FlagsPage.vue";
 import HomePage from "./pages/HomePage.vue";
 import GroupPage from "./pages/GroupPage.vue";
@@ -66,6 +68,7 @@ const page = pages[path];
 const onAccount = path === "/account";
 const onBooks = path === "/sources";
 const onIngredients = path === "/ingredients";
+const onEquipment = path === "/equipment";
 const onSearch = path === "/search";
 const onAuthors = path === "/authors";
 const onAdmin = path === "/admin";
@@ -100,6 +103,7 @@ const proposeBookId = match(`/sources/${UUID}/propose`);
 const bulkFor = match(`/sources/${UUID}/bulk`);
 const recipeId = match(`/recipes/${UUID}`);
 const ingredientId = match(`/ingredients/${UUID}`);
+const equipmentId = match(`/equipment/${UUID}`);
 const authorId = match(`/authors/${UUID}`);
 const editRecipeId = match(`/recipes/${UUID}/edit`);
 const proposeRecipeId = match(`/recipes/${UUID}/propose`);
@@ -171,6 +175,8 @@ onMounted(async () => {
     <AuthorsPage v-else-if="onAuthors" />
     <AuthorPage v-else-if="authorId" :id="authorId" :user="user" />
     <IngredientPage v-else-if="ingredientId" :id="ingredientId" :user="user" />
+    <EquipmentListPage v-else-if="onEquipment" />
+    <EquipmentItemPage v-else-if="equipmentId" :id="equipmentId" />
     <AdminPage v-else-if="onAdmin" :user="user" />
     <GroupsPage v-else-if="onGroups" :user="user" />
     <GroupPage v-else-if="groupId" :id="groupId" :user="user" />

@@ -59,7 +59,8 @@ async def test_the_sitemap_lists_every_public_page_by_kind(admin, adb, client) -
     ]
     ann = str(await adb.scalar(text("SELECT id FROM authors WHERE name = 'Ann Author'")))
     assert await _listed(client, "/sitemap.xml") == [
-        f"{SITE}/sitemaps/{kind}-1.xml" for kind in ("recipes", "sources", "ingredients", "authors")
+        f"{SITE}/sitemaps/{kind}-1.xml"
+        for kind in ("recipes", "sources", "ingredients", "equipment", "authors")
     ]
     assert await _listed(client, "/sitemaps/recipes-1.xml") == [f"{SITE}/recipes/{bread}"]
     assert await _listed(client, "/sitemaps/sources-1.xml") == [f"{SITE}/sources/{book}"]
@@ -83,8 +84,13 @@ async def test_each_page_says_the_day_it_last_changed(admin, adb, client) -> Non
     assert sitemaps._day(late) == "2026-03-05"
 
 
-async def test_an_empty_catalog_has_an_empty_index(client) -> None:
-    assert await _listed(client, "/sitemap.xml") == []
+async def test_an_empty_catalog_has_only_the_equipment_list(client, adb) -> None:
+    """Which is there from the start (migration 0079), each thing a page."""
+    assert await _listed(client, "/sitemap.xml") == [f"{SITE}/sitemaps/equipment-1.xml"]
+    things = set(await adb.scalars(text("SELECT id FROM equipment")))
+    assert set(await _listed(client, "/sitemaps/equipment-1.xml")) == {
+        f"{SITE}/equipment/{thing}" for thing in things
+    }
     for path in ("/sitemaps/recipes-1.xml", "/sitemaps/recipes-0.xml", "/sitemaps/secrets-1.xml"):
         response = await client.get(path)
         assert response.status_code == 404, path

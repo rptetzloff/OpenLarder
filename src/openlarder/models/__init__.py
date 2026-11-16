@@ -27,6 +27,13 @@ from openlarder.models.catalog import (
     WebPage,
 )
 from openlarder.models.dumps import Dump
+from openlarder.models.equipment import (
+    Equipment,
+    EquipmentAlias,
+    EquipmentCountsAs,
+    EquipmentOption,
+    RecipeEquipment,
+)
 from openlarder.models.flags import FlagKind, RecipeFlag, Resolution
 from openlarder.models.foods import FdcFood, LinkSuggestion
 from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGroup
@@ -77,6 +84,10 @@ __all__ = [
     "ImportRun",
     "ImportRunLine",
     "IngredientEmbedding",
+    "Equipment",
+    "EquipmentAlias",
+    "EquipmentCountsAs",
+    "EquipmentOption",
     "Ingredient",
     "IngredientAlias",
     "IngredientAllergen",
@@ -101,6 +112,7 @@ __all__ = [
     "PurchaseLink",
     "Recipe",
     "RecipeFlag",
+    "RecipeEquipment",
     "RecipeIngredient",
     "RecipeLocation",
     "RecipeTag",

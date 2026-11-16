@@ -45,6 +45,7 @@ from openlarder.routers import (
     authors,
     book_requests,
     covers,
+    equipment,
     flags,
     foods,
     go,
@@ -125,7 +126,7 @@ def api_description() -> str:
     s = get_settings()
     return f"""
 The catalog's public, read-only API: sources, editions, recipes, ingredients,
-authors, tags and search. The data is open under the
+equipment, authors, tags and search. The data is open under the
 [ODbL](https://opendatacommons.org/licenses/odbl/1-0/): use it, and keep what
 you make from it open too, saying it's from OpenLarder.
 
@@ -216,6 +217,7 @@ app.include_router(recipes.router)
 app.include_router(imports.router)
 app.include_router(covers.router)
 app.include_router(dumps_routes.router)
+app.include_router(equipment.router)
 app.include_router(flags.router)
 app.include_router(go.router)
 app.include_router(groups.router)
@@ -396,6 +398,19 @@ async def ingredient_page(
     return page_response(await pages.ingredient(session, ingredient_id), shell, settings, request)
 
 
+@app.get("/equipment/{equipment_id:uuid}", include_in_schema=False)
+async def equipment_page(
+    equipment_id: uuid.UUID,
+    request: Request,
+    session: Session,
+    shell: Shell,
+    settings: SettingsDep,
+) -> Response:
+    return page_response(
+        await pages.equipment_page(session, equipment_id), shell, settings, request
+    )
+
+
 @app.get("/authors/{author_id:uuid}", include_in_schema=False)
 async def author_page(
     author_id: uuid.UUID, request: Request, session: Session, shell: Shell, settings: SettingsDep
@@ -435,6 +450,13 @@ async def ingredients_page(
     request: Request, session: Session, shell: Shell, settings: SettingsDep
 ) -> Response:
     return await _listing(pages.ingredients_list, "ingredients", request, session, shell, settings)
+
+
+@app.get("/equipment", include_in_schema=False)
+async def equipment_list_page(
+    request: Request, session: Session, shell: Shell, settings: SettingsDep
+) -> Response:
+    return await _listing(pages.equipment_list, "equipment", request, session, shell, settings)
 
 
 @app.get("/authors", include_in_schema=False)
