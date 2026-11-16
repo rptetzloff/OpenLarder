@@ -19,7 +19,16 @@ from sqlalchemy.orm import aliased
 from openlarder import agreement, title_rules, trust
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
-from openlarder.models import Ingredient, IngredientOption, Proposal, Recipe, Source, User
+from openlarder.models import (
+    Equipment,
+    EquipmentOption,
+    Ingredient,
+    IngredientOption,
+    Proposal,
+    Recipe,
+    Source,
+    User,
+)
 from openlarder.routers.auth import Config
 
 router = APIRouter(tags=["review"])
@@ -41,6 +50,8 @@ class Item(BaseModel):
     # A recipe's ingredients no published recipe uses yet: new to the
     # catalog with it, for a moderator to keep or merge into another.
     new_ingredients: list[Named] = []
+    # And its equipment that isn't in the list, the same way.
+    new_equipment: list[Named] = []
 
 
 class Group(BaseModel):
@@ -126,14 +137,55 @@ async def _groups(session, source_filter, recipe_filter) -> list[Group]:
     )
     names = await _names(session, [r.created_by for r in recipes] + [s.created_by for s in sources])
     new = await _new_ingredients(session, [r.id for r in recipes])
+    new_kit = await _new_equipment(session, [r.id for r in recipes])
     by_source: dict[uuid.UUID, list[Item]] = {}
     for r in recipes:
         item = _item(r, names)
         item.new_ingredients = new.get(r.id, [])
+        item.new_equipment = new_kit.get(r.id, [])
         by_source.setdefault(r.source_id, []).append(item)
     return [
         Group(source=_item(s, names), kind=s.kind, recipes=by_source.get(s.id, [])) for s in sources
     ]
+
+
+async def _new_equipment(session, recipe_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[Named]]:
+    """Each recipe's equipment that isn't in the list and that no published
+    recipe of a public, published source needs: what it brings in, as
+    _new_ingredients finds its ingredients (*Ray's equipment spec,
+    2026-11-15: a new thing "goes through the same review"; Ray,
+    2026-11-16: equipment is treated as ingredients are*). A moderator
+    keeps each, which leaves it a thing its recipes brought and not one of
+    the list's, or merges it into the thing it's another name for."""
+    if not recipe_ids:
+        return {}
+    needed = aliased(EquipmentOption)
+    public = (
+        select(needed.id)
+        .join(Recipe, Recipe.id == needed.recipe_id)
+        .join(Source, Source.id == Recipe.source_id)
+        .where(
+            needed.equipment_id == Equipment.id,
+            Recipe.review == "published",
+            Source.review == "published",
+            Source.private.is_(False),
+        )
+    )
+    rows = await session.execute(
+        select(EquipmentOption.recipe_id, Equipment.id, Equipment.name)
+        .distinct()
+        .join(Equipment, Equipment.id == EquipmentOption.equipment_id)
+        .where(
+            EquipmentOption.recipe_id.in_(recipe_ids),
+            Equipment.listed.is_(False),
+            ~exists(public),
+        )
+        .order_by(EquipmentOption.recipe_id, Equipment.name)
+    )
+    found: dict[uuid.UUID, list[Named]] = {}
+    for recipe_id, equipment_id, name in rows:
+        found.setdefault(recipe_id, []).append(Named(id=equipment_id, name=name))
+    return found
 
 
 @router.get("/api/review", response_model=Queue)

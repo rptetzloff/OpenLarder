@@ -3,8 +3,10 @@ import Crumbs from "../components/Crumbs.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import type { Me } from "../me";
+import EquipmentPicker from "../components/EquipmentPicker.vue";
 import IngredientPicker from "../components/IngredientPicker.vue";
 import ProposalDiff from "../components/ProposalDiff.vue";
+import { mergeEquipment } from "../equipment";
 import { mergeIngredient, type Named } from "../ingredients";
 import {
   type Group,
@@ -83,6 +85,16 @@ function mergeInto(from: Named, into: Named) {
   if (!confirm(asked)) return;
   merging.value = "";
   act(() => mergeIngredient(from.id, into.id));
+}
+
+// The same for a new piece of equipment ("recipe:kit:thing" in merging).
+function mergeKitInto(from: Named, into: Named) {
+  const asked =
+    `Merge “${from.name}” into “${into.name}”? Every recipe needing “${from.name}” will need ` +
+    `“${into.name}”, and “${from.name}” becomes another name for it.`;
+  if (!confirm(asked)) return;
+  merging.value = "";
+  act(() => mergeEquipment(from.id, into.id));
 }
 
 const waitingIn = (g: Group) =>
@@ -217,6 +229,38 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
                         :exclude="[i.id]"
                         :disabled="busy"
                         @pick="(into) => mergeInto(i, into)"
+                      />
+                    </li>
+                  </ul>
+                </div>
+                <!-- Its new equipment, as its new ingredients (Ray's equipment
+                     spec, 2026-11-15: "goes through the same review"). -->
+                <div v-if="r.new_equipment.length" class="review-new">
+                  <p>
+                    New equipment, not in the list: approving keeps
+                    {{ r.new_equipment.length === 1 ? "it" : "them" }} with the recipe, or merge
+                    {{ r.new_equipment.length === 1 ? "it" : "one" }} into the equipment it's
+                    another name for.
+                  </p>
+                  <ul>
+                    <li v-for="e in r.new_equipment" :key="e.id">
+                      <a :href="`/equipment/${e.id}`">{{ e.name }}</a>
+                      <button
+                        type="button"
+                        class="secondary small"
+                        :aria-expanded="merging === `${r.id}:kit:${e.id}`"
+                        @click="merging = merging === `${r.id}:kit:${e.id}` ? '' : `${r.id}:kit:${e.id}`"
+                      >
+                        Merge into…
+                      </button>
+                      <EquipmentPicker
+                        v-if="merging === `${r.id}:kit:${e.id}`"
+                        :input-id="`merge-kit-${r.id}-${e.id}`"
+                        :label="`Merge “${e.name}” into`"
+                        placeholder="Find the equipment"
+                        :exclude="[e.id]"
+                        :disabled="busy"
+                        @pick="(into) => mergeKitInto(e, into)"
                       />
                     </li>
                   </ul>
