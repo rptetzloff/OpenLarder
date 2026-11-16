@@ -601,6 +601,30 @@ const BULK_ASKED = `(async () => {
   if (!words(row.querySelector(".bulk-summary")).endsWith("· 1 piece of equipment, all matched")) return "With its equipment answered the row says “" + words(row.querySelector(".bulk-summary")) + "”";
   return "";
 })()`;
+// What an import flags of a recipe's equipment (Ray, 2026-11-16: treated as
+// its ingredients are): what any kitchen has, left out, said in the words
+// the form refuses it with; and equipment that isn't in the list and is
+// spelt like something that is, with its change a click away as an
+// ingredient's possible typo has.
+const FLAGGED = (words, change) => `(() => {
+  const said = document.querySelector("main").textContent.replace(/\\s+/g, " ");
+  for (const w of ${JSON.stringify(words)}) if (!said.includes(w)) return "The page doesn't say “" + w + "”";
+  const buttons = [...document.querySelectorAll("main button")].map((b) => b.textContent.replace(/\\s+/g, " ").trim());
+  return buttons.includes(${JSON.stringify(change)}) ? "" : "There's no “" + ${JSON.stringify(change)} + "” button among “" + buttons.join(" | ") + "”";
+})()`;
+const EQUIPMENT_FLAGS = FLAGGED(
+  ["Possible typo in equipment", "Springfrom pan → Springform pan", "Equipment left out", "“Mixing bowl” is expected in any kitchen, so it isn't recorded."],
+  "Change to “Springform pan”",
+);
+// The import page says what its lists' columns are, the Equipment one
+// among them, to whoever opens "How this works".
+const IMPORT_COLUMNS = `(() => {
+  const how = document.querySelector("main details.how");
+  if (!how?.open) return "“How this works” isn't open";
+  const columns = [...how.querySelectorAll("strong")].map((b) => b.textContent.trim());
+  for (const c of ["Source", "Recipe Name", "Pg #", "Ingredients", "Tag", "Equipment", "none"]) if (!columns.includes(c)) return "“How this works” doesn't name " + c;
+  return "";
+})()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused). Each of the bar's links leads to
@@ -1167,7 +1191,21 @@ async function seed() {
   const wordyKit = (await api("/api/equipment", "admin", { name: LONG })).id;
   await api(`/api/equipment/${wordyKit}/aliases`, "admin", { name: `Old ${LONG}` });
   await api(`/api/equipment/${wordyKit}/counts-as/${blender}`, "admin", undefined, "PUT");
-  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit, standMixer, mixer };
+  // A list imported with an Equipment column, in a book of its own: one
+  // recipe, needing something any kitchen has and something misspelt (in
+  // a way nothing else here types: once a misspelt thing exists, the same
+  // misspelling typed again is matched to it, and isn't asked about). The
+  // first is left out and flagged as the import adds it; the second when
+  // the run finishes.
+  const importedBook = await api("/api/sources/manual", "admin", { title: "Imported Bakes", authors: ["Ann Author"] });
+  const importRun = await api("/api/import/runs", "admin", { books_in_list: 1, recipes_in_file: 1 });
+  await api("/api/import/recipes", "admin", {
+    run_id: importRun.id,
+    items: [{ row: 2, source_id: importedBook.id, title: "Imported Waffles", page: "8", ingredients: ["Egg"], equipment: "9-inch springfrom pan; mixing bowl" }],
+  });
+  await api(`/api/import/runs/${importRun.id}/finish`, "admin", { books_added: 1, books_existing: 0, books_failed: 0 });
+  const imported = (await api(`/api/sources/${importedBook.id}`, "admin")).recipes[0].id;
+  return { imported, long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit, standMixer, mixer };
 }
 
 // Script that presses the button whose words begin so; with none, it throws,
@@ -1255,7 +1293,9 @@ function pages(s) {
     ["/account", "cook", { phone: true, then: `document.querySelector(".agreement-panel details").open = true`, expect: AGREEMENT_FOLDED }],
     ["/account/flags", "admin"],
     ["/admin", "admin"],
-    ["/admin/flags", "admin", { expect: ADMIN_BAR("Flagged recipes") }],
+    ["/admin/flags", "admin", { phone: true, expect: `(${ADMIN_BAR("Flagged recipes")}) || (${EQUIPMENT_FLAGS})` }],
+    [`/recipes/${s.imported}`, "admin", { phone: true, expect: EQUIPMENT_FLAGS }],
+    ["/admin/import", "admin", { phone: true, then: `document.querySelector("main details.how").open = true`, expect: onPhone(IMPORT_COLUMNS) }],
     ["/admin/imports", "admin"],
     ["/admin/suggestions", "admin"],
     ["/admin/api", "admin"],

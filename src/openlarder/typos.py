@@ -22,6 +22,14 @@ names in common use is two ingredients ("Beef" and "Beet"). That suggests
 
 Only the public catalog is compared, and only its recipes flagged: a family
 collection's names are its own.
+
+Equipment is flagged the same way (*Ray, 2026-11-16: equipment is treated as
+ingredients are*), with one difference in what "commoner" means. Equipment
+has a list (migration 0079) and a recipe can bring in a thing that isn't in
+it; so a thing that isn't in the list is compared with the things that are,
+by their names and other names, under the same spelling rule, however often
+either is used. "Wafle iron" is flagged for "Waffle iron" on its first
+recipe. What any kitchen has is never suggested: no recipe records it.
 """
 
 import re
@@ -34,6 +42,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import lines
 from openlarder.models import (
+    Equipment,
+    EquipmentAlias,
+    EquipmentOption,
     FlagKind,
     Ingredient,
     IngredientOption,
@@ -207,6 +218,77 @@ async def sweep(session: AsyncSession) -> list[tuple[uuid.UUID, str]]:
         raised.append((recipe_id, detail))
     await session.flush()
     return raised
+
+
+def spelt_like(written: str, listed: str) -> bool:
+    """The spelling rule alone, for two match keys: what close() asks of a
+    name used once beside one used enough."""
+    return close(written, listed, 1, TIMES_MORE)
+
+
+async def sweep_equipment(session: AsyncSession) -> list[tuple[uuid.UUID, str]]:
+    """Flag every public recipe needing a thing that isn't in the equipment
+    list and is spelt like one that is, once: a flag dismissed stays
+    dismissed. Returns the new flags (recipe, detail)."""
+    listed: list[tuple[str, str]] = []
+    for query in (
+        select(Equipment.match_key, Equipment.name),
+        select(EquipmentAlias.match_key, Equipment.name)
+        .join(Equipment, Equipment.id == EquipmentAlias.equipment_id)
+        .where(EquipmentAlias.region.is_(None)),
+    ):
+        listed += [
+            (key, name)
+            for key, name in await session.execute(
+                query.where(Equipment.listed, Equipment.assumed.is_(False))
+            )
+        ]
+    brought = await session.execute(
+        select(Equipment.match_key, Equipment.name, EquipmentOption.recipe_id)
+        .join(EquipmentOption, EquipmentOption.equipment_id == Equipment.id)
+        .join(Recipe, Recipe.id == EquipmentOption.recipe_id)
+        .join(Source, Source.id == Recipe.source_id)
+        .where(Equipment.listed.is_(False), *_public())
+    )
+    wanted: set[tuple[uuid.UUID, str]] = set()
+    meant: dict[str, str | None] = {}
+    for key, name, recipe_id in brought:
+        if key not in meant:
+            # A swap of two letters first, as for ingredients; then by name.
+            like = sorted(
+                (not _swapped_keys(key, other), to)
+                for other, to in listed
+                if spelt_like(key, other)
+            )
+            meant[key] = like[0][1] if like else None
+        if meant[key]:
+            wanted.add((recipe_id, f"{name}{ARROW}{meant[key]}"))
+    raised = []
+    for recipe_id, detail in sorted(wanted):
+        if await session.scalar(
+            select(
+                exists().where(
+                    RecipeFlag.recipe_id == recipe_id,
+                    RecipeFlag.kind == FlagKind.EQUIPMENT_TYPO.value,
+                    RecipeFlag.detail == detail,
+                )
+            )
+        ):
+            continue
+        session.add(
+            RecipeFlag(recipe_id=recipe_id, kind=FlagKind.EQUIPMENT_TYPO.value, detail=detail)
+        )
+        raised.append((recipe_id, detail))
+    await session.flush()
+    return raised
+
+
+def _swapped_keys(a: str, b: str) -> bool:
+    """Whether two keys of the same number of words differ by two letters
+    swapped in one word."""
+    x, y = a.split(), b.split()
+    differ = [i for i in range(min(len(x), len(y))) if x[i] != y[i]]
+    return len(x) == len(y) and len(differ) == 1 and _swapped(x[differ[0]], y[differ[0]])
 
 
 def parse(detail: str | None) -> tuple[str, str] | None:

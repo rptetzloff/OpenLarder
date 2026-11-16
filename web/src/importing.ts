@@ -17,6 +17,9 @@ export interface ParsedRecipe {
   ingredients: string[];
   // The book's chapter, from the list's Tag column.
   chapter: string | null;
+  // What it can't be made without, as the list's Equipment column has it;
+  // empty where the list has no such column.
+  equipment: string;
 }
 
 export interface Parsed {
@@ -110,12 +113,15 @@ export async function addRunLines(
   }
 }
 
-// Possible typos, flagged once a run's recipes are all in (typos.py).
+// Possible typos, flagged once a run's recipes are all in (typos.py): in
+// an ingredient's name (possible_typo), or in equipment that isn't in the
+// list (equipment_typo).
 export interface TypoFlag {
   recipe_id: string;
   recipe: string;
   book: string;
   detail: string;
+  kind: string;
 }
 
 export async function finishRun(
@@ -136,6 +142,7 @@ export async function importBatch(
     page: string | null;
     ingredients: string[];
     chapter: string | null;
+    equipment: string;
   }[],
 ): Promise<{
   created: number;
