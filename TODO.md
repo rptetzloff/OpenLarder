@@ -1190,9 +1190,34 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           `equipment_cell`, and a book's recipe lines come with each
           recipe's, so a row sent back as it came writes nothing.
           "none" beside a need is refused: which is it?
-          - [ ] A row's equipment isn't checked as it's typed, as its
-            ingredients are: what's refused is said when the row
-            saves, and what it matched isn't said at all.
+          - [x] A row's equipment is treated as its ingredients are
+            (#213; *Ray, 2026-11-16: "No reason the experience should be
+            different"*). #212 had a one-line box that said nothing of
+            what it matched. Now it is the ingredients' kind of box, with
+            their keys (Enter saves the row and starts the next) and
+            their separators (it comes back with semicolons; a comma
+            still parts equipment, as the spec has it), and the row says
+            of it what it says of them: how many and whether all
+            matched, a need's choice as a chip, what saving refuses with
+            Remove, and a name nothing matches with what it's named
+            like, Use and It's new. The recipe form's Equipment says the
+            same as its ingredient lines too: "No exact match" with "Did
+            you mean" and "It's new" where it had called an unmatched
+            name new without asking, a choice listed in order, Remove
+            beside what saving refuses, and several pasted lines fill
+            that many boxes. Both of a row's boxes grow to hold what's
+            typed, where the browser can size a field to its content: on
+            a phone the one-line box had hidden all but the first of
+            three needs.
+          - A row that didn't save is checked all the same now, so it
+            says which line or which need was refused, with the way out
+            beside it. Before, a refused row lost its chips.
+          - [ ] In bulk entry a misspelt name is saved before anything
+            asks "did you mean": a row is checked after it saves, and by
+            then the name is an ingredient, or a piece of equipment, of
+            its own and matches itself. True of ingredients since bulk
+            entry began, and of equipment now; the recipe form asks as
+            it's typed. Checking a row before it saves would close it.
         - [ ] The import's field: an optional Equipment column, read as
           bulk entry's cell is, with what it can't take flagged on the
           recipe and not dropped.

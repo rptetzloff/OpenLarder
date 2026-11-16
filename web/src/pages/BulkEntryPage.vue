@@ -2,13 +2,17 @@
 import Crumbs from "../components/Crumbs.vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import type { Book } from "../books";
+import { type CellRead, checkCell, needNamed } from "../equipment";
 import { checkLines, type LineReview, recipeLines, saveRecipe } from "../recipes";
 
 // Entering a whole book (Ray's wireframe): a row per recipe, page, title and
 // ingredients, each saving when you leave it, with the line checks under it.
 // Under the ingredients, the row's equipment in one cell (Ray's equipment
-// spec, 2026-11-15): needs with commas between, "none" for nothing special,
-// empty for not recorded yet.
+// spec, 2026-11-15): "none" for nothing special, empty for not recorded yet.
+// It is treated as the ingredients are (Ray, 2026-11-16: "No reason the
+// experience should be different"): the same kind of box, the same keys,
+// the same separators (a comma parts equipment too, as the spec has it),
+// and the same checks under the row, with Use, It's new and Remove.
 const props = defineProps<{ id: string }>();
 
 const book = ref<Book | null>(null);
@@ -40,6 +44,11 @@ interface Row {
   checked: string;
   // Check chips answered "it's new", by line.
   kept: Set<string>;
+  // The same for its equipment: the cell's check, for the cell it was given,
+  // and the needs answered "it's new".
+  needReads: CellRead | null;
+  needsChecked: string;
+  keptNeeds: Set<string>;
 }
 
 let nextKey = 0;
@@ -60,6 +69,9 @@ function newRow(fields: Partial<Row> = {}): Row {
     reviews: null,
     checked: "",
     kept: new Set(),
+    needReads: null,
+    needsChecked: "",
+    keptNeeds: new Set(),
     ...fields,
   };
 }
@@ -145,7 +157,26 @@ const dirty = (row: Row) =>
 const blank = (row: Row) =>
   !row.id && !row.page.trim() && !row.title.trim() && !row.text.trim() && !row.equipment.trim();
 
-async function check(row: Row) {
+async function checkEquipment(row: Row) {
+  const cell = row.equipment;
+  if (!cell.trim()) {
+    row.needReads = { nothing_special: false, needs: [] };
+    row.needsChecked = cell;
+    return;
+  }
+  try {
+    const found = await checkCell(cell);
+    if (row.equipment !== cell) return;
+    row.needReads = found;
+    row.needsChecked = cell;
+  } catch {
+    row.needReads = null;
+  }
+}
+
+const check = (row: Row) => Promise.all([checkIngredients(row), checkEquipment(row)]);
+
+async function checkIngredients(row: Row) {
   const text = row.text;
   const lines = split(text);
   if (!lines.length) {
@@ -214,6 +245,9 @@ async function save(row: Row) {
   } catch (e) {
     row.status = "error";
     row.error = e instanceof Error ? e.message : String(e);
+    // What was refused is checked all the same, so the row says which line
+    // or which need it was, with the way out beside it.
+    await check(row);
   }
   if (rows.value[rows.value.length - 1] === row) rows.value.push(nextRow());
 }
@@ -233,7 +267,8 @@ async function focusRow(index: number) {
   pageInputs.value.get(rows.value[index].key)?.focus();
 }
 
-// Enter in the ingredients saves the row and starts the next.
+// Enter in the ingredients, or in the equipment, saves the row and starts
+// the next.
 function enter(index: number, event: KeyboardEvent) {
   if (event.shiftKey) return;
   event.preventDefault();
@@ -265,19 +300,62 @@ function addTen() {
   focusRow(at);
 }
 
-// A line's check, as a chip under the row.
+// A line's check, or a need's, as a chip under the row.
 interface Chip {
   text: string;
   warn: boolean;
   line: string;
+  // Which box the line is in.
+  of: "ingredients" | "equipment";
   fix?: { label: string; to: string | null };
   keep?: boolean;
 }
 
-function chips(row: Row): Chip[] {
+const chips = (row: Row): Chip[] => [
+  ...lineChips(row).map((c) => ({ ...c, of: "ingredients" as const })),
+  ...needChips(row).map((c) => ({ ...c, of: "equipment" as const })),
+];
+
+// The equipment's chips, a need apiece, saying what a line's chip says: what
+// saving refuses, with Remove; its options in order; a name nothing matches
+// that something is named like, with Use and It's new. A need that matched
+// says nothing.
+function needChips(row: Row): Omit<Chip, "of">[] {
+  if (!row.needReads || row.needsChecked !== row.equipment) return [];
+  const out: Omit<Chip, "of">[] = [];
+  for (const need of row.needReads.needs) {
+    const line = need.text;
+    if (need.problem) {
+      // The problem names what it's about; with several things in the need,
+      // the need too, since Remove takes the whole of it.
+      const text = need.options.length > 1 ? `“${line}”: ${need.problem}` : need.problem;
+      out.push({ text, warn: true, line, fix: { label: "Remove", to: null } });
+    } else if (need.options.length > 1) {
+      out.push({
+        text: `${need.options.length} options: ${need.options.map((o) => o.equipment?.name ?? o.name).join(", then ")}`,
+        warn: false,
+        line,
+      });
+    } else {
+      const o = need.options[0];
+      if (o && !o.equipment && o.similar.length && !row.keptNeeds.has(line)) {
+        out.push({
+          text: `“${o.name}” → ${o.similar[0].name}?`,
+          warn: true,
+          line,
+          fix: { label: "Use", to: needNamed(need, o.similar[0].name) },
+          keep: true,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function lineChips(row: Row): Omit<Chip, "of">[] {
   if (!row.reviews || row.checked !== row.text) return [];
   const lines = split(row.checked);
-  const out: Chip[] = [];
+  const out: Omit<Chip, "of">[] = [];
   row.reviews.forEach((r, i) => {
     const line = lines[i];
     if (r.problems.length) {
@@ -324,6 +402,19 @@ function chips(row: Row): Chip[] {
 const rowChips = computed(() => new Map(rows.value.map((r) => [r.key, chips(r)])));
 const checksOn = (row: Row) => rowChips.value.get(row.key)!.filter((c) => c.warn).length;
 
+// What the equipment comes to, beside what the ingredients do. Its count is
+// the server's, which parts the cell; until it has, nothing is said.
+function needSummary(row: Row): string {
+  if (!row.equipment.trim()) return row.id ? "Equipment not recorded yet" : "";
+  if (!row.needReads || row.needsChecked !== row.equipment) return "";
+  if (row.needReads.nothing_special) return "No special equipment";
+  const needs = row.needReads.needs;
+  const matched = needs.every((n) => !n.problem && n.options.every((o) => o.equipment));
+  return `${needs.length} piece${needs.length === 1 ? "" : "s"} of equipment${matched ? ", all matched" : ""}`;
+}
+
+const summaries = (row: Row) => [summary(row), needSummary(row)].filter(Boolean);
+
 function summary(row: Row): string {
   const count = split(row.text).length;
   if (!count) return row.id ? "No ingredients yet" : "";
@@ -333,17 +424,21 @@ function summary(row: Row): string {
 }
 
 async function apply(row: Row, chip: Chip) {
-  const lines = split(row.text);
+  // The needs as the server parted them; a chip is only shown for the cell
+  // as it stands.
+  const ofNeeds = chip.of === "equipment";
+  const lines = ofNeeds ? (row.needReads?.needs ?? []).map((n) => n.text) : split(row.text);
   const at = lines.indexOf(chip.line);
   if (at < 0 || !chip.fix) return;
   if (chip.fix.to === null) lines.splice(at, 1);
   else lines[at] = chip.fix.to;
-  row.text = join(lines);
+  if (ofNeeds) row.equipment = join(lines);
+  else row.text = join(lines);
   await save(row);
 }
 
 function keep(row: Row, chip: Chip) {
-  row.kept.add(chip.line);
+  (chip.of === "equipment" ? row.keptNeeds : row.kept).add(chip.line);
 }
 
 // Showing every row or only those with checks; in page order or as entered.
@@ -429,9 +524,10 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
             (<strong>Shift+Enter</strong> for a new line). Separate ingredients with
             <strong>;</strong> or a new line, and write a recipe printed elsewhere in the book as
             <strong>Name (p. 14)</strong>. Names only, no amounts. Under them, the equipment it
-            can't be made without, with commas between: <strong>stand mixer or hand mixer, 9-inch
-            springform pan</strong>; <strong>none</strong> if it needs nothing special; empty if
-            you don't know.
+            can't be made without, typed the same way (a comma works between them too):
+            <strong>stand mixer or hand mixer; 9-inch springform pan</strong>. Type
+            <strong>none</strong> if it needs nothing special, and leave it empty if you don't
+            know.
           </p>
         </details>
         <div class="table-head">
@@ -504,16 +600,19 @@ const unsaved = computed(() => rows.value.filter((r) => dirty(r) && r.status !==
                 placeholder="Ingredient; ingredient; Sub-recipe (p. 14)"
                 @keydown.enter="enter(rows.indexOf(row), $event)"
               />
-              <input
+              <textarea
                 v-model="row.equipment"
                 class="bulk-equipment"
                 aria-label="Equipment"
+                rows="1"
                 maxlength="2000"
                 spellcheck="false"
-                autocomplete="off"
-                placeholder="Equipment, or none"
+                placeholder="Equipment; equipment (or none)"
+                @keydown.enter="enter(rows.indexOf(row), $event)"
               />
-              <p v-if="summary(row)" class="bulk-summary">{{ summary(row) }}</p>
+              <p v-if="summaries(row).length" class="bulk-summary">
+                {{ summaries(row).join(" · ") }}
+              </p>
               <ul v-if="rowChips.get(row.key)!.length" class="bulk-chips">
                 <li
                   v-for="(chip, n) in rowChips.get(row.key)"
