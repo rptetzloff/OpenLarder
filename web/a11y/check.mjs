@@ -640,6 +640,23 @@ const IMPORT_COLUMNS = `(() => {
   for (const c of ["Source", "Recipe Name", "Pg #", "Ingredients", "Tag", "Equipment", "none"]) if (!columns.includes(c)) return "“How this works” doesn't name " + c;
   return "";
 })()`;
+// A recipe waiting for review lists the equipment it brings that isn't in
+// the list, as it lists its new ingredients, each with "Merge into…",
+// which opens a box to find the thing it's another name for.
+const REVIEW_NEW_EQUIPMENT = (open) => `(() => {
+  const block = [...document.querySelectorAll(".review-items .review-new")].find((d) => d.textContent.includes("New equipment"));
+  const item = block?.querySelector("li");
+  if (item?.querySelector("a")?.textContent.trim() !== "Pie bird") return "The waiting recipe's new equipment reads “" + (item?.textContent.replace(/\\s+/g, " ").trim() ?? "") + "”";
+  if (!item.querySelector("a").getAttribute("href").startsWith("/equipment/")) return "The new equipment isn't a link to its page";
+  const button = item.querySelector("button");
+  if (button?.textContent.trim() !== "Merge into…") return "The new equipment has no “Merge into…”";
+  if (${open}) {
+    const box = item.querySelector("input");
+    if (button.getAttribute("aria-expanded") !== "true" || !box) return "“Merge into…” opens no box to find the equipment in";
+    if (!document.querySelector('label[for="' + box.id + '"]')?.textContent.includes("Merge “Pie bird” into")) return "The box to find the equipment in has no label saying what it's for";
+  }
+  return "";
+})()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused). Each of the bar's links leads to
@@ -997,6 +1014,8 @@ async function seed() {
     title: "Waiting Pie",
     editions: [{ edition_id: waitingBook.editions[0].id, page: "3" }],
     ingredients: ["Apples", "Butter"],
+    // Something that isn't in the equipment list, which waits with it.
+    equipment: ["pie bird"],
   });
   // A change Cy suggests to a published recipe.
   const biscuitPage = await api(`/api/recipes/${biscuits.id}`, "admin");
@@ -1324,7 +1343,8 @@ function pages(s) {
     ["/admin/links", "admin"],
     ["/admin/people", "admin"],
     ["/admin/changes", "admin"],
-    ["/admin/review", "admin", { phone: true, expect: PROPOSED_EQUIPMENT }],
+    ["/admin/review", "admin", { phone: true, expect: `(${PROPOSED_EQUIPMENT}) || (${REVIEW_NEW_EQUIPMENT(false)})` }],
+    ["/admin/review", "admin", { phone: true, then: `[...document.querySelectorAll(".review-items .review-new")].find((d) => d.textContent.includes("New equipment")).querySelector("button").click()`, expect: onPhone(REVIEW_NEW_EQUIPMENT(true)) }],
     ["/admin/reports", "admin"],
     [`/sources/${s.waiting}`, "cook"],
     [`/recipes/${s.biscuits.id}/propose`, "cook", { phone: true, expect: FORM_NEEDS(["Matched: Biscuit cutter", "2 options, in the book's order", "Matched: Cast-iron skillet, 10-inch"]) }],

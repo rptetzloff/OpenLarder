@@ -275,6 +275,90 @@ async def test_a_waiting_recipe_shows_its_new_ingredients(people, adb) -> None:
     assert pie and tart
 
 
+async def test_a_waiting_recipe_shows_its_new_equipment(people, adb) -> None:
+    """As its new ingredients: the things it brings that aren't in the
+    equipment list, for a moderator to keep or merge into what each is
+    another name for."""
+    mo = await people("mo", role="moderator")
+    published = await _book(mo, "Pantry")
+    toast = (await mo.get(f"/api/sources/{published}")).json()
+    made = await mo.post(
+        f"/api/sources/{published}/recipes",
+        json={
+            "title": "Toast",
+            "editions": [{"edition_id": toast["editions"][0]["id"]}],
+            "ingredients": ["Butter"],
+            "equipment": ["toasting fork"],
+        },
+    )
+    assert made.status_code == 201, made.text
+    con = await people("con", role="contributor")
+    book = await _book(con)
+    edition = await _edition(adb, book)
+    for title, equipment in (
+        ("Pie", ["moonbeam press or wok", "Toasting fork", "moonbeam press"]),
+        ("Tart", ["Moonbeam Press", "pie bird"]),
+        ("Plain", []),
+    ):
+        made = await con.post(
+            f"/api/sources/{book}/recipes",
+            json={
+                "title": title,
+                "editions": [{"edition_id": edition}],
+                "ingredients": ["Butter"],
+                "equipment": equipment,
+            },
+        )
+        assert made.status_code == 201, made.text
+
+    # And one waiting in a book that's published, which is no more public
+    # than they are.
+    made = await con.post(
+        f"/api/sources/{published}/recipes",
+        json={
+            "title": "Crumpets",
+            "editions": [{"edition_id": toast["editions"][0]["id"]}],
+            "ingredients": ["Butter"],
+            "equipment": ["moonbeam press"],
+        },
+    )
+    assert made.status_code == 201, made.text
+
+    async def new() -> dict[str, list[str]]:
+        groups = (await mo.get("/api/review")).json()["groups"]
+        return {
+            r["title"]: [e["name"] for e in r["new_equipment"]]
+            for g in groups
+            for r in g["recipes"]
+        }
+
+    # A wok is in the list; a toasting fork isn't, but a published recipe
+    # needs one. The press and the pie bird come with waiting recipes alone.
+    assert await new() == {
+        "Pie": ["Moonbeam press"],
+        "Tart": ["Moonbeam press", "Pie bird"],
+        "Plain": [],
+        "Crumpets": ["Moonbeam press"],
+    }
+    # Merged into one that's in the list: it's that one's other name now,
+    # and not new.
+    press = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Moonbeam press'"))
+    wok = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Wok'"))
+    merged = await mo.post(f"/api/equipment/{press}/merge", json={"into": str(wok)})
+    assert merged.status_code == 200, merged.text
+    assert await new() == {"Pie": [], "Tart": ["Pie bird"], "Plain": [], "Crumpets": []}
+    assert (
+        await adb.scalar(
+            text("SELECT count(*) FROM equipment_aliases WHERE name = 'Moonbeam press'")
+        )
+        == 1
+    )
+    # Added to the list by a moderator, the pie bird is everyone's: not new.
+    listed = await mo.post("/api/equipment", json={"name": "Pie bird"})
+    assert listed.status_code in (200, 201), listed.text
+    assert await new() == {"Pie": [], "Tart": [], "Plain": [], "Crumpets": []}
+
+
 # Nothing waiting leaks
 
 

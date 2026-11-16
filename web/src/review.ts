@@ -12,6 +12,8 @@ export interface Item {
   created_at: string;
   // A recipe's ingredients no published recipe uses yet.
   new_ingredients: { id: string; name: string }[];
+  // And its equipment that isn't in the list and no published recipe needs.
+  new_equipment: { id: string; name: string }[];
 }
 
 export interface Group {

@@ -1290,10 +1290,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - A thing only a recipe hidden from the proposer or the
             moderator needs is worded as it was typed and counted new,
             to both.
-          - [ ] A recipe waiting for review lists its new ingredients for
-            the moderator, with "Merge into…" beside each. It doesn't
-            list the equipment it brings that isn't in the list. The
-            spec has a new thing go "through the same review".
+          - [x] A recipe waiting for review lists the equipment it brings
+            that isn't in the list, as it lists its new ingredients for
+            the moderator, with "Merge into…" beside each (#217). The
+            spec has a new thing go "through the same review". New
+            means not in the list and needed by no published recipe of
+            a public, published book.
+            - Approving keeps the thing with the recipe and out of the
+              list. Nothing on the Review page adds it to the list:
+              that is still done from the Equipment list.
           - [ ] Someone signed out sees no "Add it", as they see no
             "Suggest a change": nothing invites them to sign in for it.
         - [ ] The flag reason, "Equipment is wrong or missing".
