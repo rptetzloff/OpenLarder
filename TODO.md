@@ -1315,8 +1315,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             can't is told only that it isn't theirs to see.
           - Found on the way: the moderators' list said "A ingredient
             that's gone" and "A author that's gone". Fixed here.
-        - [ ] How many recipes have equipment recorded, on the admin
-          overview.
+        - [x] How many recipes have equipment recorded, on the admin
+          overview (#219): "Equipment is recorded on 7% of published
+          recipes: 3 of 44." Recorded is a need listed or nothing
+          special said. The share is never rounded to none or all:
+          "under 1%" and "over 99%" say so.
+          - It counts the recipes anyone can see. Family collections
+            and recipes waiting for review aren't counted, so the
+            numbers are the same for every moderator (*Claude's choice,
+            2026-11-16; the spec says "how many recipes"*).
+          - It is the overview's first number about the catalog, under
+            a heading of its own, "The catalog". It links nowhere:
+            search can't yet list the recipes with nothing recorded.
       - [ ] 3. My equipment, and search's three filters. *Ray,
         2026-11-15, asked whether a household group shares one equipment
         list, which the spec had left out of its first version: yes, as

@@ -699,6 +699,21 @@ const REPORTED_EQUIPMENT = `(() => {
   if (thing?.querySelector("a").textContent.trim() !== "Wok" || !words(thing).includes("· equipment ·")) return "The report of a piece of equipment reads “" + (thing ? words(thing) : "") + "”";
   return "";
 })()`;
+// The admin overview says how much of the published catalog has equipment
+// recorded (Ray's equipment spec, 2026-11-15), as a share and as the two
+// numbers it's a share of. The numbers are the server's, pinned in
+// tests/test_overview.py: here, that they're said and agree with each other.
+const EQUIPMENT_RECORDED = `(() => {
+  const line = [...document.querySelectorAll(".admin-page .catalog-stat")].map((p) => p.textContent.replace(/\\s+/g, " ").trim())[0] ?? "";
+  const said = line.match(/^Equipment is recorded on (under 1%|over 99%|\\d+%) of published recipes: ([\\d,]+) of ([\\d,]+)\\.$/);
+  if (!said) return "The overview's line about equipment reads “" + line + "”";
+  const [recorded, recipes] = [said[2], said[3]].map((n) => Number(n.replaceAll(",", "")));
+  if (!(recorded >= 2 && recorded < recipes)) return "The overview counts equipment on " + recorded + " of " + recipes + " recipes";
+  const percent = (100 * recorded) / recipes;
+  const share = percent < 1 ? "under 1%" : percent > 99 ? "over 99%" : Math.round(percent) + "%";
+  if (said[1] !== share) return "The overview calls " + recorded + " of " + recipes + " “" + said[1] + "”";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1356,7 +1371,7 @@ function pages(s) {
     ["/account", "cook", { expect: AGREEMENT_FOLDED }],
     ["/account", "cook", { phone: true, then: `document.querySelector(".agreement-panel details").open = true`, expect: AGREEMENT_FOLDED }],
     ["/account/flags", "admin"],
-    ["/admin", "admin"],
+    ["/admin", "admin", { phone: true, expect: EQUIPMENT_RECORDED }],
     ["/admin/flags", "admin", { phone: true, expect: `(${ADMIN_BAR("Flagged recipes")}) || (${EQUIPMENT_FLAGS})` }],
     [`/recipes/${s.imported}`, "admin", { phone: true, expect: EQUIPMENT_FLAGS }],
     ["/admin/import", "admin", { phone: true, then: `document.querySelector("main details.how").open = true`, expect: onPhone(IMPORT_COLUMNS) }],
