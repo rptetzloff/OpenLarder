@@ -5,9 +5,13 @@ can be recorded as needing, the most needed first; what any kitchen has
 (`assumed`) is left out unless asked for, since no recipe lists it. It can
 be narrowed by name, or by another name, as someone types.
 
-A recipe's needs can't be recorded yet (the recipe form's field comes
-next), so every count here is of none. They are counted all the same, of
-the recipes the viewer can see, so the list is right the day they can.
+A thing's page lists the recipes that need it, or anything that counts as
+it, each with how the need reads there. Every count is of the recipes the
+viewer can see. A thing a recipe's form brought in is seen with a recipe
+that needs it (visibility.equipment_seen_by).
+
+A need is checked as it's typed (POST /api/equipment/check), for the
+recipe form to say what it will be matched to before saving does it.
 
 Changing the list is for moderators, as changing the ingredient list is
 (*Ray's spec, 2026-11-15*): adding a thing, renaming it, merging it into
@@ -23,11 +27,17 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, exists, func, select
 
-from openlarder import equipment, visibility
-from openlarder.auth import ModeratorUser, SameOrigin, Viewer
+from openlarder import equipment, needs, visibility
+from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Equipment, EquipmentAlias, EquipmentCountsAs, EquipmentOption
-from openlarder.routers.ingredients import contains_pattern
+from openlarder.models import (
+    Equipment,
+    EquipmentAlias,
+    EquipmentCountsAs,
+    EquipmentOption,
+    Recipe,
+)
+from openlarder.routers.ingredients import UsedBy, contains_pattern, recipes_where
 
 router = APIRouter(prefix="/api/equipment", tags=["equipment"])
 
@@ -74,6 +84,11 @@ class EquipmentOut(BaseModel):
     # includes a stand mixer. A thing can count as more than one.
     counts_as: list[Related]
     includes: list[Related]
+    # A page of the recipes that need it, each with how the need reads
+    # (line): those needing exactly this, or with under, anything that
+    # counts as it too. And how many that list holds in all.
+    recipes: list[UsedBy] = []
+    listed_total: int = 0
     # Recipes recorded as needing exactly this.
     total: int
     # Recipes needing it or anything that counts as it.
@@ -169,7 +184,7 @@ async def as_signed_out(session, equipment_id: uuid.UUID) -> EquipmentOut | None
     None when they don't: what the server may write into a page before the
     browser does (pages.py)."""
     try:
-        return await get_equipment(equipment_id, session, None)
+        return await get_equipment(equipment_id, session, None, offset=0, under=True)
     except HTTPException as refused:
         if refused.status_code != status.HTTP_404_NOT_FOUND:
             raise
@@ -177,7 +192,14 @@ async def as_signed_out(session, equipment_id: uuid.UUID) -> EquipmentOut | None
 
 
 @router.get("/{equipment_id}", response_model=EquipmentOut)
-async def get_equipment(equipment_id: uuid.UUID, session: Session, viewer: Viewer) -> EquipmentOut:
+async def get_equipment(
+    equipment_id: uuid.UUID,
+    session: Session,
+    viewer: Viewer,
+    offset: int = Query(0, ge=0),
+    # List the recipes needing anything that counts as it too.
+    under: bool = False,
+) -> EquipmentOut:
     thing = await session.scalar(
         select(Equipment).where(Equipment.id == equipment_id, visibility.equipment_seen_by(viewer))
     )
@@ -216,16 +238,103 @@ async def get_equipment(equipment_id: uuid.UUID, session: Session, viewer: Viewe
                 EquipmentOption.equipment_id.in_(equipment.family(equipment_id)), viewer=viewer
             )
         )
+    named = (
+        EquipmentOption.equipment_id.in_(equipment.family(equipment_id))
+        if under
+        else EquipmentOption.equipment_id == equipment_id
+    )
+    recipes, listed_total = await recipes_where(
+        session,
+        Recipe.id.in_(select(EquipmentOption.recipe_id).where(named)),
+        visibility.recipes_seen_by(viewer),
+        offset=offset,
+    )
+    # Each listed recipe's need of it, as it reads: the first, if several.
+    met = set(
+        await session.scalars(
+            select(EquipmentOption.recipe_equipment_id).where(
+                EquipmentOption.recipe_id.in_([r.id for r in recipes]), named
+            )
+        )
+    )
+    reads = await needs.of_recipes(session, [r.id for r in recipes])
+    for r in recipes:
+        r.line = next(
+            (
+                needs.as_typed(detail, things)
+                for need_id, detail, things in reads.get(r.id, [])
+                if need_id in met
+            ),
+            None,
+        )
     return EquipmentOut(
         id=thing.id,
         name=thing.name,
         assumed=thing.assumed,
+        recipes=recipes,
+        listed_total=listed_total,
         aliases=[AliasOut(id=a, name=n) for a, n in aliases],
         counts_as=[Related(id=i, name=n) for i, n in counts_as],
         includes=includes,
         total=total or 0,
         family_total=family_total or 0,
     )
+
+
+# Checking needs as they're typed
+
+
+class NeedsIn(BaseModel):
+    needs: list[str] = Field(max_length=100)
+
+
+class OptionRead(BaseModel):
+    # As typed, without its size.
+    name: str
+    # What it will be matched to; none for a name the list doesn't have,
+    # which saving makes a new thing of.
+    equipment: Related | None = None
+    # Matched by another name for it.
+    alias: bool = False
+
+
+class NeedRead(BaseModel):
+    detail: str | None = None
+    options: list[OptionRead] = []
+    # Why saving would refuse it: something any kitchen has, a size alone.
+    problem: str | None = None
+
+
+@router.post("/check", response_model=list[NeedRead], dependencies=[SameOrigin])
+async def check_needs(body: NeedsIn, user: CurrentUser, session: Session) -> list[NeedRead]:
+    """Each need read as saving would read it. A thing the asker can't see
+    (one only a recipe hidden from them needs) is answered as new: that it
+    exists isn't theirs to learn."""
+    seen = set(
+        await session.scalars(select(Equipment.id).where(visibility.equipment_seen_by(user)))
+    )
+    out = []
+    for typed in body.needs:
+        try:
+            need = needs.read(typed)
+        except needs.Refused as refused:
+            out.append(NeedRead(problem=str(refused)))
+            continue
+        if need is None:
+            out.append(NeedRead())
+            continue
+        read = NeedRead(detail=need.detail)
+        for name in need.names:
+            found = await needs.held_by(session, equipment.match_key(name))
+            option = OptionRead(name=name)
+            if found and found[0].id in seen:
+                thing, option.alias = found
+                option.equipment = Related(id=thing.id, name=thing.name)
+                if thing.assumed:
+                    read.problem = needs.assumed_message(thing)
+            read.options.append(option)
+        out.append(read)
+    return out
 
 
 # Fixing the list
@@ -253,8 +362,12 @@ class Named(BaseModel):
     name: str
 
 
-async def _thing_or_404(session: Session, equipment_id: uuid.UUID) -> Equipment:
-    thing = await session.get(Equipment, equipment_id)
+async def _thing_or_404(session: Session, equipment_id: uuid.UUID, viewer) -> Equipment:
+    """The thing, if the moderator can see it: one a private recipe brought
+    in isn't theirs to change either."""
+    thing = await session.scalar(
+        select(Equipment).where(Equipment.id == equipment_id, visibility.equipment_seen_by(viewer))
+    )
     if thing is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such equipment.")
     return thing
@@ -303,7 +416,7 @@ async def add_equipment(body: NewEquipment, moderator: ModeratorUser, session: S
 async def rename_equipment(
     equipment_id: uuid.UUID, body: NameIn, moderator: ModeratorUser, session: Session
 ) -> Named:
-    thing = await _thing_or_404(session, equipment_id)
+    thing = await _thing_or_404(session, equipment_id, moderator)
     try:
         await equipment.rename(session, thing, body.name)
     except CHANGE_REFUSED as exc:
@@ -317,7 +430,7 @@ async def set_assumed(
     equipment_id: uuid.UUID, body: AssumedIn, moderator: ModeratorUser, session: Session
 ) -> Named:
     """Say whether any kitchen has it. One a recipe lists can't become so."""
-    thing = await _thing_or_404(session, equipment_id)
+    thing = await _thing_or_404(session, equipment_id, moderator)
     try:
         await equipment.set_assumed(session, thing, body.assumed)
     except CHANGE_REFUSED as exc:
@@ -331,8 +444,8 @@ async def merge_equipment(
     equipment_id: uuid.UUID, body: MergeInto, moderator: ModeratorUser, session: Session
 ) -> Named:
     """Merge this thing into another; answers with the one that's left."""
-    source = await _thing_or_404(session, equipment_id)
-    target = await _thing_or_404(session, body.into)
+    source = await _thing_or_404(session, equipment_id, moderator)
+    target = await _thing_or_404(session, body.into, moderator)
     try:
         await equipment.merge(session, source, target)
     except CHANGE_REFUSED as exc:
@@ -345,7 +458,7 @@ async def merge_equipment(
 async def delete_equipment(
     equipment_id: uuid.UUID, moderator: ModeratorUser, session: Session
 ) -> Response:
-    thing = await _thing_or_404(session, equipment_id)
+    thing = await _thing_or_404(session, equipment_id, moderator)
     try:
         await equipment.remove(session, thing)
     except CHANGE_REFUSED as exc:
@@ -364,7 +477,7 @@ async def add_alias(
     equipment_id: uuid.UUID, body: NameIn, moderator: ModeratorUser, session: Session
 ) -> AliasOut:
     """Another name for the thing, which a typed name then finds it by."""
-    thing = await _thing_or_404(session, equipment_id)
+    thing = await _thing_or_404(session, equipment_id, moderator)
     try:
         alias = await equipment.add_alias(session, thing, body.name)
     except CHANGE_REFUSED as exc:
@@ -382,6 +495,7 @@ async def delete_alias(
     equipment_id: uuid.UUID, alias_id: uuid.UUID, moderator: ModeratorUser, session: Session
 ) -> Response:
     """Stop finding the thing by this name."""
+    await _thing_or_404(session, equipment_id, moderator)
     alias = await session.get(EquipmentAlias, alias_id)
     if alias is None or alias.equipment_id != equipment_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such name for this equipment.")
@@ -398,8 +512,8 @@ async def count_as(
 ) -> Named:
     """Make this thing count as another, beside whatever it counts as
     already; answers with this thing."""
-    thing = await _thing_or_404(session, equipment_id)
-    broader = await _thing_or_404(session, broader_id)
+    thing = await _thing_or_404(session, equipment_id, moderator)
+    broader = await _thing_or_404(session, broader_id, moderator)
     try:
         await equipment.count_as(session, thing, broader)
     except CHANGE_REFUSED as exc:
@@ -416,8 +530,8 @@ async def count_as(
 async def stop_counting_as(
     equipment_id: uuid.UUID, broader_id: uuid.UUID, moderator: ModeratorUser, session: Session
 ) -> Response:
-    thing = await _thing_or_404(session, equipment_id)
-    broader = await _thing_or_404(session, broader_id)
+    thing = await _thing_or_404(session, equipment_id, moderator)
+    broader = await _thing_or_404(session, broader_id, moderator)
     await equipment.stop_counting_as(session, thing, broader)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

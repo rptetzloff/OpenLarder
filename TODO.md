@@ -1104,11 +1104,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             needed" order until one is more than that, and a thing's page
             has no table of recipes, no "Search with this" and no "Shop".
             Each comes with what makes it work.
-          - [ ] A thing a private recipe alone needs is everyone's to see,
-            which is right while the list is seeded. When the recipe form
-            can add a thing (step 2), one only a hidden recipe needs has
-            to be hidden as such an ingredient is: one function,
-            `visibility.equipment_seen_by`, which every read already asks.
+          - [x] A thing a recipe's form brings in is seen only with a
+            recipe that needs it (#211, migration 0081: `listed`). What's
+            in the list stays everyone's, whatever needs it.
           - [ ] `equipment.wikidata_id` and `shopping_term` are in the
             table, as the spec has them, with nothing yet that sets
             either.
@@ -1155,8 +1153,51 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] 2. The recipe form's field, bulk entry's and the import's; the
         "Needs" block on a recipe's page; the flag reason; how many
         recipes have equipment recorded, on the admin overview.
-      - [ ] 3. My equipment, and search's three filters.
-      - [ ] 4. The suggestion queue, from titles, tags and sources.
+        - [x] The recipe form's field and the "Needs" block (#211;
+          migration 0081). A need a box, checked as it's typed: "stand
+          mixer or hand mixer" is one need with two options, and a size
+          ("9-inch") is kept apart from the thing. "Nothing special" is a
+          tick; with neither, the recipe stays "not recorded yet". The
+          recipe's page has "Needs" above its ingredients, or one line
+          saying it needs nothing special or isn't recorded, with "Add
+          it" for whoever may change it. A thing's page lists the recipes
+          that need it; the list counts them and can be sorted by that.
+          `equipment` and `equipment_checked` are on the recipe in the
+          API; a save that leaves `equipment` out leaves the needs as
+          they are.
+          - A name the list doesn't have makes a thing that isn't in the
+            list, seen only with a recipe that needs it: private with a
+            private recipe, waiting with a waiting one, and removed when
+            no recipe needs it. A moderator adding that name to the list
+            makes it everyone's.
+          - What any kitchen has is refused, as it's typed and on saving,
+            in the same words; a recipe and its needs save together or
+            not at all.
+          - The spec's two sentences with an article in them were
+            written without one, since the names don't all take one
+            ("Ramekins", "Oven mitts"): "“Mixing bowl” is expected in any
+            kitchen, so it isn't recorded." and "Needs: Ice cream maker."
+          - [ ] A moderator who types, for the list, a name that a hidden
+            thing has as another name is told it's taken, with a thing
+            they can't open. They learn only that a name they typed is in
+            use.
+          - [ ] A need read from "9 inch pan" keeps the size as typed
+            ("9 inch", "9-inch", `9"` are three sizes to a search); none
+            is made the same as another.
+        - [ ] Bulk entry's cell and the import's field.
+        - [ ] "Add it" for someone who can't change the recipe, through a
+          suggested change; a suggested change doesn't carry equipment
+          yet, so the form leaves the field out there.
+        - [ ] The flag reason, "Equipment is wrong or missing".
+        - [ ] How many recipes have equipment recorded, on the admin
+          overview.
+      - [ ] 3. My equipment, and search's three filters. *Ray,
+        2026-11-15, asked whether a household group shares one equipment
+        list, which the spec had left out of its first version: yes, as
+        a larder is shared.*
+      - [ ] 4. The suggestion queue, from titles, tags and sources. *Ray,
+        2026-11-15, asked whether he wanted it, the spec having taken
+        "agree on all" to mean so: yes.*
       - [ ] 5. Shop links, with their clicks and the disclosure.
       - [x] Equipment is a section of the header, not a link in the
         footer (#208). *Ray, 2026-11-15*, of the footer the spec had put
@@ -1169,8 +1210,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         *Ray, 2026-11-15: "Yes, gone."* The spec had a pair of them
         beside the footer link, #208 built them, and with Equipment one
         link along in the header they led nowhere new.
-      - [ ] Not decided (the spec's list): whether a household group can
-        share one equipment list.
+      - [x] Decided (the spec's list had it open): a household group
+        can share one equipment list. *Ray, 2026-11-15.* It comes with
+        My equipment, step 3.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the

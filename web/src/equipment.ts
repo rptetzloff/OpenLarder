@@ -1,5 +1,7 @@
 // Equipment: what /api/equipment returns (routers/equipment.py).
 
+import type { Listed } from "./ingredients";
+
 export interface Related {
   id: string;
   name: string;
@@ -30,6 +32,10 @@ export interface Equipment {
   // A stand mixer counts as a mixer, and a mixer includes a stand mixer.
   counts_as: Related[];
   includes: Related[];
+  // A page of the recipes that need it, each with how the need reads
+  // there; and how many that list holds in all.
+  recipes: (Listed & { line: string | null })[];
+  listed_total: number;
   // Recipes needing exactly this; and it or anything that counts as it.
   total: number;
   family_total: number;
@@ -51,9 +57,17 @@ export async function listEquipment(
   return res.json();
 }
 
-// null: there's none with this id.
-export async function fetchEquipment(id: string): Promise<Equipment | null> {
-  const res = await fetch(`/api/equipment/${id}`);
+// null: there's none with this id. under: list the recipes needing
+// anything that counts as it too.
+export async function fetchEquipment(
+  id: string,
+  offset = 0,
+  under = false,
+): Promise<Equipment | null> {
+  const query = new URLSearchParams();
+  if (offset) query.set("offset", String(offset));
+  if (under) query.set("under", "true");
+  const res = await fetch(`/api/equipment/${id}?${query}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error("This equipment couldn't be loaded.");
   return res.json();
@@ -123,4 +137,23 @@ export async function countAs(id: string, broader: string): Promise<Related> {
 
 export async function stopCountingAs(id: string, broader: string): Promise<void> {
   await send(`/api/equipment/${id}/counts-as/${broader}`, "DELETE");
+}
+
+// A need as saving would read it, for the recipe form to say before it's
+// saved: what each thing typed will be matched to (none: a new thing), and
+// why saving would refuse it, if it would.
+export interface NeedRead {
+  detail: string | null;
+  options: { name: string; equipment: Related | null; alias: boolean }[];
+  problem: string | null;
+}
+
+export async function checkNeeds(needs: string[]): Promise<NeedRead[]> {
+  const res = await fetch("/api/equipment/check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ needs }),
+  });
+  if (!res.ok) throw new Error("The equipment couldn't be checked.");
+  return res.json();
 }

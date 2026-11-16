@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import AdminBand from "../components/AdminBand.vue";
 import Crumbs from "../components/Crumbs.vue";
 import EquipmentPicker from "../components/EquipmentPicker.vue";
@@ -18,24 +18,35 @@ import {
   stopCountingAs,
   Taken,
 } from "../equipment";
+import { whereItIs } from "../ingredients";
 import type { Me } from "../me";
 
 // One piece of equipment: what it is called, what it counts as and what
 // counts as it; for a moderator, the tools that change those (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused), as an ingredient's page has its own.
-// The recipes that need it come with the recipe form's field for them, the
-// button to search with it with search's filter, and the one to shop for
-// it with the shop links: nothing here that doesn't work yet.
+// Under them, the recipes that need it, with what counts as it unless only
+// this exact thing is asked for. The button to search with it comes with
+// search's filter, and the one to shop for it with the shop links: nothing
+// here that doesn't work yet.
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
 const equipment = ref<Equipment | null>(null);
 const missing = ref(false);
 const failed = ref(false);
 
-async function load() {
+const loading = ref(false);
+// The recipes needing anything that counts as it too, unless only this
+// exact thing is asked for, as an ingredient's page has it.
+const exact = ref(false);
+const hasNarrower = computed(() => !!equipment.value?.includes.length);
+
+async function load(more = false) {
+  loading.value = true;
   try {
-    const found = await fetchEquipment(props.id);
+    const offset = more ? (equipment.value?.recipes.length ?? 0) : 0;
+    const found = await fetchEquipment(props.id, offset, !exact.value);
     if (found === null) missing.value = true;
+    else if (more && equipment.value) equipment.value.recipes.push(...found.recipes);
     else {
       equipment.value = found;
       newName.value = found.name;
@@ -43,7 +54,15 @@ async function load() {
     }
   } catch {
     failed.value = true;
+  } finally {
+    loading.value = false;
   }
+}
+
+// Where a listed recipe is in its source, without the authors the table's
+// Source column doesn't need.
+function where(r: Equipment["recipes"][number]) {
+  return whereItIs({ ...r, authors: [] }) || "—";
 }
 
 // Fixing it, for moderators.
@@ -127,7 +146,7 @@ async function remove() {
   }
 }
 
-onMounted(load);
+onMounted(() => load());
 </script>
 
 <template>
@@ -205,6 +224,44 @@ onMounted(load);
           </p>
         </div>
       </div>
+
+      <section v-if="!equipment.assumed && equipment.family_total" class="source-section">
+        <div class="table-head">
+          <h2>Recipes needing {{ equipment.name.toLowerCase() }}</h2>
+          <label v-if="hasNarrower" class="check"
+            ><input v-model="exact" type="checkbox" @change="load()" /> Only this exact thing</label
+          >
+        </div>
+        <table v-if="equipment.recipes.length" class="recipe-table uses-table">
+          <thead>
+            <tr>
+              <th scope="col">Recipe</th>
+              <th scope="col">Source</th>
+              <th scope="col">Where</th>
+              <th scope="col">Need as listed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in equipment.recipes" :key="r.id">
+              <td><a :href="`/recipes/${r.id}`" class="strong">{{ r.title }}</a></td>
+              <td class="uses-source"><a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a></td>
+              <td class="muted uses-where">{{ where(r) }}</td>
+              <td class="lines">{{ r.line }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="status">No recipe lists exactly this.</p>
+        <button
+          v-if="equipment.recipes.length < equipment.listed_total"
+          type="button"
+          class="secondary show-more"
+          :disabled="loading"
+          @click="load(true)"
+        >
+          Show more ({{ (equipment.listed_total - equipment.recipes.length).toLocaleString() }}
+          left)
+        </button>
+      </section>
 
       <section v-if="user?.may_edit" class="fix-ingredient source-section">
         <h2>Fix this equipment</h2>

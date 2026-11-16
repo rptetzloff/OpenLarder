@@ -386,22 +386,86 @@ const IN_HEADER = (here) => `(() => {
 })()`;
 // The Equipment list is what a recipe can list. What any kitchen has is
 // there only when asked for (the switch, or its name typed), and says so.
-// A thing that counts as two says both, each a link. How many recipes
-// need each is a column only once any does, and nothing here records a
-// need yet: so no column, and no way to sort by it.
+// A thing that counts as two says both, each a link. How many recipes need
+// each is a column, with a way to sort by it, where any on the page is
+// needed by one: each thing a recipe can list then has its count, and
+// what any kitchen has has none. The whole list has it, the biscuits
+// needing three things.
 const EQUIPMENT_LIST = (assumed, atLeast = 50) => `(() => {
   const rows = [...document.querySelectorAll(".equipment-list tbody tr")];
   if (rows.length < ${atLeast}) return "The equipment list has " + rows.length + " rows";
   const said = (r) => r.textContent.replace(/\\s+/g, " ").trim();
   const any = rows.filter((r) => said(r).includes("Expected in any kitchen"));
   if (${assumed} !== any.length > 0) return any.length + " rows are of what any kitchen has";
-  if (document.querySelector(".equipment-list .numeric, #equipment-sort")) return "The list counts recipes, or sorts by them, when none is recorded as needing anything";
+  const column = !!document.querySelector(".equipment-list th.numeric");
+  if (column !== !!document.querySelector("#equipment-sort")) return "The list has a Recipes column without a way to sort by it, or the other way round";
+  if (column) {
+    const counted = any.find((r) => r.querySelector("td.numeric")?.textContent.trim());
+    if (counted) return "“" + counted.querySelector("a").textContent.trim() + "” is any kitchen's, with a count";
+    const bare = rows.find((r) => !any.includes(r) && !/^\\d/.test(r.querySelector("td.numeric")?.textContent.trim() ?? ""));
+    if (bare) return "“" + bare.querySelector("a").textContent.trim() + "” has no count";
+  }
   if (rows.length < 50) return "";
+  if (!column) return "The list doesn't count the recipes that need each thing";
+  const stand = rows.find((r) => r.querySelector("a.strong").textContent.trim() === "Stand mixer");
+  if (!/^1/.test(stand?.querySelector("td.numeric")?.textContent.trim() ?? "")) return "Stand mixer isn't counted as needed by one recipe";
   const multi = rows.find((r) => r.querySelector("a.strong").textContent.trim() === "Multicooker");
   if (!multi) return "Multicooker isn't in the list";
   if (multi.querySelectorAll('.more a[href^="/equipment/"]').length !== 2 || !said(multi).includes("Counts as Pressure cooker and Slow cooker"))
     return "Multicooker's line reads “" + said(multi) + "”";
   return "";
+})()`;
+// A recipe's page says what it can't be made without, above its
+// ingredients, in three states (Ray's equipment spec, 2026-11-15). Its
+// needs: a row each, what meets it as links 44px to tap with "or" between
+// a choice, and a size beside it. Or one line: "No special equipment.", or
+// that it isn't recorded yet, which is never said as the other. Whoever
+// may change the recipe has "Add it" there, 44px to tap.
+const NEEDS = (rows) => `(() => {
+  const block = document.querySelector("section.recipe-needs");
+  if (!block) return "The recipe's page has no Needs";
+  const ingredients = [...document.querySelectorAll("section.recipe-section")].find((x) => x.querySelector("h2")?.textContent.includes("Ingredients"));
+  if (!(block.compareDocumentPosition(ingredients) & Node.DOCUMENT_POSITION_FOLLOWING)) return "Needs isn't above the ingredients";
+  const said = [...block.querySelectorAll("li")].map((li) => li.textContent.replace(/\\s+/g, " ").trim());
+  if (said.join(" | ") !== ${JSON.stringify(rows.join(" | "))}) return "Needs reads “" + said.join(" | ") + "”";
+  const short = [...block.querySelectorAll('li a[href^="/equipment/"]')].find((a) => a.getBoundingClientRect().height < 44);
+  if (short) return "“" + short.textContent.trim() + "” is " + Math.round(short.getBoundingClientRect().height) + "px to tap";
+  // Each thing a row names is a link to it: the row, without its size, is its links with "or" between them.
+  const named = (li) => { const row = li.cloneNode(true); row.querySelector(".page-ref")?.remove(); return row.textContent.replace(/\\s+/g, " ").trim(); };
+  const plain = [...block.querySelectorAll("li")].find((li) => named(li) !== [...li.querySelectorAll('a[href^="/equipment/"]')].map((a) => a.textContent.trim()).join(" or "));
+  if (plain) return "A thing in “" + named(plain) + "” isn't a link to its equipment";
+  return "";
+})()`;
+const NEEDS_LINE = (words, addIt) => `(() => {
+  if (document.querySelector("section.recipe-needs")) return "The recipe's page lists needs";
+  const line = document.querySelector("p.recipe-needs");
+  const said = line?.textContent.replace(/\\s+/g, " ").trim() ?? "";
+  if (said !== ${JSON.stringify(words)} + (${addIt} ? " Add it" : "")) return "Under the title the page says “" + said + "”";
+  const link = line.querySelector("a");
+  if (${addIt} && (!link?.getAttribute("href").endsWith("/edit#equipment") || link.getBoundingClientRect().height < 44)) return "“Add it” doesn't lead to the form's Equipment, or isn't 44px to tap";
+  return "";
+})()`;
+// The recipe form's Equipment, after the ingredients: a box a need, each
+// saying what it was matched to, and "Nothing special", which can't be
+// ticked while a need is typed.
+const FORM_NEEDS = (hints) => `(() => {
+  const heading = document.querySelector("#equipment");
+  if (heading?.textContent.trim() !== "Equipment") return "The form has no Equipment";
+  const rows = [...document.querySelectorAll(".need-rows .line-row")];
+  const said = rows.map((r) => r.querySelector(".line-tag")?.textContent.replace(/\\s+/g, " ").trim()).filter(Boolean);
+  if (said.join(" | ") !== ${JSON.stringify(hints.join(" | "))}) return "The needs' checks read “" + said.join(" | ") + "”";
+  const unnamed = rows.find((r) => !/^Equipment \\d+$/.test(r.querySelector("input").getAttribute("aria-label") ?? ""));
+  if (unnamed) return "A need's box has no name";
+  const none = document.querySelector(".need-none input");
+  if (!none) return "The form has no “Nothing special”";
+  if (${hints.length > 0} !== none.disabled) return "“Nothing special” can be ticked with a need typed, or can't with none";
+  return "";
+})()`;
+// A piece of equipment's page lists the recipes that need it, each with
+// how the need reads there.
+const EQUIPMENT_RECIPES = (rows) => `(() => {
+  const found = [...document.querySelectorAll(".equipment-page .uses-table tbody tr")].map((tr) => tr.querySelector("a").textContent.trim() + ": " + tr.querySelector("td.lines").textContent.trim());
+  return found.join(" | ") === ${JSON.stringify(rows.join(" | "))} ? "" : "The recipes needing it read “" + found.join(" | ") + "”";
 })()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
@@ -671,19 +735,23 @@ async function seed() {
     isbn: "9780393541113",
   });
   const edition = (await api(`/api/sources/${book.id}`, "admin")).editions[0].id;
-  const recipe = (title, page, ingredients) =>
+  const recipe = (title, page, ingredients, more = {}) =>
     api(`/api/sources/${book.id}/recipes`, "admin", {
       title,
       editions: [{ edition_id: edition, page }],
       ingredients,
+      ...more,
     });
-  const blend = await recipe("Biscuit Blend", "14", ["Glutinous rice flour", "Cornstarch"]);
-  const biscuits = await recipe("Cheddar Biscuits", "22", [
-    "Biscuit Blend (p. 14)",
-    "Aged cheddar",
-    "Butter or coconut oil",
-    "Pie crust (p. 99)",
-  ]);
+  // What a recipe can't be made without, in its three states: the blend
+  // is said to need nothing special, the biscuits have needs (one with a
+  // choice, one with a size), and the rest aren't recorded.
+  const blend = await recipe("Biscuit Blend", "14", ["Glutinous rice flour", "Cornstarch"], { nothing_special: true });
+  const biscuits = await recipe(
+    "Cheddar Biscuits",
+    "22",
+    ["Biscuit Blend (p. 14)", "Aged cheddar", "Butter or coconut oil", "Pie crust (p. 99)"],
+    { equipment: ["biscuit cutter", "stand mixer or hand mixer", "10-inch cast-iron skillet"] },
+  );
   // Tags on the recipe and on its book, so both kinds of chip show.
   const allTags = await api("/api/tags", "admin");
   const tagged = (name) => allTags.find((t) => t.name === name).id;
@@ -956,7 +1024,7 @@ async function seed() {
   // that counts as two others, one that includes it, one with nothing to
   // say, and one any kitchen has.
   const kit = (await api("/api/equipment?assumed=true", "admin")).equipment;
-  const [multicooker, slowCooker, wok, stovetop, blender] = ["Multicooker", "Slow cooker", "Wok", "Stovetop", "Blender"].map(
+  const [multicooker, slowCooker, wok, stovetop, blender, standMixer, mixer] = ["Multicooker", "Slow cooker", "Wok", "Stovetop", "Blender", "Stand mixer", "Mixer"].map(
     (name) => kit.find((e) => e.name === name).id,
   );
   // And one a moderator added, named with the long word, called it too and
@@ -965,7 +1033,7 @@ async function seed() {
   const wordyKit = (await api("/api/equipment", "admin", { name: LONG })).id;
   await api(`/api/equipment/${wordyKit}/aliases`, "admin", { name: `Old ${LONG}` });
   await api(`/api/equipment/${wordyKit}/counts-as/${blender}`, "admin", undefined, "PUT");
-  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit };
+  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit, standMixer, mixer };
 }
 
 // Script that presses the button whose words begin so; with none, it throws,
@@ -1003,13 +1071,16 @@ function pages(s) {
     [`/sources/${s.show.id}/recipes/new`, "admin"],
     [`/sources/${s.box.id}/recipes/new`, "cook"],
     [`/sources/${s.book.id}/bulk`, "admin"],
-    [`/recipes/${s.biscuits.id}`, null, { expect: `(${CRUMBS}) || (${BUY_OUTLINED})` }],
+    [`/recipes/${s.biscuits.id}`, null, { phone: true, expect: `(${CRUMBS}) || (${BUY_OUTLINED}) || (${NEEDS(["Biscuit cutter", "Stand mixer or Hand mixer", "Cast-iron skillet 10-inch"])})` }],
+    [`/recipes/${s.blend.id}`, null, { expect: NEEDS_LINE("No special equipment.", false) }],
     [`/recipes/${s.biscuits.id}`, "admin"],
-    [`/recipes/${s.web.id}`, null],
+    [`/recipes/${s.web.id}`, null, { expect: NEEDS_LINE("Equipment not recorded yet.", false) }],
+    [`/recipes/${s.web.id}`, "admin", { phone: true, expect: NEEDS_LINE("Equipment not recorded yet.", true) }],
     [`/recipes/${s.issue.id}`, null],
     [`/recipes/${s.episode.id}`, null],
     [`/recipes/${s.pie.id}`, "cook"],
-    [`/recipes/${s.biscuits.id}/edit`, "admin"],
+    [`/recipes/${s.biscuits.id}/edit`, "admin", { phone: true, expect: FORM_NEEDS(["Matched: Biscuit cutter", "Matched: Stand mixer or Hand mixer", "Matched: Cast-iron skillet, 10-inch"]) }],
+    [`/recipes/${s.blend.id}/edit`, "admin", { expect: FORM_NEEDS([]) }],
     ["/ingredients", null, { expect: IN_HEADER("Ingredients") }],
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
@@ -1023,6 +1094,8 @@ function pages(s) {
     ["/equipment", "cook", { expect: NO_TOOLS }],
     ["/equipment", "admin", { phone: true, then: `document.querySelector("main details.add-panel").open = true`, expect: ADD_EQUIPMENT }],
     [`/equipment/${s.multicooker}`, "cook", { expect: NO_TOOLS }],
+    [`/equipment/${s.standMixer}`, null, { phone: true, expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe")})` }],
+    [`/equipment/${s.mixer}`, null, { expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe, including everything it includes")})` }],
     [`/equipment/${s.multicooker}`, "admin", { expect: `(${ADMIN_BAR("This equipment")}) || (${EQUIPMENT_TOOLS})` }],
     [`/equipment/${s.multicooker}`, "admin", { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("This equipment") }],
     [`/equipment/${s.stovetop}`, "admin", { expect: EQUIPMENT_TOOLS }],

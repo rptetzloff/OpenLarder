@@ -437,6 +437,13 @@ async def recent_changes(
     only theirs to see."""
     seen_ingredients = select(Ingredient.id).where(visibility.ingredients_seen_by(moderator))
     seen_authors = select(Author.id).where(visibility.authors_seen_by(moderator))
+    seen_equipment = select(Equipment.id).where(visibility.equipment_seen_by(moderator))
+    # A thing in the list is everyone's, also once it's deleted, when
+    # nothing can be asked of it but what its revision kept: so a deletion
+    # can be seen, and undone.
+    listed = func.coalesce(
+        Revision.changes["listed"][1].astext, Revision.changes["listed"][0].astext
+    )
     shown = and_(
         Revision.family.is_(false()),
         ~_hidden(moderator),
@@ -449,7 +456,18 @@ async def recent_changes(
                     "authors",
                     "author_links",
                     "substitutions",
+                    "equipment",
+                    "equipment_aliases",
+                    "equipment_counts_as",
                 )
+            ),
+            and_(
+                Revision.table_name == "equipment",
+                or_(Revision.record_id.in_(seen_equipment), listed == "true"),
+            ),
+            and_(
+                Revision.table_name.in_(("equipment_aliases", "equipment_counts_as")),
+                Revision.parent_id.in_(seen_equipment),
             ),
             and_(Revision.table_name == "ingredients", Revision.record_id.in_(seen_ingredients)),
             and_(

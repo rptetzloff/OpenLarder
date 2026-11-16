@@ -362,6 +362,60 @@ async def test_a_page_with_no_record_to_show_has_no_summary(people, client) -> N
 # An ingredient's page and an author's
 
 
+async def test_a_recipes_page_says_what_it_needs(admin, adb, client) -> None:
+    """Ray's equipment spec, 2026-11-15: in the body summary, and in the
+    description where it fits."""
+    book = await _book(admin)
+    recipe = await _recipe(admin, adb, book, title="Vanilla Ice Cream", ingredients=("Cream",))
+    edition = await adb.scalar(
+        text("SELECT id FROM editions WHERE source_id = :s LIMIT 1"), {"s": uuid.UUID(book)}
+    )
+    body = {
+        "title": "Vanilla Ice Cream",
+        "editions": [{"edition_id": str(edition), "page": "190"}],
+        "ingredients": ["Cream"],
+    }
+
+    async def saved(**equipment) -> str:
+        changed = await admin.put(f"/api/recipes/{recipe}", json={**body, **equipment})
+        assert changed.status_code == 200, changed.text
+        return (await client.get(f"/recipes/{recipe}")).text
+
+    # Not recorded: nothing said of it.
+    page = (await client.get(f"/recipes/{recipe}")).text
+    assert "Needs" not in page and "special equipment" not in page
+
+    page = await saved(equipment=["ice cream maker", "9-inch loaf pan or cake pan"])
+    named = {
+        n: await adb.scalar(text("SELECT id FROM equipment WHERE name = :n"), {"n": n})
+        for n in ("Ice cream maker", "Loaf pan", "Round cake pan")
+    }
+    assert (
+        "<h2>Needs</h2><ul>"
+        f'<li><a href="/equipment/{named["Ice cream maker"]}">Ice cream maker</a></li>'
+        f'<li>9-inch <a href="/equipment/{named["Loaf pan"]}">Loaf pan</a> or '
+        f'<a href="/equipment/{named["Round cake pan"]}">Round cake pan</a></li></ul>'
+        "<h2>Ingredients</h2>" in page
+    )
+    [description] = _content(page, "description")
+    assert description == (
+        "Vanilla Ice Cream is on page 190 of Against All Grain by Danielle Walker."
+        " Ingredients: Cream. Needs: Ice cream maker; 9-inch Loaf pan or Round cake pan."
+    )
+    assert len(description) <= pages.DESCRIPTION_MAX
+
+    # Too long to fit: the description is as it was, and the summary has it.
+    page = await saved(
+        equipment=["ice cream maker", "stand mixer or hand mixer", "candy thermometer", "wok"]
+    )
+    [description] = _content(page, "description")
+    assert description.endswith("Ingredients: Cream.") and "<h2>Needs</h2>" in page
+
+    page = await saved(nothing_special=True, equipment=[])
+    assert "<p>No special equipment.</p><h2>Ingredients</h2>" in page
+    assert "Needs" not in _content(page, "description")[0]
+
+
 async def test_a_piece_of_equipments_page_has_its_own_head_and_summary(adb, client) -> None:
     named = {
         n: str(await adb.scalar(text("SELECT id FROM equipment WHERE name = :n"), {"n": n}))
@@ -370,8 +424,8 @@ async def test_a_piece_of_equipments_page_has_its_own_head_and_summary(adb, clie
     page = (await client.get(f"/equipment/{named['Multicooker']}")).text
     assert _tag(page, "<title>(.*?)</title>") == ["Multicooker · Equipment · OpenLarder"]
     assert _content(page, "description") == [
-        "Multicooker is equipment a recipe indexed on OpenLarder can be recorded as needing."
-        " None is yet. Also called Electric pressure cooker, Instant Pot."
+        "No recipe indexed on OpenLarder lists Multicooker as needed yet."
+        " Also called Electric pressure cooker, Instant Pot."
     ]
     assert _content(page, "og:url") == [f"http://testserver/equipment/{named['Multicooker']}"]
     body = page[page.index('<div id="app">') :]
