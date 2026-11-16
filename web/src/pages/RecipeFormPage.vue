@@ -473,15 +473,16 @@ async function save(another = false) {
         chapter: chapter.value.trim() || null,
         ingredients: lines.value,
     };
-    // A suggested change doesn't carry equipment yet, so the recipe's
-    // stays as it is; a save says what it is now.
+    // What the recipe's equipment is now, said by a save and by a suggested
+    // change alike (a suggestion had carried none, and "Add it" was only
+    // for whoever could change the recipe).
     const whole = {
       ...body,
       equipment: nothingSpecial.value ? [] : needs.value,
       nothing_special: nothingSpecial.value,
     };
     if (props.propose && props.recipeId) {
-      await proposeChange(props.recipeId, { ...body, reason: reason.value.trim() || null });
+      await proposeChange(props.recipeId, { ...whole, reason: reason.value.trim() || null });
       location.href = `/recipes/${props.recipeId}?proposed=1`;
       return;
     }
@@ -846,103 +847,101 @@ async function save(another = false) {
               <span class="help">Enter starts a new line; pasting several lines fills that many.</span>
             </p>
 
-            <template v-if="!propose">
-              <h3 id="equipment" class="form-heading">Equipment</h3>
-              <p class="help">
-                What it can't be made without, a need a line: “ice cream maker”, “9-inch springform
-                pan”, “stand mixer or hand mixer”. Not what any kitchen has: a knife, a bowl, a
-                baking sheet. Leave it empty if you don't know, and it stays “not recorded yet”.
-              </p>
-              <ol class="line-rows need-rows">
-                <li v-for="(row, i) in needRows" :key="row.key" class="line-row">
-                  <div class="line-main">
-                    <div class="line-input">
-                      <input
-                        :ref="(el) => (needInputs[i] = el as HTMLInputElement)"
-                        v-model="row.text"
-                        :aria-label="`Equipment ${i + 1}`"
-                        :aria-describedby="needHints[i] ? `need-hint-${row.key}` : undefined"
-                        maxlength="150"
-                        spellcheck="false"
-                        :placeholder="i === 0 ? 'ice cream maker' : ''"
-                        :disabled="nothingSpecial"
-                        @keydown.enter.prevent="addNeed(i)"
-                        @paste="pasteNeeds(i, $event)"
-                      />
-                      <button
-                        v-if="needRows.length > 1"
-                        type="button"
-                        class="remove"
-                        :aria-label="`Remove equipment ${i + 1}`"
-                        title="Remove"
-                        @click="removeNeed(i)"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <p
-                      v-if="needHints[i]"
-                      :id="`need-hint-${row.key}`"
-                      class="line-tag"
-                      :class="`tone-${needHints[i]!.tone}`"
+            <h3 id="equipment" class="form-heading">Equipment</h3>
+            <p class="help">
+              What it can't be made without, a need a line: “ice cream maker”, “9-inch springform
+              pan”, “stand mixer or hand mixer”. Not what any kitchen has: a knife, a bowl, a
+              baking sheet. Leave it empty if you don't know, and it stays “not recorded yet”.
+            </p>
+            <ol class="line-rows need-rows">
+              <li v-for="(row, i) in needRows" :key="row.key" class="line-row">
+                <div class="line-main">
+                  <div class="line-input">
+                    <input
+                      :ref="(el) => (needInputs[i] = el as HTMLInputElement)"
+                      v-model="row.text"
+                      :aria-label="`Equipment ${i + 1}`"
+                      :aria-describedby="needHints[i] ? `need-hint-${row.key}` : undefined"
+                      maxlength="150"
+                      spellcheck="false"
+                      :placeholder="i === 0 ? 'ice cream maker' : ''"
+                      :disabled="nothingSpecial"
+                      @keydown.enter.prevent="addNeed(i)"
+                      @paste="pasteNeeds(i, $event)"
+                    />
+                    <button
+                      v-if="needRows.length > 1"
+                      type="button"
+                      class="remove"
+                      :aria-label="`Remove equipment ${i + 1}`"
+                      title="Remove"
+                      @click="removeNeed(i)"
                     >
-                      {{ needHints[i]!.text }}
-                    </p>
+                      ×
+                    </button>
                   </div>
-                  <template v-if="needHints[i]">
-                    <ol v-if="needHints[i]!.read.options.length > 1" class="line-options">
-                      <li v-for="(o, n) in needHints[i]!.read.options" :key="n">
-                        {{ needOptionText(o) }}
-                        <span class="muted">· {{ n === 0 ? "first choice" : "or this" }}</span>
-                      </li>
-                    </ol>
-                    <div v-if="needHints[i]!.tone === 'warn'" class="line-actions">
-                      <template v-if="needHints[i]!.refused">
-                        <button type="button" class="secondary small" @click="removeNeed(i)">
-                          Remove
-                        </button>
-                        <span>Saving refuses it.</span>
-                      </template>
-                      <template v-else>
-                        <template v-if="needHints[i]!.read.options[0].similar.length">
-                          <span>Did you mean</span>
-                          <button
-                            v-for="s in needHints[i]!.read.options[0].similar"
-                            :key="s.id"
-                            type="button"
-                            class="secondary small"
-                            @click="replaceNeed(i, needNamed(needHints[i]!.read, s.name))"
-                          >
-                            {{ s.name }}
-                          </button>
-                        </template>
+                  <p
+                    v-if="needHints[i]"
+                    :id="`need-hint-${row.key}`"
+                    class="line-tag"
+                    :class="`tone-${needHints[i]!.tone}`"
+                  >
+                    {{ needHints[i]!.text }}
+                  </p>
+                </div>
+                <template v-if="needHints[i]">
+                  <ol v-if="needHints[i]!.read.options.length > 1" class="line-options">
+                    <li v-for="(o, n) in needHints[i]!.read.options" :key="n">
+                      {{ needOptionText(o) }}
+                      <span class="muted">· {{ n === 0 ? "first choice" : "or this" }}</span>
+                    </li>
+                  </ol>
+                  <div v-if="needHints[i]!.tone === 'warn'" class="line-actions">
+                    <template v-if="needHints[i]!.refused">
+                      <button type="button" class="secondary small" @click="removeNeed(i)">
+                        Remove
+                      </button>
+                      <span>Saving refuses it.</span>
+                    </template>
+                    <template v-else>
+                      <template v-if="needHints[i]!.read.options[0].similar.length">
+                        <span>Did you mean</span>
                         <button
+                          v-for="s in needHints[i]!.read.options[0].similar"
+                          :key="s.id"
                           type="button"
                           class="secondary small"
-                          @click="keptNeeds.set(row.key, row.text)"
+                          @click="replaceNeed(i, needNamed(needHints[i]!.read, s.name))"
                         >
-                          It's new
+                          {{ s.name }}
                         </button>
                       </template>
-                    </div>
-                  </template>
-                </li>
-              </ol>
-              <p class="line-add">
-                <button type="button" class="secondary" :disabled="nothingSpecial" @click="addNeed()">
-                  + Add equipment
-                </button>
-                <span class="help">Enter starts a new line; pasting several lines fills that many.</span>
-              </p>
-              <label class="check need-none"
-                ><input
-                  v-model="nothingSpecial"
-                  type="checkbox"
-                  :disabled="neededFilled.length > 0"
-                />
-                Nothing special: only what any kitchen has</label
-              >
-            </template>
+                      <button
+                        type="button"
+                        class="secondary small"
+                        @click="keptNeeds.set(row.key, row.text)"
+                      >
+                        It's new
+                      </button>
+                    </template>
+                  </div>
+                </template>
+              </li>
+            </ol>
+            <p class="line-add">
+              <button type="button" class="secondary" :disabled="nothingSpecial" @click="addNeed()">
+                + Add equipment
+              </button>
+              <span class="help">Enter starts a new line; pasting several lines fills that many.</span>
+            </p>
+            <label class="check need-none"
+              ><input
+                v-model="nothingSpecial"
+                type="checkbox"
+                :disabled="neededFilled.length > 0"
+              />
+              Nothing special: only what any kitchen has</label
+            >
             <button type="submit" class="primary">Next</button>
           </form>
 
@@ -969,25 +968,23 @@ async function save(another = false) {
                 <button type="button" class="secondary small" @click="go(3)">Look again</button>
               </p>
             </template>
-            <template v-if="!propose">
-              <h3 class="review-heading">Equipment</h3>
-              <ol v-if="neededFilled.length" class="review-lines">
-                <li v-for="row in neededFilled" :key="row.key">{{ row.text.trim() }}</li>
-              </ol>
-              <p v-else class="muted">
-                {{ nothingSpecial ? "Nothing special." : "Not recorded yet." }}
-              </p>
-              <p v-if="needsRefused" class="muted">
-                {{ needsRefused }} need{{ needsRefused === 1 ? " is" : "s are" }} of something saving
-                refuses.
-                <button type="button" class="secondary small" @click="go(3)">Fix {{ needsRefused === 1 ? "it" : "them" }}</button>
-              </p>
-              <p v-else-if="needChecksLeft" class="muted">
-                {{ needChecksLeft }} need{{ needChecksLeft === 1 ? " has" : "s have" }} a check on
-                {{ needChecksLeft === 1 ? "it" : "them" }}; they save as typed.
-                <button type="button" class="secondary small" @click="go(3)">Look again</button>
-              </p>
-            </template>
+            <h3 class="review-heading">Equipment</h3>
+            <ol v-if="neededFilled.length" class="review-lines">
+              <li v-for="row in neededFilled" :key="row.key">{{ row.text.trim() }}</li>
+            </ol>
+            <p v-else class="muted">
+              {{ nothingSpecial ? "Nothing special." : "Not recorded yet." }}
+            </p>
+            <p v-if="needsRefused" class="muted">
+              {{ needsRefused }} need{{ needsRefused === 1 ? " is" : "s are" }} of something saving
+              refuses.
+              <button type="button" class="secondary small" @click="go(3)">Fix {{ needsRefused === 1 ? "it" : "them" }}</button>
+            </p>
+            <p v-else-if="needChecksLeft" class="muted">
+              {{ needChecksLeft }} need{{ needChecksLeft === 1 ? " has" : "s have" }} a check on
+              {{ needChecksLeft === 1 ? "it" : "them" }}; they save as typed.
+              <button type="button" class="secondary small" @click="go(3)">Look again</button>
+            </p>
             <template v-if="propose">
               <label for="propose-reason" class="form-heading">Why (optional)</label>
               <textarea

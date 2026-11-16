@@ -1274,9 +1274,28 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [ ] The recipe list's column names were written down nowhere
             but the code until now. The book list's still aren't on the
             page.
-        - [ ] "Add it" for someone who can't change the recipe, through a
-          suggested change; a suggested change doesn't carry equipment
-          yet, so the form leaves the field out there.
+        - [x] "Add it" for someone who can't change the recipe, through a
+          suggested change (#216). A suggested change carries the
+          recipe's equipment as it carries its ingredients (*Ray,
+          2026-11-16: treated the same*): the form shows the Equipment
+          boxes when suggesting, with the same checks; what saving would
+          refuse can't be suggested either; the moderator sees
+          "Equipment" beside the other differences, in its three states
+          and worded as it will be saved, with what it would add that
+          isn't in the list and what that's named like; applying it
+          saves it as the contributor's. "Add it", on a recipe whose
+          equipment isn't recorded, leads whoever may suggest a change
+          to those boxes. A suggestion that says nothing of equipment,
+          as every one made before this, leaves it as it is.
+          - A thing only a recipe hidden from the proposer or the
+            moderator needs is worded as it was typed and counted new,
+            to both.
+          - [ ] A recipe waiting for review lists its new ingredients for
+            the moderator, with "Merge into…" beside each. It doesn't
+            list the equipment it brings that isn't in the list. The
+            spec has a new thing go "through the same review".
+          - [ ] Someone signed out sees no "Add it", as they see no
+            "Suggest a change": nothing invites them to sign in for it.
         - [ ] The flag reason, "Equipment is wrong or missing".
         - [ ] How many recipes have equipment recorded, on the admin
           overview.

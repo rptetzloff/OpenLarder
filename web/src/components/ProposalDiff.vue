@@ -41,4 +41,23 @@ defineProps<{ proposal: Proposal }>();
       </li>
     </ul>
   </div>
+  <!-- The same for equipment that isn't in the list. -->
+  <div v-if="proposal.new_equipment?.length" class="review-new">
+    <p>
+      Applying it adds {{ proposal.new_equipment.length === 1 ? "a piece of equipment" : "equipment" }}
+      that isn't in the list. If {{ proposal.new_equipment.length === 1 ? "it's" : "one is" }}
+      something already there written differently, decline and say which.
+    </p>
+    <ul>
+      <li v-for="n in proposal.new_equipment" :key="n.name">
+        {{ n.name }}
+        <template v-if="n.similar.length">
+          <span class="muted"> · like </span>
+          <template v-for="(s, i) in n.similar" :key="s.id"
+            ><template v-if="i">, </template><a :href="`/equipment/${s.id}`">{{ s.name }}</a></template
+          >
+        </template>
+      </li>
+    </ul>
+  </div>
 </template>
