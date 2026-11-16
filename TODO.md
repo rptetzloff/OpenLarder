@@ -1083,8 +1083,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         requests:
         - [x] The tables, the list and the public pages (#208; migration
           0079). 140 things to start: 32 any kitchen has, 108 a recipe can
-          list. `/equipment`, a page for each thing, its section in the
-          header and the tabs over the Ingredients list; the server fills both pages
+          list. `/equipment`, a page for each thing and its section in
+          the header; the server fills both pages
           and the sitemap lists them; `/api/equipment`; the dumps. A
           recipe's needs have their tables and `recipes.equipment_checked`,
           and nothing writes to them yet.
@@ -1129,6 +1129,10 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         (992px), where it started at 56rem, and from 897px to 992px the
         header is the Menu, as on a tablet. The check looks at 996px
         too, where the row is tightest now.
+      - [x] No tabs over the Ingredients and Equipment lists (#209).
+        *Ray, 2026-11-15: "Yes, gone."* The spec had a pair of them
+        beside the footer link, #208 built them, and with Equipment one
+        link along in the header they led nowhere new.
       - [ ] Not decided (the spec's list): whether a household group can
         share one equipment list.
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,

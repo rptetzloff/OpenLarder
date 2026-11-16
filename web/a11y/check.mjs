@@ -364,27 +364,24 @@ const COUNT_SAID = (words) => `(() => {
 const COUNTS_AS = HIERARCHY(["Counts as"], ["Includes"]);
 const INCLUDES = HIERARCHY(["Includes"], ["Counts as"]);
 const NEITHER = HIERARCHY([], ["Counts as", "Includes"]);
-// Equipment (Ray's spec, 2026-11-15). Ingredients and Equipment are a pair
-// of tabs over each list: two links, the page's own marked and its heading
-// the same word, each 44px to tap. And Equipment is a section of the
-// header, beside Ingredients, in the row or in the Menu, whichever shows;
-// not a link in the footer, where the spec had it (Ray, the same day).
-const CATALOG_TABS = (here) => `(() => {
-  const nav = document.querySelector('main nav[aria-label="Ingredients and equipment"]');
-  if (!nav) return "The list has no tabs for Ingredients and Equipment";
-  const tabs = [...nav.querySelectorAll("a")];
-  const words = tabs.map((a) => a.textContent.trim());
-  if (words.join("|") !== "Ingredients|Equipment") return "The tabs read " + words.join(", ");
-  const marked = tabs.filter((a) => a.getAttribute("aria-current") === "page").map((a) => a.textContent.trim());
-  if (marked.join() !== ${JSON.stringify(here)}) return "The tab marked as this page is " + (marked.join() || "none") + ", not ${here}";
-  const short = tabs.find((a) => a.getBoundingClientRect().height < 44);
-  if (short) return "The " + short.textContent.trim() + " tab is " + Math.round(short.getBoundingClientRect().height) + "px to tap";
-  const heading = document.querySelector("main h1")?.textContent.trim();
-  if (heading !== ${JSON.stringify(here)}) return "Under the ${here} tab the heading is " + heading;
-  const sections = [...document.querySelectorAll('.site-header nav[aria-label="Main"]')].map((nav) => [...nav.querySelectorAll("a")].map((a) => a.textContent.trim()).join(", "));
+// Equipment is a section of the header, after Ingredients, in the row or in
+// the Menu, whichever shows, and the one marked on its own pages. Nowhere
+// else: not a link in the footer, where the spec had it, and not a pair of
+// tabs over the two lists, which it had too and which were there for a
+// day (Ray, 2026-11-15, of each).
+const IN_HEADER = (here) => `(() => {
+  const navs = [...document.querySelectorAll('.site-header nav[aria-label="Main"]')];
+  const sections = navs.map((nav) => [...nav.querySelectorAll("a")].map((a) => a.textContent.trim()).join(", "));
   const without = sections.find((said) => !said.includes("Ingredients, Equipment"));
   if (!sections.length || without !== undefined) return "The header's sections read “" + (without ?? "") + "”, without Equipment after Ingredients";
+  const marked = navs.map((nav) => [...nav.querySelectorAll('a[aria-current="page"]')].map((a) => a.textContent.trim()).join());
+  const wrong = marked.find((said) => said !== ${JSON.stringify(here)});
+  if (wrong !== undefined) return "The header marks “" + wrong + "” as this page, not ${here}";
+  const heading = document.querySelector("main h1")?.textContent.trim();
+  if (heading !== ${JSON.stringify(here)}) return "The page's heading is " + heading + ", not ${here}";
   if (document.querySelector('footer a[href="/equipment"]')) return "Equipment is a link in the footer";
+  const tabs = [...document.querySelectorAll("main nav")].find((nav) => nav.querySelector('a[href="/equipment"]') && nav.querySelector('a[href="/ingredients"]'));
+  if (tabs) return "The list has tabs for Ingredients and Equipment over it";
   return "";
 })()`;
 // The Equipment list is what a recipe can list. What any kitchen has is
@@ -980,13 +977,13 @@ function pages(s) {
     [`/recipes/${s.episode.id}`, null],
     [`/recipes/${s.pie.id}`, "cook"],
     [`/recipes/${s.biscuits.id}/edit`, "admin"],
-    ["/ingredients", null, { expect: CATALOG_TABS("Ingredients") }],
+    ["/ingredients", null, { expect: IN_HEADER("Ingredients") }],
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
     [`/ingredients/${s.cheddar}`, null, { expect: `(${COUNTS_AS}) || (${CRUMBS})` }],
     [`/ingredients/${s.cheddar}`, "admin", { expect: `(${COUNTS_AS}) || (${ADMIN_BAR("This ingredient")})` }],
     [`/ingredients/${s.cheese}`, null, { expect: `(${INCLUDES}) || (${ALLERGEN_NOTICE})` }],
-    ["/equipment", null, { phone: true, expect: `(${CATALOG_TABS("Equipment")}) || (${EQUIPMENT_LIST(false)}) || (${COUNT_SAID("/^\\d+ pieces of equipment\\.$/")})` }],
+    ["/equipment", null, { phone: true, expect: `(${IN_HEADER("Equipment")}) || (${EQUIPMENT_LIST(false)}) || (${COUNT_SAID("/^\\d+ pieces of equipment\\.$/")})` }],
     ["/equipment?assumed=true&sort=name", null, { phone: true, expect: EQUIPMENT_LIST(true) }],
     ["/equipment?q=frying+pan", null, { expect: `(${EQUIPMENT_LIST(true, 1)}) || (${COUNT_SAID("/^1 piece of equipment matches “frying pan”\\.$/")})` }],
     ["/equipment?q=no+such+thing", null],
