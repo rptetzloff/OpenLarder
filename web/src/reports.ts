@@ -1,16 +1,31 @@
 // Reports: "Report a problem" on a public record, and the moderators' queue
 // (routers/reports.py).
 
-export type Kind = "recipe" | "source" | "ingredient" | "author";
-export type Reason = "wrong" | "duplicate" | "copied" | "spam" | "other";
+export type Kind = "recipe" | "source" | "ingredient" | "author" | "equipment";
+export type Reason = "wrong" | "duplicate" | "copied" | "spam" | "other" | "equipment";
 
-export const REASONS: { reason: Reason; label: string }[] = [
+// `only` names the one kind of record a reason is offered on.
+export const REASONS: { reason: Reason; label: string; only?: Kind }[] = [
   { reason: "wrong", label: "Something's wrong (a page, a title, an ingredient)" },
+  // Ray's equipment spec, 2026-11-15, in its words. A recipe's alone:
+  // nothing else has equipment recorded, and the server refuses it there.
+  { reason: "equipment", label: "Equipment is wrong or missing", only: "recipe" },
   { reason: "duplicate", label: "It's here twice" },
   { reason: "copied", label: "It copies text it shouldn't (a method, a headnote)" },
   { reason: "spam", label: "Spam, or not a real record" },
   { reason: "other", label: "Something else" },
 ];
+
+export const reasonsFor = (kind: Kind) => REASONS.filter((r) => !r.only || r.only === kind);
+
+// A kind of record as a sentence starts with it ("An ingredient that's gone").
+export const A_RECORD: Record<Kind, string> = {
+  recipe: "A recipe",
+  source: "A source",
+  ingredient: "An ingredient",
+  author: "An author",
+  equipment: "A piece of equipment",
+};
 
 export interface Report {
   id: string;

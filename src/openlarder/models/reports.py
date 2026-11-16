@@ -1,5 +1,5 @@
 """Reports of a problem with a public record (migration 0049,
-routers/reports.py)."""
+routers/reports.py; equipment in 0083)."""
 
 import uuid
 from datetime import datetime
@@ -15,10 +15,17 @@ class Report(Base):
     __tablename__ = "reports"
     __table_args__ = (
         CheckConstraint(
-            "target_kind IN ('recipe', 'source', 'ingredient', 'author')", name="target_kind_known"
+            "target_kind IN ('recipe', 'source', 'ingredient', 'author', 'equipment')",
+            name="target_kind_known",
         ),
         CheckConstraint(
-            "reason IN ('wrong', 'duplicate', 'copied', 'spam', 'other')", name="reason_known"
+            "reason IN ('wrong', 'duplicate', 'copied', 'spam', 'other', 'equipment')",
+            name="reason_known",
+        ),
+        # "Equipment is wrong or missing" is said of a recipe: nothing else
+        # has equipment recorded.
+        CheckConstraint(
+            "reason <> 'equipment' OR target_kind = 'recipe'", name="equipment_reason_on_recipe"
         ),
         CheckConstraint("status IN ('open', 'resolved', 'dismissed')", name="status_known"),
         Index("ix_reports_target", "target_kind", "target_id"),
@@ -26,8 +33,9 @@ class Report(Base):
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    # What it's about: a recipe, source, ingredient or author, by id (not a
-    # key, so a report outlives a merge; the queue says when it's gone).
+    # What it's about: a recipe, source, ingredient, author or piece of
+    # equipment, by id (not a key, so a report outlives a merge; the queue
+    # says when it's gone).
     target_kind: Mapped[str] = mapped_column(Text, nullable=False)
     target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)

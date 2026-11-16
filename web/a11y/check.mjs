@@ -676,6 +676,29 @@ const EQUIPMENT_TOOLS = `(() => {
   if (!document.querySelector("details.history-panel")) return "The page has no History";
   return "";
 })()`;
+// "Report a problem" (Ray, 2026-11-10), opened. A recipe's offers
+// "Equipment is wrong or missing" (Ray's equipment spec, 2026-11-15) and
+// nothing else's does: only a recipe has equipment recorded. A piece of
+// equipment's page has the button, as an ingredient's has.
+const REPORT_BUTTON = `[...document.querySelectorAll(".report-problem button")].some((b) => b.textContent.trim() === "Report a problem") ? "" : "The page has no “Report a problem”"`;
+const OPEN_REPORT = `document.querySelector(".report-problem button").click()`;
+const REPORT_REASONS = (equipment) => `(() => {
+  const reasons = [...document.querySelectorAll(".report-form fieldset label")].map((l) => l.textContent.trim());
+  if (reasons.length < 5) return "The report's form offers " + reasons.length + " reasons";
+  if (reasons.includes("Equipment is wrong or missing") !== ${equipment}) return "The report's form " + (${equipment} ? "doesn't offer" : "offers") + " “Equipment is wrong or missing”: " + reasons.join(" | ");
+  return "";
+})()`;
+// The moderators' list says both: the reason in the spec's words on the
+// recipe's report, and the piece of equipment as a link to its page.
+const REPORTED_EQUIPMENT = `(() => {
+  const items = [...document.querySelectorAll(".report-list > li")];
+  const words = (e) => e.textContent.replace(/\\s+/g, " ").trim();
+  const recipe = items.find((li) => li.querySelector(".report-reason strong")?.textContent.trim() === "Equipment is wrong or missing");
+  if (!recipe?.querySelector('a[href^="/recipes/"]')) return "No recipe's report says “Equipment is wrong or missing”";
+  const thing = items.find((li) => li.querySelector('a[href^="/equipment/"]'));
+  if (thing?.querySelector("a").textContent.trim() !== "Wok" || !words(thing).includes("· equipment ·")) return "The report of a piece of equipment reads “" + (thing ? words(thing) : "") + "”";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1221,6 +1244,10 @@ async function seed() {
   const [multicooker, slowCooker, wok, stovetop, blender, standMixer, mixer] = ["Multicooker", "Slow cooker", "Wok", "Stovetop", "Blender", "Stand mixer", "Mixer"].map(
     (name) => kit.find((e) => e.name === name).id,
   );
+  // Two more problems reported: a recipe's equipment, which is a reason of
+  // its own, and a piece of equipment.
+  await api("/api/reports", "admin", { kind: "recipe", id: biscuits.id, reason: "equipment", note: "It needs a rolling pin." });
+  await api("/api/reports", "cook", { kind: "equipment", id: wok, reason: "duplicate", note: "Also here as a karahi." });
   // And one a moderator added, named with the long word, called it too and
   // counting as something: what a person typed, on the list and its page,
   // with a history to show.
@@ -1345,7 +1372,10 @@ function pages(s) {
     ["/admin/changes", "admin"],
     ["/admin/review", "admin", { phone: true, expect: `(${PROPOSED_EQUIPMENT}) || (${REVIEW_NEW_EQUIPMENT(false)})` }],
     ["/admin/review", "admin", { phone: true, then: `[...document.querySelectorAll(".review-items .review-new")].find((d) => d.textContent.includes("New equipment")).querySelector("button").click()`, expect: onPhone(REVIEW_NEW_EQUIPMENT(true)) }],
-    ["/admin/reports", "admin"],
+    ["/admin/reports", "admin", { expect: REPORTED_EQUIPMENT }],
+    [`/recipes/${s.biscuits.id}`, null, { phone: true, then: OPEN_REPORT, expect: onPhone(REPORT_REASONS(true)) }],
+    [`/equipment/${s.wok}`, null, { phone: true, then: OPEN_REPORT, expect: `innerWidth >= 640 ? (${REPORT_BUTTON}) : (${REPORT_REASONS(false)})` }],
+    [`/ingredients/${s.cheddar}`, null, { phone: true, then: OPEN_REPORT, expect: onPhone(REPORT_REASONS(false)) }],
     [`/sources/${s.waiting}`, "cook"],
     [`/recipes/${s.biscuits.id}/propose`, "cook", { phone: true, expect: FORM_NEEDS(["Matched: Biscuit cutter", "2 options, in the book's order", "Matched: Cast-iron skillet, 10-inch"]) }],
     [`/sources/${s.book.id}/propose`, "cook"],

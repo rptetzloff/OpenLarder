@@ -1,6 +1,8 @@
 """Reports: "Report a problem" on public records (routers/reports.py)."""
 
+import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from openlarder.routers import reports
 
@@ -108,3 +110,89 @@ async def test_a_report_outlives_its_record(people, adb) -> None:
     await mo.delete(f"/api/recipes/{recipe}")
     [left] = (await mo.get("/api/admin/reports")).json()["reports"]
     assert (left["title"], left["href"]) == (None, None)
+
+
+async def test_a_recipes_equipment_is_a_reason_of_its_own(people, client, adb) -> None:
+    """ "Equipment is wrong or missing" is said of a recipe, by anyone, and of
+    nothing else: nothing else has equipment recorded."""
+    mo = await people("mo", role="moderator")
+    book, recipe = await _recipe(mo, adb)
+    r = await client.post(
+        "/api/reports",
+        json={"kind": "recipe", "id": recipe, "reason": "equipment", "note": "It needs a tagine."},
+    )
+    assert r.status_code == 201, r.text
+    [only] = (await mo.get("/api/admin/reports")).json()["reports"]
+    assert (only["kind"], only["reason"], only["note"]) == (
+        "recipe",
+        "equipment",
+        "It needs a tagine.",
+    )
+    wok = str(await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Wok'")))
+    eggs = str(await adb.scalar(text("SELECT id FROM ingredients LIMIT 1")))
+    for kind, target in (("source", book), ("ingredient", eggs), ("equipment", wok)):
+        refused = await client.post(
+            "/api/reports", json={"kind": kind, "id": target, "reason": "equipment"}
+        )
+        assert refused.status_code == 422, (kind, refused.text)
+        assert refused.json()["detail"] == reports.NOT_A_RECIPE
+    assert await adb.scalar(text("SELECT count(*) FROM reports")) == 1
+    # And the database won't hold one, whatever wrote it.
+    insert = text(
+        "INSERT INTO reports (target_kind, target_id, reason, reporter)"
+        " VALUES (:kind, :id, 'equipment', 'user:someone')"
+    )
+    with pytest.raises(IntegrityError):
+        async with adb.begin_nested():
+            await adb.execute(insert, {"kind": "source", "id": book})
+    async with adb.begin_nested():
+        await adb.execute(insert, {"kind": "recipe", "id": recipe})
+
+
+async def test_a_piece_of_equipment_is_reported_as_an_ingredient_is(people, client, adb) -> None:
+    mo = await people("mo", role="moderator")
+    wok = str(await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Wok'")))
+    r = await client.post(
+        "/api/reports",
+        json={"kind": "equipment", "id": wok, "reason": "duplicate", "note": "Also a karahi."},
+    )
+    assert r.status_code == 201, r.text
+    [only] = (await mo.get("/api/admin/reports")).json()["reports"]
+    assert (only["kind"], only["title"], only["href"], only["reason"]) == (
+        "equipment",
+        "Wok",
+        f"/equipment/{wok}",
+        "duplicate",
+    )
+    # A thing that isn't in the list is seen only with a recipe that needs
+    # it. One typed into a family's collection is theirs: nobody else can
+    # report it, and a moderator isn't told its name.
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Box", "acknowledged": True})
+    ).json()["id"]
+    made = await ann.post(
+        f"/api/sources/{box}/recipes",
+        json={"title": "Nana's", "ingredients": ["eggs"], "equipment": ["moonbeam press"]},
+    )
+    assert made.status_code == 201, made.text
+    press = str(await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Moonbeam press'")))
+    theirs = {"kind": "equipment", "id": press, "reason": "wrong"}
+    assert (await client.post("/api/reports", json=theirs)).status_code == 404
+    assert (await mo.post("/api/reports", json=theirs)).status_code == 404
+    assert (await ann.post("/api/reports", json=theirs)).status_code == 201
+    hidden = (await mo.get("/api/admin/reports")).json()["reports"][1]
+    assert (hidden["kind"], hidden["title"], hidden["href"]) == ("equipment", None, None)
+    # Merged into another, the wok is gone, and its report says so.
+    other = str(
+        await adb.scalar(
+            text(
+                "SELECT id FROM equipment WHERE listed AND NOT assumed AND name <> 'Wok'"
+                " ORDER BY name LIMIT 1"
+            )
+        )
+    )
+    merged = await mo.post(f"/api/equipment/{wok}/merge", json={"into": other})
+    assert merged.status_code == 200, merged.text
+    gone = (await mo.get("/api/admin/reports")).json()["reports"][0]
+    assert (gone["note"], gone["title"], gone["href"]) == ("Also a karahi.", None, None)
