@@ -9,7 +9,8 @@ without it. `--confirm <host>` answers that in advance, for a script.
 
 *Ray, 2026-11-10.* The catalog goes, family collections included: sources
 and all that hangs off them (editions, buy links and their clicks, issues,
-episodes, web pages, credits), recipes and their lines, ingredients,
+episodes, web pages, credits), recipes with their lines and the equipment
+each needs, ingredients,
 aliases and swaps, authors, and the tags given to sources and recipes. With
 them: which ingredients each producer supplies (the producers stay),
 people's larder items (the lists stay, empty), shelves, saved recipes,
@@ -27,7 +28,9 @@ after it starts again as a new user, the owner too: make yourself owner
 again by hand (roles.py).
 
 Never emptied: the tag list (the seeded diets, courses, cuisines and
-techniques, and any added since, which the app expects), FoodData
+techniques, and any added since, which the app expects), the equipment
+list the same way (what there is, its other names and what counts as
+what: migration 0079's, and any change since), FoodData
 Central's foods (reference data, not the catalog's), the shops and their
 affiliate settings (the site's configuration, not its catalog), and the
 schema's version.
@@ -70,6 +73,8 @@ CATALOG = (
     "recipe_locations",
     "recipe_ingredients",
     "ingredient_options",
+    "recipe_equipment",
+    "equipment_options",
     "recipe_tags",
     "recipe_flags",
     "ingredients",
@@ -117,7 +122,17 @@ PEOPLE = (
 )
 # Never emptied. A new table must be named in one of the three lists
 # (tests/test_reset.py), so the reset never misses one.
-KEPT = ("alembic_version", "tags", "fdc_foods", "allergens", "diet_allergens", "shops")
+KEPT = (
+    "alembic_version",
+    "tags",
+    "fdc_foods",
+    "allergens",
+    "diet_allergens",
+    "shops",
+    "equipment",
+    "equipment_aliases",
+    "equipment_counts_as",
+)
 # A catalog reset's history kept: the tag list's, and what diets avoid.
 HISTORY_KEPT = ("tags", "diet_allergens")
 
@@ -196,11 +211,12 @@ async def _main(confirm: str | None, everything: bool) -> int:
             return 0
         if everything:
             print(
-                "Everything goes but the tag list. Anyone signing in afterwards is a new user,"
+                "Everything goes but the tag and equipment lists. Anyone signing in afterwards"
+                " is a new user,"
                 " you too: make yourself owner again by hand."
             )
         else:
-            print("Accounts, groups, larder lists, requests and the tag list stay.")
+            print("Accounts, groups, larder lists, requests and the tag and equipment lists stay.")
         try:
             answer = confirm if confirm is not None else input(f"Type {host} to go ahead: ")
         except EOFError:
@@ -211,7 +227,9 @@ async def _main(confirm: str | None, everything: bool) -> int:
             return 1
         await reset(session, everything)
         await session.commit()
-    print("Emptied, all but the tag list." if everything else "The catalog is empty.")
+    print(
+        "Emptied, all but the tag and equipment lists." if everything else "The catalog is empty."
+    )
     return 0
 
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
+import CatalogTabs from "../components/CatalogTabs.vue";
 import { type IngredientSummary, listIngredients } from "../ingredients";
 
 document.title = "Ingredients · OpenLarder";
@@ -63,6 +64,7 @@ onMounted(() => load());
 
 <template>
   <article class="wide ingredients-page">
+    <CatalogTabs here="ingredients" />
     <div class="list-head">
       <h1>Ingredients</h1>
       <p class="muted">

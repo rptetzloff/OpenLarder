@@ -359,6 +359,10 @@ class Recipe(Reviewed, Timestamps, Base):
     # Who added it, so they can see its flags. Null for recipes added before
     # migration 0012, or whose account was deleted.
     created_by: Mapped[uuid.UUID | None] = _fk("users.id", ondelete="SET NULL", nullable=True)
+    # Whether anyone has said what equipment it needs (models/equipment.py).
+    # False: not recorded yet, which is not "nothing special"; true with no
+    # needs: nothing special; needs with false: at least these.
+    equipment_checked: Mapped[bool] = mapped_column(nullable=False, server_default=false())
 
 
 class WebPage(Timestamps, Base):

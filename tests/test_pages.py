@@ -362,6 +362,96 @@ async def test_a_page_with_no_record_to_show_has_no_summary(people, client) -> N
 # An ingredient's page and an author's
 
 
+async def test_a_piece_of_equipments_page_has_its_own_head_and_summary(adb, client) -> None:
+    named = {
+        n: str(await adb.scalar(text("SELECT id FROM equipment WHERE name = :n"), {"n": n}))
+        for n in ("Multicooker", "Pressure cooker", "Slow cooker", "Stovetop")
+    }
+    page = (await client.get(f"/equipment/{named['Multicooker']}")).text
+    assert _tag(page, "<title>(.*?)</title>") == ["Multicooker · Equipment · OpenLarder"]
+    assert _content(page, "description") == [
+        "Multicooker is equipment a recipe indexed on OpenLarder can be recorded as needing."
+        " None is yet. Also called Electric pressure cooker, Instant Pot."
+    ]
+    assert _content(page, "og:url") == [f"http://testserver/equipment/{named['Multicooker']}"]
+    body = page[page.index('<div id="app">') :]
+    assert (
+        '<nav aria-label="Breadcrumb"><a href="/equipment">Equipment</a></nav>'
+        "<h1>Multicooker</h1>"
+        f'<p>Counts as <a href="/equipment/{named["Pressure cooker"]}">Pressure cooker</a> and '
+        f'<a href="/equipment/{named["Slow cooker"]}">Slow cooker</a>.</p>'
+        "<p>Also called Electric pressure cooker, Instant Pot.</p>" in body
+    )
+    [trail] = [d for d in _data(page) if d["@type"] == "BreadcrumbList"]
+    assert [i["name"] for i in trail["itemListElement"]] == ["Equipment", "Multicooker"]
+    # What it counts as says what it includes.
+    page = (await client.get(f"/equipment/{named['Slow cooker']}")).text
+    assert (
+        f'<p>Includes <a href="/equipment/{named["Multicooker"]}">Multicooker</a>.</p>'
+        in page[page.index('<div id="app">') :]
+    )
+    # What any kitchen has says why no recipe lists it.
+    page = (await client.get(f"/equipment/{named['Stovetop']}")).text
+    # Its apostrophe is written as an entity, as any value in the head is.
+    assert [html.unescape(said) for said in _content(page, "description")] == [
+        "Stovetop is expected in any kitchen, so recipes indexed on OpenLarder don't list it."
+        " Also called Hob, Stove."
+    ]
+    assert "<p>Expected in any kitchen, so recipes don't list it.</p>" in page
+
+
+async def test_equipments_description_counts_the_recipes_that_need_it(admin, adb, client) -> None:
+    book = await _book(admin)
+    for title, thing in (
+        ("Banana Bread", "Stand mixer"),
+        ("Sponge", "Stand mixer"),
+        ("Rolls", "Hand mixer"),
+    ):
+        made = uuid.UUID(await _recipe(admin, adb, book, title=title, page="7"))
+        need = await adb.scalar(
+            text("INSERT INTO recipe_equipment (recipe_id, position) VALUES (:r, 1) RETURNING id"),
+            {"r": made},
+        )
+        await adb.execute(
+            text(
+                "INSERT INTO equipment_options (recipe_equipment_id, recipe_id, rank, equipment_id)"
+                " SELECT :n, :r, 1, id FROM equipment WHERE name = :e"
+            ),
+            {"n": need, "r": made, "e": thing},
+        )
+
+    async def said(name: str) -> str:
+        found = await adb.scalar(text("SELECT id FROM equipment WHERE name = :n"), {"n": name})
+        [description] = _content((await client.get(f"/equipment/{found}")).text, "description")
+        return description
+
+    assert await said("Stand mixer") == "Stand mixer is needed for 2 recipes indexed on OpenLarder."
+    assert await said("Hand mixer") == "Hand mixer is needed for 1 recipe indexed on OpenLarder."
+    assert await said("Mixer") == (
+        "Mixer is needed for 3 recipes indexed on OpenLarder, including everything that counts"
+        " as it. Also called Electric mixer."
+    )
+    # The list says how many, of those that have any.
+    listing = (await client.get("/equipment")).text
+    stand = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Stand mixer'"))
+    wok = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Wok'"))
+    assert f'<li><a href="/equipment/{stand}">Stand mixer</a>, 2 recipes</li>' in listing
+    assert f'<li><a href="/equipment/{wok}">Wok</a></li>' in listing
+
+
+async def test_the_equipment_list_has_its_own_head_and_what_a_recipe_can_list(adb, client) -> None:
+    page = (await client.get("/equipment?q=wok")).text
+    assert _tag(page, "<title>(.*?)</title>") == ["Equipment · OpenLarder"]
+    assert _tag(page, '<link rel="canonical" href="([^"]*)" />') == ["http://testserver/equipment"]
+    body = page[page.index('<div id="app">') :]
+    assert "<h1>Equipment</h1>" in body
+    recorded = await adb.scalar(text("SELECT count(*) FROM equipment WHERE NOT assumed"))
+    assert body.count('<li><a href="/equipment/') == recorded
+    # What any kitchen has isn't in it.
+    knife = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Knife'"))
+    assert str(knife) not in body
+
+
 async def test_an_ingredients_page_has_its_own_head_and_summary(admin, adb, client) -> None:
     book = await _book(admin)
     bread = await _recipe(admin, adb, book, ingredients=("Aged Cheddar", "Egg"))
@@ -437,7 +527,11 @@ async def test_an_authors_page_has_its_own_head_and_summary(admin, adb, client) 
 
 
 async def test_an_unknown_ingredient_or_author_is_a_404(client) -> None:
-    for path in (f"/ingredients/{uuid.uuid4()}", f"/authors/{uuid.uuid4()}"):
+    for path in (
+        f"/ingredients/{uuid.uuid4()}",
+        f"/authors/{uuid.uuid4()}",
+        f"/equipment/{uuid.uuid4()}",
+    ):
         response = await client.get(path)
         assert response.status_code == 404, path
         assert GENERIC in response.text and _body(response.text) == ""

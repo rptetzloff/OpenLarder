@@ -1074,6 +1074,57 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         screen reader pass (open since round 2); signed-in pages on
         openlarder.com itself; the review queue, Ingredient links and
         Merged books with real rows; the dark theme.
+- [ ] **Equipment.** *Ray's spec, 2026-11-15, in private/ (not
+      committed); separate from round 5.* What a recipe can't be made
+      without, recorded the way ingredients are, with what any kitchen has
+      left off (SCOPING.md, "Equipment"). In the spec's order:
+      - [ ] 1. The tables, the list to start from, the moderators' tools
+        and the `/equipment` pages; nothing on recipes yet. In two pull
+        requests:
+        - [x] The tables, the list and the public pages (#208; migration
+          0079). 140 things to start: 32 any kitchen has, 108 a recipe can
+          list. `/equipment`, a page for each thing, the footer's link and
+          the tabs over the Ingredients list; the server fills both pages
+          and the sitemap lists them; `/api/equipment`; the dumps. A
+          recipe's needs have their tables and `recipes.equipment_checked`,
+          and nothing writes to them yet.
+          - *Ray, 2026-11-15:* one thing can count as several (a
+            multicooker: a pressure cooker and a slow cooker), so "counts
+            as" is a table here, not the one parent the spec's SQL gave
+            it. The spec's groups aren't stored: they laid the list out.
+            And the list isn't held to the spec's ("why would we limit it
+            to things in the sample listing?").
+          - Claude's choices in the list, 2026-11-15, for moderators to
+            correct: a name offering two things is one name and another
+            name for it; "Mixer", "Thermometer" and "Steamer" were added
+            for what counts as them; "Baking stone" is another name for
+            "Pizza stone"; and a few dozen things were added.
+          - Every count of recipes is nought until a need can be
+            recorded, so the list has no Recipes column and no "Most
+            needed" order until one is more than that, and a thing's page
+            has no table of recipes, no "Search with this" and no "Shop".
+            Each comes with what makes it work.
+          - [ ] A thing a private recipe alone needs is everyone's to see,
+            which is right while the list is seeded. When the recipe form
+            can add a thing (step 2), one only a hidden recipe needs has
+            to be hidden as such an ingredient is: one function,
+            `visibility.equipment_seen_by`, which every read already asks.
+          - [ ] `equipment.wikidata_id` and `shopping_term` are in the
+            table, as the spec has them, with nothing yet that sets
+            either.
+        - [ ] The moderators' tools: add, rename, merge into, count as,
+          also called, mark as any kitchen's, delete when unused; every
+          change in the edit history and revertible; a merged thing's old
+          address going to the one kept.
+      - [ ] 2. The recipe form's field, bulk entry's and the import's; the
+        "Needs" block on a recipe's page; the flag reason; how many
+        recipes have equipment recorded, on the admin overview.
+      - [ ] 3. My equipment, and search's three filters.
+      - [ ] 4. The suggestion queue, from titles, tags and sources.
+      - [ ] 5. Shop links, with their clicks and the disclosure.
+      - [ ] Not decided (the spec's list): whether a household group can
+        share one equipment list; whether the header should say
+        "Equipment".
 - [ ] **Pages crawlers and link previews can read.** *Ray's spec,
       2026-11-11, in private/ (not committed).* Every page is the same
       empty shell until the browser fills it, so a shared link shows the

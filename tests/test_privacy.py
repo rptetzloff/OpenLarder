@@ -51,6 +51,20 @@ async def secret(people, adb):
         text("INSERT INTO recipe_flags (recipe_id, kind, detail) VALUES (:r, 'no_page', 'x')"),
         {"r": uuid.UUID(stew)},
     )
+    # The stew needs a tagine: nothing records a need yet; the database can.
+    # The tagine is everyone's to know of. That this recipe needs one isn't.
+    tagine = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Tagine'"))
+    need = await adb.scalar(
+        text("INSERT INTO recipe_equipment (recipe_id, position) VALUES (:r, 1) RETURNING id"),
+        {"r": uuid.UUID(stew)},
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO equipment_options (recipe_equipment_id, recipe_id, rank, equipment_id)"
+            " VALUES (:n, :r, 1, :e)"
+        ),
+        {"n": need, "r": uuid.UUID(stew), "e": tagine},
+    )
     # No route credits anyone on a family collection yet; the database can.
     nana = await adb.scalar(
         text(
@@ -106,6 +120,7 @@ async def secret(people, adb):
         "stew": stew,
         "salt": salt,
         "butter": butter,
+        "tagine": tagine,
         "author": nana,
         "pat": pat,
         "above": above,
@@ -420,6 +435,7 @@ PAGES = [
     ("/sources/{source_id}", ["source_id"]),
     ("/ingredients/{ingredient_id}", ["ingredient_id"]),
     ("/authors/{author_id}", ["author_id"]),
+    ("/equipment/{equipment_id}", ["equipment_id"]),
 ]
 
 
@@ -444,6 +460,9 @@ def _fill(path: str, names: list[str], secret: dict) -> str:
         "recipe_id": secret["stew"],
         "ingredient_id": secret["salt"],
         "author_id": secret["author"],
+        # What the private recipe needs, where the sweep was given one
+        # (test_review.py asks with its own things, which need nothing).
+        "equipment_id": secret.get("tagine", uuid.uuid4()),
         "group_id": secret["group"],
         # An invite's token is itself the secret: whoever has it may see the
         # group's name. The sweep asks without one.

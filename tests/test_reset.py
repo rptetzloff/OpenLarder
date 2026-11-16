@@ -69,6 +69,18 @@ async def test_the_catalog_goes_and_the_rest_stays(people, adb) -> None:
     await adb.execute(
         text("INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (:r, :t)"), {"r": recipe, "t": tag}
     )
+    # What the recipe needs goes with it; the equipment list stays.
+    need = await adb.scalar(
+        text("INSERT INTO recipe_equipment (recipe_id, position) VALUES (:r, 1) RETURNING id"),
+        {"r": recipe},
+    )
+    await adb.execute(
+        text(
+            "INSERT INTO equipment_options (recipe_equipment_id, recipe_id, rank, equipment_id)"
+            " SELECT :n, :r, 1, id FROM equipment WHERE name = 'Dutch oven'"
+        ),
+        {"n": need, "r": recipe},
+    )
     # A family collection goes too (Ray, 2026-11-10).
     await adb.execute(
         text(
@@ -85,6 +97,11 @@ async def test_the_catalog_goes_and_the_rest_stays(people, adb) -> None:
     )
     assert await adb.scalar(text("SELECT source_id FROM book_requests")) == book
     tags_before = await adb.scalar(text("SELECT count(*) FROM tags"))
+    listed = [
+        await adb.scalar(text(f"SELECT count(*) FROM {table}"))
+        for table in ("equipment", "equipment_aliases", "equipment_counts_as")
+    ]
+    assert all(listed), listed
     assert await adb.scalar(text("SELECT count(*) FROM revisions WHERE table_name = 'sources'"))
 
     found = await reset.counts(adb)
@@ -95,6 +112,10 @@ async def test_the_catalog_goes_and_the_rest_stays(people, adb) -> None:
         assert await adb.scalar(text(f"SELECT count(*) FROM {table}")) == 0, table
     assert await adb.scalar(text("SELECT count(*) FROM revisions WHERE table_name <> 'tags'")) == 0
     assert await adb.scalar(text("SELECT count(*) FROM tags")) == tags_before
+    assert listed == [
+        await adb.scalar(text(f"SELECT count(*) FROM {table}"))
+        for table in ("equipment", "equipment_aliases", "equipment_counts_as")
+    ]
     assert await adb.scalar(text("SELECT count(*) FROM users")) >= 1
     assert await adb.scalar(text("SELECT count(*) FROM larder_lists")) == 1
     assert (await adb.execute(text("SELECT status, source_id FROM book_requests"))).one() == (

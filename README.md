@@ -211,8 +211,10 @@ collections included, with people's larder items, the catalog's edit
 history, flags, reports, suggested changes and import history; accounts,
 groups, larder lists and requests (unlinked, to link again as their books
 come back) stay. `--everything` deletes those too, with all edit history and
-the list of published data dumps: only the tag list and the schema's version
-are left. After it you sign in as a new user, so make yourself owner again
+the list of published data dumps. Neither touches what the site starts
+with: the tag list, the equipment list (what each recipe needs goes with
+the recipe), the allergens and what diets avoid, FoodData Central's foods,
+the shops, and the schema's version. After it you sign in as a new user, so make yourself owner again
 by hand (`roles.py` has the statement). There's no undo: run a backup first
 (Coolify's backups of the database, to their private R2 bucket; the data
 dumps are no backup).
