@@ -822,11 +822,12 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           producer's card is about 230px and two about 540px with their
           heading (measured): the list starts that much lower. Ray's spec
           puts them there; after the list is the other place for them.
-- [ ] **Round 5.** *Ray's spec and wireframes, 2026-11-15, from a review
-      of `dev` at be914e9 (the build with "Want this book"): a local copy
-      with test data, signed in as an owner and signed out, at 360, 384,
-      412 and 1280px, then every 20px from 640 to 1100px; in private/ (not
-      committed).* A PR for each item, in this order.
+- [x] **Round 5** (#196 to #206). *Ray's spec and wireframes, 2026-11-15,
+      from a review of `dev` at be914e9 (the build with "Want this book"):
+      a local copy with test data, signed in as an owner and signed out,
+      at 360, 384, 412 and 1280px, then every 20px from 640 to 1100px; in
+      private/ (not committed).* A PR for each item, in this order. All
+      nine are in, and nothing found on the way is left open under them.
       - [x] 1. The ingredient hierarchy in plain words (#196). *Ray,
         2026-11-15: "Counts as".* Cheddar counts as cheese, and cheese
         includes cheddar, where the site had said it as a place: comes
