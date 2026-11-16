@@ -1212,12 +1212,31 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - A row that didn't save is checked all the same now, so it
             says which line or which need was refused, with the way out
             beside it. Before, a refused row lost its chips.
-          - [ ] In bulk entry a misspelt name is saved before anything
-            asks "did you mean": a row is checked after it saves, and by
-            then the name is an ingredient, or a piece of equipment, of
-            its own and matches itself. True of ingredients since bulk
-            entry began, and of equipment now; the recipe form asks as
-            it's typed. Checking a row before it saves would close it.
+          - [x] In bulk entry a misspelt name was saved before anything
+            asked "did you mean": a row was checked after it saved, and
+            by then the name was an ingredient, or a piece of equipment,
+            of its own and matched itself. True of ingredients since
+            bulk entry began. Now a row is checked before it saves too
+            (#214; *Ray, 2026-11-16: "yes", and "should have a fix
+            button for equipment as well"*), and what that finds stays
+            under the row after the save: "“wafle iron” → Waffle iron?"
+            with Use and It's new, for ingredients and equipment alike,
+            and the row isn't said to be all matched until it's
+            answered. The row still saves as typed when it's left;
+            nothing waits on the answer. It's new answers for every row
+            on the page that typed the same.
+          - Use on an ingredient puts the right name in the row, saves
+            it, and deletes the misspelt ingredient the first save
+            made, when nothing else uses it and the person may delete
+            ingredients. (Equipment a recipe brought in is removed by
+            the server when no recipe needs it.)
+          - [ ] The question lasts while the page is open. After a
+            reload the misspelt name matches itself again and nothing
+            asks; nothing on the server remembers that it was never
+            answered.
+          - [ ] Someone who isn't a moderator and presses Use leaves the
+            misspelt ingredient behind, used by nothing: only a
+            moderator may delete an ingredient.
         - [ ] The import's field: an optional Equipment column, read as
           bulk entry's cell is, with what it can't take flagged on the
           recipe and not dropped.
