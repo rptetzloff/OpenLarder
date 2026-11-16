@@ -36,6 +36,8 @@ const choosing = ref<string | null>(null);
 const total = computed(() =>
   (larder.value?.lists ?? []).reduce((n, l) => n + l.items.length, 0),
 );
+// Nothing on the page: signed out, or nothing in any list shown.
+const empty = computed(() => props.user === null || (!!larder.value && !total.value));
 
 async function act(work: () => Promise<unknown>) {
   busy.value = true;
@@ -117,12 +119,22 @@ watch(
     <div class="list-head">
       <h1>Your larder</h1>
       <p class="muted">
-        What you have, in lists of your own. Each thing is matched to an ingredient, so
-        <a href="/search?larder=1">search</a> can find what you can make with it, and it counts as
-        what's above it too: chipotle hot sauce is hot sauce. Only you see your larder, and the
-        household <a href="/groups">groups</a> you share a list with.
+        Only you see your larder, and the household <a href="/groups">groups</a> you share a list
+        with.
       </p>
     </div>
+    <!-- One sentence under the heading, who can see it, and the rest here,
+         closed (Ray's round 5 list, item 8, 2026-11-15: five lines on a phone, and
+         the first list 417px down). Open when there's nothing on
+         the page, which is when it's wanted. -->
+    <details class="how" :open="empty">
+      <summary>How this works</summary>
+      <p>
+        What you have, in lists of your own. Each thing is matched to an ingredient, so
+        <a href="/search?larder=1">search</a> can find what you can make with it, and it counts as
+        what's above it too: chipotle hot sauce is hot sauce.
+      </p>
+    </details>
     <p v-if="user === null" class="status">
       <SignInLink /> to keep a larder.
     </p>

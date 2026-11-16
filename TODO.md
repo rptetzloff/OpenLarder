@@ -1016,10 +1016,37 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           "How this works", as a recipe's does and as the drawing has it.
           It said "earns", which isn't so of a shop with no affiliate ID
           set. The sentence is one constant for both pages.
-      - [ ] 8. Your shelf, Your larder and Saved recipes keep one sentence
+      - [x] 8. Your shelf, Your larder and Saved recipes keep one sentence
         under the heading and fold the rest into "How this works", open
         only when the page is empty; Your account says when the agreement
-        was accepted and folds its text.
+        was accepted and folds its text (#205). The sentence is who can
+        see it, as it was written. "Empty" is signed out, or nothing of
+        yours or shared with you on the page.
+        - Measured at 384px, where the first thing on the page starts:
+          Your shelf 398px (was 476px), Your larder 398px (was 451px),
+          Saved recipes 449px (was 459px). The sentence is two lines
+          there and the closed "How this works" is a row 44px to tap,
+          which is why Saved recipes, whose text was four lines, gains
+          little.
+          - [x] As first built the three were 409px, 409px and 460px,
+            Saved recipes a pixel worse than before. Ray was asked
+            whether "How this works" should go under the lists where
+            there are any, for 52px more: *2026-11-15, "Maybe a little
+            less padding would help but no not under".* The row takes
+            12px of the sentence's margin above it. The 8px under it
+            stays: without it the row touched Saved recipes' tabs, whose
+            own 44px to tap reach 6.5px above them.
+        - Every "How this works" row on a phone, the admin pages' too, was
+          43.25px to tap and is 44px: its padding and its line didn't add
+          up to what the comment beside them said. Found when the check
+          was first asked to measure it, which it now does on these
+          three pages.
+        - Your account: "Accepted on November 15, 2026." and "Read the
+          agreement", closed. The panel is 173px at 384px, where it was
+          767px. The date is of accepting the agreement as it reads now,
+          and `/api/auth/me` has it as `agreed_at`; someone whose
+          acceptance was of an older wording is asked again and shown no
+          date. Before it's accepted the agreement is in full, as it was.
       - [ ] 9. Search on a phone: the filters go inside "More options".
         *Ray, 2026-11-15: "Filters probably makes sense under More
         options".*

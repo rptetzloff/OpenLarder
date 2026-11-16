@@ -26,6 +26,8 @@ export interface Me {
   // Whether they've accepted the contributor agreement as it reads now,
   // which adding to the catalog needs (agreement.py).
   agreed: boolean;
+  // When they accepted it as it reads now; null when they haven't.
+  agreed_at: string | null;
   // A contributor whose additions publish without review (trust.py).
   trusted: boolean;
   // Their buy-link shops (shops.ts); null until chosen.

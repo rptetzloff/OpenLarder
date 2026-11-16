@@ -249,6 +249,48 @@ const BUY_BY_FORMAT = `(() => {
   if (![...box.querySelectorAll(".buy-note a")].some((a) => a.textContent.trim() === "How this works")) return "The book's shops don't say how the links work";
   return "";
 })()`;
+// Your shelf, Your larder and Saved recipes (Ray's round 5 list, item 8,
+// 2026-11-15): one sentence under the heading, who can see it, and how the
+// page works folded under it. Closed where there's something on the page;
+// open where there's nothing, which is when it's wanted.
+const HOW_FOLDED = (open) => `(() => {
+  const intro = document.querySelector("main .list-head p");
+  const how = document.querySelector("main .list-head + details.how");
+  if (!intro) return "The page has no sentence under its heading";
+  if (!how) return "The page has no “How this works” under its heading";
+  const words = intro.textContent.trim();
+  if (!words.startsWith("Only you see") || words.split(". ").length > 1)
+    return "Under the heading isn't the one sentence, who can see it: " + JSON.stringify(words.slice(0, 60));
+  if (how.querySelector("summary").textContent.trim() !== "How this works") return "The folded part isn't called “How this works”";
+  if (!how.querySelector("p")?.textContent.trim()) return "“How this works” has nothing in it";
+  if (how.open !== ${open}) return "“How this works” is " + (how.open ? "open" : "closed") + ${JSON.stringify(open ? " on a page with nothing on it" : " on a page with something on it")};
+  // On a phone its row is 44px to tap, in space it takes back from the
+  // sentence above and the row below (Ray, 2026-11-15: "a little less
+  // padding"): neither may be inside it.
+  if (innerWidth < 640) {
+    const row = how.querySelector("summary").getBoundingClientRect();
+    if (row.height < 44) return "“How this works” is " + Math.round(row.height) + "px to tap on a phone, under 44px";
+    if (intro.getBoundingClientRect().bottom > row.top) return "“How this works” is over the sentence above it";
+    const after = (how.open ? how.querySelector("p") : how.nextElementSibling)?.getBoundingClientRect();
+    if (after && after.top < row.bottom) return "“How this works” is over what comes after it";
+  }
+  return "";
+})()`;
+// Your account: the agreement, once accepted, is the day it was and its
+// words folded under "Read the agreement" (the same item: in full it made
+// the page 2,734px on a phone).
+const AGREEMENT_FOLDED = `(() => {
+  const panel = document.querySelector(".agreement-panel");
+  if (!panel) return "Your account has no contributor agreement";
+  const said = panel.querySelector(".status")?.textContent.trim() ?? "";
+  if (!said.startsWith("Accepted on ") || !said.includes(String(new Date().getFullYear()))) return "The agreement doesn't say when it was accepted: " + JSON.stringify(said.slice(0, 60));
+  const fold = panel.querySelector("details");
+  if (!fold || fold.querySelector("summary").textContent.trim() !== "Read the agreement") return "The accepted agreement has no “Read the agreement”";
+  const points = [...panel.querySelectorAll(".agreement-points li")];
+  if (!points.length || points.some((li) => !fold.contains(li))) return "The accepted agreement's words aren't folded under “Read the agreement”";
+  if (innerWidth >= 640 && fold.open) return "The accepted agreement is open before it's asked for";
+  return "";
+})()`;
 const WANTS_ON_SHELF = `(() => {
   const heads = [...document.querySelectorAll(".shelf-wants")];
   if (heads.length !== 1) return "The shelf page has " + heads.length + " lists of wanted books, not one";
@@ -367,6 +409,7 @@ const ADMIN_BAR = (label) => `(() => {
   if (tall > 56) return "the admin bar is " + tall + "px tall on a phone, more than one row";
   return "";
 })()`;
+const OPEN_HOW = `document.querySelector("main details.how").open = true`;
 const OPEN_BAR = `document.querySelector(".bar-toggle").click()`;
 // An author's bar offers the other author of the same name, to merge.
 const DUPLICATE_SAID = `document.querySelector("#admin-bar").textContent.includes("Possible duplicate:") ? "" : "The author's admin bar doesn't offer the other author of that name"`;
@@ -855,7 +898,8 @@ function pages(s) {
     ["/groups", "cook"],
     [`/groups/${s.group.id}`, "cook", { expect: CRUMBS }],
     ["/invite/not-a-real-invite", null],
-    ["/account", "cook"],
+    ["/account", "cook", { expect: AGREEMENT_FOLDED }],
+    ["/account", "cook", { phone: true, then: `document.querySelector(".agreement-panel details").open = true`, expect: AGREEMENT_FOLDED }],
     ["/account/flags", "admin"],
     ["/admin", "admin"],
     ["/admin/flags", "admin", { expect: ADMIN_BAR("Flagged recipes") }],
@@ -875,21 +919,21 @@ function pages(s) {
     [`/recipes/${s.biscuits.id}/propose`, "cook"],
     [`/sources/${s.book.id}/propose`, "cook"],
     [`/recipes/${s.biscuits.id}`, "cook", { expect: ALLERGEN_NOTICE }],
-    ["/account", "admin"],
+    ["/account", "admin", { expect: AGREEMENT_FOLDED }],
     ["/requests", null],
     ["/requests", "cook"],
     ["/admin/suggestions", "cook"],
     ["/data", null],
-    ["/larder", "cook"],
+    ["/larder", "cook", { expect: HOW_FOLDED(false) }],
     ["/larder", "admin"],
     ["/search?larder=1", "cook"],
-    ["/larder", null],
-    ["/shelf", "cook", { phone: true, expect: WANTS_ON_SHELF }],
+    ["/larder", null, { expect: HOW_FOLDED(true) }],
+    ["/shelf", "cook", { phone: true, expect: `(${WANTS_ON_SHELF}) || (${HOW_FOLDED(false)})` }],
     ["/shelf", "admin", { phone: true, expect: WANTS_ON_SHELF }],
-    ["/shelf", null],
+    ["/shelf", null, { phone: true, expect: HOW_FOLDED(true) }],
     // The book Cy wants: its shops first, on a phone.
     [`/sources/${s.long.id}`, "cook", { phone: true, expect: `(${WANTED_BOOK}) || (${BUY_BY_FORMAT})` }],
-    ["/saved", "cook", { expect: `(${THUMBS_DRAWN}) || (${SAVED_CARDS("Cooked it")})` }],
+    ["/saved", "cook", { expect: `(${THUMBS_DRAWN}) || (${SAVED_CARDS("Cooked it")}) || (${HOW_FOLDED(false)})` }],
     ["/saved", "admin", { expect: SAVED_READ_ONLY }],
     // Its other tab, and a card's two buttons pressed, each of which leaves
     // a line with Undo where the card was.
@@ -901,7 +945,11 @@ function pages(s) {
       "cook",
       { phone: true, then: `${SAVED_PRESS("Cooked it")}; ${SAVED_LEAVE}`, expect: onPhone(SAVED_GONE) },
     ],
-    ["/saved", null],
+    ["/saved", null, { expect: HOW_FOLDED(true) }],
+    // "How this works" opened by hand on each, on a phone.
+    ["/shelf", "cook", { phone: true, then: OPEN_HOW }],
+    ["/larder", "cook", { phone: true, then: OPEN_HOW }],
+    ["/saved", "cook", { phone: true, then: OPEN_HOW }],
     ["/saved#notes", "cook", { expect: THUMBS_DRAWN }],
     ["/saved#notes", "admin"],
     ["/search?sv=1", "cook"],
@@ -954,7 +1002,7 @@ function pages(s) {
     [
       "/admin/suggestions",
       "admin",
-      { phone: true, then: `document.querySelector("main details.how").open = true` },
+      { phone: true, then: OPEN_HOW },
     ],
     // Search: "More options" opened, signed out and with a larder; the
     // filters opened on a phone; and kept to what can be made now, with

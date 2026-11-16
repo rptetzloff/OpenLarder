@@ -93,7 +93,7 @@ const n = (v: number | null, one: string, many: string) =>
         </section>
       </div>
       <div v-if="user.may_claim" class="tool-panels account-panels">
-        <AgreementPanel :agreed="user.agreed" @accepted="accepted" />
+        <AgreementPanel :agreed="user.agreed" :agreed-at="user.agreed_at" @accepted="accepted" />
         <ContributionsPanel />
         <ProposalsPanel v-if="!user.may_edit" />
       </div>

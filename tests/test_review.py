@@ -1,6 +1,8 @@
 """Review (migration 0041, routers/review.py): a contributor's books and
 recipes wait, hidden, for a moderator; the agreement comes first."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from sqlalchemy import text
 
@@ -42,7 +44,8 @@ async def _review(adb, table, id_):
 
 async def test_adding_needs_the_agreement_first(people) -> None:
     con = await people("con", role="contributor", agreed=False)
-    assert not (await con.get("/api/auth/me")).json()["agreed"]
+    me = (await con.get("/api/auth/me")).json()
+    assert not me["agreed"] and me["agreed_at"] is None
     refused = await con.post("/api/sources/manual", json={"title": "Plenty"})
     assert refused.status_code == 403 and "agreement" in refused.json()["detail"]
     terms = (await con.get("/api/agreement")).json()
@@ -50,8 +53,24 @@ async def test_adding_needs_the_agreement_first(people) -> None:
     stale = await con.post("/api/account/agreement", json={"version": "1999-01-01"})
     assert stale.status_code == 409
     assert (await con.post("/api/account/agreement", json=terms)).status_code == 204
-    assert (await con.get("/api/auth/me")).json()["agreed"]
+    me = (await con.get("/api/auth/me")).json()
+    assert me["agreed"]
+    # And when, for "Accepted on …" on the account's page: just now.
+    since = datetime.now(UTC) - datetime.fromisoformat(me["agreed_at"])
+    assert timedelta(0) <= since < timedelta(minutes=1)
     assert (await con.post("/api/sources/manual", json={"title": "Plenty"})).status_code == 200
+
+
+async def test_an_older_wording_accepted_is_not_a_date_to_show(people, adb) -> None:
+    """The date is of accepting the agreement as it reads now. One that was
+    accepted before its wording changed is asked for again, and the
+    account's page mustn't say "Accepted on" over words they never saw."""
+    old = await people("old", role="contributor")
+    assert (await old.get("/api/auth/me")).json()["agreed_at"] is not None
+    await adb.execute(text("UPDATE users SET agreed_version = '1999-01-01' WHERE subject = 'old'"))
+    await adb.commit()
+    me = (await old.get("/api/auth/me")).json()
+    assert not me["agreed"] and me["agreed_at"] is None
 
 
 async def test_moderators_and_admins_need_it_too(people) -> None:

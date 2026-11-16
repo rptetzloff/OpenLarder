@@ -2259,8 +2259,12 @@ main h2 {
   margin: 0.5rem 0 0;
 }
 @media (max-width: 40rem) {
-  /* 44px to tap: its line and this above and below it. */
+  /* 44px to tap: its line and this above and below it, which came to
+     43.25px until the height was said as well (2026-11-15, when the check
+     first measured it). */
   .how > summary {
+    box-sizing: border-box;
+    min-height: 2.75rem;
     padding: 0.625rem 0;
   }
   .how {
@@ -2268,6 +2272,17 @@ main h2 {
   }
   .how > p {
     margin: 0 0 0.5rem;
+  }
+  /* Under the one sentence of a page that is someone's own (Your shelf,
+     Your larder, Saved recipes): the row is still 44px to tap, and takes
+     12px of the sentence's margin above it. *Ray, 2026-11-15, shown that
+     the row cost Saved recipes all it had gained: "Maybe a little less
+     padding would help but no not under" (the lists).* Measured at 384px:
+     the sentence ends 4px above the row, so no link in it is inside the
+     44px. The 8px under the row stays: without it the row touched Saved
+     recipes' tabs, whose own 44px reach 6.5px above them. */
+  .list-head + .how {
+    margin-top: -0.75rem;
   }
 }
 /* Cards that are links: the account page's. */
