@@ -199,6 +199,11 @@ export interface SearchResult {
   // IDs in the search that name no ingredient now, as after a merge.
   missing: string[];
   missing_sources: string[];
+  // Equipment every recipe found needs, equipment none of them needs, and
+  // the IDs asked for that name nothing now.
+  needing: Named[];
+  no_equipment: Named[];
+  missing_equipment: string[];
   // The tags searched for, and those that name nothing now.
   tags: Named[];
   missing_tags: string[];
@@ -212,6 +217,9 @@ export interface SearchResult {
     needs: string[];
     // Which of the ingredients you have it uses, in your order.
     uses: string[];
+    // What it can't be made without, a need each ("Stand mixer or Hand
+    // mixer"). `needs`, above, is the lines of it you don't have.
+    equipment: string[];
   })[];
   total: number;
   // Recipes a page holds.
@@ -237,6 +245,8 @@ export async function searchRecipes(
     saved = false,
     byRating = false,
     missingMax = null,
+    needs = [],
+    noEquipment = [],
   }: {
     offset?: number;
     sources?: string[];
@@ -259,6 +269,10 @@ export async function searchRecipes(
     // With ingredients or a larder: only recipes missing at most this many
     // lines; 0 is what you can make now.
     missingMax?: number | null;
+    // Only recipes needing all of this equipment, and none that can't do
+    // without any of that.
+    needs?: string[];
+    noEquipment?: string[];
   } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
@@ -267,6 +281,8 @@ export async function searchRecipes(
   for (const kind of kinds) query.append("kind", kind);
   for (const id of without) query.append("without", id);
   for (const id of tags) query.append("tag", id);
+  for (const id of needs) query.append("needs", id);
+  for (const id of noEquipment) query.append("no_equipment", id);
   if (larder) {
     query.set("larder", "true");
     for (const id of larderLists) query.append("larder_list", id);

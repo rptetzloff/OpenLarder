@@ -714,6 +714,34 @@ const EQUIPMENT_RECORDED = `(() => {
   if (said[1] !== share) return "The overview calls " + recorded + " of " + recipes + " “" + said[1] + "”";
   return "";
 })()`;
+// Search by equipment (Ray's equipment spec, 2026-11-15): a link's
+// ?needs= or ?no_equipment= is a chip among the filters in use and a chip
+// in its box under "More options", which is open for it. `has` is a recipe
+// the search finds, with what its line says it needs; `hasnt` is one it
+// doesn't find. The biscuits need "Stand mixer or Hand mixer": needing a
+// stand mixer finds them, leaving one out keeps them (there's the hand
+// mixer), and leaving out every mixer doesn't.
+const SEARCH_EQUIPMENT = ({ chip, box, has, needs, hasnt }) => `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const chips = [...document.querySelectorAll(".narrowing .filter-chip")].map(words);
+  if (!chips.includes(${JSON.stringify(chip)})) return "The filters in use are “" + chips.join(" | ") + "”, without “${chip}”";
+  const input = document.getElementById(${JSON.stringify(box)});
+  if (!input || !input.getClientRects().length) return "More options isn't open on the equipment's box";
+  const inBox = [...input.closest(".chip-input").querySelectorAll(".chip")].map((c) => words(c).replace(/ ×$/, ""));
+  if (inBox.join() !== ${JSON.stringify(chip.replace(/^(Needs|Without) /, ""))}) return "The equipment's box holds “" + inBox.join(" | ") + "”";
+  const hits = Object.fromEntries([...document.querySelectorAll(".hits .hit")].map((li) => [words(li.querySelector("h3")), words(li.querySelector(".hit-where"))]));
+  const has = ${JSON.stringify(has ?? "")}, hasnt = ${JSON.stringify(hasnt ?? "")};
+  if (has && !(has in hits)) return "The search doesn't find “" + has + "”: " + Object.keys(hits).join(" | ");
+  if (has && !hits[has].endsWith(${JSON.stringify(" · " + (needs ?? ""))})) return "The recipe's line reads “" + hits[has] + "”";
+  if (hasnt && hasnt in hits) return "The search finds “" + hasnt + "”";
+  return "";
+})()`;
+// A piece of equipment's page leads to the search for what needs it, as an
+// ingredient's does; what any kitchen has leads nowhere.
+const SEARCH_WITH = (words) => `(() => {
+  const links = [...document.querySelectorAll(".ingredient-actions a")].map((a) => a.textContent.replace(/\\s+/g, " ").trim() + " " + a.getAttribute("href").replace(/[0-9a-f-]{36}/, "ID"));
+  return links.join() === ${JSON.stringify(words ? words + " /search?needs=ID" : "")} ? "" : "The page's search link reads “" + links.join(" | ") + "”";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1349,6 +1377,11 @@ function pages(s) {
     ["/equipment", "cook", { expect: NO_TOOLS }],
     ["/equipment", "admin", { phone: true, then: `document.querySelector("main details.add-panel").open = true`, expect: ADD_EQUIPMENT }],
     [`/equipment/${s.multicooker}`, "cook", { expect: NO_TOOLS }],
+    [`/equipment/${s.standMixer}`, "cook", { expect: SEARCH_WITH("Search with stand mixer") }],
+    [`/equipment/${s.stovetop}`, "cook", { expect: SEARCH_WITH("") }],
+    [`/search?needs=${s.standMixer}`, null, { phone: true, expect: SEARCH_EQUIPMENT({ chip: "Needs Stand mixer", box: "search-needs", has: "Cheddar Biscuits", needs: "needs Biscuit cutter, Stand mixer or Hand mixer and 1 more" }) }],
+    [`/search?q=cheddar&no_equipment=${s.standMixer}`, "cook", { phone: true, expect: SEARCH_EQUIPMENT({ chip: "Without Stand mixer", box: "search-no-equipment", has: "Cheddar Biscuits", needs: "needs Biscuit cutter, Stand mixer or Hand mixer and 1 more" }) }],
+    [`/search?q=cheddar&no_equipment=${s.mixer}`, null, { expect: SEARCH_EQUIPMENT({ chip: "Without Mixer", box: "search-no-equipment", hasnt: "Cheddar Biscuits" }) }],
     [`/equipment/${s.standMixer}`, null, { phone: true, expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe")})` }],
     [`/equipment/${s.mixer}`, null, { expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe, including everything it includes")})` }],
     [`/equipment/${s.multicooker}`, "admin", { expect: `(${ADMIN_BAR("This equipment")}) || (${EQUIPMENT_TOOLS})` }],

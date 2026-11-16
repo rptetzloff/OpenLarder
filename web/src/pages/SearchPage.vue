@@ -6,6 +6,7 @@ import OptionList from "../components/OptionList.vue";
 import { KINDS, listTags, type Tag } from "../tags";
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { findBooks } from "../books";
+import { listEquipment } from "../equipment";
 import { type Example, findExamples } from "../examples";
 import {
   listIngredients,
@@ -33,6 +34,7 @@ document.title = "Search · OpenLarder";
 // Nothing it could ask is gone, and a link made before opens the same search.
 const MAX_INGREDIENTS = 30;
 const MAX_SOURCES = 10;
+const MAX_EQUIPMENT = 30;
 // The wireframe's kinds of source, grouped as people think of them; the
 // first three show, the rest behind "More kinds".
 const KIND_GROUPS = [
@@ -85,6 +87,13 @@ function larderLoaded(ids: string[]) {
 // What you don't have or want (Ray, 2026-11-08): recipes needing one are left
 // out; a line offering something else ("butter or oil") doesn't need it.
 const unwanted = ref<Named[]>([]);
+// Equipment (Ray's equipment spec, 2026-11-15), which filters where
+// ingredients rank: only recipes needing all of these (?needs=…, enough to
+// search by: "what can I make with my ice cream maker?"), and none that
+// can't do without one of those (?no_equipment=…), as `unwanted` is for
+// ingredients.
+const needing = ref<Named[]>([]);
+const noKit = ref<Named[]>([]);
 const shelf = ref<Named[]>([]);
 // Only the books you own (routers/shelf.py).
 const onShelf = ref(params.get("own") === "1");
@@ -151,13 +160,17 @@ const narrow = useNarrow();
 // arrives with some of it set (on a phone, a filter too); the button says
 // how many are in use.
 const moreOpen = ref(
-  ["x", "source", "book", "own", "sv", "li", "lx"].some((k) => params.has(k)) ||
+  ["x", "source", "book", "own", "sv", "li", "lx", "needs", "no_equipment"].some((k) =>
+    params.has(k),
+  ) ||
     (narrow.value && ["tag", "kind"].some((k) => params.has(k))),
 );
 const moreCount = computed(
   () =>
     [
       unwanted.value.length,
+      needing.value.length,
+      noKit.value.length,
       shelf.value.length,
       onShelf.value,
       onlySaved.value,
@@ -206,6 +219,8 @@ const narrowing = computed(() => {
   if (onShelf.value) add("shelf", "On my shelf", () => (onShelf.value = false));
   if (onlySaved.value) add("saved", "Saved", () => (onlySaved.value = false));
   for (const i of unwanted.value) add(`x-${i.id}`, `Without ${i.name}`, () => dropUnwanted(i.id, false));
+  for (const e of needing.value) add(`needs-${e.id}`, `Needs ${e.name}`, () => dropNeeded(e.id, false));
+  for (const e of noKit.value) add(`nokit-${e.id}`, `Without ${e.name}`, () => dropNoKit(e.id, false));
   for (const b of shelf.value) add(`in-${b.id}`, `In ${b.name}`, () => dropSource(b.id, false));
   return chips;
 });
@@ -226,6 +241,8 @@ function clearAll() {
   onShelf.value = false;
   onlySaved.value = false;
   unwanted.value = [];
+  needing.value = [];
+  noKit.value = [];
   shelf.value = [];
   run();
   toResults();
@@ -242,17 +259,20 @@ const searching = computed(
     onlySaved.value ||
     !!chosen.value.length ||
     !!title.value.trim() ||
-    !!tags.value.length,
+    !!tags.value.length ||
+    !!needing.value.length,
 );
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv", "sort", "missing"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv", "sort", "missing", "needs", "no_equipment"]) {
     url.searchParams.delete(key);
   }
   if (sort.value === "rating") url.searchParams.set("sort", "rating");
   if (missingMax.value !== null && ranked.value) url.searchParams.set("missing", String(missingMax.value));
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
+  for (const e of needing.value) url.searchParams.append("needs", e.id);
+  for (const e of noKit.value) url.searchParams.append("no_equipment", e.id);
   for (const b of shelf.value) url.searchParams.append("source", b.id);
   for (const i of chosen.value) url.searchParams.append("i", i.id);
   if (title.value.trim()) url.searchParams.set("q", title.value.trim());
@@ -296,6 +316,8 @@ async function run(toPage = 1) {
         saved: onlySaved.value,
         byRating: sort.value === "rating",
         missingMax: missingMax.value,
+        needs: needing.value.map((e) => e.id),
+        noEquipment: noKit.value.map((e) => e.id),
       },
     );
     if (mine !== latest) return;
@@ -363,6 +385,42 @@ function dropUnwanted(id: string, refocus = true) {
   unwanted.value = unwanted.value.filter((i) => i.id !== id);
   if (refocus) document.getElementById("search-unwanted")?.focus();
   run();
+}
+
+// The same two boxes for equipment. What any kitchen has isn't offered:
+// no recipe lists it, so there'd be nothing to find or to leave out.
+const taken = () => [...needing.value, ...noKit.value];
+const needFind = finder(async (q) => (await listEquipment(q)).equipment, taken);
+const noKitFind = finder(async (q) => (await listEquipment(q)).equipment, taken);
+function addNeeded(item: Named) {
+  if (needing.value.length < MAX_EQUIPMENT) needing.value.push({ id: item.id, name: item.name });
+  needFind.query.value = "";
+  needFind.suggestions.value = [];
+  document.getElementById("search-needs")?.focus();
+  run();
+}
+function dropNeeded(id: string, refocus = true) {
+  needing.value = needing.value.filter((e) => e.id !== id);
+  if (refocus) document.getElementById("search-needs")?.focus();
+  run();
+}
+function addNoKit(item: Named) {
+  if (noKit.value.length < MAX_EQUIPMENT) noKit.value.push({ id: item.id, name: item.name });
+  noKitFind.query.value = "";
+  noKitFind.suggestions.value = [];
+  document.getElementById("search-no-equipment")?.focus();
+  run();
+}
+function dropNoKit(id: string, refocus = true) {
+  noKit.value = noKit.value.filter((e) => e.id !== id);
+  if (refocus) document.getElementById("search-no-equipment")?.focus();
+  run();
+}
+// A hit's needs after where it is: two of them, and how many more ("needs
+// Ice cream maker", "needs Wok, Blender and 2 more").
+function kitSaid(needs: string[]) {
+  const more = needs.length - 2;
+  return `needs ${needs.slice(0, 2).join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
 }
 
 const ingredientFind = finder(
@@ -468,10 +526,15 @@ onMounted(async () => {
     .catch(() => {});
   const ids = params.getAll("i").slice(0, MAX_INGREDIENTS);
   const sources = [...params.getAll("source"), ...params.getAll("book")].slice(0, MAX_SOURCES);
-  if (!searching.value && !ids.length) findExamples().then((found) => (examples.value = found));
+  const kit = params.getAll("needs").slice(0, MAX_EQUIPMENT);
+  const kitOut = params.getAll("no_equipment").slice(0, MAX_EQUIPMENT);
+  if (!searching.value && !ids.length && !kit.length) {
+    findExamples().then((found) => (examples.value = found));
+  }
   try {
     if (
       !ids.length &&
+      !kit.length &&
       !title.value.trim() &&
       !tags.value.length &&
       !useLarder.value &&
@@ -488,7 +551,17 @@ onMounted(async () => {
         const res = await fetch(`/api/ingredients/${id}`);
         if (res.ok) unwanted.value.push({ id, name: (await res.json()).name });
       }
-      if (shelf.value.length < sources.length || unwanted.value.length < leftOut.length) toAddress();
+      for (const id of kitOut) {
+        const res = await fetch(`/api/equipment/${id}`);
+        if (res.ok) noKit.value.push({ id, name: (await res.json()).name });
+      }
+      if (
+        shelf.value.length < sources.length ||
+        unwanted.value.length < leftOut.length ||
+        noKit.value.length < kitOut.length
+      ) {
+        toAddress();
+      }
       return;
     }
     // The search names the ingredients and sources, so a link needs only IDs.
@@ -506,12 +579,19 @@ onMounted(async () => {
       saved: onlySaved.value,
       byRating: sort.value === "rating",
       missingMax: missingMax.value,
+      needs: kit,
+      noEquipment: kitOut,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
+    needing.value = first.needing;
+    noKit.value = first.no_equipment;
     shelf.value = first.sources;
     missing.value =
-      first.missing.length + first.missing_sources.length + first.missing_tags.length;
+      first.missing.length +
+      first.missing_sources.length +
+      first.missing_tags.length +
+      first.missing_equipment.length;
     if (first.missing_tags.length) {
       tags.value = tags.value.filter((t) => !first.missing_tags.includes(t));
     }
@@ -654,6 +734,80 @@ onMounted(async () => {
         <p id="search-unwanted-help" class="help">
           Recipes that need one are left out. One that offers another choice, like “butter or oil”,
           stays.
+        </p>
+
+        <!-- Ray's equipment spec, 2026-11-15: "Needs" and "Leave out
+             equipment", pickers here. The boxes are the ingredients' one
+             above (Ray, 2026-11-16: equipment is treated the same). -->
+        <label for="search-needs" class="more-gap">Needs</label>
+        <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
+          <span v-for="e in needing" :key="e.id" class="chip">
+            {{ e.name }}
+            <button type="button" class="remove" :aria-label="`Remove ${e.name}`" @click.stop="dropNeeded(e.id)">
+              ×
+            </button>
+          </span>
+          <input
+            id="search-needs"
+            v-model="needFind.query.value"
+            type="search"
+            autocomplete="off"
+            placeholder="Add equipment a recipe needs"
+            aria-describedby="search-needs-help"
+            :disabled="needing.length >= MAX_EQUIPMENT"
+            @keydown="dropLastOn($event, needing, (e) => dropNeeded(e.id))"
+            @keydown.enter.prevent="needFind.suggestions.value[0] && addNeeded(needFind.suggestions.value[0])"
+          />
+        </div>
+        <OptionList
+          v-slot="{ option: s }"
+          :options="needFind.suggestions.value"
+          for="search-needs"
+          @pick="addNeeded"
+        >
+          {{ s.name }}
+          <span class="page-ref">
+            {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
+          </span>
+        </OptionList>
+        <p id="search-needs-help" class="help">
+          Only recipes that need it, or something that counts as it: a mixer finds a stand mixer.
+        </p>
+
+        <label for="search-no-equipment" class="more-gap">Leave out equipment</label>
+        <div class="chip-input" @click="($event.currentTarget as HTMLElement).querySelector('input')?.focus()">
+          <span v-for="e in noKit" :key="e.id" class="chip chip-unwanted">
+            {{ e.name }}
+            <button type="button" class="remove" :aria-label="`Remove ${e.name}`" @click.stop="dropNoKit(e.id)">
+              ×
+            </button>
+          </span>
+          <input
+            id="search-no-equipment"
+            v-model="noKitFind.query.value"
+            type="search"
+            autocomplete="off"
+            placeholder="Add equipment to leave out"
+            aria-describedby="search-no-equipment-help"
+            :disabled="noKit.length >= MAX_EQUIPMENT"
+            @keydown="dropLastOn($event, noKit, (e) => dropNoKit(e.id))"
+            @keydown.enter.prevent="noKitFind.suggestions.value[0] && addNoKit(noKitFind.suggestions.value[0])"
+          />
+        </div>
+        <OptionList
+          v-slot="{ option: s }"
+          :options="noKitFind.suggestions.value"
+          for="search-no-equipment"
+          @pick="addNoKit"
+        >
+          {{ s.name }}
+          <span class="page-ref">
+            {{ s.recipes.toLocaleString() }} {{ s.recipes === 1 ? "recipe" : "recipes" }}
+          </span>
+        </OptionList>
+        <p id="search-no-equipment-help" class="help">
+          Recipes that need one are left out. One that offers another choice, like “stand mixer or
+          hand mixer”, stays.
         </p>
 
         <label for="search-source" class="more-gap">In sources</label>
@@ -864,8 +1018,8 @@ onMounted(async () => {
         <p class="visually-hidden" aria-live="polite">{{ said }}</p>
         <p v-if="failed" role="alert">The search didn't work. Try again.</p>
         <p v-else-if="!searching" class="status">
-          Add what you have, words of a title or a tag, and the recipes you're closest to making
-          come first, with where to find them.
+          Add what you have, words of a title, a tag or equipment, and the recipes you're closest
+          to making come first, with where to find them.
         </p>
         <template v-else-if="result">
           <p v-if="result.shelf_books === 0" class="status">
@@ -893,7 +1047,8 @@ onMounted(async () => {
                 <h3><a :href="`/recipes/${r.id}`">{{ r.title }}</a></h3>
                 <p class="hit-where">
                   <a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a
-                  ><template v-if="whereItIs(r)"> · {{ whereItIs(r) }}</template>
+                  ><template v-if="whereItIs(r)"> · {{ whereItIs(r) }}</template
+                  ><template v-if="r.equipment.length"> · {{ kitSaid(r.equipment) }}</template>
                 </p>
                 <template v-if="r.lines !== null">
                   <!-- Kept to what you can make: what's missing is the thing to say. -->

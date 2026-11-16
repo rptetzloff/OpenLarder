@@ -187,6 +187,14 @@ onMounted(() => load());
           </p>
           <p v-else class="status">No recipe lists it yet.</p>
         </div>
+        <!-- As an ingredient's page has (Ray's equipment spec, 2026-11-15:
+             "Search with this", to /search?needs=). Not for what any
+             kitchen has: no recipe lists it, so there's nothing to find. -->
+        <div v-if="!equipment.assumed" class="ingredient-actions">
+          <a :href="`/search?needs=${equipment.id}`" class="primary"
+            >Search with {{ equipment.name.toLowerCase() }}</a
+          >
+        </div>
       </div>
 
       <!-- As an ingredient's page: one line when there's nothing to say,

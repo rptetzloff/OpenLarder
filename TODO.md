@@ -1331,6 +1331,33 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         2026-11-15, asked whether a household group shares one equipment
         list, which the spec had left out of its first version: yes, as
         a larder is shared.*
+        - [x] Search by equipment (#220): "Needs" and "Leave out
+          equipment" under More options, built as "Leave out
+          ingredients" is (`?needs=` and `?no_equipment=`). They filter,
+          where ingredients rank. Needs keeps the recipes needing every
+          thing named, or something that counts as it (a mixer finds a
+          stand mixer), and is enough to search by; leaving one out
+          hides the recipes that can't do without it, and one offering
+          another choice stays. Each is a chip among the filters and is
+          carried in the link. A result's line says what it needs, two
+          needs and how many more. A piece of equipment's page has
+          "Search with …", as an ingredient's has.
+          - A recipe whose equipment isn't recorded needs nothing anyone
+            knows of: Needs never finds it and leaving out never hides
+            it.
+          - What any kitchen has isn't offered in either box, and its
+            page has no "Search with": no recipe lists it.
+          - [ ] A suggestion in either box counts the recipes needing
+            exactly that thing, so "Mixer" says 0 recipes and finds the
+            ones needing a stand mixer.
+        - [ ] My equipment. *Ray, 2026-11-16, asked how sharing works
+          when the spec gives it no lists: "it should work like larder
+          and book lists work".* So: named lists, each shared with
+          household groups, as the larder's are; the spec's single
+          checklist is set aside.
+        - [ ] "Only what I have the equipment for" (`equipment=mine`),
+          and "You don't have this" on a recipe's page. Both wait for My
+          equipment.
       - [ ] 4. The suggestion queue, from titles, tags and sources. *Ray,
         2026-11-15, asked whether he wanted it, the spec having taken
         "agree on all" to mean so: yes.*
