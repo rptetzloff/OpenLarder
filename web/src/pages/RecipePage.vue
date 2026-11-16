@@ -16,7 +16,7 @@ import { issueName } from "../books";
 import FlagItem from "../components/FlagItem.vue";
 import SwapForm from "../components/SwapForm.vue";
 import SwapList from "../components/SwapList.vue";
-import { type Flag, recipeFlags } from "../flags";
+import { type Flag, recipeFlags, typo } from "../flags";
 import type { Me } from "../me";
 import { archivePage, markGone, type Recipe, removeRecipe } from "../recipes";
 import { type OnShelf, onShelf } from "../shelf";
@@ -37,6 +37,17 @@ const error = ref("");
 // Only whoever may deal with them gets any back: an admin, or who added it.
 const flags = ref<Flag[]>([]);
 const openFlags = computed(() => flags.value.filter((f) => !f.resolution));
+
+// A flag dealt with. One whose change was made ("Change to …", for a
+// possible typo in an ingredient or in equipment) changed the recipe too,
+// so that's read again: the page had gone on showing the old spelling until
+// it was loaded afresh.
+async function flagResolved(updated: Flag) {
+  flags.value = flags.value.map((x) => (x.id === updated.id ? updated : x));
+  if (updated.resolution !== "fixed" || !typo(updated)) return;
+  const res = await fetch(`/api/recipes/${props.id}`);
+  if (res.ok) recipe.value = await res.json();
+}
 
 onMounted(loadAllergens);
 // The grocers, for the rows' Shop buttons.
@@ -556,7 +567,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                 :key="f.id"
                 :flag="f"
                 :show-recipe="false"
-                @resolved="(u) => (flags = flags.map((x) => (x.id === u.id ? u : x)))"
+                @resolved="flagResolved"
               />
             </ul>
           </section>

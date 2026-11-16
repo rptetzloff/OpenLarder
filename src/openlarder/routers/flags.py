@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import ingredients, lines, typos, visibility
+from openlarder import ingredients, lines, needs, typos, visibility
 from openlarder.auth import CurrentUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -187,11 +187,37 @@ async def resolve(
     return _out(flag, recipe, await session.get(Source, recipe.source_id))
 
 
+async def _mean_equipment(session, recipe: Recipe, written: str, meant: str) -> None:
+    """Make a recipe's need of the thing written so a need of the one
+    meant, which is in the list. The thing written goes if no recipe needs
+    it any more (needs.sweep)."""
+    held = await needs.held_by(session, ingredients.match_key(meant))
+    if held is None or held[0].assumed or not held[0].listed:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"There's no “{meant}” in the equipment list any more. Dismiss it.",
+        )
+    target, wrong = held[0], ingredients.match_key(written)
+    now = (await needs.of_recipes(session, [recipe.id])).get(recipe.id, [])
+    if not any(thing.match_key == wrong for _, _, things in now for thing in things):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"The recipe doesn't need “{written}” now. Mark it fixed, or dismiss it.",
+        )
+    typed = [
+        needs.as_typed(detail, [target if thing.match_key == wrong else thing for thing in things])
+        for _, detail, things in now
+    ]
+    await needs.write(session, recipe, typed, None)
+
+
 @router.post("/api/flags/{flag_id}/apply", response_model=FlagOut, dependencies=[SameOrigin])
 async def apply(flag_id: uuid.UUID, user: CurrentUser, session: Session) -> FlagOut:
     """Make the change a possible-typo flag suggests: the line is changed to
     the suggested name and matched to it, the misspelled ingredient goes if
-    nothing else uses it, and the flag is marked fixed (typos.py)."""
+    nothing else uses it, and the flag is marked fixed (typos.py). The same
+    for a flag on equipment that isn't in the list: the need becomes one of
+    the thing suggested."""
     flag = await session.get(RecipeFlag, flag_id, with_for_update=True)
     recipe = await session.get(Recipe, flag.recipe_id) if flag else None
     if recipe is None or not await visibility.can_see(
@@ -202,12 +228,20 @@ async def apply(flag_id: uuid.UUID, user: CurrentUser, session: Session) -> Flag
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Only a moderator can change a published recipe."
         )
-    found = typos.parse(flag.detail) if flag.kind == FlagKind.POSSIBLE_TYPO.value else None
+    suggests = (FlagKind.POSSIBLE_TYPO.value, FlagKind.EQUIPMENT_TYPO.value)
+    found = typos.parse(flag.detail) if flag.kind in suggests else None
     if found is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "That flag has no change to make.")
     if flag.resolved_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "That flag has already been dealt with.")
     written, meant = found
+    if flag.kind == FlagKind.EQUIPMENT_TYPO.value:
+        await _mean_equipment(session, recipe, written, meant)
+        flag.resolution, flag.note = "fixed", f"Changed to “{meant}”."
+        flag.resolved_by, flag.resolved_at = user.id, func.now()
+        await session.commit()
+        await session.refresh(flag)
+        return _out(flag, recipe, await session.get(Source, recipe.source_id))
     target = (await ingredients.known_ids(session, {ingredients.match_key(meant)})).get(
         ingredients.match_key(meant)
     )

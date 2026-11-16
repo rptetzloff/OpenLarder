@@ -33,6 +33,8 @@ const report = ref<ReportLine[]>([]);
 
 const withIsbn = computed(() => parsed.value?.books.filter((b) => b.isbn13).length ?? 0);
 const recipeTotal = computed(() => parsed.value?.recipes.length ?? 0);
+// Rows with something in the Equipment column, to say the column was read.
+const withEquipment = computed(() => parsed.value?.recipes.filter((r) => r.equipment).length ?? 0);
 
 const KINDS = KIND_LABELS;
 
@@ -111,6 +113,7 @@ async function run() {
           page: r.page,
           ingredients: r.ingredients,
           chapter: r.chapter,
+          equipment: r.equipment,
         })),
       );
       totals.value.created += result.created;
@@ -141,8 +144,11 @@ async function run() {
     books_existing: totals.value.booksExisting,
     books_failed: totals.value.booksFailed,
   });
+  // Flags too, though they come at the end and not with a batch: "3 flags
+  // raised" over a report of four lines had left them out.
+  totals.value.flags += typos.length;
   for (const t of typos) {
-    report.value.push({ row: null, book: t.book, recipe: t.recipe, kind: KINDS.possible_typo, detail: t.detail });
+    report.value.push({ row: null, book: t.book, recipe: t.recipe, kind: KINDS[t.kind] ?? t.kind, detail: t.detail });
   }
   stage.value = "done";
 }
@@ -184,7 +190,11 @@ function download() {
     <section v-else-if="stage === 'review' && parsed" class="tool-panel import-form" aria-label="What's in the files">
       <ul>
         <li>{{ parsed.books.length }} books: {{ withIsbn }} with an ISBN, looked up on Open Library; {{ parsed.books.length - withIsbn }} without, added from the list.</li>
-        <li>{{ recipeTotal.toLocaleString() }} recipes.</li>
+        <li>
+          {{ recipeTotal.toLocaleString() }} recipes<template v-if="withEquipment"
+            >, {{ withEquipment.toLocaleString() }} with equipment</template
+          >.
+        </li>
         <li v-if="parsed.blank_rows">{{ parsed.blank_rows }} blank rows, skipped.</li>
         <li v-if="parsed.untitled_rows.length">{{ parsed.untitled_rows.length }} rows with no title or no book, which can't be imported; they'll be in the report.</li>
         <li v-if="parsed.unknown_sources.length">
@@ -223,6 +233,19 @@ function download() {
     <details v-if="user?.may_run" class="how">
       <summary>How this works</summary>
       <p>Nothing is stored until you've seen what's in the two lists.</p>
+      <p>
+        The recipe list's columns are <strong>Source</strong>, <strong>Recipe Name</strong>,
+        <strong>Pg #</strong> and <strong>Ingredients</strong>, with semicolons between
+        ingredients. Two more are read if they're there: <strong>Tag</strong>, for the chapter,
+        and <strong>Equipment</strong>, for what the recipe can't be made without, typed as the
+        ingredients are: <strong>stand mixer or hand mixer; 9-inch springform pan</strong>, or
+        <strong>none</strong> if it needs nothing special. Leave it empty if you don't know.
+      </p>
+      <p>
+        Equipment any kitchen has is left out and flagged on its recipe, as an ingredient with
+        an amount is. Equipment that isn't in the list and is spelled like something that is
+        gets flagged as a possible typo, to change in one click.
+      </p>
     </details>
   </article>
 </template>

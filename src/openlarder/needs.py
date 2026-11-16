@@ -86,7 +86,11 @@ def read(text: str) -> Need | None:
     if not text:
         return None
     if len(text) > MAX_NEED:
-        raise Refused(f"A need is at most {MAX_NEED} characters: the thing, and its size.")
+        # Named, as every refusal is: an import's flag is this sentence alone.
+        raise Refused(
+            f"“{text[:40]}…” is too long: a need is at most {MAX_NEED} characters, the thing"
+            " and its size."
+        )
     detail: str | None = None
     names: list[str] = []
     for part in _OR.split(text):
@@ -259,6 +263,30 @@ def as_cell(checked: bool, read: list[tuple[uuid.UUID, str | None, list[Equipmen
     if not read:
         return "none" if checked else ""
     return "; ".join(as_typed(detail, things) for _, detail, things in read)
+
+
+async def sift(session: AsyncSession, typed: list[str]) -> tuple[list[str], list[str]]:
+    """The needs saving would take, and for each of the rest why not, in
+    the words saving would refuse it with. For an import, which keeps what
+    it can of a row and flags the rest, where a form refuses the lot."""
+    kept: list[str] = []
+    refused: list[str] = []
+    for text in typed:
+        try:
+            need = read(text)
+            if need is None:
+                continue
+            for name in need.names:
+                found = await held_by(session, match_key(name))
+                if found and found[0].assumed:
+                    raise Refused(assumed_message(found[0]))
+            if len(kept) == MAX_NEEDS:
+                raise Refused(f"“{text}” is past the {MAX_NEEDS} needs a recipe can list.")
+        except Refused as why:
+            refused.append(str(why))
+            continue
+        kept.append(text)
+    return kept, refused
 
 
 async def write(

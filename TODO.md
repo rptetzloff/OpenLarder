@@ -1237,9 +1237,43 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [ ] Someone who isn't a moderator and presses Use leaves the
             misspelt ingredient behind, used by nothing: only a
             moderator may delete an ingredient.
-        - [ ] The import's field: an optional Equipment column, read as
-          bulk entry's cell is, with what it can't take flagged on the
-          recipe and not dropped.
+        - [x] The import's field (#215; migration 0082): an optional
+          Equipment column in the recipe list, treated as the Ingredients
+          column is (*Ray, 2026-11-16*). It is read as bulk entry's cell
+          is: semicolons, commas or new lines between needs, "none" for
+          nothing special, empty for not recorded. What saving would
+          refuse (something any kitchen has, a size alone, "none" beside
+          equipment) is left out and flagged on the recipe, "Equipment
+          left out", in the words the form refuses it with, and the rest
+          is kept, as a line with an amount is. A recipe already added
+          gets its equipment when the import runs again, if none is
+          recorded for it, as it gets its chapter. When a run finishes,
+          equipment that isn't in the list and is spelt like something
+          that is ("Wafle iron → Waffle iron") is flagged, "Possible
+          typo in equipment", with its change a click away on the flag,
+          as an ingredient's possible typo is. The import page says what
+          the lists' columns are, under "How this works", and how many
+          rows came with equipment.
+          - A cell with only what any kitchen has ("bowl, whisk") leaves
+            the recipe not recorded, and flagged: it isn't taken to mean
+            "nothing special", which only "none" says.
+          - An ingredient's typo is judged by how often each name is
+            used; equipment's by the list. A thing that isn't in the
+            list is compared with the things that are, by name and other
+            names, under the same spelling rule, however often either
+            is used.
+          - A recipe's page reads the recipe again after "Change to …" on
+            one of its flags. It had gone on showing the old spelling
+            until it was loaded afresh, for an ingredient's typo as for
+            equipment's. And the import page's "flags raised" counts the
+            typos a run's end finds; it had said 3 over a report of 4.
+          - [ ] Equipment spelt like something any kitchen has
+            ("Colandar") isn't flagged: what any kitchen has is never
+            suggested, since taking it up would be refused. It stays a
+            thing of its own until someone merges or removes it.
+          - [ ] The recipe list's column names were written down nowhere
+            but the code until now. The book list's still aren't on the
+            page.
         - [ ] "Add it" for someone who can't change the recipe, through a
           suggested change; a suggested change doesn't carry equipment
           yet, so the form leaves the field out there.

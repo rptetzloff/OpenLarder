@@ -19,6 +19,18 @@ Tag column is each recipe's chapter in its book ("Yeast Breads"), imported
 when the list has it; a recipe already added gets its chapter when the
 import runs again, if it has none. *Ray, 2026-11-09: chapters, not tags,
 which are one list across the catalog.*
+
+An Equipment column, when the list has one, is what each recipe can't be
+made without (*Ray's equipment spec, 2026-11-15*), and is treated as the
+Ingredients column is (*Ray, 2026-11-16*). It is read as a row of a whole
+book is (needs.cell_parts): semicolons or commas between needs, "none" for
+a recipe that needs nothing special, empty for one nobody has recorded.
+What saving would refuse (something any kitchen has, a size alone) is left
+out and flagged on the recipe, as a line with an amount is, and the rest
+is kept. A recipe already added gets its equipment when the import runs
+again, if none is recorded for it. At the end of a run a thing that isn't
+in the equipment list and is spelt like one that is gets flagged, as a
+possible typo in an ingredient is.
 """
 
 import csv
@@ -30,7 +42,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openlarder import detector, isbn, recipes, references, typos
+from openlarder import detector, isbn, needs, recipes, references, typos
 from openlarder.models import (
     Edition,
     FlagKind,
@@ -47,6 +59,8 @@ BOOK_COLUMNS = ("Source Title", "Author(s)", "ISBN", "Year Published")
 RECIPE_COLUMNS = ("Source", "Recipe Name", "Pg #", "Ingredients")
 # Optional: a list without it imports no chapters.
 CHAPTER_COLUMN = "Tag"
+# Optional: a list without it leaves every recipe's equipment not recorded.
+EQUIPMENT_COLUMN = "Equipment"
 MAX_BATCH = 250
 
 # What is left of a page reference split at a semicolon: "269)", "p. 42)".
@@ -91,6 +105,8 @@ class RecipeRow:
     page: str | None
     lines: list[str]
     chapter: str | None = None
+    # The Equipment cell as written; empty where there's no column.
+    equipment: str = ""
 
 
 @dataclass
@@ -161,6 +177,8 @@ def parse_recipes(text: str) -> ParsedRecipes:
                 page=_squash(line["Pg #"]) or None,
                 lines=[_squash(x) for x in (line["Ingredients"] or "").split(";")],
                 chapter=_squash(line.get(CHAPTER_COLUMN) or "") or None,
+                # Not squashed: a new line in the cell parts two needs.
+                equipment=(line.get(EQUIPMENT_COLUMN) or "").strip(),
             )
         )
     return ParsedRecipes(rows=rows, blank=blank, untitled=untitled)
@@ -213,6 +231,7 @@ class Item:
     page: str | None
     lines: list[str]
     chapter: str | None = None
+    equipment: str = ""
 
 
 @dataclass
@@ -250,6 +269,44 @@ async def _ingredients(session: AsyncSession, recipe_ids: list[uuid.UUID]) -> li
     ).all():
         lines[recipe_id].append(text)
     return list(lines.values())
+
+
+async def _equip(session: AsyncSession, recipe: Recipe, cell: str) -> list[str]:
+    """Give a recipe the needs its Equipment cell names, keeping what
+    saving would take. Answers why each of the rest was left out, for a
+    flag apiece. An empty cell says nothing, and nothing is written."""
+    parts = needs.cell_parts(cell)
+    none = [part for part in parts if needs.says_none(part)]
+    named = [part for part in parts if not needs.says_none(part)]
+    kept, refused = await needs.sift(session, named)
+    if none and named:
+        # "none" beside equipment: the equipment is kept, and which was
+        # meant is for a person to say.
+        refused.insert(0, needs.none_beside(none[0]))
+    nothing_special = bool(none) and not named
+    if kept or nothing_special:
+        try:
+            await needs.write(session, recipe, kept, nothing_special)
+        except needs.Refused as why:
+            refused.append(str(why))
+    return refused
+
+
+async def _flag_once(
+    session: AsyncSession, recipe_id: uuid.UUID, kind: FlagKind, detail: str
+) -> bool:
+    """Raise a flag unless the recipe has had the same one: an import run
+    again doesn't raise again what was dealt with, or is still open."""
+    if await session.scalar(
+        select(RecipeFlag.id).where(
+            RecipeFlag.recipe_id == recipe_id,
+            RecipeFlag.kind == kind.value,
+            RecipeFlag.detail == detail,
+        )
+    ):
+        return False
+    session.add(RecipeFlag(recipe_id=recipe_id, kind=kind.value, detail=detail))
+    return True
 
 
 async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[Item]) -> Outcome:
@@ -292,11 +349,30 @@ async def import_batch(session: AsyncSession, admin_id: uuid.UUID, items: list[I
                     .where(Recipe.id.in_(already), Recipe.chapter.is_(None))
                     .values(chapter=entry.chapter)
                 )
+            # Added before equipment was imported, or with none: it gets
+            # its equipment now, unless somebody has recorded it since.
+            if item.equipment:
+                for recipe in await session.scalars(
+                    select(Recipe).where(
+                        Recipe.id.in_(already), Recipe.equipment_checked.is_(False)
+                    )
+                ):
+                    if (await needs.of_recipes(session, [recipe.id])).get(recipe.id):
+                        continue
+                    for why in await _equip(session, recipe, item.equipment):
+                        if await _flag_once(session, recipe.id, FlagKind.EQUIPMENT_REMOVED, why):
+                            outcome.flags.append(
+                                (item.row, recipe.id, FlagKind.EQUIPMENT_REMOVED.value, why)
+                            )
             continue
 
         recipe = await recipes.create(session, item.source_id, entry)
         recipe.created_by = admin_id
         flags = list(prepared.flags)
+        flags += [
+            (FlagKind.EQUIPMENT_REMOVED, why)
+            for why in await _equip(session, recipe, item.equipment)
+        ]
         if same_title:
             others = ", ".join(sorted({p or "no page" for _, p in same_title}))
             flags.append((FlagKind.DUPLICATE_TITLE, f"also on page {others}"))
@@ -392,14 +468,23 @@ class Typo:
     recipe: str
     book: str
     detail: str
+    # Which flag: an ingredient's name, or a piece of equipment's.
+    kind: str = FlagKind.POSSIBLE_TYPO.value
 
 
 async def flag_typos(session: AsyncSession, run: ImportRun) -> list[Typo]:
     """At the end of a run, flag names that look like typos (typos.py), once
     across the catalog, so one early in the file is caught however late
-    its right spelling arrives. Each goes in the run's report, by recipe and
-    book: the run keeps no row for a recipe nothing else flagged."""
-    raised = await typos.sweep(session)
+    its right spelling arrives: ingredients' names, and equipment that
+    isn't in the list. Each goes in the run's report, by recipe and book:
+    the run keeps no row for a recipe nothing else flagged."""
+    raised = [
+        (recipe_id, detail, FlagKind.POSSIBLE_TYPO.value)
+        for recipe_id, detail in await typos.sweep(session)
+    ] + [
+        (recipe_id, detail, FlagKind.EQUIPMENT_TYPO.value)
+        for recipe_id, detail in await typos.sweep_equipment(session)
+    ]
     if not raised:
         return []
     named = {
@@ -407,22 +492,18 @@ async def flag_typos(session: AsyncSession, run: ImportRun) -> list[Typo]:
         for r, title, book in await session.execute(
             select(Recipe.id, Recipe.title, Source.title)
             .join(Source, Source.id == Recipe.source_id)
-            .where(Recipe.id.in_({r for r, _ in raised}))
+            .where(Recipe.id.in_({r for r, _, _ in raised}))
         )
     }
     found = []
-    for recipe_id, detail in raised:
+    for recipe_id, detail, kind in raised:
         title, book = named.get(recipe_id, ("", ""))
         session.add(
             ImportRunLine(
-                run_id=run.id,
-                recipe=title,
-                kind=FlagKind.POSSIBLE_TYPO.value,
-                detail=detail,
-                recipe_id=recipe_id,
+                run_id=run.id, recipe=title, kind=kind, detail=detail, recipe_id=recipe_id
             )
         )
-        found.append(Typo(recipe_id, title, book, detail))
+        found.append(Typo(recipe_id, title, book, detail, kind))
     run.flags_raised += len(found)
     return found
 

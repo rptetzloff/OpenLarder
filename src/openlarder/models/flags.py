@@ -38,6 +38,13 @@ class FlagKind(enum.StrEnum):
     # A rare ingredient name close to a much commoner one (typos.py); the
     # detail is "as written → suggested".
     POSSIBLE_TYPO = "possible_typo"
+    # Something in an import's Equipment column that saving refuses (what
+    # any kitchen has, a size alone) and was left out, as a line is; the
+    # detail is the sentence it would have been refused with.
+    EQUIPMENT_REMOVED = "equipment_removed"
+    # A thing a recipe needs that isn't in the equipment list and is spelt
+    # like one that is (typos.py); the detail is "as written → suggested".
+    EQUIPMENT_TYPO = "equipment_typo"
 
 
 class Resolution(enum.StrEnum):

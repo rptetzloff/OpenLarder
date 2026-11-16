@@ -43,6 +43,8 @@ class RecipeOut(BaseModel):
     page: str | None
     ingredients: list[str]
     chapter: str | None = None
+    # The Equipment cell as written; empty where the list has no column.
+    equipment: str = ""
 
 
 class Parsed(BaseModel):
@@ -63,6 +65,8 @@ class ItemIn(BaseModel):
     page: str | None = None
     ingredients: list[str] = []
     chapter: str | None = Field(default=None, max_length=200)
+    # As a row of a whole book has it (recipes' equipment_cell).
+    equipment: str = Field(default="", max_length=2000)
 
 
 class Batch(BaseModel):
@@ -163,6 +167,7 @@ async def parse(files: Files, admin: AdminUser) -> Parsed:
                 page=r.page,
                 ingredients=r.lines,
                 chapter=r.chapter,
+                equipment=r.equipment,
             )
             for r in rows
         ],
@@ -190,6 +195,7 @@ async def import_recipes(batch: Batch, admin: AdminUser, session: Session) -> Ba
                 page=i.page,
                 lines=i.ingredients,
                 chapter=i.chapter,
+                equipment=i.equipment,
             )
         )
     run = await _open_run(session, batch.run_id) if batch.run_id else None
@@ -242,6 +248,8 @@ class TypoOut(BaseModel):
     recipe: str
     book: str
     detail: str
+    # possible_typo for an ingredient's name, equipment_typo for equipment.
+    kind: str
 
 
 class Finished(BaseModel):
@@ -270,7 +278,9 @@ async def finish_run(
     return Finished(
         finished=True,
         typos=[
-            TypoOut(recipe_id=t.recipe_id, recipe=t.recipe, book=t.book, detail=t.detail)
+            TypoOut(
+                recipe_id=t.recipe_id, recipe=t.recipe, book=t.book, detail=t.detail, kind=t.kind
+            )
             for t in flagged
         ],
     )
