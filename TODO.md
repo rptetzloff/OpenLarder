@@ -1301,7 +1301,20 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
               that is still done from the Equipment list.
           - [ ] Someone signed out sees no "Add it", as they see no
             "Suggest a change": nothing invites them to sign in for it.
-        - [ ] The flag reason, "Equipment is wrong or missing".
+        - [x] The flag reason, "Equipment is wrong or missing" (#218,
+          migration 0083). It is a reason under "Report a problem", on
+          a recipe: a reason is what a person picks there, and a flag's
+          kind is what an import raises (*Claude's reading of the
+          spec's "flag reason", 2026-11-16*). Only a recipe has
+          equipment recorded, so no other page offers it and the server
+          and the database refuse it anywhere else.
+          - A piece of equipment's page has "Report a problem" too, as
+            an ingredient's has (*Ray, 2026-11-16: treated the same*).
+            One that isn't in the list can be reported only by someone
+            who can see a recipe that needs it, and a moderator who
+            can't is told only that it isn't theirs to see.
+          - Found on the way: the moderators' list said "A ingredient
+            that's gone" and "A author that's gone". Fixed here.
         - [ ] How many recipes have equipment recorded, on the admin
           overview.
       - [ ] 3. My equipment, and search's three filters. *Ray,
@@ -1647,7 +1660,8 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         *Ray, 2026-11-10*): "Report a problem" on each recipe, source,
         ingredient and author page, with a reason and a note; signed out,
         5 a day per address and a field bots fill. Moderators fix or
-        dismiss them at `/admin/reports`.
+        dismiss them at `/admin/reports`. (A piece of equipment's page
+        has it since #218.)
       - [x] The ingredient matching flow (#125): the recipe form already
         says what each line matches, suggests names like an unmatched
         one, and keeps one as typed as a new ingredient. The last step:

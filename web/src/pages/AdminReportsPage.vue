@@ -3,7 +3,7 @@ import Crumbs from "../components/Crumbs.vue";
 import { computed, ref, watch } from "vue";
 import AdminBar from "../components/AdminBar.vue";
 import type { Me } from "../me";
-import { REASONS, type Report, decideReport, reportQueue } from "../reports";
+import { A_RECORD, REASONS, type Report, decideReport, reportQueue } from "../reports";
 
 // Problems people have reported with public records, oldest first, for
 // moderators to fix or dismiss. *Ray, 2026-11-10.*
@@ -62,8 +62,8 @@ watch(allowed, (yes) => yes && !reports.value && load(), { immediate: true });
     <div class="list-head">
       <h1>Reports</h1>
       <p class="muted">
-        Problems people have reported with recipes, sources, ingredients and authors, oldest
-        first.
+        Problems people have reported with recipes, sources, ingredients, equipment and
+        authors, oldest first.
       </p>
     </div>
     <p v-if="!user?.may_edit" class="status">This is for moderators.</p>
@@ -93,7 +93,9 @@ watch(allowed, (yes) => yes && !reports.value && load(), { immediate: true });
         <li v-for="r in reports" :key="r.id">
           <div>
             <a v-if="r.href" :href="r.href">{{ r.title }}</a>
-            <span v-else class="muted">A {{ r.kind }} that's gone, or isn't yours to see</span>
+            <span v-else class="muted">
+              {{ A_RECORD[r.kind] }} that's gone, or isn't yours to see
+            </span>
             <span class="muted"> · {{ r.kind }} · {{ when(r.created_at) }}</span>
             <p class="report-reason">
               <strong>{{ reasonLabel(r.reason) }}</strong>

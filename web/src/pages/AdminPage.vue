@@ -57,7 +57,7 @@ const tools = computed(() => {
       name: "Reports",
       count: reported.value,
       unit: "open",
-      about: "Problems people have reported with recipes, sources, ingredients and authors.",
+      about: "Problems people have reported with recipes, sources, ingredients, equipment and authors.",
     },
     {
       href: "/admin/review",

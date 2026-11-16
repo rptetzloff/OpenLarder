@@ -1,11 +1,15 @@
 """Reports: "Report a problem" on any public record, for anyone. *Ray,
 2026-11-10.*
 
-A report names the record (a recipe, source, ingredient or author, which
-the reporter can see), a reason and a note. Signed out, it's limited per
-address like book requests, a field people never see catches bots, and the
-address is kept only as its pseudonym (usage.py). A second report of the
-same record from the same person, while the first is open, replaces it.
+A report names the record (a recipe, source, ingredient, author or piece
+of equipment, which the reporter can see), a reason and a note. One reason
+is a recipe's alone, "Equipment is wrong or missing" (*Ray's equipment
+spec, 2026-11-15*, which calls it a flag reason: a reason is what a person
+picks here, and a flag's kind is what an import raises). Signed out, it's
+limited per address like book requests, a field people never see catches
+bots, and the address is kept only as its pseudonym (usage.py). A second
+report of the same record from the same person, while the first is open,
+replaces it.
 
 Moderators see the open ones, oldest first, with what each is about (or
 that it's gone, merged or removed, or one they can't see), and resolve or
@@ -23,12 +27,15 @@ from sqlalchemy import func, select
 from openlarder import daily, usage, visibility
 from openlarder.auth import ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
-from openlarder.models import Author, Ingredient, Recipe, Report, Source, User
+from openlarder.models import Author, Equipment, Ingredient, Recipe, Report, Source, User
 from openlarder.ratelimit import _address
 
 router = APIRouter(tags=["reports"])
-Kind = Literal["recipe", "source", "ingredient", "author"]
-Reason = Literal["wrong", "duplicate", "copied", "spam", "other"]
+Kind = Literal["recipe", "source", "ingredient", "author", "equipment"]
+Reason = Literal["wrong", "duplicate", "copied", "spam", "other", "equipment"]
+# The reason that is a recipe's alone, and what's said of it anywhere else.
+EQUIPMENT_REASON = "equipment"
+NOT_A_RECIPE = "Only a recipe has equipment recorded, so only a recipe can be reported for it."
 # Reports a day from one address, signed out; one account, signed in.
 ANONYMOUS_PER_DAY = 5
 SIGNED_IN_PER_DAY = 50
@@ -37,6 +44,7 @@ HREF = {
     "source": "/sources/",
     "ingredient": "/ingredients/",
     "author": "/authors/",
+    "equipment": "/equipment/",
 }
 
 
@@ -53,6 +61,12 @@ async def _title(session, viewer: User | None, kind: str, target_id: uuid.UUID) 
     elif kind == "ingredient":
         query = select(Ingredient.name).where(
             Ingredient.id == target_id, visibility.ingredients_seen_by(viewer)
+        )
+    elif kind == "equipment":
+        # A thing that isn't in the list is seen only with a recipe that
+        # needs it, by a moderator as by anyone.
+        query = select(Equipment.name).where(
+            Equipment.id == target_id, visibility.equipment_seen_by(viewer)
         )
     else:
         query = select(Author.name).where(
@@ -78,6 +92,8 @@ class Sent(BaseModel):
 async def send(body: ReportIn, request: Request, session: Session, viewer: Viewer) -> Sent:
     if body.website:
         return Sent()
+    if body.reason == EQUIPMENT_REASON and body.kind != "recipe":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, NOT_A_RECIPE)
     if await _title(session, viewer, body.kind, body.id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's nothing there to report.")
     reporter = f"user:{viewer.id}" if viewer else f"ip:{usage.pseudonym(_address(request))}"

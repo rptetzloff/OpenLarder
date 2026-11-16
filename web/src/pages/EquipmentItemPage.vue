@@ -4,6 +4,7 @@ import AdminBand from "../components/AdminBand.vue";
 import Crumbs from "../components/Crumbs.vue";
 import EquipmentPicker from "../components/EquipmentPicker.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
+import ReportButton from "../components/ReportButton.vue";
 import {
   addAlias,
   countAs,
@@ -411,6 +412,8 @@ onMounted(() => load());
           </button>
         </p>
       </section>
+      <!-- As an ingredient's page has (Ray, 2026-11-16: treated the same). -->
+      <ReportButton kind="equipment" :id="id" />
       <HistoryPanel kind="equipment" :id="id" :can-revert="!!user?.may_edit" />
     </template>
   </article>

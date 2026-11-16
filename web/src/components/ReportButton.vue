@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { type Kind, REASONS, type Reason, sendReport } from "../reports";
+import { type Kind, type Reason, reasonsFor, sendReport } from "../reports";
 
 // "Report a problem" on a public record, for anyone (routers/reports.py).
 // *Ray, 2026-11-10.*
@@ -51,7 +51,7 @@ async function submit() {
     <form v-if="open" class="recipe-form report-form" @submit.prevent="submit">
       <fieldset>
         <legend>What's the problem?</legend>
-        <label v-for="r in REASONS" :key="r.reason" class="check">
+        <label v-for="r in reasonsFor(kind)" :key="r.reason" class="check">
           <input v-model="reason" type="radio" name="report-reason" :value="r.reason" />
           {{ r.label }}
         </label>
