@@ -3428,22 +3428,34 @@ main h2 {
   font-weight: 600;
 }
 .bulk-lines textarea {
+  /* A block, so two of them stack with the gap the stylesheet gives and
+     not a line's leftover under each. */
+  display: block;
   width: 100%;
   resize: vertical;
+  /* As tall as what's typed, where the browser sizes a field to its
+     content; elsewhere it stays the height its rows give and scrolls, as
+     both did. Measured at 384px (2026-11-16): the biscuits' three needs
+     wanted 62px of a 39px box, and all but the first were out of sight.
+     Never shorter than its rows: two lines of ingredients. */
+  field-sizing: content;
+  min-height: calc(2lh + 0.75rem + 2px);
 }
-/* The row's equipment, under its ingredients: the smaller of the two, as
-   the chapter is under the title. */
-.bulk-row input.bulk-equipment {
-  width: 100%;
+/* The row's equipment, under its ingredients, and the same kind of box:
+   the smaller of the two, as the chapter is under the title. */
+.bulk-row textarea.bulk-equipment {
   margin-top: 0.375rem;
   font-size: 0.875rem;
   padding: 0.25rem 0.5rem;
+  /* One line until there's more. */
+  min-height: calc(1lh + 0.5rem + 2px);
 }
 /* Full size where it's typed with a thumb, as the chapter is there. */
 @media (max-width: 48rem) {
-  .bulk-row input.bulk-equipment {
+  .bulk-row textarea.bulk-equipment {
     font-size: inherit;
     padding: 0.375rem 0.5rem;
+    min-height: calc(1lh + 0.75rem + 2px);
   }
 }
 .bulk-summary {

@@ -364,7 +364,9 @@ async def test_needs_are_checked_as_theyre_typed(mo, client) -> None:
         ("stick blender", "Immersion blender", True),
     ]
     assert (pan["detail"], pan["options"][0]["equipment"]["name"]) == ("9-inch", "Springform pan")
-    assert new["options"] == [{"name": "egg coddler", "equipment": None, "alias": False}]
+    assert new["options"] == [
+        {"name": "egg coddler", "equipment": None, "alias": False, "similar": []}
+    ]
     assert new["problem"] is None
     assert bowl["problem"] == "“Mixing bowl” is expected in any kitchen, so it isn't recorded."
     assert "is a size" in size["problem"] and size["options"] == []
@@ -382,7 +384,73 @@ async def test_checking_doesnt_say_a_hidden_thing_exists(people) -> None:
     [hers] = (await ann.post("/api/equipment/check", json=asked)).json()
     assert hers["options"][0]["equipment"]["name"] == "Nana's cauldron"
     [his] = (await bob.post("/api/equipment/check", json=asked)).json()
-    assert his["options"] == [{"name": "nana's cauldron", "equipment": None, "alias": False}]
+    assert his["options"] == [
+        {"name": "nana's cauldron", "equipment": None, "alias": False, "similar": []}
+    ]
+    # Nor is it named to someone who types something like it, though it is
+    # to her.
+    nearly = {"needs": ["nanas cauldrons pot"]}
+    [hers] = (await ann.post("/api/equipment/check", json=nearly)).json()
+    assert [n["name"] for n in hers["options"][0]["similar"]] == ["Nana's cauldron"]
+    [his] = (await bob.post("/api/equipment/check", json=nearly)).json()
+    assert his["options"][0]["similar"] == []
+    cell = (
+        await bob.post("/api/equipment/check-cell", json={"cell": "nanas cauldrons pot"})
+    ).json()
+    assert cell["needs"][0]["options"][0]["similar"] == []
+
+
+async def test_a_name_nothing_matches_is_given_what_its_named_like(mo) -> None:
+    typed = ["wafle iron", "9-inch springfrm pan", "stick blendr", "mixing bowel", "wok"]
+    read = (await mo.post("/api/equipment/check", json={"needs": typed})).json()
+    like = [[n["name"] for o in need["options"] for n in o["similar"]] for need in read]
+    waffle, pan, blender, bowl, wok = like
+    # Closest first, by its name or by another name for it.
+    assert waffle[0] == "Waffle iron"
+    assert pan[0] == "Springform pan"
+    assert blender[0] == "Immersion blender"
+    # What any kitchen has is never offered: taking it up would be refused.
+    assert "Mixing bowl" not in bowl
+    # What matched is given nothing.
+    assert wok == [] and read[4]["options"][0]["equipment"]["name"] == "Wok"
+    assert [o["equipment"] for need in read[:4] for o in need["options"]] == [None] * 4
+
+
+async def test_a_rows_cell_is_checked_a_need_apiece(mo, client) -> None:
+    async def checked(cell: str) -> dict:
+        response = await mo.post("/api/equipment/check-cell", json={"cell": cell})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    read = await checked("stand mixer or hand mixer, 9-inch springfrm pan; mixing bowl\n wok ")
+    assert read["nothing_special"] is False
+    assert [n["text"] for n in read["needs"]] == [
+        "stand mixer or hand mixer",
+        "9-inch springfrm pan",
+        "mixing bowl",
+        "wok",
+    ]
+    mixers, pan, bowl, wok = read["needs"]
+    assert [o["equipment"]["name"] for o in mixers["options"]] == ["Stand mixer", "Hand mixer"]
+    assert (pan["detail"], pan["options"][0]["similar"][0]["name"]) == ("9-inch", "Springform pan")
+    assert bowl["problem"] == "“Mixing bowl” is expected in any kitchen, so it isn't recorded."
+    assert wok["problem"] is None and wok["options"][0]["equipment"]["name"] == "Wok"
+    # "none" alone, an empty cell, and "none" beside a need, which is the
+    # one saving refuses, said of it and not of the need.
+    assert await checked(" None ") == {"nothing_special": True, "needs": []}
+    assert await checked("  ") == {"nothing_special": False, "needs": []}
+    beside = await checked("none; wok")
+    assert beside["nothing_special"] is False
+    assert "needs nothing special" in beside["needs"][0]["problem"]
+    assert beside["needs"][1]["problem"] is None
+    # The cell is parted as saving parts it: what's refused here is refused
+    # there, and what isn't saves.
+    assert needs.from_cell("stand mixer or hand mixer, wok") == (
+        [n["text"] for n in (await checked("stand mixer or hand mixer, wok"))["needs"]],
+        False,
+    )
+    refused = await client.post("/api/equipment/check-cell", json={"cell": "wok"})
+    assert refused.status_code == 401
 
 
 # The list takes in what a recipe brought
@@ -459,8 +527,9 @@ async def test_a_rows_cell_saves_and_comes_back_as_typed(mo, client, adb) -> Non
     # Each row's cell, for entering a whole book.
     lines = (await client.get(f"/api/sources/{book}/recipe-lines")).json()
     cells = {row["id"]: row["equipment_cell"] for row in lines}
+    # With semicolons between, as a row's ingredients come back.
     assert cells == {
-        cake: "Stand mixer or Hand mixer, 9-inch Springform pan",
+        cake: "Stand mixer or Hand mixer; 9-inch Springform pan",
         toast: "none",
         plain: "",
     }

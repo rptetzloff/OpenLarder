@@ -139,13 +139,44 @@ export async function stopCountingAs(id: string, broader: string): Promise<void>
   await send(`/api/equipment/${id}/counts-as/${broader}`, "DELETE");
 }
 
-// A need as saving would read it, for the recipe form to say before it's
-// saved: what each thing typed will be matched to (none: a new thing), and
-// why saving would refuse it, if it would.
+// A need as saving would read it, to say before it's saved: what each thing
+// typed will be matched to; with none, the things named like it (it's a new
+// thing unless one of them is meant); and why saving would refuse it, if it
+// would. As an ingredient line's review is (recipes.ts).
+export interface NeedOption {
+  name: string;
+  equipment: Related | null;
+  alias: boolean;
+  similar: Related[];
+}
+
 export interface NeedRead {
   detail: string | null;
-  options: { name: string; equipment: Related | null; alias: boolean }[];
+  options: NeedOption[];
   problem: string | null;
+}
+
+// A need with something else in place of what was typed, keeping its size:
+// "9-inch springfrm pan" taken as Springform pan is "9-inch Springform pan".
+export const needNamed = (read: NeedRead, name: string) =>
+  read.detail ? `${read.detail} ${name}` : name;
+
+// A row's needs typed into one cell (entering a whole book): each as the
+// server parted them, with its reading.
+export interface CellRead {
+  // "none" alone.
+  nothing_special: boolean;
+  needs: (NeedRead & { text: string })[];
+}
+
+export async function checkCell(cell: string): Promise<CellRead> {
+  const res = await fetch("/api/equipment/check-cell", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cell }),
+  });
+  if (!res.ok) throw new Error("The equipment couldn't be checked.");
+  return res.json();
 }
 
 export async function checkNeeds(needs: string[]): Promise<NeedRead[]> {

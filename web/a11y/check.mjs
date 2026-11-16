@@ -459,6 +459,33 @@ const FORM_NEEDS = (hints) => `(() => {
   const none = document.querySelector(".need-none input");
   if (!none) return "The form has no “Nothing special”";
   if (${hints.length > 0} !== none.disabled) return "“Nothing special” can be ticked with a need typed, or can't with none";
+  const choice = rows.find((r) => r.querySelector(".line-tag")?.textContent.includes("options"));
+  const listed = [...(choice?.querySelectorAll(".line-options li") ?? [])].map((li) => li.textContent.replace(/\\s+/g, " ").trim());
+  if (choice && listed.join(" | ") !== "Stand mixer · first choice | Hand mixer · or this") return "The need with a choice lists “" + listed.join(" | ") + "”";
+  return "";
+})()`;
+// A need nothing in the list matches, typed into the form's last box: it
+// is asked about as an ingredient line is (Ray, 2026-11-16: equipment is
+// treated as ingredients are), with what's named like it to take up, which
+// keeps the size typed, and "It's new".
+const TYPE_NEED = (words) => `(async () => {
+  const boxes = [...document.querySelectorAll(".need-rows .line-row input")];
+  const box = boxes[boxes.length - 1];
+  box.value = ${JSON.stringify(words)};
+  box.dispatchEvent(new Event("input", { bubbles: true }));
+  for (let i = 0; i < 80 && !box.closest(".line-row").querySelector(".line-tag"); i++) await new Promise((r) => setTimeout(r, 100));
+})()`;
+const NEED_ASKED = (meant, taken) => `(async () => {
+  const rows = [...document.querySelectorAll(".need-rows .line-row")].filter((r) => r.querySelector("input").value);
+  const row = rows[rows.length - 1];
+  const said = row?.querySelector(".line-tag")?.textContent.replace(/\\s+/g, " ").trim();
+  if (!said?.startsWith("No exact match")) return "A need nothing matches is told “" + said + "”";
+  const actions = row.querySelector(".line-actions");
+  const buttons = [...(actions?.querySelectorAll("button") ?? [])].map((b) => b.textContent.trim());
+  if (!actions?.textContent.includes("Did you mean") || buttons.join(" | ") !== ${JSON.stringify(meant + " | It's new")}) return "It's offered “" + buttons.join(" | ") + "”";
+  actions.querySelector("button").click();
+  await new Promise((r) => setTimeout(r, 50));
+  if (row.querySelector("input").value !== ${JSON.stringify(taken)}) return "Taking it up leaves “" + row.querySelector("input").value + "” in the box";
   return "";
 })()`;
 // A piece of equipment's page lists the recipes that need it, each with
@@ -469,20 +496,58 @@ const EQUIPMENT_RECIPES = (rows) => `(() => {
 })()`;
 // Entering a whole book: each row has its equipment in one cell under its
 // ingredients, named for a screen reader, with what was saved: the
-// biscuits' needs with commas between, "none" for the blend, and nothing
-// for a recipe whose equipment isn't recorded.
+// biscuits' needs with semicolons between, "none" for the blend, and
+// nothing for a recipe whose equipment isn't recorded. It's treated as the
+// ingredients are (Ray, 2026-11-16): the same kind of box, and the row says
+// of it what it says of them, how many and whether all matched, with a
+// need's choice as a chip.
 const BULK_EQUIPMENT = `(() => {
   const rows = [...document.querySelectorAll(".bulk-row[role=group]")];
-  const cell = (title) => rows.find((r) => r.getAttribute("aria-label") === title)?.querySelector("input.bulk-equipment");
-  const unnamed = rows.find((r) => r.querySelector("input.bulk-equipment")?.getAttribute("aria-label") !== "Equipment");
-  if (!rows.length || unnamed) return "A row has no Equipment cell, or it has no name";
+  const row = (title) => rows.find((r) => r.getAttribute("aria-label").startsWith(title));
+  const cell = (title) => row(title)?.querySelector("textarea.bulk-equipment");
+  const unnamed = rows.find((r) => r.querySelector("textarea.bulk-equipment")?.getAttribute("aria-label") !== "Equipment");
+  if (!rows.length || unnamed) return "A row has no Equipment box of the ingredients' kind, or it has no name";
   const biscuits = cell("Cheddar Biscuits")?.value;
-  if (biscuits !== "Biscuit cutter, Stand mixer or Hand mixer, 10-inch Cast-iron skillet") return "The biscuits' equipment reads “" + biscuits + "”";
+  if (biscuits !== "Biscuit cutter; Stand mixer or Hand mixer; 10-inch Cast-iron skillet") return "The biscuits' equipment reads “" + biscuits + "”";
   if (cell("Biscuit Blend")?.value !== "none") return "The blend's equipment reads “" + cell("Biscuit Blend")?.value + "”, not “none”";
-  const unrecorded = rows.find((r) => r.getAttribute("aria-label").startsWith("Slow-Roasted"))?.querySelector("input.bulk-equipment").value;
+  const unrecorded = cell("Slow-Roasted").value;
   if (unrecorded !== "") return "A recipe whose equipment isn't recorded has “" + unrecorded + "” in its cell";
-  const under = rows.find((r) => { const lines = r.querySelector("textarea"), kit = r.querySelector("input.bulk-equipment"); return !(lines.compareDocumentPosition(kit) & Node.DOCUMENT_POSITION_FOLLOWING) || kit.getBoundingClientRect().top < lines.getBoundingClientRect().bottom; });
+  const under = rows.find((r) => { const lines = r.querySelector("textarea"), kit = r.querySelector("textarea.bulk-equipment"); return !(lines.compareDocumentPosition(kit) & Node.DOCUMENT_POSITION_FOLLOWING) || kit.getBoundingClientRect().top < lines.getBoundingClientRect().bottom; });
   if (under) return "A row's equipment isn't under its ingredients";
+  const summed = (title) => row(title).querySelector(".bulk-summary")?.textContent.replace(/\\s+/g, " ").trim() ?? "";
+  if (!summed("Cheddar Biscuits").endsWith("· 3 pieces of equipment, all matched")) return "The biscuits' row says “" + summed("Cheddar Biscuits") + "”";
+  if (!summed("Biscuit Blend").endsWith("· No special equipment")) return "The blend's row says “" + summed("Biscuit Blend") + "”";
+  if (!summed("Slow-Roasted").endsWith("· Equipment not recorded yet")) return "The row of a recipe whose equipment isn't recorded says “" + summed("Slow-Roasted") + "”";
+  const chips = [...row("Cheddar Biscuits").querySelectorAll(".bulk-chips li")].map((li) => li.textContent.replace(/\\s+/g, " ").trim());
+  if (!chips.includes("2 options: Stand mixer, then Hand mixer")) return "The biscuits' chips are “" + chips.join(" | ") + "”, with none for the mixers";
+  return "";
+})()`;
+// Equipment saving refuses, and a name nothing matches, typed into a row
+// and the row left. Nothing is saved (saving refuses the row for what any
+// kitchen has), so the four browsers looking at once each see their own.
+// The row says why it didn't save, and under it each need has a chip as a
+// line has: the refused one with Remove, the unmatched one with what it's
+// named like, Use and It's new.
+const TYPE_KIT = `(async () => {
+  const row = [...document.querySelectorAll(".bulk-row[role=group]")].find((r) => r.getAttribute("aria-label").startsWith("Slow-Roasted"));
+  const box = row.querySelector("textarea.bulk-equipment");
+  box.focus();
+  box.value = "mixing bowl; 8-inch wafle iron";
+  box.dispatchEvent(new Event("input", { bubbles: true }));
+  box.blur();
+  for (let i = 0; i < 80 && !row.querySelector(".bulk-chips")?.textContent.includes("Mixing bowl"); i++) await new Promise((r) => setTimeout(r, 100));
+})()`;
+const BULK_CHECKS = `(async () => {
+  const row = [...document.querySelectorAll(".bulk-row[role=group]")].find((r) => r.getAttribute("aria-label").startsWith("Slow-Roasted"));
+  const status = row.querySelector(".bulk-status").textContent.replace(/\\s+/g, " ").trim();
+  if (!status.includes("expected in any kitchen")) return "The row's status says “" + status + "”";
+  const chips = [...row.querySelectorAll(".bulk-chips li.tone-warn")].map((li) => li.textContent.replace(/\\s+/g, " ").trim());
+  const refused = chips.find((c) => c.startsWith("“Mixing bowl” is expected in any kitchen") && c.endsWith("Remove"));
+  const asked = chips.find((c) => c === "“wafle iron” → Waffle iron? Use It's new");
+  if (!refused || !asked) return "The row's chips for its equipment are “" + chips.join(" | ") + "”";
+  if (!row.classList.contains("has-checks")) return "A row with checks on its equipment isn't marked as having checks";
+  const summed = row.querySelector(".bulk-summary").textContent.replace(/\\s+/g, " ").trim();
+  if (!summed.endsWith("· 2 pieces of equipment")) return "The row says “" + summed + "”";
   return "";
 })()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
@@ -1089,6 +1154,7 @@ function pages(s) {
     [`/sources/${s.show.id}/recipes/new`, "admin"],
     [`/sources/${s.box.id}/recipes/new`, "cook"],
     [`/sources/${s.book.id}/bulk`, "admin", { phone: true, expect: BULK_EQUIPMENT }],
+    [`/sources/${s.book.id}/bulk`, "admin", { phone: true, then: TYPE_KIT, expect: onPhone(BULK_CHECKS) }],
     [`/recipes/${s.biscuits.id}`, null, { phone: true, expect: `(${CRUMBS}) || (${BUY_OUTLINED}) || (${NEEDS(["Biscuit cutter", "Stand mixer or Hand mixer", "Cast-iron skillet 10-inch"])})` }],
     [`/recipes/${s.blend.id}`, null, { expect: NEEDS_LINE("No special equipment.", false) }],
     [`/recipes/${s.biscuits.id}`, "admin"],
@@ -1097,7 +1163,9 @@ function pages(s) {
     [`/recipes/${s.issue.id}`, null],
     [`/recipes/${s.episode.id}`, null],
     [`/recipes/${s.pie.id}`, "cook"],
-    [`/recipes/${s.biscuits.id}/edit`, "admin", { phone: true, expect: FORM_NEEDS(["Matched: Biscuit cutter", "Matched: Stand mixer or Hand mixer", "Matched: Cast-iron skillet, 10-inch"]) }],
+    [`/recipes/${s.biscuits.id}/edit`, "admin", { phone: true, expect: FORM_NEEDS(["Matched: Biscuit cutter", "2 options, in the book's order", "Matched: Cast-iron skillet, 10-inch"]) }],
+    [`/recipes/${s.biscuits.id}/edit`, "admin", { phone: true, then: TYPE_NEED("8-inch wafle iron"), expect: onPhone(NEED_ASKED("Waffle iron", "8-inch Waffle iron")) }],
+    [`/recipes/${s.word.id}/edit`, "admin", { phone: true, then: TYPE_NEED(LONG.slice(0, -2)), expect: onPhone(NEED_ASKED(LONG, LONG)) }],
     [`/recipes/${s.blend.id}/edit`, "admin", { expect: FORM_NEEDS([]) }],
     ["/ingredients", null, { expect: IN_HEADER("Ingredients") }],
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],

@@ -25,7 +25,7 @@ import re
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import delete, exists, select
+from sqlalchemy import ColumnElement, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder.ingredients import match_key
@@ -122,6 +122,36 @@ async def held_by(session: AsyncSession, key: str) -> tuple[Equipment, bool] | N
     return (by_alias, True) if by_alias is not None else None
 
 
+async def like(
+    session: AsyncSession, name: str, seen: ColumnElement[bool], limit: int = 3
+) -> list[tuple[uuid.UUID, str]]:
+    """Things named like a name nothing matches, by it or another name,
+    closest first, as ingredients.like finds ingredients: "wafle iron"
+    finds "Waffle iron". Only among what the asker sees, and never what any
+    kitchen has: taking that up would only be refused."""
+    closeness = func.greatest(
+        func.similarity(Equipment.name, name),
+        func.coalesce(
+            select(func.max(func.similarity(EquipmentAlias.name, name)))
+            .where(EquipmentAlias.equipment_id == Equipment.id)
+            .scalar_subquery(),
+            0,
+        ),
+    )
+    by_alias = select(EquipmentAlias.equipment_id).where(EquipmentAlias.name.op("%")(name))
+    rows = await session.execute(
+        select(Equipment.id, Equipment.name)
+        .where(
+            or_(Equipment.name.op("%")(name), Equipment.id.in_(by_alias)),
+            Equipment.assumed.is_(False),
+            seen,
+        )
+        .order_by(closeness.desc(), Equipment.name)
+        .limit(limit)
+    )
+    return [(i, n) for i, n in rows]
+
+
 def assumed_message(thing: Equipment) -> str:
     """Said wherever something any kitchen has is typed for a recipe. The
     spec's words began "A {name}", which "Oven mitts" and "An oven" don't
@@ -189,28 +219,46 @@ NONE_SAID = ("none", "nothing", "nothing special")
 _BETWEEN = re.compile(r"[,;\n]")
 
 
+def cell_parts(cell: str) -> list[str]:
+    """What's typed into a cell, a need apiece, in order. Semicolons and
+    new lines part them, as they part a row's ingredients; so do commas
+    (Ray's spec, 2026-11-15: "comma-separated")."""
+    parts = [" ".join(part.split()) for part in _BETWEEN.split(cell)]
+    return [part for part in parts if part]
+
+
+def says_none(part: str) -> bool:
+    return part.casefold() in NONE_SAID
+
+
+def none_beside(part: str) -> str:
+    """Said of "none" in a cell that also names equipment: which is it?"""
+    return (
+        f"“{part}” is for a recipe that needs nothing special. Take it out, or the"
+        " equipment beside it."
+    )
+
+
 def from_cell(cell: str) -> tuple[list[str], bool]:
     """A row's needs typed into one cell: the needs, and whether it was said
-    to need nothing special. Commas, semicolons and new lines part them.
-    "none" alone is nothing special; an empty cell is neither, which leaves
-    the recipe not recorded."""
-    parts = [" ".join(part.split()) for part in _BETWEEN.split(cell)]
-    parts = [part for part in parts if part]
-    said_none = [part for part in parts if part.casefold() in NONE_SAID]
-    if said_none and len(parts) > 1:
-        raise Refused(
-            f"“{said_none[0]}” is for a recipe that needs nothing special. Take it out, or"
-            " the equipment beside it."
-        )
-    return ([], True) if said_none else (parts, False)
+    to need nothing special. "none" alone is nothing special; an empty cell
+    is neither, which leaves the recipe not recorded."""
+    parts = cell_parts(cell)
+    none = [part for part in parts if says_none(part)]
+    if none and len(parts) > 1:
+        raise Refused(none_beside(none[0]))
+    return ([], True) if none else (parts, False)
 
 
 def as_cell(checked: bool, read: list[tuple[uuid.UUID, str | None, list[Equipment]]]) -> str:
     """A recipe's needs as their cell takes them back: "Stand mixer or Hand
-    mixer, 9-inch Springform pan"; "none"; or nothing, not recorded."""
+    mixer; 9-inch Springform pan"; "none"; or nothing, not recorded. With
+    semicolons between, as a row's ingredients come back (Ray, 2026-11-16:
+    a row's equipment is treated as its ingredients are; it had come back
+    with commas, which are still read)."""
     if not read:
         return "none" if checked else ""
-    return ", ".join(as_typed(detail, things) for _, detail, things in read)
+    return "; ".join(as_typed(detail, things) for _, detail, things in read)
 
 
 async def write(

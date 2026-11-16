@@ -3,7 +3,7 @@ import Crumbs from "../components/Crumbs.vue";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import { type Book, issueName, KIND_NAMES, SHOWS } from "../books";
-import { checkNeeds, type NeedRead } from "../equipment";
+import { checkNeeds, needNamed, type NeedOption, type NeedRead } from "../equipment";
 import type { Me } from "../me";
 import {
   checkLines,
@@ -165,30 +165,51 @@ interface NeedHint {
   text: string;
   // Saving would refuse it.
   refused: boolean;
+  read: NeedRead;
 }
 
+// Needs someone has answered "it's new" to, by row, for the text they kept.
+const keptNeeds = ref(new Map<number, string>());
+
+// A need's hint says what an ingredient line's says (hintFor, below), in
+// the same words: matched, several options in the source's order, or no
+// exact match, with what's named like it and "It's new" (Ray, 2026-11-16:
+// equipment is treated as ingredients are; a name nothing matched had been
+// called new without asking).
 function needHintFor(row: Row): NeedHint | null {
   const found = needReads.value.get(row.key);
   if (!row.text.trim() || !found || found.text !== row.text) return null;
   const read = found.read;
-  if (read.problem) return { tone: "warn", text: read.problem, refused: true };
+  if (read.problem) return { tone: "warn", text: read.problem, refused: true, read };
   if (!read.options.length) return null;
-  const named = read.options.map((o) =>
-    o.equipment ? `${o.equipment.name}${o.alias ? " (another name for it)" : ""}` : `${o.name} (new)`,
-  );
   const size = read.detail ? `, ${read.detail}` : "";
-  if (read.options.every((o) => o.equipment)) {
-    return { tone: "ok", text: `Matched: ${named.join(" or ")}${size}`, refused: false };
+  const hint = (tone: Tone, text: string) => ({ tone, text: text + size, refused: false, read });
+  if (read.options.length > 1) {
+    return hint("ok", `${read.options.length} options, in the ${place.value}'s order`);
   }
-  return {
-    tone: "info",
-    text: `${named.join(" or ")}${size}. What's new is added to the equipment list.`,
-    refused: false,
-  };
+  const only = read.options[0];
+  if (only.equipment) {
+    return hint("ok", `Matched: ${only.equipment.name}${only.alias ? " (another name for it)" : ""}`);
+  }
+  if (keptNeeds.value.get(row.key) === row.text) return hint("ok", "New equipment");
+  return hint("warn", "No exact match");
 }
+
+// How an option of a need with several reads.
+const needOptionText = (o: NeedOption) => (o.equipment ? o.equipment.name : `${o.name} (new)`);
 
 const needHints = computed(() => needRows.value.map((r) => needHintFor(r)));
 const needsRefused = computed(() => needHints.value.filter((h) => h?.refused).length);
+const needChecksLeft = computed(() => needHints.value.filter((h) => h?.tone === "warn").length);
+
+function replaceNeed(index: number, text: string) {
+  needRows.value[index].text = text;
+}
+
+function pasteNeeds(index: number, event: ClipboardEvent) {
+  const at = pasteInto(needRows.value, index, event);
+  if (at !== null) focusNeed(at);
+}
 
 // The steps. Each one reached stays open to go back to.
 const step = ref(2);
@@ -400,18 +421,25 @@ function replace(index: number, text: string) {
   rows.value[index].text = text;
 }
 
-// Pasting several lines into a box fills that many.
-function paste(index: number, event: ClipboardEvent) {
+// Pasting several lines into a box fills that many, of ingredients or of
+// equipment: the box to go to afterwards, or null when it was one line and
+// the paste is the browser's.
+function pasteInto(list: Row[], index: number, event: ClipboardEvent): number | null {
   const pasted = event.clipboardData?.getData("text") ?? "";
-  if (!pasted.includes("\n")) return;
+  if (!pasted.includes("\n")) return null;
   event.preventDefault();
   const found = pasted.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (!found.length) return;
-  const row = rows.value[index];
+  if (!found.length) return null;
+  const row = list[index];
   const added = row.text.trim() ? found : found.slice(1);
   if (!row.text.trim()) row.text = found[0];
-  rows.value.splice(index + 1, 0, ...added.map((t) => newRow(t)));
-  focusRow(index + added.length);
+  list.splice(index + 1, 0, ...added.map((t) => newRow(t)));
+  return index + added.length;
+}
+
+function paste(index: number, event: ClipboardEvent) {
+  const at = pasteInto(rows.value, index, event);
+  if (at !== null) focusRow(at);
 }
 
 const filled = computed(() => rows.value.filter((r) => r.text.trim()));
@@ -839,6 +867,7 @@ async function save(another = false) {
                         :placeholder="i === 0 ? 'ice cream maker' : ''"
                         :disabled="nothingSpecial"
                         @keydown.enter.prevent="addNeed(i)"
+                        @paste="pasteNeeds(i, $event)"
                       />
                       <button
                         v-if="needRows.length > 1"
@@ -860,12 +889,50 @@ async function save(another = false) {
                       {{ needHints[i]!.text }}
                     </p>
                   </div>
+                  <template v-if="needHints[i]">
+                    <ol v-if="needHints[i]!.read.options.length > 1" class="line-options">
+                      <li v-for="(o, n) in needHints[i]!.read.options" :key="n">
+                        {{ needOptionText(o) }}
+                        <span class="muted">· {{ n === 0 ? "first choice" : "or this" }}</span>
+                      </li>
+                    </ol>
+                    <div v-if="needHints[i]!.tone === 'warn'" class="line-actions">
+                      <template v-if="needHints[i]!.refused">
+                        <button type="button" class="secondary small" @click="removeNeed(i)">
+                          Remove
+                        </button>
+                        <span>Saving refuses it.</span>
+                      </template>
+                      <template v-else>
+                        <template v-if="needHints[i]!.read.options[0].similar.length">
+                          <span>Did you mean</span>
+                          <button
+                            v-for="s in needHints[i]!.read.options[0].similar"
+                            :key="s.id"
+                            type="button"
+                            class="secondary small"
+                            @click="replaceNeed(i, needNamed(needHints[i]!.read, s.name))"
+                          >
+                            {{ s.name }}
+                          </button>
+                        </template>
+                        <button
+                          type="button"
+                          class="secondary small"
+                          @click="keptNeeds.set(row.key, row.text)"
+                        >
+                          It's new
+                        </button>
+                      </template>
+                    </div>
+                  </template>
                 </li>
               </ol>
               <p class="line-add">
                 <button type="button" class="secondary" :disabled="nothingSpecial" @click="addNeed()">
                   + Add equipment
                 </button>
+                <span class="help">Enter starts a new line; pasting several lines fills that many.</span>
               </p>
               <label class="check need-none"
                 ><input
@@ -914,6 +981,11 @@ async function save(another = false) {
                 {{ needsRefused }} need{{ needsRefused === 1 ? " is" : "s are" }} of something saving
                 refuses.
                 <button type="button" class="secondary small" @click="go(3)">Fix {{ needsRefused === 1 ? "it" : "them" }}</button>
+              </p>
+              <p v-else-if="needChecksLeft" class="muted">
+                {{ needChecksLeft }} need{{ needChecksLeft === 1 ? " has" : "s have" }} a check on
+                {{ needChecksLeft === 1 ? "it" : "them" }}; they save as typed.
+                <button type="button" class="secondary small" @click="go(3)">Look again</button>
               </p>
             </template>
             <template v-if="propose">

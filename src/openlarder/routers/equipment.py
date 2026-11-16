@@ -10,8 +10,11 @@ it, each with how the need reads there. Every count is of the recipes the
 viewer can see. A thing a recipe's form brought in is seen with a recipe
 that needs it (visibility.equipment_seen_by).
 
-A need is checked as it's typed (POST /api/equipment/check), for the
-recipe form to say what it will be matched to before saving does it.
+A need is checked as an ingredient line is (POST /api/equipment/check
+for the recipe form's boxes, /check-cell for a row of a whole book), to
+say what it will be matched to, or that nothing matches and what is named
+like it, before saving does it (*Ray, 2026-11-16: equipment is treated as
+ingredients are*).
 
 Changing the list is for moderators, as changing the ingredient list is
 (*Ray's spec, 2026-11-15*): adding a thing, renaming it, merging it into
@@ -284,8 +287,12 @@ async def get_equipment(
 # Checking needs as they're typed
 
 
+# Far more than a recipe may list (needs.MAX_NEEDS), and an end to it.
+MAX_CHECKED = 100
+
+
 class NeedsIn(BaseModel):
-    needs: list[str] = Field(max_length=100)
+    needs: list[str] = Field(max_length=MAX_CHECKED)
 
 
 class OptionRead(BaseModel):
@@ -296,6 +303,9 @@ class OptionRead(BaseModel):
     equipment: Related | None = None
     # Matched by another name for it.
     alias: bool = False
+    # When there isn't: things named like it, as an unmatched ingredient
+    # line is given ingredients named like it.
+    similar: list[Related] = []
 
 
 class NeedRead(BaseModel):
@@ -305,18 +315,23 @@ class NeedRead(BaseModel):
     problem: str | None = None
 
 
-@router.post("/check", response_model=list[NeedRead], dependencies=[SameOrigin])
-async def check_needs(body: NeedsIn, user: CurrentUser, session: Session) -> list[NeedRead]:
+# Looking for names like each unmatched option is a query apiece, as it is
+# for ingredient lines (routers/recipes.py).
+MAX_SIMILAR = 30
+
+
+async def _read(session: Session, user, typed: list[str]) -> list[NeedRead]:
     """Each need read as saving would read it. A thing the asker can't see
-    (one only a recipe hidden from them needs) is answered as new: that it
-    exists isn't theirs to learn."""
-    seen = set(
-        await session.scalars(select(Equipment.id).where(visibility.equipment_seen_by(user)))
-    )
+    (one only a recipe hidden from them needs) is answered as new, and is
+    never among the names like another: that it exists isn't theirs to
+    learn."""
+    seen_by = visibility.equipment_seen_by(user)
+    seen = set(await session.scalars(select(Equipment.id).where(seen_by)))
+    looked = 0
     out = []
-    for typed in body.needs:
+    for text in typed:
         try:
-            need = needs.read(typed)
+            need = needs.read(text)
         except needs.Refused as refused:
             out.append(NeedRead(problem=str(refused)))
             continue
@@ -332,9 +347,54 @@ async def check_needs(body: NeedsIn, user: CurrentUser, session: Session) -> lis
                 option.equipment = Related(id=thing.id, name=thing.name)
                 if thing.assumed:
                     read.problem = needs.assumed_message(thing)
+            elif looked < MAX_SIMILAR:
+                looked += 1
+                option.similar = [
+                    Related(id=i, name=n) for i, n in await needs.like(session, name, seen_by)
+                ]
             read.options.append(option)
         out.append(read)
     return out
+
+
+@router.post("/check", response_model=list[NeedRead], dependencies=[SameOrigin])
+async def check_needs(body: NeedsIn, user: CurrentUser, session: Session) -> list[NeedRead]:
+    """The recipe form's needs, a box apiece, as saving would read them."""
+    return await _read(session, user, body.needs)
+
+
+class CellIn(BaseModel):
+    cell: str = Field(max_length=2000)
+
+
+class CellNeed(NeedRead):
+    # The need as typed, to say which one a check is about.
+    text: str
+
+
+class CellRead(BaseModel):
+    # "none" alone: the recipe needs nothing special.
+    nothing_special: bool = False
+    needs: list[CellNeed] = []
+
+
+@router.post("/check-cell", response_model=CellRead, dependencies=[SameOrigin])
+async def check_cell(body: CellIn, user: CurrentUser, session: Session) -> CellRead:
+    """A row's needs typed into one cell (entering a whole book), parted as
+    saving parts them and each read as saving would read it, so the row can
+    say what each matched as it says of its ingredients."""
+    parts = needs.cell_parts(body.cell)[:MAX_CHECKED]
+    if len(parts) == 1 and needs.says_none(parts[0]):
+        return CellRead(nothing_special=True)
+    reads = iter(await _read(session, user, [p for p in parts if not needs.says_none(p)]))
+    return CellRead(
+        needs=[
+            CellNeed(text=part, problem=needs.none_beside(part))
+            if needs.says_none(part)
+            else CellNeed(text=part, **next(reads).model_dump())
+            for part in parts
+        ]
+    )
 
 
 # Fixing the list
