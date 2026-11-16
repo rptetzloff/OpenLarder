@@ -22,6 +22,9 @@ const waiting = ref<number | null>(null);
 const reported = ref<number | null>(null);
 const imports = ref<number | null>(null);
 const linksWaiting = ref<number | null>(null);
+// How much of the published catalog has equipment recorded
+// (routers/overview.py, which words the share); null if it couldn't be had.
+const kit = ref<{ recipes: number; recorded: number; share: string } | null>(null);
 const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
 const n = (v: number | null, one: string, many: string) =>
   v === null ? "" : `${v.toLocaleString()} ${v === 1 ? one : many}`;
@@ -38,6 +41,9 @@ async function loadCounts() {
     fetch("/api/fdc/suggestions")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((p) => (linksWaiting.value = p.counts.likely)),
+    fetch("/api/admin/overview")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((o) => (kit.value = o.equipment)),
   ]);
   if (flags.status === "fulfilled") openFlags.value = sum(flags.value.open_by_kind);
   if (suggestions.status === "fulfilled") openSuggestions.value = sum(suggestions.value.open_by_kind);
@@ -256,6 +262,17 @@ async function archiveAll() {
           </a>
         </li>
       </ul>
+
+      <!-- Ray's equipment spec, 2026-11-15: "how many recipes have equipment
+           recorded, as a percentage". -->
+      <template v-if="counted && kit">
+        <h2 class="section-title">The catalog</h2>
+        <p v-if="kit.recipes" class="catalog-stat">
+          Equipment is recorded on <strong>{{ kit.share }}</strong> of published recipes:
+          {{ kit.recorded.toLocaleString() }} of {{ kit.recipes.toLocaleString() }}.
+        </p>
+        <p v-else class="status">No published recipes yet.</p>
+      </template>
 
       <h2 class="section-title">Catching up</h2>
       <div class="tool-panels">
