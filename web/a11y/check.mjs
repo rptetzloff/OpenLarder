@@ -403,6 +403,33 @@ const EQUIPMENT_LIST = (assumed, atLeast = 50) => `(() => {
     return "Multicooker's line reads “" + said(multi) + "”";
   return "";
 })()`;
+// A moderator's tools on a piece of equipment's page (Ray's spec,
+// 2026-11-15: rename, merge into, count as, also called, mark as any
+// kitchen's, delete when unused). Each of the bar's links leads to
+// something on the page; and what it counts as now can each be stopped, by
+// a button that says which.
+const EQUIPMENT_TOOLS = `(() => {
+  const links = [...document.querySelectorAll('#admin-bar a[href^="#"]')];
+  if (links.length < 5) return "The admin bar has " + links.length + " links to the page's tools";
+  const lost = links.find((a) => !document.getElementById(a.getAttribute("href").slice(1)));
+  if (lost) return "The admin bar's “" + lost.textContent.trim() + "” leads to nothing on the page";
+  for (const id of ["equipment-name", "merge-into", "counts-as", "includes", "other-name", "any-kitchen"])
+    if (!document.getElementById(id)) return "The tools have nothing with the id " + id;
+  const counted = [...document.querySelectorAll(".ingredient-cards > div")].find((c) => c.querySelector("h2")?.textContent.trim() === "Counts as");
+  const stops = [...document.querySelectorAll(".fix-ingredient button.remove")].map((b) => b.getAttribute("aria-label") ?? "");
+  for (const a of counted?.querySelectorAll("a") ?? [])
+    if (!stops.includes("Stop counting it as " + a.textContent.trim())) return "Nothing stops it counting as " + a.textContent.trim();
+  if (!document.querySelector("details.history-panel")) return "The page has no History";
+  return "";
+})()`;
+// Only a moderator has them, and the way to add to the list.
+const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
+const ADD_EQUIPMENT = `(() => {
+  const panel = document.querySelector("main details.add-panel");
+  if (panel?.querySelector("summary")?.textContent.trim() !== "Add equipment") return "A moderator has no “Add equipment” on the list";
+  if (innerWidth < 640 && !panel.open) return "“Add equipment” didn't open";
+  return panel.querySelector("#new-equipment") && panel.querySelector('input[type="checkbox"]') ? "" : "“Add equipment” has no name box, or no way to say any kitchen has one";
+})()`;
 // What a piece of equipment's page says under its name.
 const EQUIPMENT_SAYS = (words) => `(() => {
   const said = [...document.querySelectorAll(".equipment-page .status")].map((p) => p.textContent.replace(/\\s+/g, " ").trim());
@@ -929,10 +956,16 @@ async function seed() {
   // that counts as two others, one that includes it, one with nothing to
   // say, and one any kitchen has.
   const kit = (await api("/api/equipment?assumed=true", "admin")).equipment;
-  const [multicooker, slowCooker, wok, stovetop] = ["Multicooker", "Slow cooker", "Wok", "Stovetop"].map(
+  const [multicooker, slowCooker, wok, stovetop, blender] = ["Multicooker", "Slow cooker", "Wok", "Stovetop", "Blender"].map(
     (name) => kit.find((e) => e.name === name).id,
   );
-  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop };
+  // And one a moderator added, named with the long word, called it too and
+  // counting as something: what a person typed, on the list and its page,
+  // with a history to show.
+  const wordyKit = (await api("/api/equipment", "admin", { name: LONG })).id;
+  await api(`/api/equipment/${wordyKit}/aliases`, "admin", { name: `Old ${LONG}` });
+  await api(`/api/equipment/${wordyKit}/counts-as/${blender}`, "admin", undefined, "PUT");
+  return { long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit };
 }
 
 // Script that presses the button whose words begin so; with none, it throws,
@@ -986,7 +1019,16 @@ function pages(s) {
     ["/equipment", null, { phone: true, expect: `(${IN_HEADER("Equipment")}) || (${EQUIPMENT_LIST(false)}) || (${COUNT_SAID("/^\\d+ pieces of equipment\\.$/")})` }],
     ["/equipment?assumed=true&sort=name", null, { phone: true, expect: EQUIPMENT_LIST(true) }],
     ["/equipment?q=frying+pan", null, { expect: `(${EQUIPMENT_LIST(true, 1)}) || (${COUNT_SAID("/^1 piece of equipment matches “frying pan”\\.$/")})` }],
-    ["/equipment?q=no+such+thing", null],
+    ["/equipment?q=no+such+thing", null, { expect: NO_TOOLS }],
+    ["/equipment", "cook", { expect: NO_TOOLS }],
+    ["/equipment", "admin", { phone: true, then: `document.querySelector("main details.add-panel").open = true`, expect: ADD_EQUIPMENT }],
+    [`/equipment/${s.multicooker}`, "cook", { expect: NO_TOOLS }],
+    [`/equipment/${s.multicooker}`, "admin", { expect: `(${ADMIN_BAR("This equipment")}) || (${EQUIPMENT_TOOLS})` }],
+    [`/equipment/${s.multicooker}`, "admin", { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("This equipment") }],
+    [`/equipment/${s.stovetop}`, "admin", { expect: EQUIPMENT_TOOLS }],
+    [`/equipment/${s.wordyKit}`, null, { expect: HIERARCHY(["Counts as"], ["Includes"], "/equipment/") }],
+    [`/equipment/${s.wordyKit}`, "admin", { phone: true, then: `document.querySelector("details.history-panel").open = true` }],
+    [`/equipment/${s.blender}`, "admin", { expect: `(${HIERARCHY(["Includes"], ["Counts as"], "/equipment/")}) || (${EQUIPMENT_TOOLS})` }],
     [`/equipment/${s.multicooker}`, null, { expect: `(${HIERARCHY(["Counts as"], ["Includes"], "/equipment/")}) || (${CRUMBS}) || (${EQUIPMENT_SAYS("No recipe lists it yet.")})` }],
     [`/equipment/${s.slowCooker}`, null, { expect: HIERARCHY(["Includes"], ["Counts as", "Also called"], "/equipment/") }],
     [`/equipment/${s.wok}`, null, { expect: `(${HIERARCHY([], ["Counts as", "Includes", "Also called"], "/equipment/")}) || (${EQUIPMENT_SAYS("Nothing it counts as, includes or is also called yet.")})` }],

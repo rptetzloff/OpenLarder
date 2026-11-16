@@ -1,8 +1,33 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { type EquipmentSummary, listEquipment } from "../equipment";
+import { addEquipment, type EquipmentSummary, listEquipment, Taken } from "../equipment";
+import type { Me } from "../me";
 
 document.title = "Equipment · OpenLarder";
+
+// A moderator adds to the list from here (Ray's spec, 2026-11-15: the list
+// is a start, for editors to change), and changes a thing from its page.
+defineProps<{ user: Me | null | undefined }>();
+const adding = ref("");
+const addingAssumed = ref(false);
+const addError = ref("");
+// The thing that has the name already, to go to.
+const addTaken = ref<{ id: string; name: string } | null>(null);
+const addBusy = ref(false);
+
+async function add() {
+  addError.value = "";
+  addTaken.value = null;
+  addBusy.value = true;
+  try {
+    const made = await addEquipment(adding.value, addingAssumed.value);
+    location.href = `/equipment/${made.id}`;
+  } catch (e) {
+    if (e instanceof Taken) addTaken.value = e.equipment;
+    addError.value = e instanceof Error ? e.message : String(e);
+    addBusy.value = false;
+  }
+}
 
 const params = new URLSearchParams(location.search);
 const q = ref(params.get("q") ?? "");
@@ -79,6 +104,36 @@ onMounted(() => load());
         What some recipes can't be made without, from a stand mixer to a springform pan. A knife
         or a mixing bowl isn't listed on a recipe: any kitchen has one.
       </p>
+    </div>
+
+    <div v-if="user?.may_edit" class="add-panels">
+      <details class="add-panel">
+        <summary>Add equipment</summary>
+        <form class="isbn-form" @submit.prevent="add">
+          <label for="new-equipment">Name</label>
+          <div class="row">
+            <input
+              id="new-equipment"
+              v-model="adding"
+              required
+              maxlength="200"
+              autocomplete="off"
+              placeholder="Egg coddler"
+              :aria-invalid="addError ? 'true' : undefined"
+              aria-describedby="new-equipment-error"
+            />
+            <button type="submit" class="primary" :disabled="addBusy || !adding.trim()">Add</button>
+          </div>
+          <label class="check"
+            ><input v-model="addingAssumed" type="checkbox" /> Any kitchen has one, so recipes
+            won't list it</label
+          >
+          <p v-if="addError" id="new-equipment-error" class="error" role="alert">
+            {{ addError }}
+            <a v-if="addTaken" :href="`/equipment/${addTaken.id}`">Open “{{ addTaken.name }}”</a>
+          </p>
+        </form>
+      </details>
     </div>
 
     <div class="list-tools">

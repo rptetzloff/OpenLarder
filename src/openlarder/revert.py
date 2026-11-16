@@ -22,6 +22,8 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import history
+from openlarder.author_names import name_key
+from openlarder.ingredients import match_key
 from openlarder.models import Base, Revision
 
 # Parents before children: the order removed rows are put back in, and the
@@ -29,12 +31,15 @@ from openlarder.models import Base, Revision
 ORDER = [
     "authors",
     "ingredients",
+    "equipment",
     "tags",
     "shops",
     "sources",
     "author_links",
     "ingredient_aliases",
     "ingredient_allergens",
+    "equipment_aliases",
+    "equipment_counts_as",
     "diet_allergens",
     "producer_ingredients",
     "editions",
@@ -48,6 +53,8 @@ ORDER = [
     "recipe_locations",
     "recipe_ingredients",
     "ingredient_options",
+    "recipe_equipment",
+    "equipment_options",
     "recipe_tags",
     "substitutions",
 ]
@@ -55,6 +62,20 @@ ORDER = [
 
 # Required columns a removal before migration 0042 didn't keep.
 KEYS = {"ingredients": "match_key", "ingredient_aliases": "match_key", "authors": "name_key"}
+
+
+# A key made from a row's name. The trigger leaves it out of a change as
+# noise (it says nothing the name doesn't), so a rename's revision has the
+# old name and not the old key: undoing one makes the key again. Without
+# this an ingredient renamed and put back had its old name and was matched
+# by its new one (found 2026-11-15, building equipment's undo).
+KEYED = {
+    "ingredients": ("match_key", match_key),
+    "ingredient_aliases": ("match_key", match_key),
+    "equipment": ("match_key", match_key),
+    "equipment_aliases": ("match_key", match_key),
+    "authors": ("name_key", name_key),
+}
 
 
 class CantRevert(Exception):
@@ -167,6 +188,9 @@ async def revert(session: AsyncSession, change_id: uuid.UUID) -> int:
             for r in reversed([r for r in revisions if r.action == "u"]):
                 table = tables[r.table_name]
                 values = {c: _value(table, c, b) for c, (b, _) in r.changes.items() if c in table.c}
+                if r.table_name in KEYED and values.get("name"):
+                    column, make = KEYED[r.table_name]
+                    values[column] = make(values["name"])
                 await session.execute(
                     update(table)
                     .where(_where(table, r, _row(table, r.changes, 1)))

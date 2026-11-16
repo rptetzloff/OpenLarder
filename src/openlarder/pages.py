@@ -41,7 +41,15 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder import visibility
-from openlarder.models import Author, BookMerge, Ingredient, MergedRecord, Recipe, Source
+from openlarder.models import (
+    Author,
+    BookMerge,
+    Equipment,
+    Ingredient,
+    MergedRecord,
+    Recipe,
+    Source,
+)
 from openlarder.routers import authors, equipment, ingredients, recipes, sources
 
 SITE = "OpenLarder"
@@ -657,7 +665,8 @@ async def _kept(session: AsyncSession, gone_id: uuid.UUID) -> uuid.UUID | None:
 async def _went_to(
     session: AsyncSession, kind: str, gone_id: uuid.UUID, model, seen
 ) -> uuid.UUID | None:
-    """The ingredient or author a merged one went into (migration 0070),
+    """The ingredient, author or equipment a merged one went into (migrations
+    0070 and 0080),
     following merges on, if anyone can see it: an address that says where a
     record went mustn't say that one that isn't everyone's is there."""
     at = gone_id
@@ -720,11 +729,15 @@ async def ingredient(session: AsyncSession, ingredient_id: uuid.UUID) -> Page:
 
 
 async def equipment_page(session: AsyncSession, equipment_id: uuid.UUID) -> Page:
-    """A piece of equipment's page. Each is everyone's so far
-    (visibility.equipment_seen_by), so one that isn't there is not found."""
+    """A piece of equipment's page. One merged into another goes to the
+    one kept. Each is everyone's so far (visibility.equipment_seen_by), so
+    one that isn't there and went nowhere is not found."""
     shown = await equipment.as_signed_out(session, equipment_id)
     if shown is None:
-        return NOT_FOUND
+        kept = await _went_to(
+            session, "equipment", equipment_id, Equipment, visibility.equipment_seen_by(None)
+        )
+        return Page(status=301, moved_to=f"/equipment/{kept}") if kept else NOT_FOUND
     return Page(
         title=f"{shown.name} · Equipment · {SITE}",
         description=equipment_description(shown),
