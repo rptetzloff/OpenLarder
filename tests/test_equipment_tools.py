@@ -393,7 +393,8 @@ def _said(change: dict) -> list[tuple]:
 
 async def test_the_list_as_it_started_has_no_history(client, adb) -> None:
     """Seeds aren't edits: the triggers start after them (migration 0080)."""
-    assert await adb.scalar(text("SELECT count(*) FROM revisions")) == 0
+    of_the_list = "SELECT count(*) FROM revisions WHERE table_name LIKE 'equipment%'"
+    assert await adb.scalar(text(of_the_list)) == 0
     assert await _history(client, await _id(adb, "Multicooker")) == []
     assert (await client.get(f"/api/equipment/{uuid.uuid4()}/history")).status_code == 404
 

@@ -17,7 +17,14 @@ from openlarder import visibility
 from openlarder.main import app
 from openlarder.models import Ingredient, Source, User
 
-SECRETS = ("Secret Box", "Secret Stew", "Zanzibar Moonsalt", "Nana Secretta", "Secret Family")
+SECRETS = (
+    "Secret Box",
+    "Secret Stew",
+    "Zanzibar Moonsalt",
+    "Nana Secretta",
+    "Secret Family",
+    "Moonlit Cauldron",
+)
 
 
 async def _collection(c, title="Secret Box", **more):
@@ -51,20 +58,20 @@ async def secret(people, adb):
         text("INSERT INTO recipe_flags (recipe_id, kind, detail) VALUES (:r, 'no_page', 'x')"),
         {"r": uuid.UUID(stew)},
     )
-    # The stew needs a tagine: nothing records a need yet; the database can.
-    # The tagine is everyone's to know of. That this recipe needs one isn't.
+    # The stew needs a tagine, which is the list's and everyone's to know
+    # of (that this recipe needs one isn't), and a cauldron only it names,
+    # which is as private as it is.
+    saved = await ann.put(
+        f"/api/recipes/{stew}",
+        json={
+            "title": "Secret Stew",
+            "ingredients": ["Zanzibar Moonsalt", "Butter"],
+            "equipment": ["tagine", "Moonlit Cauldron"],
+        },
+    )
+    assert saved.status_code == 200, saved.text
     tagine = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Tagine'"))
-    need = await adb.scalar(
-        text("INSERT INTO recipe_equipment (recipe_id, position) VALUES (:r, 1) RETURNING id"),
-        {"r": uuid.UUID(stew)},
-    )
-    await adb.execute(
-        text(
-            "INSERT INTO equipment_options (recipe_equipment_id, recipe_id, rank, equipment_id)"
-            " VALUES (:n, :r, 1, :e)"
-        ),
-        {"n": need, "r": uuid.UUID(stew), "e": tagine},
-    )
+    cauldron = await adb.scalar(text("SELECT id FROM equipment WHERE name = 'Moonlit Cauldron'"))
     # No route credits anyone on a family collection yet; the database can.
     nana = await adb.scalar(
         text(
@@ -121,6 +128,7 @@ async def secret(people, adb):
         "salt": salt,
         "butter": butter,
         "tagine": tagine,
+        "cauldron": cauldron,
         "author": nana,
         "pat": pat,
         "above": above,
@@ -460,9 +468,9 @@ def _fill(path: str, names: list[str], secret: dict) -> str:
         "recipe_id": secret["stew"],
         "ingredient_id": secret["salt"],
         "author_id": secret["author"],
-        # What the private recipe needs, where the sweep was given one
+        # What only the private recipe needs, where the sweep was given one
         # (test_review.py asks with its own things, which need nothing).
-        "equipment_id": secret.get("tagine", uuid.uuid4()),
+        "equipment_id": secret.get("cauldron", uuid.uuid4()),
         "group_id": secret["group"],
         # An invite's token is itself the secret: whoever has it may see the
         # group's name. The sweep asks without one.
@@ -483,6 +491,7 @@ QUERIES = {
     "/api/sources": {"q": "Secret"},
     "/api/ingredients": {"q": "Moonsalt"},
     "/api/authors": {"q": ""},
+    "/api/equipment": {"q": "Cauldron", "assumed": "true"},
     "/api/flags": {"scope": "all"},
 }
 
@@ -507,6 +516,11 @@ async def _sweep(c: httpx2.AsyncClient, secret: dict) -> str:
             for other in ("twin", "pat"):
                 if other in secret:
                     seen.append((await c.get(f"/api/authors/{secret[other]}")).text)
+        if route == "/api/equipment":
+            # And unfiltered, where a hidden thing would otherwise show.
+            seen.append((await c.get(path)).text)
+        if route == "/api/equipment/{equipment_id}" and "tagine" in secret:
+            seen.append((await c.get(f"/api/equipment/{secret['tagine']}?under=true")).text)
         if route == "/api/ingredients/{ingredient_id}":
             for other in ("above", "below"):
                 seen.append((await c.get(f"/api/ingredients/{secret[other]}")).text)

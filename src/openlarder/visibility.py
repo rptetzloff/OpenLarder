@@ -21,10 +21,14 @@ What a contributor adds is hidden the same way until a moderator approves
 it (migration 0041): from everyone but them and moderators, ingredients and
 authors only it uses included.
 
-Equipment (migration 0079) is everyone's so far: the list was seeded, and
-nothing a recipe's form does adds to it. What a recipe needs is hidden
-with the recipe, so a count of the recipes needing a thing is of those
-the viewer can see.
+Equipment in the list (seeded by migration 0079, or added by a moderator)
+is everyone's, whatever needs it. A thing a recipe's form brought in
+(`listed` false, migration 0081) is seen only by those who can see a recipe
+that needs it: stricter than an ingredient, which shows once nothing uses
+it, because such a thing has no reason to be there but its recipes
+(needs.sweep removes one none needs). What a recipe needs is hidden with
+the recipe, so a count of the recipes needing a thing is of those the
+viewer can see.
 
 The database does not enforce any of this; tests/test_privacy.py asks every
 GET route in the app as other people and fails on anything private it
@@ -37,6 +41,7 @@ from sqlalchemy.orm import aliased
 
 from openlarder.models import (
     Author,
+    Equipment,
     EquipmentOption,
     GroupMember,
     Ingredient,
@@ -151,13 +156,17 @@ def needs_seen_by(viewer: User | None) -> ColumnElement[bool]:
 
 
 def equipment_seen_by(viewer: User | None) -> ColumnElement[bool]:
-    """Every piece of equipment, for anyone: the list is seeded (migration
-    0079), not made from what recipes say, so a thing only a private recipe
-    needs is still one everyone knows of. Every read of equipment asks
-    here all the same, so that when a recipe's form can bring a thing into
-    being, hiding one only a hidden recipe needs is a change to this
-    function and not to each of them."""
-    return true()
+    """What's in the list, and what a recipe the viewer can see needs. One
+    typed into a private collection is its owner's, and theirs it's shared
+    with; one in a recipe waiting for review waits with it."""
+    # Aliased, so a query already joining options doesn't swallow this.
+    need = aliased(EquipmentOption)
+    return or_(
+        Equipment.listed,
+        Equipment.id.in_(
+            select(need.equipment_id).where(need.recipe_id.not_in(_hidden_recipe_ids(viewer)))
+        ),
+    )
 
 
 def authors_seen_by(viewer: User | None) -> ColumnElement[bool]:

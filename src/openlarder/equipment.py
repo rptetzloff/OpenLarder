@@ -101,7 +101,15 @@ async def create(session: AsyncSession, name: str, assumed: bool = False) -> Equ
     """Add a thing to the list."""
     name, key = _named(name)
     if holder := await _holder(session, key):
-        raise Taken(holder)
+        if holder.listed or holder.match_key != key:
+            raise Taken(holder)
+        # A recipe's form brought it in (needs.py): it is the list's now,
+        # under the name the moderator gave it.
+        # (Not as any kitchen's while a recipe lists it: set_assumed says so.)
+        await set_assumed(session, holder, assumed)
+        holder.name, holder.listed = name, True
+        await session.flush()
+        return holder
     thing = Equipment(name=name, match_key=key, assumed=assumed)
     session.add(thing)
     await session.flush()

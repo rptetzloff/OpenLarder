@@ -360,6 +360,49 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
             </div>
           </section>
 
+          <!-- What it can't be made without (Ray's equipment spec,
+               2026-11-15), above the ingredients, in three states that
+               are never confused: its needs; "No special equipment",
+               when someone has said so; "not recorded yet" when nobody
+               has. -->
+          <section
+            v-if="recipe.equipment.length"
+            class="recipe-section recipe-needs"
+            aria-labelledby="needs-heading"
+          >
+            <div class="table-head">
+              <h2 id="needs-heading">
+                Needs
+                <span class="ingredient-count">{{ recipe.equipment.length }}</span>
+              </h2>
+            </div>
+            <ul class="ingredient-lines ingredient-rows">
+              <li v-for="(need, i) in recipe.equipment" :key="i">
+                <span class="row-names">
+                  <!-- The spaces are written out: between elements on their
+                       own lines there are none, and the row read "Stand
+                       mixerorHand mixer" to whatever reads its text. -->
+                  <template v-for="(o, j) in need.options" :key="o.id"
+                    ><span v-if="j > 0" class="muted">{{ " or " }}</span
+                    ><a :href="`/equipment/${o.id}`">{{ o.name }}</a></template
+                  ><template v-if="need.detail"
+                    >{{ " " }}<span class="page-ref">{{ need.detail }}</span></template
+                  >
+                </span>
+              </li>
+            </ul>
+            <p v-if="!recipe.equipment_checked" class="status">
+              At least these: nobody has said yet whether that's all.
+            </p>
+          </section>
+          <p v-else-if="recipe.equipment_checked" class="status recipe-needs">
+            No special equipment.
+          </p>
+          <p v-else class="status recipe-needs">
+            Equipment not recorded yet.
+            <a v-if="recipe.editable" :href="`/recipes/${recipe.id}/edit#equipment`">Add it</a>
+          </p>
+
           <section class="recipe-section">
             <div class="table-head">
               <h2>
@@ -595,6 +638,16 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
   margin-left: 0.25rem;
   color: var(--muted);
   font-weight: 400;
+}
+/* One line where there's nothing to list: "No special equipment", or that
+   it isn't recorded. Its link is 44px to tap. */
+p.recipe-needs {
+  margin: 1.5rem 0 0;
+}
+p.recipe-needs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
 }
 /* A row: the names on the left, Shop at the right end. */
 .ingredient-rows {

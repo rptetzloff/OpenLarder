@@ -19,6 +19,7 @@ from openlarder import (
     buying,
     detector,
     ingredients,
+    needs,
     openlibrary,
     recipes,
     references,
@@ -201,6 +202,13 @@ class RecipeIn(BaseModel):
     # The chapter or section it's in, as the book names it.
     chapter: str | None = Field(default=None, max_length=200)
     ingredients: list[str] = []
+    # What it can't be made without, a need a line: "stand mixer or hand
+    # mixer", "9-inch springform pan" (needs.py). None leaves its needs as
+    # they are; a list, even an empty one, is what they become.
+    equipment: list[str] | None = Field(default=None, max_length=needs.MAX_NEEDS)
+    # Said to need nothing special. With no equipment and without this, a
+    # recipe is "not recorded yet", which isn't the same.
+    nothing_special: bool | None = None
 
 
 class PageOut(BaseModel):
@@ -289,6 +297,20 @@ class LineOut(BaseModel):
     options: list[OptionOut]
 
 
+class NeedOption(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class NeedOut(BaseModel):
+    # A size, where the source gives one: "9-inch".
+    detail: str | None
+    # What meets it, the source's first choice first.
+    options: list[NeedOption]
+    # The need as the edit form's box takes it back.
+    text: str
+
+
 class RecipeOut(BaseModel):
     id: uuid.UUID
     title: str
@@ -317,6 +339,12 @@ class RecipeOut(BaseModel):
     # What its ingredients record as containing or maybe containing
     # (allergens.py), never what they don't; shown with allergens.NOTICE.
     allergens: list[RecipeAllergenOut] = []
+    # What it can't be made without (needs.py), in three states: not
+    # recorded yet (equipment_checked false, none listed), nothing special
+    # (true, none listed), or the needs listed. Needs with equipment_checked
+    # false are at least those: nobody has said the list is whole.
+    equipment_checked: bool = False
+    equipment: list[NeedOut] = []
     # Whether the viewer may change or remove it.
     editable: bool
     # Who added it (their display name, public as on everything they add),
@@ -582,6 +610,17 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
             for line_id, text in lines
         ],
         used_in=[UsedIn(id=i, title=t, page=used_pages.get(i)) for i, t in used_in],
+        equipment_checked=recipe.equipment_checked,
+        equipment=[
+            NeedOut(
+                detail=detail,
+                options=[NeedOption(id=t.id, name=t.name) for t in things],
+                text=needs.as_typed(detail, things),
+            )
+            for _, detail, things in (await needs.of_recipes(session, [recipe.id])).get(
+                recipe.id, []
+            )
+        ],
         allergens=await for_recipe(
             session,
             # In the order the lines are, each line's options in theirs.
@@ -671,8 +710,12 @@ async def add_recipe(
     _catalog_write(user, source)
     entry = _clean(body)
     try:
-        recipe = await recipes.create(session, source_id, entry)
-    except recipes.InvalidRecipe as exc:
+        # Together or not at all: a need that's refused leaves no recipe
+        # behind it.
+        async with session.begin_nested():
+            recipe = await recipes.create(session, source_id, entry)
+            await needs.write(session, recipe, body.equipment, body.nothing_special)
+    except (recipes.InvalidRecipe, needs.Refused) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     # Whoever added it deals with its flags (routers/flags.py).
     recipe.created_by = user.id
@@ -700,8 +743,10 @@ async def change_recipe(
     _catalog_write(user, source, recipe)
     entry = _clean(body)
     try:
-        await recipes.replace(session, recipe, entry)
-    except recipes.InvalidRecipe as exc:
+        async with session.begin_nested():
+            await recipes.replace(session, recipe, entry)
+            await needs.write(session, recipe, body.equipment, body.nothing_special)
+    except (recipes.InvalidRecipe, needs.Refused) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     # Fixed after being sent back: waiting again.
     if recipe.review == "returned" and not user.may_edit:
@@ -726,6 +771,8 @@ async def remove_recipe(recipe_id: uuid.UUID, user: CurrentUser, session: Sessio
     await references.release(session, recipe.id)
     await session.delete(recipe)
     await session.flush()
+    # What only it needed, and no list has, goes with it.
+    await needs.sweep(session)
     await references.relink(session, source_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -77,6 +77,11 @@ export interface Recipe {
   swaps: Swap[];
   // What its ingredients contain or may contain; never what they don't.
   allergens: RecipeAllergen[];
+  // What it can't be made without, in three states: not recorded yet
+  // (equipment_checked false, none listed), nothing special (true, none
+  // listed), or its needs. Needs with it false are at least those.
+  equipment_checked: boolean;
+  equipment: Need[];
   // Whether you may change or remove it.
   editable: boolean;
   // published, or (for its maker and moderators) pending or returned.
@@ -85,6 +90,14 @@ export interface Recipe {
   // Who added it (their public display name), and when.
   added_by: string | null;
   added_on: string | null;
+}
+
+// One need: a size where the source gives one, what meets it (the source's
+// first choice first), and the need as the edit form's box takes it back.
+export interface Need {
+  detail: string | null;
+  options: { id: string; name: string }[];
+  text: string;
 }
 
 export interface RecipeIn {
@@ -109,6 +122,10 @@ export interface RecipeIn {
   // The chapter or section it's in, as the book names it.
   chapter?: string | null;
   ingredients: string[];
+  // A need a line. Left out, a recipe's needs stay as they are.
+  equipment?: string[];
+  // Said to need nothing special; false with no equipment is "not recorded".
+  nothing_special?: boolean;
 }
 
 // Adds (bookId given) or changes (recipeId given) a recipe; resolves to its

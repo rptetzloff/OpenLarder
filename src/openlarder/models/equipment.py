@@ -40,6 +40,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -70,6 +71,11 @@ class Equipment(Timestamps, Base):
     match_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     # Expected in any kitchen, so never recorded on a recipe.
     assumed: Mapped[bool] = mapped_column(nullable=False, server_default=false())
+    # In the list: seeded, or added by a moderator, and so everyone's to
+    # see. False for one a recipe's form brought in, which is seen only
+    # with a recipe that needs it (visibility.equipment_seen_by; migration
+    # 0081).
+    listed: Mapped[bool] = mapped_column(nullable=False, server_default=true())
     # What to search for at a shop, when it differs from the name.
     shopping_term: Mapped[str | None] = mapped_column(Text)
     wikidata_id: Mapped[str | None] = mapped_column(Text)

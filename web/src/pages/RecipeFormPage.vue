@@ -3,6 +3,7 @@ import Crumbs from "../components/Crumbs.vue";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import AgreementPanel from "../components/AgreementPanel.vue";
 import { type Book, issueName, KIND_NAMES, SHOWS } from "../books";
+import { checkNeeds, type NeedRead } from "../equipment";
 import type { Me } from "../me";
 import {
   checkLines,
@@ -108,6 +109,87 @@ const newRow = (text = ""): Row => ({ key: nextKey++, text });
 const rows = ref<Row[]>([newRow()]);
 const lines = computed(() => rows.value.map((r) => r.text));
 
+// What it can't be made without (Ray's equipment spec, 2026-11-15), after
+// the ingredients: a need a box, as an ingredient is ("stand mixer or hand
+// mixer" is one need, "9-inch springform pan" a pan with its size), or
+// "Nothing special". With neither, the recipe stays "not recorded yet":
+// it is never required.
+const needRows = ref<Row[]>([newRow()]);
+const nothingSpecial = ref(false);
+const needs = computed(() => needRows.value.map((r) => r.text));
+const neededFilled = computed(() => needRows.value.filter((r) => r.text.trim()));
+const needInputs = ref<HTMLInputElement[]>([]);
+
+async function focusNeed(index: number) {
+  await nextTick();
+  needInputs.value[index]?.focus();
+}
+
+function addNeed(after = needRows.value.length - 1) {
+  needRows.value.splice(after + 1, 0, newRow());
+  focusNeed(after + 1);
+}
+
+function removeNeed(index: number) {
+  needRows.value.splice(index, 1);
+  if (!needRows.value.length) needRows.value.push(newRow());
+  focusNeed(Math.min(index, needRows.value.length - 1));
+}
+
+// What each need will be matched to, checked as it's typed, as the
+// ingredient lines are. Kept by row with the text it was given for.
+const needReads = ref(new Map<number, { text: string; read: NeedRead }>());
+let needsAsked = 0;
+let needsTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  needs,
+  () => {
+    clearTimeout(needsTimer);
+    needsTimer = setTimeout(async () => {
+      const mine = ++needsAsked;
+      const sent = needRows.value.map((r) => ({ key: r.key, text: r.text }));
+      try {
+        const found = await checkNeeds(sent.map((r) => r.text));
+        if (mine !== needsAsked) return;
+        needReads.value = new Map(sent.map((r, i) => [r.key, { text: r.text, read: found[i] }]));
+      } catch {
+        if (mine === needsAsked) needReads.value = new Map();
+      }
+    }, 400);
+  },
+  { deep: true },
+);
+
+interface NeedHint {
+  tone: Tone;
+  text: string;
+  // Saving would refuse it.
+  refused: boolean;
+}
+
+function needHintFor(row: Row): NeedHint | null {
+  const found = needReads.value.get(row.key);
+  if (!row.text.trim() || !found || found.text !== row.text) return null;
+  const read = found.read;
+  if (read.problem) return { tone: "warn", text: read.problem, refused: true };
+  if (!read.options.length) return null;
+  const named = read.options.map((o) =>
+    o.equipment ? `${o.equipment.name}${o.alias ? " (another name for it)" : ""}` : `${o.name} (new)`,
+  );
+  const size = read.detail ? `, ${read.detail}` : "";
+  if (read.options.every((o) => o.equipment)) {
+    return { tone: "ok", text: `Matched: ${named.join(" or ")}${size}`, refused: false };
+  }
+  return {
+    tone: "info",
+    text: `${named.join(" or ")}${size}. What's new is added to the equipment list.`,
+    refused: false,
+  };
+}
+
+const needHints = computed(() => needRows.value.map((r) => needHintFor(r)));
+const needsRefused = computed(() => needHints.value.filter((h) => h?.refused).length);
+
 // The steps. Each one reached stays open to go back to.
 const step = ref(2);
 const reached = ref(2);
@@ -164,11 +246,15 @@ onMounted(async () => {
       airedOn.value = existing.episode?.aired_on ?? "";
       at.value = existing.episode?.at ?? "";
       rows.value = [...existing.ingredients.map((t) => newRow(t)), newRow()];
+      needRows.value = [...existing.equipment.map((n) => newRow(n.text)), newRow()];
+      nothingSpecial.value = existing.equipment_checked && !existing.equipment.length;
       // Changing one usually means its ingredients.
       step.value = 3;
       reached.value = 4;
     }
     document.title = `${heading.value} · ${book.value!.title} · OpenLarder`;
+    // "Add it", from a recipe whose equipment isn't recorded: to its box.
+    if (location.hash === "#equipment") focusNeed(0);
   } catch {
     loadFailed.value = true;
   }
@@ -359,13 +445,20 @@ async function save(another = false) {
         chapter: chapter.value.trim() || null,
         ingredients: lines.value,
     };
+    // A suggested change doesn't carry equipment yet, so the recipe's
+    // stays as it is; a save says what it is now.
+    const whole = {
+      ...body,
+      equipment: nothingSpecial.value ? [] : needs.value,
+      nothing_special: nothingSpecial.value,
+    };
     if (props.propose && props.recipeId) {
       await proposeChange(props.recipeId, { ...body, reason: reason.value.trim() || null });
       location.href = `/recipes/${props.recipeId}?proposed=1`;
       return;
     }
     const id = await saveRecipe(
-      body,
+      whole,
       props.recipeId ? { recipeId: props.recipeId } : { bookId: book.value!.id },
     );
     location.href = another ? `/sources/${book.value!.id}/recipes/new` : `/recipes/${id}`;
@@ -724,6 +817,65 @@ async function save(another = false) {
               <button type="button" class="secondary" @click="addRow()">+ Add ingredient</button>
               <span class="help">Enter starts a new line; pasting several lines fills that many.</span>
             </p>
+
+            <template v-if="!propose">
+              <h3 id="equipment" class="form-heading">Equipment</h3>
+              <p class="help">
+                What it can't be made without, a need a line: “ice cream maker”, “9-inch springform
+                pan”, “stand mixer or hand mixer”. Not what any kitchen has: a knife, a bowl, a
+                baking sheet. Leave it empty if you don't know, and it stays “not recorded yet”.
+              </p>
+              <ol class="line-rows need-rows">
+                <li v-for="(row, i) in needRows" :key="row.key" class="line-row">
+                  <div class="line-main">
+                    <div class="line-input">
+                      <input
+                        :ref="(el) => (needInputs[i] = el as HTMLInputElement)"
+                        v-model="row.text"
+                        :aria-label="`Equipment ${i + 1}`"
+                        :aria-describedby="needHints[i] ? `need-hint-${row.key}` : undefined"
+                        maxlength="150"
+                        spellcheck="false"
+                        :placeholder="i === 0 ? 'ice cream maker' : ''"
+                        :disabled="nothingSpecial"
+                        @keydown.enter.prevent="addNeed(i)"
+                      />
+                      <button
+                        v-if="needRows.length > 1"
+                        type="button"
+                        class="remove"
+                        :aria-label="`Remove equipment ${i + 1}`"
+                        title="Remove"
+                        @click="removeNeed(i)"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <p
+                      v-if="needHints[i]"
+                      :id="`need-hint-${row.key}`"
+                      class="line-tag"
+                      :class="`tone-${needHints[i]!.tone}`"
+                    >
+                      {{ needHints[i]!.text }}
+                    </p>
+                  </div>
+                </li>
+              </ol>
+              <p class="line-add">
+                <button type="button" class="secondary" :disabled="nothingSpecial" @click="addNeed()">
+                  + Add equipment
+                </button>
+              </p>
+              <label class="check need-none"
+                ><input
+                  v-model="nothingSpecial"
+                  type="checkbox"
+                  :disabled="neededFilled.length > 0"
+                />
+                Nothing special: only what any kitchen has</label
+              >
+            </template>
             <button type="submit" class="primary">Next</button>
           </form>
 
@@ -748,6 +900,20 @@ async function save(another = false) {
                 {{ checksLeft }} line{{ checksLeft === 1 ? " has" : "s have" }} a check on
                 {{ checksLeft === 1 ? "it" : "them" }}; they save as typed.
                 <button type="button" class="secondary small" @click="go(3)">Look again</button>
+              </p>
+            </template>
+            <template v-if="!propose">
+              <h3 class="review-heading">Equipment</h3>
+              <ol v-if="neededFilled.length" class="review-lines">
+                <li v-for="row in neededFilled" :key="row.key">{{ row.text.trim() }}</li>
+              </ol>
+              <p v-else class="muted">
+                {{ nothingSpecial ? "Nothing special." : "Not recorded yet." }}
+              </p>
+              <p v-if="needsRefused" class="muted">
+                {{ needsRefused }} need{{ needsRefused === 1 ? " is" : "s are" }} of something saving
+                refuses.
+                <button type="button" class="secondary small" @click="go(3)">Fix {{ needsRefused === 1 ? "it" : "them" }}</button>
               </p>
             </template>
             <template v-if="propose">

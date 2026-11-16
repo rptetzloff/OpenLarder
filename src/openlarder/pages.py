@@ -192,13 +192,30 @@ def recipe_description(shown: recipes.RecipeOut) -> str:
     if len(first) > DESCRIPTION_MAX:
         return _cut(first, DESCRIPTION_MAX)
     names = line_names(shown)
+    said = first
     for count in range(min(len(names), NAMED), 0, -1):
         rest = len(shown.lines) - count
         more = f", and {rest} more" if rest else ""
         whole = f"{first} Ingredients: {', '.join(names[:count])}{more}."
         if len(whole) <= DESCRIPTION_MAX:
-            return whole
-    return first
+            said = whole
+            break
+    # What it can't be made without, where that fits too (Ray's equipment
+    # spec, 2026-11-15).
+    needed = needs_said(shown)
+    if needed and len(f"{said} {needed}") <= DESCRIPTION_MAX:
+        return f"{said} {needed}"
+    return said
+
+
+def needs_said(shown: recipes.RecipeOut) -> str:
+    """ "Needs: Ice cream maker; 9-inch Springform pan or Round cake pan."
+    Each thing as the list names it. The spec's words were "Needs an ice
+    cream maker.", which wants an article the names don't all take
+    ("Ramekins", "Cheesecloth"). Nothing for a recipe that needs none or
+    whose needs aren't recorded: neither is something to find it by."""
+    listed = "; ".join(need.text for need in shown.equipment)
+    return f"Needs: {listed}." if listed else ""
 
 
 def source_description(shown: sources.Book) -> str:
@@ -308,12 +325,25 @@ def _line(line: recipes.LineOut) -> str:
     return " or ".join(named)
 
 
+def _need(need: recipes.NeedOut) -> str:
+    """A need as the page shows it: its size, and each thing that meets it
+    as a link."""
+    things = " or ".join(_a(f"/equipment/{o.id}", o.name) for o in need.options)
+    return f"{_e(need.detail)} {things}" if need.detail else things
+
+
 def recipe_summary(shown: recipes.RecipeOut) -> str:
     lines = "".join(f"<li>{line}</li>" for line in map(_line, shown.lines) if line)
+    needed = "".join(f"<li>{_need(need)}</li>" for need in shown.equipment)
+    if needed:
+        needed = f"<h2>Needs</h2><ul>{needed}</ul>"
+    elif shown.equipment_checked:
+        needed = "<p>No special equipment.</p>"
     return _summary(
         [_a("/sources", "Sources"), _a(f"/sources/{shown.source.id}", shown.source.title)],
         f"<h1>{_e(shown.title)}</h1>",
         _recipe_place(shown),
+        needed,
         f"<h2>Ingredients</h2><ul>{lines}</ul>" if lines else "",
     )
 
@@ -439,10 +469,7 @@ def equipment_description(shown: equipment.EquipmentOut) -> str:
             " don't list it."
         )
     elif shown.family_total == 0:
-        first = (
-            f"{shown.name} is equipment a recipe indexed on OpenLarder can be recorded as"
-            " needing. None is yet."
-        )
+        first = f"No recipe indexed on OpenLarder lists {shown.name} as needed yet."
     else:
         count = shown.total
         needed = f"{count:,} recipe{'' if count == 1 else 's'} indexed on OpenLarder"
@@ -472,7 +499,17 @@ def equipment_summary(shown: equipment.EquipmentOut) -> str:
     if shown.includes:
         narrower = _listed([_a(f"/equipment/{c.id}", c.name) for c in shown.includes])
         about += f"<p>Includes {narrower}.</p>"
-    return _summary([_a("/equipment", "Equipment")], f"<h1>{_e(shown.name)}</h1>", about)
+    needing = "".join(_used(r) for r in shown.recipes)
+    more = ""
+    if shown.listed_total > len(shown.recipes):
+        words = f"All {shown.listed_total:,} recipes"
+        more = f"<p>{_a(f'/equipment/{shown.id}', words)}</p>"
+    return _summary(
+        [_a("/equipment", "Equipment")],
+        f"<h1>{_e(shown.name)}</h1>",
+        about,
+        f"<h2>Recipes needing {_e(shown.name)}</h2><ul>{needing}</ul>{more}" if needing else "",
+    )
 
 
 def author_description(shown: authors.AuthorOut) -> str:
