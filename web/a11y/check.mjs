@@ -467,6 +467,24 @@ const EQUIPMENT_RECIPES = (rows) => `(() => {
   const found = [...document.querySelectorAll(".equipment-page .uses-table tbody tr")].map((tr) => tr.querySelector("a").textContent.trim() + ": " + tr.querySelector("td.lines").textContent.trim());
   return found.join(" | ") === ${JSON.stringify(rows.join(" | "))} ? "" : "The recipes needing it read “" + found.join(" | ") + "”";
 })()`;
+// Entering a whole book: each row has its equipment in one cell under its
+// ingredients, named for a screen reader, with what was saved: the
+// biscuits' needs with commas between, "none" for the blend, and nothing
+// for a recipe whose equipment isn't recorded.
+const BULK_EQUIPMENT = `(() => {
+  const rows = [...document.querySelectorAll(".bulk-row[role=group]")];
+  const cell = (title) => rows.find((r) => r.getAttribute("aria-label") === title)?.querySelector("input.bulk-equipment");
+  const unnamed = rows.find((r) => r.querySelector("input.bulk-equipment")?.getAttribute("aria-label") !== "Equipment");
+  if (!rows.length || unnamed) return "A row has no Equipment cell, or it has no name";
+  const biscuits = cell("Cheddar Biscuits")?.value;
+  if (biscuits !== "Biscuit cutter, Stand mixer or Hand mixer, 10-inch Cast-iron skillet") return "The biscuits' equipment reads “" + biscuits + "”";
+  if (cell("Biscuit Blend")?.value !== "none") return "The blend's equipment reads “" + cell("Biscuit Blend")?.value + "”, not “none”";
+  const unrecorded = rows.find((r) => r.getAttribute("aria-label").startsWith("Slow-Roasted"))?.querySelector("input.bulk-equipment").value;
+  if (unrecorded !== "") return "A recipe whose equipment isn't recorded has “" + unrecorded + "” in its cell";
+  const under = rows.find((r) => { const lines = r.querySelector("textarea"), kit = r.querySelector("input.bulk-equipment"); return !(lines.compareDocumentPosition(kit) & Node.DOCUMENT_POSITION_FOLLOWING) || kit.getBoundingClientRect().top < lines.getBoundingClientRect().bottom; });
+  if (under) return "A row's equipment isn't under its ingredients";
+  return "";
+})()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused). Each of the bar's links leads to
@@ -1070,7 +1088,7 @@ function pages(s) {
     [`/sources/${s.book.id}/recipes/new`, "admin"],
     [`/sources/${s.show.id}/recipes/new`, "admin"],
     [`/sources/${s.box.id}/recipes/new`, "cook"],
-    [`/sources/${s.book.id}/bulk`, "admin"],
+    [`/sources/${s.book.id}/bulk`, "admin", { phone: true, expect: BULK_EQUIPMENT }],
     [`/recipes/${s.biscuits.id}`, null, { phone: true, expect: `(${CRUMBS}) || (${BUY_OUTLINED}) || (${NEEDS(["Biscuit cutter", "Stand mixer or Hand mixer", "Cast-iron skillet 10-inch"])})` }],
     [`/recipes/${s.blend.id}`, null, { expect: NEEDS_LINE("No special equipment.", false) }],
     [`/recipes/${s.biscuits.id}`, "admin"],

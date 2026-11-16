@@ -126,6 +126,9 @@ export interface RecipeIn {
   equipment?: string[];
   // Said to need nothing special; false with no equipment is "not recorded".
   nothing_special?: boolean;
+  // Both as one cell, as bulk entry has them: needs with commas between,
+  // "none" for nothing special, empty for not recorded. In place of the two.
+  equipment_cell?: string;
 }
 
 // Adds (bookId given) or changes (recipeId given) a recipe; resolves to its
@@ -202,11 +205,13 @@ export interface LineOption {
 }
 
 // Every recipe's ingredient lines as typed, for entering a whole book.
-export async function recipeLines(sourceId: string): Promise<Map<string, string[]>> {
+export async function recipeLines(
+  sourceId: string,
+): Promise<Map<string, { lines: string[]; equipment: string }>> {
   const res = await fetch(`/api/sources/${sourceId}/recipe-lines`);
   if (!res.ok) throw new Error("The recipes couldn't be loaded.");
-  const found: { id: string; lines: string[] }[] = await res.json();
-  return new Map(found.map((r) => [r.id, r.lines]));
+  const found: { id: string; lines: string[]; equipment_cell: string }[] = await res.json();
+  return new Map(found.map((r) => [r.id, { lines: r.lines, equipment: r.equipment_cell }]));
 }
 
 // Each line's review. With the source, page references are looked up in

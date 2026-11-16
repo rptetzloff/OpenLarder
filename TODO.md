@@ -1184,7 +1184,18 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [ ] A need read from "9 inch pan" keeps the size as typed
             ("9 inch", "9-inch", `9"` are three sizes to a search); none
             is made the same as another.
-        - [ ] Bulk entry's cell and the import's field.
+        - [x] Bulk entry's cell (#212): under a row's ingredients, its
+          equipment with commas between, "none" for nothing special,
+          empty for not recorded yet. The API takes the same as
+          `equipment_cell`, and a book's recipe lines come with each
+          recipe's, so a row sent back as it came writes nothing.
+          "none" beside a need is refused: which is it?
+          - [ ] A row's equipment isn't checked as it's typed, as its
+            ingredients are: what's refused is said when the row
+            saves, and what it matched isn't said at all.
+        - [ ] The import's field: an optional Equipment column, read as
+          bulk entry's cell is, with what it can't take flagged on the
+          recipe and not dropped.
         - [ ] "Add it" for someone who can't change the recipe, through a
           suggested change; a suggested change doesn't carry equipment
           yet, so the form leaves the field out there.

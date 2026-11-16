@@ -209,6 +209,10 @@ class RecipeIn(BaseModel):
     # Said to need nothing special. With no equipment and without this, a
     # recipe is "not recorded yet", which isn't the same.
     nothing_special: bool | None = None
+    # Both of those as one cell, as bulk entry has them: needs with commas
+    # between, "none" for nothing special, empty for not recorded
+    # (needs.from_cell). In place of the two above, not beside them.
+    equipment_cell: str | None = Field(default=None, max_length=2000)
 
 
 class PageOut(BaseModel):
@@ -360,6 +364,19 @@ class RecipeOut(BaseModel):
 
 class Created(BaseModel):
     id: uuid.UUID
+
+
+def _needs(body: RecipeIn) -> tuple[list[str] | None, bool | None]:
+    """What a save says of equipment: the needs and "nothing special", or
+    neither, which leaves the recipe's as they are."""
+    if body.equipment_cell is None:
+        return body.equipment, body.nothing_special
+    if body.equipment is not None or body.nothing_special is not None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Send a recipe's equipment as a list or as one cell, not both.",
+        )
+    return needs.from_cell(body.equipment_cell)
 
 
 def _clean(body: RecipeIn) -> recipes.RecipeEntry:
@@ -663,14 +680,18 @@ async def as_signed_out(session, recipe_id: uuid.UUID) -> RecipeOut | None:
 class RecipeLines(BaseModel):
     id: uuid.UUID
     lines: list[str]
+    # Its needs as bulk entry's cell has them (needs.as_cell): "Stand mixer
+    # or Hand mixer, 9-inch Springform pan"; "none"; or empty, not recorded.
+    equipment_cell: str = ""
 
 
 @router.get("/api/sources/{source_id}/recipe-lines", response_model=list[RecipeLines])
 async def source_recipe_lines(
     source_id: uuid.UUID, session: Session, viewer: Viewer
 ) -> list[RecipeLines]:
-    """Every recipe's ingredient lines as typed, for entering a whole book:
-    the source's page gives only the first few of each."""
+    """Every recipe's ingredient lines as typed, and its equipment as one
+    cell, for entering a whole book: the source's page gives only the first
+    few lines of each, and none of its equipment."""
     source = await session.get(Source, source_id)
     if source is None or not await visibility.can_see(session, viewer, source):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such source.")
@@ -689,7 +710,16 @@ async def source_recipe_lines(
         .order_by(RecipeIngredient.recipe_id, RecipeIngredient.position)
     ):
         found[recipe_id].append(text)
-    return [RecipeLines(id=r, lines=lines) for r, lines in found.items()]
+    read = await needs.of_recipes(session, list(found))
+    checked = set(
+        await session.scalars(
+            select(Recipe.id).where(Recipe.id.in_(list(found)), Recipe.equipment_checked)
+        )
+    )
+    return [
+        RecipeLines(id=r, lines=lines, equipment_cell=needs.as_cell(r in checked, read.get(r, [])))
+        for r, lines in found.items()
+    ]
 
 
 @router.post(
@@ -709,12 +739,13 @@ async def add_recipe(
     source = await _editable_source(session, source_id, user)
     _catalog_write(user, source)
     entry = _clean(body)
+    typed, nothing_special = _needs(body)
     try:
         # Together or not at all: a need that's refused leaves no recipe
         # behind it.
         async with session.begin_nested():
             recipe = await recipes.create(session, source_id, entry)
-            await needs.write(session, recipe, body.equipment, body.nothing_special)
+            await needs.write(session, recipe, typed, nothing_special)
     except (recipes.InvalidRecipe, needs.Refused) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     # Whoever added it deals with its flags (routers/flags.py).
@@ -742,10 +773,11 @@ async def change_recipe(
     source = await _editable_source(session, recipe.source_id, user)
     _catalog_write(user, source, recipe)
     entry = _clean(body)
+    typed, nothing_special = _needs(body)
     try:
         async with session.begin_nested():
             await recipes.replace(session, recipe, entry)
-            await needs.write(session, recipe, body.equipment, body.nothing_special)
+            await needs.write(session, recipe, typed, nothing_special)
     except (recipes.InvalidRecipe, needs.Refused) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     # Fixed after being sent back: waiting again.

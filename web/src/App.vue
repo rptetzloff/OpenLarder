@@ -3431,6 +3431,21 @@ main h2 {
   width: 100%;
   resize: vertical;
 }
+/* The row's equipment, under its ingredients: the smaller of the two, as
+   the chapter is under the title. */
+.bulk-row input.bulk-equipment {
+  width: 100%;
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+}
+/* Full size where it's typed with a thumb, as the chapter is there. */
+@media (max-width: 48rem) {
+  .bulk-row input.bulk-equipment {
+    font-size: inherit;
+    padding: 0.375rem 0.5rem;
+  }
+}
 .bulk-summary {
   margin: 0.25rem 0 0;
   color: var(--muted);
