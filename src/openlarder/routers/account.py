@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from openlarder import account_deletion, buying, grocery, names, ratelimit
+from openlarder import account_deletion, buying, grocery, kitchen, names, ratelimit
 from openlarder.auth import SESSION_COOKIE, CurrentUser, SameOrigin, hash_token, new_token
 from openlarder.db import Session
 from openlarder.models import ApiKey
@@ -64,11 +64,10 @@ async def set_shops(body: Shops, user: CurrentUser, session: Session, settings: 
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Leave at least one shop showing."
         )
-    # The grocer chosen (set_grocer) stays.
-    grocer = (user.shop_preferences or {}).get("grocer")
-    user.shop_preferences = {"order": order, "hidden": hidden} | (
-        {"grocer": grocer} if grocer else {}
-    )
+    # The grocer and the kitchen shop chosen (set_grocer, set_kitchen_shop)
+    # stay.
+    kept = {k: v for k in ("grocer", "kitchen_shop") if (v := (user.shop_preferences or {}).get(k))}
+    user.shop_preferences = {"order": order, "hidden": hidden} | kept
     await session.commit()
     return me_for(user, settings)
 
@@ -89,6 +88,30 @@ async def set_grocer(body: GrocerIn, user: CurrentUser, session: Session, settin
     prefs = {k: v for k, v in (user.shop_preferences or {}).items() if k != "grocer"}
     if body.grocer:
         prefs["grocer"] = body.grocer
+    user.shop_preferences = prefs or None
+    await session.commit()
+    return me_for(user, settings)
+
+
+class KitchenShopIn(BaseModel):
+    # A kitchen shop's key (shops.py); None, the first offered.
+    kitchen_shop: str | None = None
+
+
+@router.put("/kitchen-shop", response_model=Me, dependencies=[SameOrigin])
+async def set_kitchen_shop(
+    body: KitchenShopIn, user: CurrentUser, session: Session, settings: Config
+) -> Me:
+    """Which shop equipment's links go to: the first on offer unless another
+    is chosen, as a grocer is chosen (*Ray, 2026-11-16: equipment is treated
+    as ingredients are*)."""
+    if body.kitchen_shop is not None and body.kitchen_shop not in await kitchen.keys(session):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"No such shop: {body.kitchen_shop}."
+        )
+    prefs = {k: v for k, v in (user.shop_preferences or {}).items() if k != "kitchen_shop"}
+    if body.kitchen_shop:
+        prefs["kitchen_shop"] = body.kitchen_shop
     user.shop_preferences = prefs or None
     await session.commit()
     return me_for(user, settings)

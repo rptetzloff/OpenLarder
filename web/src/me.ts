@@ -34,6 +34,8 @@ export interface Me {
   shops: { order: string[]; hidden: string[] } | null;
   // The grocer for ingredients' links (grocery.ts); null until chosen.
   grocer: string | null;
+  // The shop for equipment's links (kitchen.ts); null until chosen.
+  kitchen_shop: string | null;
 }
 
 // Sends the chosen name; resolves to the updated account, or rejects with

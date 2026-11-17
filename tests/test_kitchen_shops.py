@@ -257,3 +257,37 @@ async def test_the_migration_gives_amazon_the_booksellers_tag_switched_off(adb) 
     tag, on, builder, note = (await adb.execute(seeded)).one()
     assert (tag, on, builder) == ("larder0b-20", False, "amazon")
     assert "Amazon Associate" in note
+
+
+async def test_each_person_chooses_a_kitchen_shop(people, kitchen) -> None:
+    """As each chooses a grocer (tests/test_grocery.py), and beside it."""
+    ann, bo = await people("ann"), await people("bo")
+    assert (await ann.get("/api/auth/me")).json()["kitchen_shop"] is None
+    me = (await ann.put("/api/account/kitchen-shop", json={"kitchen_shop": "panhandle"})).json()
+    assert (me["kitchen_shop"], me["grocer"], me["shops"]) == ("panhandle", None, None)
+    # Choosing a grocer, and the book shops, keeps it; and it keeps them.
+    me = (await ann.put("/api/account/grocer", json={"grocer": "walmart"})).json()
+    assert (me["kitchen_shop"], me["grocer"]) == ("panhandle", "walmart")
+    me = (await ann.put("/api/account/shops", json={"order": ["amazon"], "hidden": []})).json()
+    assert (me["kitchen_shop"], me["grocer"]) == ("panhandle", "walmart")
+    assert me["shops"] == {"order": ["amazon"], "hidden": []}
+    me = (await ann.put("/api/account/kitchen-shop", json={"kitchen_shop": "amazon"})).json()
+    assert (me["kitchen_shop"], me["grocer"], me["shops"]["order"]) == (
+        "amazon",
+        "walmart",
+        ["amazon"],
+    )
+    # A grocer isn't a kitchen shop, nor a kitchen shop a grocer.
+    for path, body in (
+        ("/api/account/kitchen-shop", {"kitchen_shop": "instacart"}),
+        ("/api/account/kitchen-shop", {"kitchen_shop": "kroger"}),
+        ("/api/account/grocer", {"grocer": "panhandle"}),
+    ):
+        bad = await ann.put(path, json=body)
+        assert bad.status_code == 422, (path, body)
+    assert (await ann.get("/api/auth/me")).json()["kitchen_shop"] == "amazon"
+    # None again: the first on offer; the rest stays.
+    me = (await ann.put("/api/account/kitchen-shop", json={})).json()
+    assert (me["kitchen_shop"], me["grocer"], me["shops"]["order"]) == (None, "walmart", ["amazon"])
+    # Hers alone, and an account's.
+    assert (await bo.get("/api/auth/me")).json()["kitchen_shop"] is None

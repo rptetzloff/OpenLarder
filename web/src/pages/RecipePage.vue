@@ -2,6 +2,7 @@
 import Crumbs from "../components/Crumbs.vue";
 import { arrange } from "../shops";
 import GrocerChooser from "../components/GrocerChooser.vue";
+import KitchenShopChooser from "../components/KitchenShopChooser.vue";
 import DietCheck from "../components/DietCheck.vue";
 import { grocerHref, grocerNow, loadGrocers } from "../grocery";
 import { equipmentHref, kitchenShopNow, loadKitchenShops } from "../kitchen";
@@ -475,6 +476,7 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                 <template v-if="kitchenShopNow()?.note">{{ kitchenShopNow()!.note }}{{ " " }}</template>
                 <a href="/terms#commissions">How this works</a>
               </p>
+              <KitchenShopChooser :signed-in="!!user" />
             </div>
           </section>
           <p v-else-if="recipe.equipment_checked" class="status recipe-needs">

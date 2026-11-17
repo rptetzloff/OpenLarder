@@ -1483,10 +1483,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             of a department in the address couldn't be checked from
             here.
           - What any kitchen has gets no Shop button on its page.
-          - [ ] A grocer is each person's to choose, on the page and
-            kept with their account. A kitchen shop isn't: the link
-            goes to the first on offer. With one shop there's nothing
-            to choose; with a second there will be.
+          - [x] A grocer is each person's to choose, on the page and
+            kept with their account. A kitchen shop is too (#226;
+            *Ray, 2026-11-16: equipment is treated as ingredients
+            are*): "Shop at" under a recipe's Needs, beside the notice,
+            when more than one shop is on offer, and "Shop links go to
+            …" with one. Signed in it's kept with the account
+            (`/api/account/kitchen-shop`), signed out by the browser;
+            the first on offer until someone chooses. Choosing a
+            grocer or the book shops leaves it be, and it them.
           - [ ] Nothing sets a thing's shopping term yet, as nothing
             sets an ingredient's from the site: a link searches for its
             name.

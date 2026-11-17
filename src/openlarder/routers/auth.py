@@ -97,6 +97,8 @@ class Me(BaseModel):
     shops: dict | None = None
     # The grocer they chose for ingredients' links (grocery.py), or None.
     grocer: str | None = None
+    # And the shop they chose for equipment's (kitchen.py), or None.
+    kitchen_shop: str | None = None
 
 
 def me_for(user: User, settings: Settings) -> Me:
@@ -120,6 +122,7 @@ def me_for(user: User, settings: Settings) -> Me:
             else None
         ),
         grocer=prefs.get("grocer"),
+        kitchen_shop=prefs.get("kitchen_shop"),
     )
 
 
