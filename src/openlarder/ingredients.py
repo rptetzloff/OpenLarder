@@ -259,6 +259,9 @@ async def merge(session: AsyncSession, source: Ingredient, target: Ingredient) -
         target.fdc_id = source.fdc_id
     if target.wikidata_id is None:
         target.wikidata_id, target.wikidata_label = source.wikidata_id, source.wikidata_label
+    # And what its Shop links search for, as equipment's merge does.
+    if target.shopping_term is None:
+        target.shopping_term = source.shopping_term
     # Where it went, for its old address to say (pages.py).
     session.add(MergedRecord(kind="ingredient", gone_id=s, kept_id=t))
     await session.delete(source)

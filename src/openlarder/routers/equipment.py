@@ -30,7 +30,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, exists, func, select
 
-from openlarder import equipment, needs, visibility
+from openlarder import equipment, needs, shops, visibility
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin, Viewer
 from openlarder.db import Session
 from openlarder.models import (
@@ -96,6 +96,8 @@ class EquipmentOut(BaseModel):
     total: int
     # Recipes needing it or anything that counts as it.
     family_total: int
+    # What a Shop link searches a kitchen shop for, when it isn't the name.
+    shopping_term: str | None = None
 
 
 def _needing(*conditions: ColumnElement[bool], viewer):
@@ -297,6 +299,7 @@ async def get_equipment(
         includes=includes,
         total=total or 0,
         family_total=family_total or 0,
+        shopping_term=thing.shopping_term,
     )
 
 
@@ -497,6 +500,24 @@ async def rename_equipment(
         await equipment.rename(session, thing, body.name)
     except CHANGE_REFUSED as exc:
         raise _refused(exc) from None
+    await session.commit()
+    return Named(id=thing.id, name=thing.name)
+
+
+class TermIn(BaseModel):
+    # Nothing, or the name again: search for the name.
+    term: str | None = Field(None, max_length=shops.MAX_TERM)
+
+
+@router.put("/{equipment_id}/shopping-term", response_model=Named, dependencies=[SameOrigin])
+async def set_shopping_term(
+    equipment_id: uuid.UUID, body: TermIn, moderator: ModeratorUser, session: Session
+) -> Named:
+    """What a Shop link searches a kitchen shop for, when the name isn't
+    what's sold ("Dutch oven": "enameled dutch oven, 5 qt"); answers with
+    the thing. As an ingredient's is set (routers/ingredients.py)."""
+    thing = await _thing_or_404(session, equipment_id, moderator)
+    thing.shopping_term = shops.shopping_term(body.term, thing.name)
     await session.commit()
     return Named(id=thing.id, name=thing.name)
 

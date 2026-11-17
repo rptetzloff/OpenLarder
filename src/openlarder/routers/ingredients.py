@@ -19,6 +19,7 @@ from openlarder import (
     fdc,
     ingredients,
     openlibrary,
+    shops,
     substitutions,
     title_rank,
     visibility,
@@ -143,6 +144,8 @@ class IngredientOut(BaseModel):
     family_total: int
     # What can stand in for it.
     swaps: list[SwapOut]
+    # What a Shop link searches a grocer for, when it isn't the name.
+    shopping_term: str | None = None
     # The same food in USDA FoodData Central and Wikidata (fdc.py).
     fdc: FdcLink | None = None
     wikidata: WikidataLink | None = None
@@ -509,6 +512,7 @@ async def get_ingredient(
     return IngredientOut(
         id=ingredient.id,
         name=ingredient.name,
+        shopping_term=ingredient.shopping_term,
         fdc=_fdc_link(food) if food else None,
         wikidata=(
             WikidataLink(
@@ -700,6 +704,31 @@ async def set_links(
                     status.HTTP_422_UNPROCESSABLE_CONTENT, f"Wikidata has no item {item}."
                 )
             ingredient.wikidata_id, ingredient.wikidata_label = item, found[item].label
+    await session.commit()
+    return Named(id=ingredient.id, name=ingredient.name)
+
+
+class TermIn(BaseModel):
+    # Nothing, or the name again: search for the name.
+    term: str | None = Field(None, max_length=shops.MAX_TERM)
+
+
+@router.put("/{ingredient_id}/shopping-term", response_model=Named, dependencies=[SameOrigin])
+async def set_shopping_term(
+    ingredient_id: uuid.UUID, body: TermIn, admin: ModeratorUser, session: Session
+) -> Named:
+    """What a Shop link searches a grocer for, when the name isn't what's
+    on the shelf ("Egg": "eggs, large"); answers with the ingredient. One
+    only a private recipe uses isn't a moderator's to change, or to learn
+    of."""
+    ingredient = await session.scalar(
+        select(Ingredient).where(
+            Ingredient.id == ingredient_id, visibility.ingredients_seen_by(admin)
+        )
+    )
+    if ingredient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingredient.")
+    ingredient.shopping_term = shops.shopping_term(body.term, ingredient.name)
     await session.commit()
     return Named(id=ingredient.id, name=ingredient.name)
 

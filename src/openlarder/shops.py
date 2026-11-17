@@ -262,6 +262,19 @@ def for_term(shop: Shop, term: str) -> str | None:
     return _address(shop, {"term": quote_plus(term)})
 
 
+# As long as a name may be.
+MAX_TERM = 200
+
+
+def shopping_term(typed: str | None, name: str) -> str | None:
+    """What a Shop link is to search for, as it's kept for an ingredient
+    or a piece of equipment: its spaces tidied, and nothing when it's
+    empty or only says the name again, since a link with no term searches
+    for the name."""
+    term = " ".join((typed or "").split())
+    return term if term and term.casefold() != name.casefold() else None
+
+
 def for_producer(shop: Shop) -> str | None:
     """Where a click on a producer's link goes: its address, as written."""
     return shop.product_template if shop.builder == "direct" else None

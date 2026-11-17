@@ -39,6 +39,8 @@ export interface Equipment {
   // Recipes needing exactly this; and it or anything that counts as it.
   total: number;
   family_total: number;
+  // What a Shop link searches a kitchen shop for, when it isn't the name.
+  shopping_term: string | null;
 }
 
 // sort "name": A to Z, rather than most needed first; assumed: what any
@@ -108,6 +110,11 @@ export async function addEquipment(name: string, assumed: boolean): Promise<Rela
 
 export async function renameEquipment(id: string, name: string): Promise<Related> {
   return send(`/api/equipment/${id}`, "PATCH", { name });
+}
+
+// What its Shop links search for; empty, or the name again, is the name.
+export async function setShoppingTerm(id: string, term: string): Promise<Related> {
+  return send(`/api/equipment/${id}/shopping-term`, "PUT", { term });
 }
 
 // Whether any kitchen has it. Refused for one a recipe lists.

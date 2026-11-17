@@ -1107,9 +1107,9 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [x] A thing a recipe's form brings in is seen only with a
             recipe that needs it (#211, migration 0081: `listed`). What's
             in the list stays everyone's, whatever needs it.
-          - [ ] `equipment.wikidata_id` and `shopping_term` are in the
-            table, as the spec has them, with nothing yet that sets
-            either.
+          - [ ] `equipment.wikidata_id` is in the table, as the spec has
+            it, with nothing yet that sets it. `shopping_term` is set
+            from a thing's page (#230).
         - [x] The moderators' tools (#210; migration 0080): "Add
           equipment" on the list, and on a thing's page rename, merge
           into, count as (several, each stopped by its own button), add
@@ -1537,9 +1537,21 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             (`/api/account/kitchen-shop`), signed out by the browser;
             the first on offer until someone chooses. Choosing a
             grocer or the book shops leaves it be, and it them.
-          - [ ] Nothing sets a thing's shopping term yet, as nothing
-            sets an ingredient's from the site: a link searches for its
-            name.
+          - [x] Nothing set a thing's shopping term, as nothing set an
+            ingredient's from the site: a link searched for its name. A
+            moderator says what to search for (#230, 2026-11-17), under
+            "What Shop links search for" among a thing's tools and an
+            ingredient's, the same field on both (`PUT
+            /api/equipment/{id}/shopping-term`, and `/api/ingredients/`).
+            Empty, or the name again, is the name: nothing is kept, so
+            a rename is searched for. The change is in the history, and
+            a merge takes the term along where the one kept has none
+            (an ingredient's merge left it behind). What any kitchen
+            has is never shopped for, and has no field. *Claude's
+            choices, not asked for:* that moderators set it, as they
+            rename, and not administrators only; and the words.
+          - [ ] Nothing says what a term found at the shop: it's typed
+            and trusted. The page's own Shop link, pressed, shows.
       - [x] Equipment is a section of the header, not a link in the
         footer (#208). *Ray, 2026-11-15*, of the footer the spec had put
         it in. Measured with five sections and a name of twelve letters

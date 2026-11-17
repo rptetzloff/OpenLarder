@@ -681,6 +681,29 @@ const REVIEW_NEW_EQUIPMENT = (open) => `(() => {
   }
   return "";
 })()`;
+// What a Shop link searches for is set on an ingredient's page and on a
+// piece of equipment's, by the same field (the column was there for both
+// with nothing on the site that set it). One with a term shows it; the bar
+// leads to the field; empty, it shows the name a link searches for; and
+// there's nothing to save until it's changed. What any kitchen has is
+// never shopped for, and has no field.
+const SHOP_TERM = ({ name, term, none }) => `(() => {
+  const input = document.getElementById("shopping-term");
+  const link = document.querySelector('#admin-bar a[href="#shopping-term"]');
+  if (${!!none}) return input || link ? "What any kitchen has is offered a shopping term" : "";
+  if (!input) return "The page has no field for what its Shop links search for";
+  if (!link) return "The admin bar doesn't lead to the shopping term";
+  const form = input.closest("form");
+  const label = form.querySelector('label[for="shopping-term"]')?.textContent.trim();
+  if (label !== "Search for") return "The field is labelled “" + label + "”";
+  if (input.value !== ${JSON.stringify(term ?? "")}) return "The field holds “" + input.value + "”, not “${term ?? ""}”";
+  if (input.placeholder !== ${JSON.stringify(name ?? "")}) return "Empty, the field shows “" + input.placeholder + "”";
+  const save = form.querySelector('button[type="submit"]');
+  if (save?.textContent.trim() !== "Save" || !save.disabled) return "With nothing changed, Save can be pressed";
+  const heading = form.previousElementSibling?.previousElementSibling;
+  if (heading?.tagName !== "H3" || heading.textContent.trim() !== "What Shop links search for") return "The field's heading is “" + heading?.textContent.trim() + "”";
+  return "";
+})()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused). Each of the bar's links leads to
@@ -1207,6 +1230,8 @@ async function seed() {
   const cheddar = ids.ingredients.find((i) => i.name === "Aged cheddar").id;
   const cheese = (await api("/api/ingredients?q=butter", "admin")).ingredients[0].id;
   await api(`/api/ingredients/${cheddar}/parent`, "admin", { parent: cheese }, "PUT");
+  // And its Shop links search for more than its name.
+  await api(`/api/ingredients/${cheddar}/shopping-term`, "admin", { term: "aged cheddar cheese" }, "PUT");
   // And it contains milk, so its page, aged cheddar's and a recipe's with
   // either have allergen information, and the notice beside it.
   await api(`/api/ingredients/${cheese}/allergens`, "admin", { statuses: { milk: "contains" } }, "PUT");
@@ -1514,6 +1539,8 @@ async function seed() {
   const [multicooker, slowCooker, wok, stovetop, blender, standMixer, mixer] = ["Multicooker", "Slow cooker", "Wok", "Stovetop", "Blender", "Stand mixer", "Mixer"].map(
     (name) => kit.find((e) => e.name === name).id,
   );
+  // One whose Shop links search for more than its name.
+  await api(`/api/equipment/${multicooker}/shopping-term`, "admin", { term: "electric multicooker" }, "PUT");
   // Two more problems reported: a recipe's equipment, which is a reason of
   // its own, and a piece of equipment.
   await api("/api/reports", "admin", { kind: "recipe", id: biscuits.id, reason: "equipment", note: "It needs a rolling pin." });
@@ -1595,7 +1622,7 @@ function pages(s) {
     ["/ingredients?top=true&sort=name", null, { expect: COUNT_SAID("/^\\d+ main ingredients\\.$/") }],
     ["/ingredients?q=cheddar", null, { expect: COUNT_SAID("/^1 ingredient matches “cheddar”\\.$/") }],
     [`/ingredients/${s.cheddar}`, null, { expect: `(${COUNTS_AS}) || (${CRUMBS})` }],
-    [`/ingredients/${s.cheddar}`, "admin", { expect: `(${COUNTS_AS}) || (${ADMIN_BAR("This ingredient")})` }],
+    [`/ingredients/${s.cheddar}`, "admin", { expect: `(${COUNTS_AS}) || (${ADMIN_BAR("This ingredient")}) || (${SHOP_TERM({ name: "Aged cheddar", term: "aged cheddar cheese" })})` }],
     [`/ingredients/${s.cheese}`, null, { expect: `(${INCLUDES}) || (${ALLERGEN_NOTICE})` }],
     ["/equipment", null, { phone: true, expect: `(${IN_HEADER("Equipment")}) || (${EQUIPMENT_LIST(false)}) || (${COUNT_SAID("/^\\d+ pieces of equipment\\.$/")})` }],
     ["/equipment?assumed=true&sort=name", null, { phone: true, expect: EQUIPMENT_LIST(true) }],
@@ -1614,9 +1641,10 @@ function pages(s) {
     ["/search", null, { phone: true, then: TYPE_IN("search-ingredient", "butter"), expect: onPhone(OFFERED("search-ingredient", ["Butter 40 recipes"])) }],
     [`/equipment/${s.standMixer}`, null, { phone: true, expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe")})` }],
     [`/equipment/${s.mixer}`, null, { expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe, including everything it includes")})` }],
-    [`/equipment/${s.multicooker}`, "admin", { expect: `(${ADMIN_BAR("This equipment")}) || (${EQUIPMENT_TOOLS})` }],
+    [`/equipment/${s.multicooker}`, "admin", { expect: `(${ADMIN_BAR("This equipment")}) || (${EQUIPMENT_TOOLS}) || (${SHOP_TERM({ name: "Multicooker", term: "electric multicooker" })})` }],
+    [`/equipment/${s.wok}`, "admin", { phone: true, expect: SHOP_TERM({ name: "Wok", term: "" }) }],
     [`/equipment/${s.multicooker}`, "admin", { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("This equipment") }],
-    [`/equipment/${s.stovetop}`, "admin", { expect: EQUIPMENT_TOOLS }],
+    [`/equipment/${s.stovetop}`, "admin", { expect: `(${EQUIPMENT_TOOLS}) || (${SHOP_TERM({ none: true })})` }],
     [`/equipment/${s.wordyKit}`, null, { expect: HIERARCHY(["Counts as"], ["Includes"], "/equipment/") }],
     [`/equipment/${s.wordyKit}`, "admin", { phone: true, then: `document.querySelector("details.history-panel").open = true` }],
     [`/equipment/${s.blender}`, "admin", { expect: `(${HIERARCHY(["Includes"], ["Counts as"], "/equipment/")}) || (${EQUIPMENT_TOOLS})` }],
