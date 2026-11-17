@@ -36,6 +36,8 @@ export interface Ingredient {
   family_total: number;
   // What can stand in for it.
   swaps: Swap[];
+  // What a Shop link searches a grocer for, when it isn't the name.
+  shopping_term: string | null;
   // The same food in USDA FoodData Central and Wikidata, and other
   // ingredients linked to the same record (likely one to merge).
   fdc: Food | null;
@@ -321,6 +323,11 @@ export async function searchRecipes(
   const res = await fetch(`/api/search?${query}`);
   if (!res.ok) throw new Error("The search didn't work. Try again.");
   return res.json();
+}
+
+// What its Shop links search for; empty, or the name again, is the name.
+export async function setShoppingTerm(id: string, term: string): Promise<void> {
+  await send(`/api/ingredients/${id}/shopping-term`, "PUT", { term });
 }
 
 // Puts an ingredient under another, or (parent null) under nothing.

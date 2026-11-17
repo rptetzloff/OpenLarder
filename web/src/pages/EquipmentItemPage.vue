@@ -17,6 +17,7 @@ import {
   type Related,
   renameEquipment,
   setAssumed,
+  setShoppingTerm,
   stopCountingAs,
   Taken,
 } from "../equipment";
@@ -52,6 +53,7 @@ async function load(more = false) {
     else {
       equipment.value = found;
       newName.value = found.name;
+      term.value = found.shopping_term ?? "";
       document.title = `${found.name} · Equipment · OpenLarder`;
     }
   } catch {
@@ -94,6 +96,14 @@ async function change(what: () => Promise<unknown>) {
     busy.value = false;
   }
 }
+
+// What its Shop links search for, when that isn't its name, as an
+// ingredient's page has it. Empty puts it back to the name.
+const term = ref("");
+const saveTerm = () => {
+  const here = equipment.value;
+  if (here) change(() => setShoppingTerm(here.id, term.value));
+};
 
 const rename = () => {
   const here = equipment.value;
@@ -165,6 +175,7 @@ onMounted(() => {
         <a href="#merge-into">Merge into…</a>
         <a href="#counts-as">Count it as…</a>
         <a href="#other-name">Add another name</a>
+        <a v-if="!equipment.assumed" href="#shopping-term">Shop links search for…</a>
         <a href="#any-kitchen">{{
           equipment.assumed ? "Let recipes list it" : "Mark as any kitchen's"
         }}</a>
@@ -416,6 +427,35 @@ onMounted(() => {
             </button>
           </div>
         </form>
+
+        <!-- What any kitchen has is never shopped for: it has no link. -->
+        <template v-if="!equipment.assumed">
+          <h3>What Shop links search for</h3>
+          <p class="status">
+            A Shop link searches the kitchen shop for the thing's name. Say something else when the
+            name isn't what's sold: “enameled dutch oven” for Dutch oven. Empty, it's the name
+            again.
+          </p>
+          <form class="isbn-form" @submit.prevent="saveTerm">
+            <label for="shopping-term">Search for</label>
+            <div class="row">
+              <input
+                id="shopping-term"
+                v-model="term"
+                autocomplete="off"
+                maxlength="200"
+                :placeholder="equipment.name"
+              />
+              <button
+                type="submit"
+                class="secondary"
+                :disabled="busy || term.trim() === (equipment.shopping_term ?? '')"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </template>
 
         <h3>Whether any kitchen has it</h3>
         <p v-if="equipment.assumed" class="status">

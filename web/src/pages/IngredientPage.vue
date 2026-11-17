@@ -20,6 +20,7 @@ import {
   type Named,
   renameIngredient,
   setParent,
+  setShoppingTerm,
   Taken,
   whereItIs,
 } from "../ingredients";
@@ -46,6 +47,7 @@ async function load(more = false) {
     else {
       ingredient.value = page;
       newName.value = page.name;
+      term.value = page.shopping_term ?? "";
       document.title = `${page.name} · Ingredients · OpenLarder`;
     }
   } catch {
@@ -80,6 +82,25 @@ async function rename() {
     newName.value = renamed.name;
   } catch (e) {
     if (e instanceof Taken) taken.value = e.ingredient;
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+// What its Shop links search for, when that isn't its name: the column
+// was there with nothing on the site that set it. Empty puts it back to
+// the name.
+const term = ref("");
+async function saveTerm() {
+  if (!ingredient.value) return;
+  error.value = "";
+  taken.value = null;
+  busy.value = true;
+  try {
+    await setShoppingTerm(ingredient.value.id, term.value);
+    await load();
+  } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
     busy.value = false;
@@ -171,6 +192,7 @@ onMounted(() => {
         <a href="#merge-into">Merge into…</a>
         <a href="#parent-of">Count it as…</a>
         <a href="#child-of">Add an ingredient this includes…</a>
+        <a href="#shopping-term">Shop links search for…</a>
         <a v-if="ingredient.aliases.length" href="#also-called">Edit other names</a>
         <a v-if="ingredient.total === 0" href="#delete-ingredient">Delete</a>
         <span v-else class="muted">Delete (only when nothing uses it)</span>
@@ -431,6 +453,31 @@ onMounted(() => {
             </span>
           </template>
         </p>
+
+        <h3>What Shop links search for</h3>
+        <p class="status">
+          A Shop link searches the grocer for the ingredient's name. Say something else when the
+          name isn't what's on the shelf: “eggs, large” for Egg. Empty, it's the name again.
+        </p>
+        <form class="isbn-form" @submit.prevent="saveTerm">
+          <label for="shopping-term">Search for</label>
+          <div class="row">
+            <input
+              id="shopping-term"
+              v-model="term"
+              autocomplete="off"
+              maxlength="200"
+              :placeholder="ingredient.name"
+            />
+            <button
+              type="submit"
+              class="secondary"
+              :disabled="busy || term.trim() === (ingredient.shopping_term ?? '')"
+            >
+              Save
+            </button>
+          </div>
+        </form>
 
         <p v-if="ingredient.total === 0">
           <button id="delete-ingredient" type="button" class="secondary small" @click="remove">
