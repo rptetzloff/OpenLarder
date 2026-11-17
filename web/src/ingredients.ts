@@ -191,6 +191,10 @@ export interface SearchResult {
   larder_items?: number | null;
   // Kept to your shelf: how many books are on it.
   shelf_books?: number | null;
+  // Kept to what you have the equipment for: how many of your things
+  // counted, and how many of the recipes found have none recorded.
+  equipment_items?: number | null;
+  unrecorded?: number | null;
   // The sources searched within, if any were.
   sources: Named[];
   ingredients: Named[];
@@ -220,6 +224,8 @@ export interface SearchResult {
     // What it can't be made without, a need each ("Stand mixer or Hand
     // mixer"). `needs`, above, is the lines of it you don't have.
     equipment: string[];
+    // Whether its equipment is recorded: a need, or nothing special said.
+    equipment_recorded: boolean;
   })[];
   total: number;
   // Recipes a page holds.
@@ -247,6 +253,10 @@ export async function searchRecipes(
     missingMax = null,
     needs = [],
     noEquipment = [],
+    equipment = false,
+    equipmentLists = [],
+    equipmentItems = [],
+    equipmentWithout = [],
   }: {
     offset?: number;
     sources?: string[];
@@ -273,6 +283,12 @@ export async function searchRecipes(
     // without any of that.
     needs?: string[];
     noEquipment?: string[];
+    // Only what you have the equipment for: the lists, only some things on
+    // them, or all but some, as a larder's.
+    equipment?: boolean;
+    equipmentLists?: string[];
+    equipmentItems?: string[];
+    equipmentWithout?: string[];
   } = {},
 ): Promise<SearchResult> {
   const query = new URLSearchParams(ids.map((id) => ["ingredient", id]));
@@ -283,6 +299,12 @@ export async function searchRecipes(
   for (const id of tags) query.append("tag", id);
   for (const id of needs) query.append("needs", id);
   for (const id of noEquipment) query.append("no_equipment", id);
+  if (equipment) {
+    query.set("equipment", "mine");
+    for (const id of equipmentLists) query.append("equipment_list", id);
+    for (const id of equipmentItems) query.append("equipment_item", id);
+    for (const id of equipmentWithout) query.append("equipment_without", id);
+  }
   if (larder) {
     query.set("larder", "true");
     for (const id of larderLists) query.append("larder_list", id);

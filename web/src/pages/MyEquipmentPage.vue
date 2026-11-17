@@ -91,6 +91,14 @@ const choose = (item: Item, picked: Related) =>
     choosing.value = null;
   });
 const unmatch = (item: Item) => act(() => changeItem(item.id, { equipment_id: "none" }));
+// What counts in a search: matched, and had.
+const counts = (item: Item) => !!item.equipment_id && item.state === "have";
+// Things ticked to search with ("What can I make with only these?").
+const ticked = ref<string[]>([]);
+function tick(item: Item, on: boolean) {
+  ticked.value = on ? [...ticked.value, item.id] : ticked.value.filter((i) => i !== item.id);
+}
+const withTicked = computed(() => `/search?${ticked.value.map((i) => `ei=${i}`).join("&")}`);
 // The list whose sharing is open.
 const sharing = ref<string | null>(null);
 function toggleGroup(list: List, groupId: string, on: boolean) {
@@ -126,8 +134,10 @@ watch(
       <summary>How this works</summary>
       <p>
         What you have, in lists of your own. Each thing is matched to a piece of
-        <a href="/equipment">equipment</a>, and counts as what that counts as too: a stand mixer is
-        a mixer. Something you want stays on its list and doesn't count as one you have.
+        <a href="/equipment">equipment</a>, so <a href="/search?equipment=mine">search</a> can keep
+        to the recipes you have the equipment for, and it counts as what that counts as too: a
+        stand mixer is a mixer. Something you want stays on its list and doesn't count as one you
+        have.
       </p>
     </details>
     <p v-if="user === null" class="status">
@@ -139,7 +149,13 @@ watch(
       <template v-else>
         <p v-if="total" class="status larder-summary">
           {{ lists.counted.toLocaleString() }} of {{ total.toLocaleString() }}
-          {{ total === 1 ? "thing counts" : "things count" }} as equipment you have.
+          {{ total === 1 ? "thing counts" : "things count" }} in a search.
+          <a href="/search?equipment=mine" class="secondary">What can I make?</a>
+        </p>
+        <p v-if="ticked.length" class="larder-ticked" role="status">
+          {{ ticked.length }} {{ ticked.length === 1 ? "thing" : "things" }} checked.
+          <a :href="withTicked" class="secondary">What can I make with only these?</a>
+          <button type="button" class="link" @click="ticked = []">Clear</button>
         </p>
         <div class="larder-lists">
           <section
@@ -168,6 +184,9 @@ watch(
                 </button>
               </span>
             </div>
+            <p v-if="list.items.some(counts)" class="larder-search-list">
+              <a :href="`/search?el=${list.id}`">Search with this list</a>
+            </p>
             <p v-if="!list.mine" class="muted larder-shared">
               {{ list.owner_name ?? "Someone" }}'s, shared with you through
               {{ list.shared_with.map((g) => g.name).join(", ") }}{{
@@ -206,6 +225,14 @@ watch(
             <ul v-if="list.items.length" class="larder-items">
               <li v-for="item in list.items" :key="item.id" :class="`state-${item.state}`">
                 <div class="larder-item-name">
+                  <label v-if="counts(item)" class="larder-tick">
+                    <input
+                      type="checkbox"
+                      :checked="ticked.includes(item.id)"
+                      @change="tick(item, ($event.target as HTMLInputElement).checked)"
+                    />
+                    <span class="visually-hidden">Search with {{ item.name }}</span>
+                  </label>
                   <strong>{{ item.name }}</strong>
                   <span v-if="item.equipment" class="muted">
                     ·
@@ -221,7 +248,7 @@ watch(
                     </button>
                   </span>
                   <span v-else class="muted">
-                    · not matched, so it doesn't count
+                    · not matched, so search can't use it
                     <button
                       v-if="list.editable"
                       type="button"

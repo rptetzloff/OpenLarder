@@ -45,6 +45,19 @@ def family(*equipment_ids: uuid.UUID, name: str = "equipment_family"):
     return select(tree.c.id)
 
 
+def ancestry(*equipment_ids: uuid.UUID, name: str = "equipment_ancestry"):
+    """The things and everything they count as, as a select of IDs: someone
+    with a stand mixer has a mixer. family's other direction, and UNION for
+    its reason."""
+    tree = (
+        select(Equipment.id).where(Equipment.id.in_(equipment_ids)).cte(name=name, recursive=True)
+    )
+    tree = tree.union(
+        select(EquipmentCountsAs.counts_as_id).where(EquipmentCountsAs.equipment_id == tree.c.id)
+    )
+    return select(tree.c.id)
+
+
 # Fixing the list.
 
 

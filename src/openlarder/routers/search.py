@@ -48,6 +48,18 @@ needing one are left out, as `without` leaves out an ingredient: a need
 offering something else stays. A recipe whose equipment isn't recorded
 needs nothing anyone knows of: `needs` never finds it and `no_equipment`
 never hides it. Each hit says what it needs.
+
+**Only what you have the equipment for** (`equipment=mine`; routers/
+equipment_lists.py): recipes with a need you can't meet are left out. A
+need is met by any of its choices, and by a thing of yours that counts as
+one: a stand mixer meets "Mixer". What you want doesn't count, nor what
+isn't matched. Narrowed as a larder is, to some lists (`equipment_list`), to
+some things (`equipment_item`: only these), or less some
+(`equipment_without`). A recipe whose equipment isn't recorded stays in,
+"because hiding them would hide most of the catalog at first" (the spec):
+those come after the ones whose equipment is known, and are counted. One
+with needs listed and nobody having said the list is whole is judged on the
+needs it has. Enough to search by, as a larder is.
 """
 
 import uuid
@@ -66,6 +78,8 @@ from openlarder.db import Session
 from openlarder.ingredients import family, rooted_ancestry, rooted_family
 from openlarder.models import (
     Equipment,
+    EquipmentList,
+    EquipmentListItem,
     EquipmentOption,
     Ingredient,
     IngredientOption,
@@ -79,6 +93,7 @@ from openlarder.models import (
     SourceTag,
     Tag,
 )
+from openlarder.routers.equipment_lists import seen_list_ids as seen_equipment_list_ids
 from openlarder.routers.ingredients import (
     UsedBy,
     contains_pattern,
@@ -121,6 +136,10 @@ class Hit(UsedBy):
     # What it can't be made without, each need as its recipe's page words
     # it ("Stand mixer or Hand mixer"). `needs` above was taken, by lines.
     equipment: list[str] = []
+    # Whether its equipment is recorded: a need listed, or nothing special
+    # said. Kept to what someone has the equipment for, one that isn't is
+    # there all the same, and says so.
+    equipment_recorded: bool = False
 
 
 Kind = Literal[
@@ -166,6 +185,11 @@ class Found(BaseModel):
     larder_items: int | None = None
     # Kept to the viewer's shelf: how many books are on it.
     shelf_books: int | None = None
+    # Kept to what the viewer has the equipment for: how many of their
+    # things counted (had, and matched), and how many of the recipes found
+    # have no equipment recorded, so are there without having been judged.
+    equipment_items: int | None = None
+    unrecorded: int | None = None
 
 
 def _too_many(n: int, limit: int, what: str) -> None:
@@ -192,6 +216,12 @@ async def search(
     # none needing any of that.
     needing: Annotated[list[uuid.UUID] | None, Query(alias="needs")] = None,
     no_equipment: Annotated[list[uuid.UUID] | None, Query()] = None,
+    # Only what you have the equipment for: "mine" is the one value (Ray's
+    # equipment spec, 2026-11-15). Narrowed as a larder is.
+    equipment: Literal["mine"] | None = None,
+    equipment_list: Annotated[list[uuid.UUID] | None, Query()] = None,
+    equipment_item: Annotated[list[uuid.UUID] | None, Query()] = None,
+    equipment_without: Annotated[list[uuid.UUID] | None, Query()] = None,
     # With what's in your larder, as well as any ingredients chosen: each
     # thing counts as itself and everything above it (Chipotle Hot Sauce is
     # hot sauce too). Ray, 2026-11-10. Narrowed to some lists (larder_list),
@@ -237,6 +267,22 @@ async def search(
         stocked = await larder_ingredients(
             session, viewer, larder_list or [], larder_item or [], larder_without or []
         )
+    mine = equipment == "mine"
+    had: list[uuid.UUID] = []
+    if mine:
+        if viewer is None:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, "Sign in to search with your equipment."
+            )
+        for given, what in (
+            (equipment_list, "lists"),
+            (equipment_item, "things"),
+            (equipment_without, "things to leave out"),
+        ):
+            _too_many(len(given or []), MAX_LARDER_PICKS, f"equipment {what}")
+        had = await equipment_had(
+            session, viewer, equipment_list or [], equipment_item or [], equipment_without or []
+        )
     asked = list(dict.fromkeys(ingredient or []))
     unwanted = list(dict.fromkeys(without or []))
     words = list(dict.fromkeys(q.casefold().split()))
@@ -244,7 +290,15 @@ async def search(
     tagged = list(dict.fromkeys(tag or []))
     wanted_kit = list(dict.fromkeys(needing or []))
     unwanted_kit = list(dict.fromkeys(no_equipment or []))
-    if not asked and not words and not tagged and not larder and not saved and not wanted_kit:
+    if (
+        not asked
+        and not words
+        and not tagged
+        and not larder
+        and not saved
+        and not wanted_kit
+        and not mine
+    ):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "Choose an ingredient, a tag or equipment, or type part of a title.",
@@ -318,8 +372,18 @@ async def search(
         found.larder_items = len(stocked)
         if not stocked and not known:
             return found
+    if mine:
+        found.equipment_items = len(had)
     # Everything asked for is gone: nothing left to search by.
-    if not known and not words and not tags_known and not stocked and not saved and not kit_needed:
+    if (
+        not known
+        and not words
+        and not tags_known
+        and not stocked
+        and not saved
+        and not kit_needed
+        and not mine
+    ):
         return found
     conditions = [Recipe.title.ilike(contains_pattern(w), escape="\\") for w in words]
     conditions.append(visibility.recipes_seen_by(viewer))
@@ -343,6 +407,11 @@ async def search(
         conditions.append(_can_use(thing, n))
     if kit_left_out:
         conditions.append(~_cant_do_without(kit_left_out))
+    # Kept to what they have the equipment for, the recipes nobody has
+    # recorded equipment for come last: they're there unjudged.
+    last = [~_recorded()] if mine else []
+    if mine:
+        conditions.append(~_cant_meet(had))
     by_rating = sort == "rating"
     title = (words, found.q) if words else None
     if stocked:
@@ -355,10 +424,17 @@ async def search(
             by_rating=by_rating,
             title=title,
             missing_max=missing_max,
+            last=last,
         )
     elif not known:
         page, found.total = await recipes_where(
-            session, *conditions, offset=offset, limit=PAGE, by_rating=by_rating, title=title
+            session,
+            *conditions,
+            offset=offset,
+            limit=PAGE,
+            by_rating=by_rating,
+            title=title,
+            last=last,
         )
         found.recipes = [Hit(**r.model_dump()) for r in page]
     else:
@@ -370,13 +446,86 @@ async def search(
             by_rating=by_rating,
             title=title,
             missing_max=missing_max,
+            last=last,
         )
+    if mine:
+        # The same search over again, kept to the recipes with nothing
+        # recorded: only its count is wanted.
+        unjudged = [*conditions, ~_recorded()]
+        if stocked or known:
+            _, found.unrecorded = await _best_match(
+                session, known, unjudged, 0, upward=stocked, missing_max=missing_max, count=True
+            )
+        else:
+            found.unrecorded = await session.scalar(
+                select(func.count()).select_from(Recipe).where(*unjudged)
+            )
     listed = await recipe_needs.of_recipes(session, [r.id for r in found.recipes])
+    said = set(
+        await session.scalars(
+            select(Recipe.id).where(
+                Recipe.id.in_([r.id for r in found.recipes]), Recipe.equipment_checked
+            )
+        )
+    )
     for hit in found.recipes:
         hit.equipment = [
             recipe_needs.as_typed(detail, things) for _, detail, things in listed.get(hit.id, [])
         ]
+        hit.equipment_recorded = bool(hit.equipment) or hit.id in said
     return found
+
+
+async def equipment_had(
+    session: Session,
+    viewer,
+    lists: list[uuid.UUID] = (),
+    items: list[uuid.UUID] = (),
+    without: list[uuid.UUID] = (),
+) -> list[uuid.UUID]:
+    """The equipment the viewer has, as larder_ingredients finds what's in
+    their larder: on their lists and those shared with them, had and not
+    wanted, of the equipment they may see; only the things named, if some
+    are, or else only the lists named, if some are; less the things left
+    out."""
+    query = (
+        select(func.distinct(EquipmentListItem.equipment_id))
+        .join(EquipmentList, EquipmentList.id == EquipmentListItem.list_id)
+        .join(Equipment, Equipment.id == EquipmentListItem.equipment_id)
+        .where(
+            EquipmentList.id.in_(seen_equipment_list_ids(viewer)),
+            EquipmentListItem.state == "have",
+            visibility.equipment_seen_by(viewer),
+        )
+    )
+    if items:
+        query = query.where(EquipmentListItem.id.in_(items))
+    elif lists:
+        query = query.where(EquipmentList.id.in_(lists))
+    if without:
+        query = query.where(EquipmentListItem.id.not_in(without))
+    return list(await session.scalars(query))
+
+
+def _recorded():
+    """A recipe's equipment is recorded when a need is listed or nothing
+    special is said (needs.py): what its page doesn't call "not recorded
+    yet"."""
+    listed = aliased(RecipeEquipment)
+    return or_(Recipe.equipment_checked, exists().where(listed.recipe_id == Recipe.id))
+
+
+def _cant_meet(had: list[uuid.UUID]):
+    """A recipe has a need someone can't meet when none of the need's
+    choices is a thing they have, or one a thing of theirs counts as: with
+    a stand mixer, "Mixer" is met, and so is "Stand mixer or Whisk"."""
+    have = kit.ancestry(*had, name="had_equipment")
+    need = aliased(RecipeEquipment)
+    choice = aliased(EquipmentOption)
+    return exists().where(
+        need.recipe_id == Recipe.id,
+        ~exists().where(choice.recipe_equipment_id == need.id, choice.equipment_id.in_(have)),
+    )
 
 
 async def larder_ingredients(
@@ -487,6 +636,8 @@ async def _best_match(
     by_rating: bool = False,
     title: tuple[list[str], str] | None = None,
     missing_max: int | None = None,
+    last=(),
+    count: bool = False,
 ):
     """Recipes covering any line with what you have: those using the most of
     your ingredients first, then by the share of their lines you have (so
@@ -496,7 +647,9 @@ async def _best_match(
     by_rating: the rated ones first, best first, then the rest that way.
     title: a title search's words and the search as typed; recipes level
     on what you have come closest title first (title_rank.py).
-    missing_max: only those with at most this many lines not covered."""
+    missing_max: only those with at most this many lines not covered.
+    last: what puts a recipe after all the others, whatever else orders
+    them. count: only how many there are."""
     # Which of yours each match is under (or, from a larder, above): to count
     # how many of yours a recipe uses, and to say which.
     have = list(dict.fromkeys([*chosen, *upward]))
@@ -547,6 +700,8 @@ async def _best_match(
     if missing_max is not None:
         matching = matching.where(tally.c.lines - tally.c.have <= missing_max)
     total = await session.scalar(select(func.count()).select_from(matching.subquery()))
+    if count:
+        return [], total or 0
     first, closest = (), [func.lower(Source.title), func.lower(Recipe.title)]
     if by_rating or title:
         ratings = rated()
@@ -562,6 +717,7 @@ async def _best_match(
     rows = (
         await session.execute(
             matching.order_by(
+                *last,
                 *first,
                 used.c.used.desc(),
                 # True division: SQLAlchemy makes / between integers a real one.

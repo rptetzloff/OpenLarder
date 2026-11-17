@@ -1379,14 +1379,33 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - Found on the way: removing a list with one thing on it
             asked about "the 1 things on it", on the larder's page too.
             Fixed on both.
-          - [ ] Nothing uses the lists yet: the page says how many
-            things count, and that is all they do until the next two
-            items.
-          - [ ] The larder's page has "What can I make?", "Search with
+          - [x] Nothing used the lists: search does now (#222), and a
+            recipe's page will with "You don't have this".
+          - [x] The larder's page has "What can I make?", "Search with
             this list" and a tick on each thing to search with. This
-            page has none of them until search can use the lists.
-        - [ ] "Only what I have the equipment for" (`equipment=mine`),
-          and "You don't have this" on a recipe's page.
+            page has them too (#222).
+        - [x] "Only what I have the equipment for" (#222), under More
+          options for someone signed in with equipment on a list
+          (`equipment=mine`). Recipes with a need they can't meet are
+          left out. A need is met by any of its choices, and by a thing
+          of theirs that counts as one (a stand mixer meets "Mixer");
+          what's wanted or unmatched doesn't count. It is a chip among
+          the filters, and enough to search by, as a larder is.
+          - Recipes with no equipment recorded stay in, as the spec has
+            it ("hiding them would hide most of the catalog at first"):
+            they come after every recipe that's judged, whatever else
+            orders the search; each says "Equipment not recorded"; and
+            the heading counts them ("44 recipes · 42 without equipment
+            recorded"). A recipe with needs listed and the list not
+            said to be whole is judged on the needs it has.
+          - Narrowed as a larder search is: to some lists
+            (`equipment_list`; `?el=` on the page), to only some things
+            (`equipment_item`, `?ei=`), or less some
+            (`equipment_without`, `?ex=`). A list shared with someone
+            counts for them. A link's `equipment=mine` ticks every list.
+          - [ ] Counting the recipes with nothing recorded runs the
+            search a second time. Not timed against a loaded database.
+        - [ ] "You don't have this" on a recipe's page.
       - [ ] 4. The suggestion queue, from titles, tags and sources. *Ray,
         2026-11-15, asked whether he wanted it, the spec having taken
         "agree on all" to mean so: yes.*
