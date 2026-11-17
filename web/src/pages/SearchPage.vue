@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { dropLastOn } from "../chips";
 import CoverThumb from "../components/CoverThumb.vue";
+import EquipmentListsPicker from "../components/EquipmentListsPicker.vue";
 import LarderPicker from "../components/LarderPicker.vue";
 import OptionList from "../components/OptionList.vue";
 import { KINDS, listTags, type Tag } from "../tags";
@@ -94,6 +95,26 @@ const unwanted = ref<Named[]>([]);
 // ingredients.
 const needing = ref<Named[]>([]);
 const noKit = ref<Named[]>([]);
+// Only what you have the equipment for (the spec's third filter; your
+// lists are routers/equipment_lists.py). Kept as the larder is above: the
+// lists ticked (?el=…), only some things on them (?ei=…), or all but some
+// (?ex=…); a link's equipment=mine ticks every list.
+const ownLists = ref<string[]>(params.getAll("el"));
+const ownOnly = ref<string[]>(params.getAll("ei"));
+const ownOut = ref<string[]>(params.getAll("ex"));
+const ownAll = params.get("equipment") === "mine";
+const useOwn = computed(() => !!ownLists.value.length || !!ownOnly.value.length);
+const ownIds = ref<string[]>([]);
+let ownBefore: string[] = [];
+function toggleOwn(on: boolean) {
+  if (on) ownLists.value = ownBefore.length ? ownBefore : [...ownIds.value];
+  else {
+    ownBefore = ownLists.value;
+    ownLists.value = [];
+    ownOnly.value = [];
+  }
+  run();
+}
 const shelf = ref<Named[]>([]);
 // Only the books you own (routers/shelf.py).
 const onShelf = ref(params.get("own") === "1");
@@ -160,8 +181,8 @@ const narrow = useNarrow();
 // arrives with some of it set (on a phone, a filter too); the button says
 // how many are in use.
 const moreOpen = ref(
-  ["x", "source", "book", "own", "sv", "li", "lx", "needs", "no_equipment"].some((k) =>
-    params.has(k),
+  ["x", "source", "book", "own", "sv", "li", "lx", "needs", "no_equipment", "equipment", "el", "ei", "ex"].some(
+    (k) => params.has(k),
   ) ||
     (narrow.value && ["tag", "kind"].some((k) => params.has(k))),
 );
@@ -171,6 +192,7 @@ const moreCount = computed(
       unwanted.value.length,
       needing.value.length,
       noKit.value.length,
+      useOwn.value,
       shelf.value.length,
       onShelf.value,
       onlySaved.value,
@@ -221,6 +243,7 @@ const narrowing = computed(() => {
   for (const i of unwanted.value) add(`x-${i.id}`, `Without ${i.name}`, () => dropUnwanted(i.id, false));
   for (const e of needing.value) add(`needs-${e.id}`, `Needs ${e.name}`, () => dropNeeded(e.id, false));
   for (const e of noKit.value) add(`nokit-${e.id}`, `Without ${e.name}`, () => dropNoKit(e.id, false));
+  if (useOwn.value) add("own-kit", "Equipment I have", () => toggleOwn(false));
   for (const b of shelf.value) add(`in-${b.id}`, `In ${b.name}`, () => dropSource(b.id, false));
   return chips;
 });
@@ -243,6 +266,10 @@ function clearAll() {
   unwanted.value = [];
   needing.value = [];
   noKit.value = [];
+  ownBefore = [];
+  ownLists.value = [];
+  ownOnly.value = [];
+  ownOut.value = [];
   shelf.value = [];
   run();
   toResults();
@@ -260,12 +287,13 @@ const searching = computed(
     !!chosen.value.length ||
     !!title.value.trim() ||
     !!tags.value.length ||
-    !!needing.value.length,
+    !!needing.value.length ||
+    useOwn.value,
 );
 
 function toAddress() {
   const url = new URL(location.href);
-  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv", "sort", "missing", "needs", "no_equipment"]) {
+  for (const key of ["i", "x", "book", "source", "q", "kind", "tag", "page", "larder", "ll", "li", "lx", "own", "sv", "sort", "missing", "needs", "no_equipment", "equipment", "el", "ei", "ex"]) {
     url.searchParams.delete(key);
   }
   if (sort.value === "rating") url.searchParams.set("sort", "rating");
@@ -273,6 +301,9 @@ function toAddress() {
   for (const i of unwanted.value) url.searchParams.append("x", i.id);
   for (const e of needing.value) url.searchParams.append("needs", e.id);
   for (const e of noKit.value) url.searchParams.append("no_equipment", e.id);
+  for (const id of ownLists.value) url.searchParams.append("el", id);
+  for (const id of ownOnly.value) url.searchParams.append("ei", id);
+  for (const id of ownOut.value) url.searchParams.append("ex", id);
   for (const b of shelf.value) url.searchParams.append("source", b.id);
   for (const i of chosen.value) url.searchParams.append("i", i.id);
   if (title.value.trim()) url.searchParams.set("q", title.value.trim());
@@ -318,6 +349,10 @@ async function run(toPage = 1) {
         missingMax: missingMax.value,
         needs: needing.value.map((e) => e.id),
         noEquipment: noKit.value.map((e) => e.id),
+        equipment: useOwn.value,
+        equipmentLists: ownLists.value,
+        equipmentItems: ownOnly.value,
+        equipmentWithout: ownOut.value,
       },
     );
     if (mine !== latest) return;
@@ -538,9 +573,11 @@ onMounted(async () => {
       !title.value.trim() &&
       !tags.value.length &&
       !useLarder.value &&
+      !useOwn.value &&
       !onlySaved.value
     ) {
-      // larder=1 alone: the picker ticks every list, then searches.
+      // larder=1 alone, or equipment=mine: the picker ticks every list, then
+      // searches.
       // Sources, before anything to search by: their names are all to show.
       for (const id of sources) {
         const res = await fetch(`/api/sources/${id}`);
@@ -581,6 +618,10 @@ onMounted(async () => {
       missingMax: missingMax.value,
       needs: kit,
       noEquipment: kitOut,
+      equipment: useOwn.value,
+      equipmentLists: ownLists.value,
+      equipmentItems: ownOnly.value,
+      equipmentWithout: ownOut.value,
     });
     chosen.value = first.ingredients;
     unwanted.value = first.without;
@@ -863,6 +904,26 @@ onMounted(async () => {
             @change="run()"
             @loaded="larderLoaded"
           />
+          <!-- Ray's equipment spec, 2026-11-15: a checkbox here, for someone
+               signed in with equipment saved. Its lists are the larder's
+               picker over again (Ray, 2026-11-16). -->
+          <label v-if="ownIds.length || useOwn" class="check more-gap own-equipment">
+            <input
+              type="checkbox"
+              :checked="useOwn"
+              @change="toggleOwn(($event.target as HTMLInputElement).checked)"
+            />
+            Only what I have the equipment for
+          </label>
+          <EquipmentListsPicker
+            v-model:lists="ownLists"
+            v-model:only="ownOnly"
+            v-model:leave-out="ownOut"
+            :counted="result?.equipment_items"
+            :tick-all="ownAll"
+            @change="run()"
+            @loaded="(ids) => (ownIds = ids)"
+          />
         </template>
         <!-- Where the filters go on a phone, after the options. -->
         <h2 v-if="narrow" class="more-filters-title">Filters</h2>
@@ -908,6 +969,11 @@ onMounted(async () => {
         <div v-if="searching && result && !failed" class="results-count">
           <h2 ref="resultsHead" class="results-head" tabindex="-1">
             {{ summary }}
+            <!-- The spec's count line: "212 recipes · 140 without equipment
+                 recorded". They're there unjudged, and come last. -->
+            <span v-if="useOwn && result.unrecorded" class="muted order-note unrecorded-note">
+              · {{ result.unrecorded.toLocaleString() }} without equipment recorded</span
+            >
             <span v-if="sort === 'rating'" class="muted order-note"> · highest rated first</span>
             <span
               v-else-if="(chosen.length || useLarder) && missingMax !== 0 && result.total > 1"
@@ -1048,7 +1114,10 @@ onMounted(async () => {
                 <p class="hit-where">
                   <a :href="`/sources/${r.source_id}`">{{ r.source_title }}</a
                   ><template v-if="whereItIs(r)"> · {{ whereItIs(r) }}</template
-                  ><template v-if="r.equipment.length"> · {{ kitSaid(r.equipment) }}</template>
+                  ><template v-if="r.equipment.length"> · {{ kitSaid(r.equipment) }}</template
+                  ><template v-else-if="useOwn && !r.equipment_recorded">
+                    · Equipment not recorded</template
+                  >
                 </p>
                 <template v-if="r.lines !== null">
                   <!-- Kept to what you can make: what's missing is the thing to say. -->

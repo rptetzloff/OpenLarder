@@ -169,12 +169,14 @@ async def recipes_where(
     limit: int | None = None,
     by_rating: bool = False,
     title: tuple[Sequence[str], str] | None = None,
+    last: Sequence[ColumnElement[bool]] = (),
 ) -> tuple[list[UsedBy], int]:
     """A page of the recipes meeting the conditions, by book then title,
     with their pages, and how many there are in all. by_rating: the rated
     ones first, best first (routers/ratings.py), then the rest that way.
     title: the words of a title search and the search as typed; the
-    closest titles first (title_rank.py), then by title."""
+    closest titles first (title_rank.py), then by title. last: what puts a
+    recipe after all the others, whatever else orders them."""
     total = await session.scalar(select(func.count()).select_from(Recipe).where(*conditions))
     query = (
         select(Recipe.id, Recipe.title, Source.id, Source.title)
@@ -197,7 +199,9 @@ async def recipes_where(
             ]
         if by_rating:
             order = [*best_first(ratings), *order]
-    rows = (await session.execute(query.order_by(*order).offset(offset).limit(limit or PAGE))).all()
+    rows = (
+        await session.execute(query.order_by(*last, *order).offset(offset).limit(limit or PAGE))
+    ).all()
     return await with_pages(session, rows), total or 0
 
 

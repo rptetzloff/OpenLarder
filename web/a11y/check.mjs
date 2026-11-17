@@ -755,11 +755,16 @@ const MY_EQUIPMENT = `(() => {
   const pressed = (li) => [...li.querySelectorAll('.kind-filter button[aria-pressed="true"]')].map(words).join();
   const mixer = item("Stand mixer"), cauldron = item("Nana's cauldron"), maker = item("Ice cream maker");
   if (!mixer?.querySelector('.larder-item-name a[href^="/equipment/"]') || pressed(mixer) !== "Have") return "The stand mixer reads “" + words(mixer) + "”";
-  if (!words(cauldron).includes("not matched, so it doesn't count") || !words(cauldron).includes("Choose what it is")) return "The thing nothing matches reads “" + words(cauldron) + "”";
+  if (!words(cauldron).includes("not matched, so search can't use it") || !words(cauldron).includes("Choose what it is")) return "The thing nothing matches reads “" + words(cauldron) + "”";
+  // What counts has a box to search with it; what's wanted or unmatched
+  // hasn't. The list and the page lead to the search too.
+  if (!mixer.querySelector(".larder-tick input") || cauldron.querySelector(".larder-tick") || maker.querySelector(".larder-tick")) return "The boxes to search with are on the wrong things";
+  if (!(lists[0].querySelector(".larder-search-list a")?.getAttribute("href") ?? "").startsWith("/search?el=")) return "The kitchen has no “Search with this list”";
+  if (document.querySelector(".larder-summary a")?.getAttribute("href") !== "/search?equipment=mine") return "The page has no “What can I make?”";
   if (pressed(maker) !== "Want" || !maker.classList.contains("state-want")) return "The thing wanted reads “" + words(maker) + "”";
   const group = maker.querySelector(".kind-filter");
   if (group.getAttribute("role") !== "group" || group.getAttribute("aria-label") !== "Ice cream maker: have or want" || [...group.querySelectorAll("button")].map(words).join() !== "Have,Want") return "A thing's states are “" + words(group) + "”, named “" + group.getAttribute("aria-label") + "”";
-  const said = words(document.querySelector(".larder-summary")).match(/^(\\d+) of (\\d+) things count as equipment you have\\.$/);
+  const said = words(document.querySelector(".larder-summary")).match(/^(\\d+) of (\\d+) things count in a search\\. What can I make\\?$/);
   const had = [...document.querySelectorAll(".larder-items > li")].filter((li) => pressed(li) === "Have" && li.querySelector('.larder-item-name a[href^="/equipment/"]')).length;
   if (!said || Number(said[1]) !== had || Number(said[2]) !== document.querySelectorAll(".larder-items > li").length) return "The page says “" + words(document.querySelector(".larder-summary")) + "” of " + had + " had";
   if (!words(lists[0].querySelector(".larder-shared")).startsWith("Shared with ")) return "The kitchen doesn't say who it's shared with";
@@ -793,6 +798,37 @@ const CHOOSE_EQUIPMENT = `(() => {
   const box = document.querySelector('.equipment-lists-page input[id^="pick-"]');
   if (!box) return "“Choose what it is” opens no box";
   return document.querySelector('label[for="' + box.id + '"]')?.textContent.includes("What “Nana's cauldron” is") ? "" : "The box to find the equipment in isn't labelled with the thing's name";
+})()`;
+// A search kept to what someone has the equipment for (Ray's equipment
+// spec, 2026-11-15; his lists as a larder's, Ray, 2026-11-16). Its box is
+// ticked under "More options", which is open for it, with the lists it's
+// kept to; it's a chip among the filters in use. `has` is a recipe it
+// finds, `hasnt` one it doesn't. `all`: the whole catalog he's equipped
+// for, where the recipes with no equipment recorded are counted in the
+// heading, say so on their lines, and come after every one that's judged.
+// (A search for a title may find some too: the seed has a second recipe
+// with cheddar in its name and nothing recorded.)
+const OWN_EQUIPMENT = ({ lists, has, hasnt, all }) => `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const chips = [...document.querySelectorAll(".narrowing .filter-chip")].map(words);
+  if (!chips.includes("Equipment I have")) return "The filters in use are “" + chips.join(" | ") + "”, without “Equipment I have”";
+  const box = document.querySelector(".own-equipment input");
+  if (!box?.checked || !box.getClientRects().length) return "“Only what I have the equipment for” isn't ticked under More options";
+  const ticked = [...document.querySelectorAll(".equipment-picker .larder-picker-lists label")].filter((l) => l.querySelector("input").checked).map((l) => words(l).replace(/ \\d+$/, ""));
+  if (ticked.join() !== ${JSON.stringify(lists.join())}) return "The lists ticked are “" + ticked.join(" | ") + "”";
+  const hits = [...document.querySelectorAll(".hits .hit")].map((li) => [words(li.querySelector("h3")), words(li.querySelector(".hit-where"))]);
+  const has = ${JSON.stringify(has ?? "")}, hasnt = ${JSON.stringify(hasnt ?? "")};
+  if (has && !hits.some(([title]) => title === has)) return "The search doesn't find “" + has + "”: " + hits.map(([title]) => title).join(" | ");
+  if (hasnt && hits.some(([title]) => title === hasnt)) return "The search finds “" + hasnt + "”";
+  const head = words(document.querySelector(".results-head"));
+  if (${!!all}) {
+    const said = head.match(/^([\\d,]+) recipes · ([\\d,]+) without equipment recorded/);
+    if (!said || Number(said[2].replaceAll(",", "")) >= Number(said[1].replaceAll(",", ""))) return "The heading reads “" + head + "”";
+    const unjudged = hits.map(([, where]) => where.endsWith("· Equipment not recorded"));
+    if (!unjudged.includes(true) || !unjudged.includes(false)) return "The page has " + unjudged.filter(Boolean).length + " of " + hits.length + " recipes marked “Equipment not recorded”";
+    if (unjudged.indexOf(true) < unjudged.lastIndexOf(false)) return "A recipe with no equipment recorded comes before one that's judged";
+  }
+  return "";
 })()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
@@ -1170,7 +1206,11 @@ async function seed() {
   // wants. His kitchen is shared with the family, as his pantry is; Ada
   // views it.
   const kitchen = await api("/api/equipment-lists/lists", "cook", { name: "Kitchen" });
-  await api("/api/equipment-lists/lists", "cook", { name: "Cabin" });
+  // At the cabin, the rest of what the biscuits need: with both lists he
+  // can make them, and with the kitchen's alone he can't.
+  const cabin = await api("/api/equipment-lists/lists", "cook", { name: "Cabin" });
+  await api(`/api/equipment-lists/lists/${cabin.id}/items`, "cook", { name: "Biscuit cutter" });
+  await api(`/api/equipment-lists/lists/${cabin.id}/items`, "cook", { name: "Cast-iron skillet" });
   await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: "Stand mixer" });
   await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: "Nana's cauldron" });
   await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: "Ice cream maker", state: "want" });
@@ -1374,7 +1414,7 @@ async function seed() {
   });
   await api(`/api/import/runs/${importRun.id}/finish`, "admin", { books_added: 1, books_existing: 0, books_failed: 0 });
   const imported = (await api(`/api/sources/${importedBook.id}`, "admin")).recipes[0].id;
-  return { imported, long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit, standMixer, mixer };
+  return { kitchenList: kitchen.id, cabinList: cabin.id, imported, long, oats, wordy, word, wordyAuthor, wordyIngredient, waiting: waiting.id, vegetarian, book, blend, biscuits, site, web, magazine, issue, show, episode, box, pie, group, author, cheddar, cheese, multicooker, slowCooker, wok, stovetop, blender, wordyKit, standMixer, mixer };
 }
 
 // Script that presses the button whose words begin so; with none, it throws,
@@ -1503,6 +1543,9 @@ function pages(s) {
     ["/equipment/mine", "cook", { phone: true, expect: `(${HOW_FOLDED(false)}) || (${MY_EQUIPMENT}) || (${MINE_IN_MENU})` }],
     ["/equipment/mine", "admin", { phone: true, expect: MY_EQUIPMENT_SHARED }],
     ["/equipment/mine", null, { expect: HOW_FOLDED(true) }],
+    ["/search?equipment=mine", "cook", { phone: true, expect: OWN_EQUIPMENT({ lists: ["Kitchen", "Cabin"], has: "Cheddar Biscuits", all: true }) }],
+    [`/search?q=cheddar&el=${s.kitchenList}&el=${s.cabinList}`, "cook", { expect: OWN_EQUIPMENT({ lists: ["Kitchen", "Cabin"], has: "Cheddar Biscuits" }) }],
+    [`/search?q=cheddar&el=${s.kitchenList}`, "cook", { phone: true, expect: OWN_EQUIPMENT({ lists: ["Kitchen"], hasnt: "Cheddar Biscuits" }) }],
     ["/shelf", "cook", { phone: true, expect: `(${WANTS_ON_SHELF}) || (${HOW_FOLDED(false)})` }],
     ["/shelf", "admin", { phone: true, expect: WANTS_ON_SHELF }],
     ["/shelf", null, { phone: true, expect: HOW_FOLDED(true) }],
