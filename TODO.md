@@ -1405,7 +1405,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             counts for them. A link's `equipment=mine` ticks every list.
           - [ ] Counting the recipes with nothing recorded runs the
             search a second time. Not timed against a loaded database.
-        - [ ] "You don't have this" on a recipe's page.
+        - [x] "You don't have this" on a recipe's page (#223): muted, at
+          the right of each need the viewer can't meet, and the heading
+          counts them ("Needs 3 · 2 you don't have"). A need they can
+          meet says nothing: the spec's "no green ticks". A need is met
+          as search meets it: by any of its choices, or by a thing of
+          theirs that counts as one.
+          - Nothing is said to someone signed out, or with nothing that
+            counts on a list: there's nothing to go by until they've
+            said what they have.
+          - It is said to the viewer alone, of their own lists and
+            those shared with them. No response tells anyone what
+            someone else has.
+          - Found by the a11y check while building it: the need's name
+            ran into the words with nothing between them ("Biscuit
+            cutterYou don't have this") for whatever reads the row's
+            text. Its space is written out.
       - [ ] 4. The suggestion queue, from titles, tags and sources. *Ray,
         2026-11-15, asked whether he wanted it, the spec having taken
         "agree on all" to mean so: yes.*

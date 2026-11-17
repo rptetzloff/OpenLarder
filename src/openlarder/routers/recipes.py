@@ -48,6 +48,7 @@ from openlarder.models import (
     WebPage,
 )
 from openlarder.routers.allergens import RecipeAllergenOut, for_recipe
+from openlarder.routers.equipment_lists import held
 from openlarder.routers.substitutions import SwapOut, swap_out
 from openlarder.tagging import RecipeTagOut, recipe_tags
 
@@ -313,6 +314,11 @@ class NeedOut(BaseModel):
     options: list[NeedOption]
     # The need as the edit form's box takes it back.
     text: str
+    # Whether whoever's asking has something that meets it (routers/
+    # equipment_lists.py): false is the page's "You don't have this". None
+    # when there's nothing to go by: signed out, or with no equipment of
+    # theirs on a list. Theirs alone: nobody is told what anyone else has.
+    have: bool | None = None
 
 
 class RecipeOut(BaseModel):
@@ -466,6 +472,8 @@ def _catalog_write(user, source: Source, recipe: Recipe | None = None) -> None:
 
 async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
     work = await session.get_one(Source, recipe.source_id)
+    # What the viewer has to meet its needs with, if they've said.
+    theirs = await held(session, viewer)
     pages = (
         await session.execute(
             select(RecipeLocation.page, Edition)
@@ -633,6 +641,8 @@ async def _out(session, recipe: Recipe, viewer) -> RecipeOut:
                 detail=detail,
                 options=[NeedOption(id=t.id, name=t.name) for t in things],
                 text=needs.as_typed(detail, things),
+                # Met by any of its choices.
+                have=None if theirs is None else any(t.id in theirs for t in things),
             )
             for _, detail, things in (await needs.of_recipes(session, [recipe.id])).get(
                 recipe.id, []

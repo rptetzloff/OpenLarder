@@ -31,6 +31,10 @@ const proposed = new URLSearchParams(location.search).has("proposed");
 // it, what goes in it, what uses it, and what can stand in.
 const props = defineProps<{ id: string; user: Me | null | undefined }>();
 const recipe = ref<Recipe | null>(null);
+// How many of its needs you haven't the equipment for (Need.have).
+const lacking = computed(
+  () => (recipe.value?.equipment ?? []).filter((n) => n.have === false).length,
+);
 const missing = ref(false);
 const failed = ref(false);
 const error = ref("");
@@ -397,6 +401,11 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
               <h2 id="needs-heading">
                 Needs
                 <span class="ingredient-count">{{ recipe.equipment.length }}</span>
+                <!-- Ray's equipment spec, 2026-11-15: "Needs · 1 you don't
+                     have", for someone with equipment on a list. -->
+                <span v-if="lacking" class="ingredient-count needs-lacking">
+                  · {{ lacking }} you don't have</span
+                >
               </h2>
             </div>
             <ul class="ingredient-lines ingredient-rows">
@@ -412,6 +421,14 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                     >{{ " " }}<span class="page-ref">{{ need.detail }}</span></template
                   >
                 </span>
+                <!-- The spec: muted, on what isn't had, and nothing on what
+                     is: "no green ticks". -->
+                <!-- Its space is written out, as the row's are: the two are
+                     side by side with nothing between them, and it read
+                     "Biscuit cutterYou don't have this" (the a11y check). -->
+                <span v-if="need.have === false" class="muted need-lacking">{{
+                  " You don't have this"
+                }}</span>
               </li>
             </ul>
             <p v-if="!recipe.equipment_checked" class="status">
@@ -664,6 +681,12 @@ p.recipe-needs a {
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
+}
+/* What someone hasn't the equipment for: at the row's right end, where an
+   ingredient's Shop is, and whole when the row wraps. */
+.need-lacking {
+  font-size: var(--text-sm);
+  white-space: nowrap;
 }
 /* A row: the names on the left, Shop at the right end. */
 .ingredient-rows {

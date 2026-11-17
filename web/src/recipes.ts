@@ -98,6 +98,9 @@ export interface Need {
   detail: string | null;
   options: { id: string; name: string }[];
   text: string;
+  // Whether you have something that meets it; null when there's nothing to
+  // go by: signed out, or with no equipment of yours on a list.
+  have?: boolean | null;
 }
 
 export interface RecipeIn {

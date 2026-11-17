@@ -78,8 +78,6 @@ from openlarder.db import Session
 from openlarder.ingredients import family, rooted_ancestry, rooted_family
 from openlarder.models import (
     Equipment,
-    EquipmentList,
-    EquipmentListItem,
     EquipmentOption,
     Ingredient,
     IngredientOption,
@@ -93,7 +91,7 @@ from openlarder.models import (
     SourceTag,
     Tag,
 )
-from openlarder.routers.equipment_lists import seen_list_ids as seen_equipment_list_ids
+from openlarder.routers.equipment_lists import had as equipment_had
 from openlarder.routers.ingredients import (
     UsedBy,
     contains_pattern,
@@ -474,37 +472,6 @@ async def search(
         ]
         hit.equipment_recorded = bool(hit.equipment) or hit.id in said
     return found
-
-
-async def equipment_had(
-    session: Session,
-    viewer,
-    lists: list[uuid.UUID] = (),
-    items: list[uuid.UUID] = (),
-    without: list[uuid.UUID] = (),
-) -> list[uuid.UUID]:
-    """The equipment the viewer has, as larder_ingredients finds what's in
-    their larder: on their lists and those shared with them, had and not
-    wanted, of the equipment they may see; only the things named, if some
-    are, or else only the lists named, if some are; less the things left
-    out."""
-    query = (
-        select(func.distinct(EquipmentListItem.equipment_id))
-        .join(EquipmentList, EquipmentList.id == EquipmentListItem.list_id)
-        .join(Equipment, Equipment.id == EquipmentListItem.equipment_id)
-        .where(
-            EquipmentList.id.in_(seen_equipment_list_ids(viewer)),
-            EquipmentListItem.state == "have",
-            visibility.equipment_seen_by(viewer),
-        )
-    )
-    if items:
-        query = query.where(EquipmentListItem.id.in_(items))
-    elif lists:
-        query = query.where(EquipmentList.id.in_(lists))
-    if without:
-        query = query.where(EquipmentListItem.id.not_in(without))
-    return list(await session.scalars(query))
 
 
 def _recorded():
