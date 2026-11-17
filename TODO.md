@@ -1403,8 +1403,13 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             (`equipment_item`, `?ei=`), or less some
             (`equipment_without`, `?ex=`). A list shared with someone
             counts for them. A link's `equipment=mine` ticks every list.
-          - [ ] Counting the recipes with nothing recorded runs the
-            search a second time. Not timed against a loaded database.
+          - [x] Counting the recipes with nothing recorded runs the
+            search a second time. Timed (#228, 2026-11-17) on the
+            check's database with 20,100 recipes found by a title
+            search: 0.10 to 0.12 seconds kept to someone's equipment,
+            0.08 to 0.09 without. Left as it is. Those recipes were
+            made for the measuring, with no ingredients or equipment:
+            a search that ranks by ingredients wasn't timed.
         - [x] "You don't have this" on a recipe's page (#223): muted, at
           the right of each need the viewer can't meet, and the heading
           counts them ("Needs 3 · 2 you don't have"). A need they can
@@ -1465,10 +1470,26 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
               itself.
             - What's together is worked out from each suggestion's
               reason, so it holds for those filed before this.
-          - [ ] The queue's page loads every open suggestion to count
-            them by kind, which its own comment calls small
-            ("hundreds"). A first sweep of the whole catalog may file
-            thousands. Not measured against the live catalog.
+          - [x] The queue's page loads every open suggestion to count
+            them by kind, which its own comment called small
+            ("hundreds"), and a first sweep of the whole catalog may
+            file thousands. Measured (#228, 2026-11-17), and left as it
+            is: the live catalog has about 1,100 recipes whose titles
+            the rules read (15 public title searches; an upper bound,
+            and without the books about one appliance), and on the
+            check's database the page's request took 0.1 seconds with
+            1,100 open, 0.3 with 5,000 and 1.0 with 20,000. The comment
+            says so now.
+            - What the measuring found instead: a sweep of everything
+              sent an INSERT for every suggestion already open, each
+              declined, every time (15.6 seconds with 20,000 open, to
+              find nothing new; it runs when an import finishes). It
+              skips what's been suggested now (1.6 seconds), and asks
+              that of the recipes at hand, so a recipe's save doesn't
+              read the whole queue.
+            - The limit of these numbers: the check's database on this
+              machine, with recipes made for the measuring that have no
+              ingredients. Not the live server.
           - [ ] The rules know English, and only the words in them.
       - [ ] 5. Shop links, with their clicks and the disclosure.
         - [x] Equipment's Shop links (#225, migration 0086; `kitchen.py`,
