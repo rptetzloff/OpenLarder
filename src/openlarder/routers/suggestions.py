@@ -531,8 +531,12 @@ async def list_suggestions(
     kind: Kind | None = None,
     offset: int = Query(0, ge=0),
 ) -> SuggestionPage:
-    # The queue is small (hundreds), and which an admin may see depends on
-    # ids inside JSON, so it's filtered here rather than in SQL.
+    # Which an admin may see depends on ids inside JSON, so the queue is
+    # read whole and filtered here rather than in SQL. It was hundreds when
+    # that was chosen; equipment's rules made it thousands. Measured
+    # 2026-11-17 on the check's database: 0.1 seconds for this with 1,100
+    # open (about what the live catalog's titles would file), 0.3 with
+    # 5,000 and 1.0 with 20,000. Left as it is until it's nearer that.
     query = select(Suggestion).where(
         Suggestion.status == "open" if state == "open" else Suggestion.status != "open"
     )

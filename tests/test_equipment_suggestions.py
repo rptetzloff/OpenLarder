@@ -4,7 +4,9 @@ dismissing one does. The rules themselves are tests/test_equipment_rules.py.
 *Ray's equipment spec, 2026-11-15.*"""
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
+
+from openlarder import equipment_rules
 
 QUEUE = "/api/suggestions"
 
@@ -377,3 +379,48 @@ async def test_a_source_tagged_for_a_thing_is_accepted_together_too(mo, ad, adb)
     left = await _open(mo)
     assert _said(left) == [("Ribs", "Smoker"), ("Wings", "Smoker")]
     assert [s["equipment"]["others_in_source"] for s in left] == [1, 1]
+
+
+async def test_a_sweep_files_only_whats_new_and_asks_only_of_its_recipes(
+    mo, ad, adb, async_engine, monkeypatch
+) -> None:
+    """What a sweep says to the database, since what it returns is the same
+    either way: nothing is filed again for what's open already (it was an
+    INSERT for each, declined, every time), and what's been suggested is
+    asked of the recipes at hand and not of the whole queue."""
+    book = await _book(mo, adb)
+    await _recipe(mo, book, "Smoked Trout")
+    await _recipe(mo, book, "Grilled Corn")
+    assert len(await _open(mo)) == 2
+    said: list[str] = []
+
+    def note(conn, cursor, statement, parameters, context, executemany) -> None:
+        said.append(" ".join(statement.split()))
+
+    def filed() -> list[str]:
+        return [q for q in said if q.upper().startswith("INSERT INTO SUGGESTIONS")]
+
+    def asked() -> list[str]:
+        return [q for q in said if q.startswith("SELECT") and "proposal ->> 'recipe_id'" in q]
+
+    event.listen(async_engine.sync_engine, "before_cursor_execute", note)
+    try:
+        # Everything, again: both are open, and nothing is sent to be filed.
+        assert (await ad.post(f"{QUEUE}/equipment")).json() == {"suggested": 0}
+        assert filed() == []
+        [of_few] = asked()
+        assert " IN (" in of_few
+        # One more recipe: its own suggestion, and only that.
+        said.clear()
+        await _recipe(mo, book, "Buttermilk Waffles")
+        assert len(filed()) == 1
+        # Past a few recipes it asks of the queue, which is quicker than
+        # naming them all.
+        monkeypatch.setattr(equipment_rules, "FEW", 2)
+        said.clear()
+        assert (await ad.post(f"{QUEUE}/equipment")).json() == {"suggested": 0}
+        [of_all] = asked()
+        assert " IN (" not in of_all and filed() == []
+    finally:
+        event.remove(async_engine.sync_engine, "before_cursor_execute", note)
+    assert len(await _open(mo)) == 3
