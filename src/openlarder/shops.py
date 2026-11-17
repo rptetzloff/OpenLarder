@@ -17,15 +17,15 @@ and the book or the ingredient:
 
 - `bookshop`: the shop's address with the affiliate id in it.
 - `amazon`: for a book its ISBN-10 where it has one and a search where it
-  doesn't; for an ingredient a search of Amazon Fresh; the Associates tag
-  on either.
+  doesn't; for an ingredient a search of Amazon Fresh; for a piece of
+  equipment a search of all of Amazon; the Associates tag on each.
 - `wrapped`: the shop's address inside an affiliate network's deep link.
 - `template`: the shop's address alone.
 - `direct`: the address as written, for a producer's referral link.
 
 A shop's address is its product_template, with {isbn13}, {isbn10}, {title},
 {author} and {words} (title and author, for a search) for a book, {term}
-for an ingredient, and {id} for the affiliate id; each is encoded for an
+for an ingredient or a piece of equipment, and {id} for the affiliate id; each is encoded for an
 address as it's put in. {words} isn't in Ray's list: Kobo is searched by
 title and author, and without it that search stayed in code.
 
@@ -52,7 +52,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from openlarder.models import Shop as ShopRow
 
-Kind = Literal["bookseller", "grocer", "producer"]
+Kind = Literal["bookseller", "grocer", "producer", "kitchen"]
 # How long the rows are kept before they're read again.
 TTL = 60.0
 
@@ -145,16 +145,21 @@ PLACEHOLDERS = {
     "grocer": ("term", "id"),
     # A producer's address is its referral link, used as written.
     "producer": (),
+    # A kitchen shop is searched for a piece of equipment as a grocer is
+    # for an ingredient.
+    "kitchen": ("term", "id"),
 }
 # The builders a kind of shop may have.
 BUILDERS = {
     "bookseller": ("bookshop", "amazon", "wrapped", "template"),
     "grocer": ("amazon", "wrapped", "template"),
     "producer": ("direct",),
+    "kitchen": ("amazon", "wrapped", "template"),
 }
 # What's shown for "Test link": a book and an ingredient that are no one's.
 SAMPLE_BOOK = Book(isbn13="9780393541113", title="A Sample Cookbook", author="Ann Author")
 SAMPLE_TERM = "olive oil"
+SAMPLE_EQUIPMENT = "Dutch oven"
 
 
 def lacks(shop: Shop) -> str | None:
@@ -175,7 +180,7 @@ def sample(shop: Shop) -> str | None:
         return for_book(shop, SAMPLE_BOOK)
     if shop.kind == "producer":
         return for_producer(shop)
-    return for_term(shop, SAMPLE_TERM)
+    return for_term(shop, SAMPLE_EQUIPMENT if shop.kind == "kitchen" else SAMPLE_TERM)
 
 
 def _filled(template: str, values: dict[str, str | None]) -> str | None:
@@ -244,12 +249,16 @@ def for_book(shop: Shop, book: Book) -> str | None:
 
 
 def for_term(shop: Shop, term: str) -> str | None:
-    """Where a click on a grocer's link goes, for this ingredient."""
+    """Where a click on a grocer's link goes, for this ingredient, or on a
+    kitchen shop's, for this piece of equipment."""
     if shop.builder == "amazon":
         if not shop.affiliate_id:
             return None
         tag = quote(shop.affiliate_id, safe="")
-        return f"https://www.amazon.com/s?k={quote_plus(term)}&i=amazonfresh&tag={tag}"
+        # Groceries are Amazon Fresh's. Equipment is in no one department,
+        # so its search names none.
+        within = "&i=amazonfresh" if shop.kind == "grocer" else ""
+        return f"https://www.amazon.com/s?k={quote_plus(term)}{within}&tag={tag}"
     return _address(shop, {"term": quote_plus(term)})
 
 

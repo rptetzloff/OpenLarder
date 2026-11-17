@@ -184,7 +184,7 @@ async def test_everything_leaves_only_the_tag_list(people, adb) -> None:
         )
     ).one()
     assert tuple(kept) == ("777", True, None)
-    assert await adb.scalar(text("SELECT count(*) FROM shops")) == 9
+    assert await adb.scalar(text("SELECT count(*) FROM shops")) == 10
     link = await adb.scalar(
         text(
             "SELECT pg_get_constraintdef(oid) FROM pg_constraint"

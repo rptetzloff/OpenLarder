@@ -107,6 +107,7 @@ async def test_the_groups_are_booksellers_grocers_and_producers(people) -> None:
         ("bookseller", "Booksellers", 6),
         ("grocer", "Grocers", 3),
         ("producer", "Producers", 0),
+        ("kitchen", "Kitchen shops", 1),
     ]
 
 

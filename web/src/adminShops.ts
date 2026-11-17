@@ -1,7 +1,7 @@
 // Shops, for administrators: what /api/admin/shops takes and returns
 // (routers/shops.py).
 
-export type ShopKind = "bookseller" | "grocer" | "producer";
+export type ShopKind = "bookseller" | "grocer" | "producer" | "kitchen";
 export type Builder = "bookshop" | "amazon" | "wrapped" | "template" | "direct";
 
 export interface Shop {
@@ -70,6 +70,8 @@ export const PLACEHOLDERS: Record<ShopKind, string[]> = {
   bookseller: ["{isbn13}", "{isbn10}", "{title}", "{author}", "{words}", "{id}"],
   grocer: ["{term}", "{id}"],
   producer: [],
+  // Searched for a piece of equipment as a grocer is for an ingredient.
+  kitchen: ["{term}", "{id}"],
 };
 export const BUILDERS: Record<ShopKind, [Builder, string][]> = {
   bookseller: [
@@ -84,6 +86,11 @@ export const BUILDERS: Record<ShopKind, [Builder, string][]> = {
     ["amazon", "Amazon Fresh's, made for each ingredient, with the Associates tag"],
   ],
   producer: [["direct", "Its referral link, as written"]],
+  kitchen: [
+    ["wrapped", "Its own address, inside an affiliate network's deep link"],
+    ["template", "Its own address, as written"],
+    ["amazon", "Amazon's, a search for each piece of equipment, with the Associates tag"],
+  ],
 };
 
 async function send<T>(path: string, method: string, body?: unknown): Promise<T> {

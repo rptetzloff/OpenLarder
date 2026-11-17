@@ -8,13 +8,15 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import Date, Text, cast, delete, func, select
 
-from openlarder import buying, grocery, producers, usage, visibility
+from openlarder import buying, grocery, kitchen, producers, usage, visibility
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
     ApiKey,
     ApiUsage,
     Edition,
+    Equipment,
+    EquipmentClick,
     GroceryClick,
     Ingredient,
     ProducerClick,
@@ -153,6 +155,12 @@ class IngredientClicks(BaseModel):
     clicks: int
 
 
+class EquipmentClicks(BaseModel):
+    equipment_id: uuid.UUID
+    name: str
+    clicks: int
+
+
 class ClicksPage(BaseModel):
     days: int
     clicks: int
@@ -168,6 +176,11 @@ class ClicksPage(BaseModel):
     # Producers' links (producers.py), by producer.
     producer_clicks: int = 0
     producers: list[ShopClicks] = []
+    # Equipment's shop links (kitchen.py): by shop, and the most clicked
+    # things, as the grocery links are.
+    equipment_clicks: int = 0
+    kitchen_shops: list[ShopClicks] = []
+    equipment: list[EquipmentClicks] = []
 
 
 @router.get("/clicks", response_model=ClicksPage)
@@ -255,7 +268,40 @@ async def clicks(
         )
     ).all()
     producer_labels = await producers.labels(session)
+    on_equipment = EquipmentClick.clicked_at >= since
+    by_kitchen_shop = (
+        await session.execute(
+            select(
+                EquipmentClick.shop,
+                func.count(),
+                func.count().filter(EquipmentClick.clicked_at >= week),
+            )
+            .where(on_equipment)
+            .group_by(EquipmentClick.shop)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    top_equipment = (
+        await session.execute(
+            select(Equipment.id, Equipment.name, func.count())
+            .select_from(EquipmentClick)
+            .join(Equipment, Equipment.id == EquipmentClick.equipment_id)
+            # A thing a hidden recipe brought in isn't named to an
+            # administrator who can't see that recipe.
+            .where(on_equipment, visibility.equipment_seen_by(admin))
+            .group_by(Equipment.id, Equipment.name)
+            .order_by(func.count().desc(), Equipment.name)
+            .limit(TOP)
+        )
+    ).all()
+    kitchen_labels = await kitchen.labels(session)
     return ClicksPage(
+        equipment_clicks=sum(n for _, n, _ in by_kitchen_shop),
+        kitchen_shops=[
+            ShopClicks(retailer=k, label=kitchen_labels.get(k, k), clicks=n, last_7_days=w)
+            for k, n, w in by_kitchen_shop
+        ],
+        equipment=[EquipmentClicks(equipment_id=i, name=m, clicks=n) for i, m, n in top_equipment],
         producer_clicks=sum(n for _, n, _ in by_producer),
         producers=[
             ShopClicks(retailer=p, label=producer_labels.get(p, p), clicks=n, last_7_days=w)

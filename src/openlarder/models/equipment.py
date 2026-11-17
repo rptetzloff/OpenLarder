@@ -28,9 +28,11 @@ refuses them), or that nothing assumed is on a recipe.
 """
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -179,3 +181,25 @@ class EquipmentOption(Timestamps, Base):
     rank: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     # RESTRICT: a thing a recipe needs is merged into another, not deleted.
     equipment_id: Mapped[uuid.UUID] = _fk("equipment.id", ondelete="RESTRICT")
+
+
+class EquipmentClick(Base):
+    """A click on a piece of equipment's shop link (kitchen.py): which
+    thing, which shop, when, and from which OpenLarder page. Nothing about
+    who clicked. The grocery clicks' table over again (migration 0086)."""
+
+    __tablename__ = "equipment_clicks"
+    __table_args__ = (
+        CheckConstraint("shop <> ''", name="shop_not_empty"),
+        Index("ix_equipment_clicks_clicked_at", "clicked_at"),
+        Index("ix_equipment_clicks_equipment_id", "equipment_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    equipment_id: Mapped[uuid.UUID] = _fk("equipment.id", ondelete="CASCADE")
+    # The shop's key, as the other click tables keep it.
+    shop: Mapped[str] = mapped_column(Text, nullable=False)
+    page: Mapped[str | None] = mapped_column(Text)
+    clicked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )

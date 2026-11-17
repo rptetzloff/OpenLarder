@@ -1,4 +1,5 @@
-"""Shops, for administrators: the booksellers, grocers and producers a link
+"""Shops, for administrators: the booksellers, grocers, producers and
+kitchen shops a link
 out of the site can go to, added, changed, put in order and switched on
 and off from the site, with no redeploy (shops.py; round 4, part D).
 
@@ -35,6 +36,7 @@ from openlarder import producers, shops, visibility
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
+    EquipmentClick,
     GroceryClick,
     Ingredient,
     ProducerClick,
@@ -46,12 +48,17 @@ from openlarder.models import Shop as ShopRow
 
 router = APIRouter(prefix="/api/admin/shops", tags=["admin"])
 
-Kind = Literal["bookseller", "grocer", "producer"]
+Kind = Literal["bookseller", "grocer", "producer", "kitchen"]
 Builder = Literal["bookshop", "amazon", "wrapped", "template", "direct"]
 _KEY = re.compile(r"[a-z0-9-]{1,40}")
 _TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}")
 _PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
-KINDS = {"bookseller": "Booksellers", "grocer": "Grocers", "producer": "Producers"}
+KINDS = {
+    "bookseller": "Booksellers",
+    "grocer": "Grocers",
+    "producer": "Producers",
+    "kitchen": "Kitchen shops",
+}
 # Not a bookseller's key: /go/producer/<key> is the producers' address, and
 # /go/<bookseller>/<edition> would be shadowed by it.
 RESERVED = {"bookseller": {"producer"}}
@@ -273,6 +280,7 @@ async def _clicks(
         ("bookseller", PurchaseClick, PurchaseClick.retailer),
         ("grocer", GroceryClick, GroceryClick.grocer),
         ("producer", ProducerClick, ProducerClick.producer),
+        ("kitchen", EquipmentClick, EquipmentClick.shop),
     ):
         query = select(column, func.count()).group_by(column)
         if since is not None:
@@ -515,5 +523,6 @@ async def test_link(body: NewShop, admin: AdminUser) -> Tried | Response:
             "bookseller": f"“{book.title}” by {book.author}, ISBN {book.isbn13}",
             "grocer": f"the ingredient “{shops.SAMPLE_TERM}”",
             "producer": "anyone who follows it",
+            "kitchen": f"the equipment “{shops.SAMPLE_EQUIPMENT}”",
         }[body.kind],
     )

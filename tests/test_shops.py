@@ -67,6 +67,8 @@ async def test_the_shops_there_were_are_rows_in_their_order(adb) -> None:
         ("grocer", "instacart", "Instacart", "wrapped", None),
         ("grocer", "amazon", "Amazon Fresh", "amazon", None),
         ("grocer", "walmart", "Walmart", "wrapped", None),
+        # Equipment's (migration 0086): one, switched off until it's wanted.
+        ("kitchen", "amazon", "Amazon", "amazon", None),
     ]
     # No variable is set where the tests' database was made: each is seeded
     # switched off, with no setting, and nobody's.
@@ -76,7 +78,7 @@ async def test_the_shops_there_were_are_rows_in_their_order(adb) -> None:
             " AND wrapper_template IS NULL AND updated_by IS NULL"
         )
     )
-    assert blank == 9
+    assert blank == 10
 
 
 def _migration(name: str = "0073_shops"):
@@ -360,7 +362,8 @@ async def test_amazon_is_a_bookseller_and_a_grocer_and_each_once(adb) -> None:
     """The key is unique among a kind: /go/amazon/… and /go/grocer/amazon/…
     are both on the web already."""
     kinds = await adb.scalars(text("SELECT kind FROM shops WHERE key = 'amazon' ORDER BY kind"))
-    assert list(kinds) == ["bookseller", "grocer"]
+    # And a kitchen shop, at /go/equipment/amazon/… (migration 0086).
+    assert list(kinds) == ["bookseller", "grocer", "kitchen"]
     with pytest.raises(IntegrityError):
         async with adb.begin_nested():
             await adb.execute(

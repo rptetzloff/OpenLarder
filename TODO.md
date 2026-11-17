@@ -1460,6 +1460,36 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             thousands. Not measured against the live catalog.
           - [ ] The rules know English, and only the words in them.
       - [ ] 5. Shop links, with their clicks and the disclosure.
+        - [x] Equipment's Shop links (#225, migration 0086; `kitchen.py`,
+          as `grocery.py` is for ingredients). A fourth kind of shop,
+          `kitchen`, on the Shops page; a "Shop" pill at the end of each
+          need on a recipe's page, one for each thing it names, and
+          "Shop at …" on a piece of equipment's page; through
+          `/go/equipment/<shop>/<equipment>`, which counts the click
+          (the thing, the shop, when and the page; nothing about who)
+          in `equipment_clicks` and sends it on. The notice of the
+          commission is under the Needs block, the recipe page's third,
+          and on the equipment page. The privacy policy and the terms
+          say so. The clicks are on the Buy-link clicks page and beside
+          each shop.
+          - One shop is seeded, Amazon, switched off, with the
+            Associates tag the bookseller has: nothing shows until an
+            administrator switches it on. Whether these links earn
+            under the books' tag or their own is theirs to say there.
+            As seeded it's nobody's change: it isn't in the history.
+          - Amazon's link searches all of Amazon and names no
+            department (*Claude's choice, 2026-11-16*; a grocer's names
+            Amazon Fresh): equipment is sold in several, and the name
+            of a department in the address couldn't be checked from
+            here.
+          - What any kitchen has gets no Shop button on its page.
+          - [ ] A grocer is each person's to choose, on the page and
+            kept with their account. A kitchen shop isn't: the link
+            goes to the first on offer. With one shop there's nothing
+            to choose; with a second there will be.
+          - [ ] Nothing sets a thing's shopping term yet, as nothing
+            sets an ingredient's from the site: a link searches for its
+            name.
       - [x] Equipment is a section of the header, not a link in the
         footer (#208). *Ray, 2026-11-15*, of the footer the spec had put
         it in. Measured with five sections and a name of twelve letters
