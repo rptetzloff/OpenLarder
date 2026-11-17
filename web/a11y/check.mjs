@@ -704,6 +704,32 @@ const SHOP_TERM = ({ name, term, none }) => `(() => {
   if (heading?.tagName !== "H3" || heading.textContent.trim() !== "What Shop links search for") return "The field's heading is “" + heading?.textContent.trim() + "”";
   return "";
 })()`;
+// History, opened and loaded, on each kind of page that has one: it is
+// one component, and only equipment's was looked at. A record with
+// changes lists them; one with none says since when there could have been
+// any, which for equipment is later than for the rest.
+const OPEN_HISTORY = `(async () => {
+  const panel = () => document.querySelector("details.history-panel");
+  // A recipe's is behind a button; the others' are folded on the page.
+  if (!panel()) [...document.querySelectorAll("main button")].find((b) => b.textContent.trim() === "History")?.click();
+  for (let i = 0; i < 80 && !panel(); i++) await new Promise((r) => setTimeout(r, 100));
+  if (!panel()) return;
+  panel().open = true;
+  for (let i = 0; i < 80 && (panel().children.length < 2 || panel().textContent.includes("Loading…")); i++) await new Promise((r) => setTimeout(r, 100));
+})()`;
+const HISTORY_LISTS = `(() => {
+  const panel = document.querySelector("details.history-panel");
+  if (!panel?.open) return "History isn't open";
+  const changes = panel.querySelectorAll("ol.change-list > li");
+  if (!changes.length) return "History lists no change: “" + panel.textContent.replace(/\\s+/g, " ").trim() + "”";
+  const unnamed = [...changes].find((li) => !li.querySelector(".change-head strong")?.textContent.trim() || !li.querySelector("time[datetime]"));
+  return unnamed ? "A change doesn't say who made it, or when" : "";
+})()`;
+const HISTORY_BEGAN = (when) => `(() => {
+  const panel = document.querySelector("details.history-panel");
+  const said = [...(panel?.querySelectorAll("p.status") ?? [])].map((p) => p.textContent.replace(/\\s+/g, " ").trim()).join(" ");
+  return said === "No changes recorded yet. History began on ${when}." ? "" : "With no changes, History says “" + said + "”";
+})()`;
 // A moderator's tools on a piece of equipment's page (Ray's spec,
 // 2026-11-15: rename, merge into, count as, also called, mark as any
 // kitchen's, delete when unused). Each of the bar's links leads to
@@ -1646,7 +1672,12 @@ function pages(s) {
     [`/equipment/${s.multicooker}`, "admin", { phone: true, then: OPEN_BAR, expect: ADMIN_BAR("This equipment") }],
     [`/equipment/${s.stovetop}`, "admin", { expect: `(${EQUIPMENT_TOOLS}) || (${SHOP_TERM({ none: true })})` }],
     [`/equipment/${s.wordyKit}`, null, { expect: HIERARCHY(["Counts as"], ["Includes"], "/equipment/") }],
-    [`/equipment/${s.wordyKit}`, "admin", { phone: true, then: `document.querySelector("details.history-panel").open = true` }],
+    [`/equipment/${s.wordyKit}`, "admin", { phone: true, then: OPEN_HISTORY, expect: onPhone(HISTORY_LISTS) }],
+    [`/equipment/${s.blender}`, null, { phone: true, then: OPEN_HISTORY, expect: onPhone(HISTORY_BEGAN("November 15, 2026")) }],
+    [`/ingredients/${s.cheddar}`, "admin", { phone: true, then: OPEN_HISTORY, expect: onPhone(HISTORY_LISTS) }],
+    [`/recipes/${s.biscuits.id}`, "admin", { phone: true, then: OPEN_HISTORY, expect: onPhone(HISTORY_LISTS) }],
+    [`/sources/${s.book.id}`, "admin", { phone: true, then: OPEN_HISTORY, expect: onPhone(HISTORY_LISTS) }],
+    [`/authors/${s.author}`, "admin", { phone: true, then: OPEN_HISTORY, expect: onPhone(HISTORY_LISTS) }],
     [`/equipment/${s.blender}`, "admin", { expect: `(${HIERARCHY(["Includes"], ["Counts as"], "/equipment/")}) || (${EQUIPMENT_TOOLS})` }],
     [`/equipment/${s.multicooker}`, null, { expect: `(${HIERARCHY(["Counts as"], ["Includes"], "/equipment/")}) || (${CRUMBS}) || (${EQUIPMENT_SAYS("No recipe lists it yet.")})` }],
     [`/equipment/${s.slowCooker}`, null, { expect: HIERARCHY(["Includes"], ["Counts as", "Also called"], "/equipment/") }],
