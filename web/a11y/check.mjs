@@ -893,6 +893,14 @@ const SUGGESTED_EQUIPMENT = `(() => {
   const buttons = [...card.querySelectorAll("button")].map(words);
   if (!buttons.includes("Accept") || !buttons.includes("Dismiss")) return "The suggestion's buttons are “" + buttons.join(" | ") + "”";
   if (![...document.querySelectorAll(".row-actions button")].some((b) => words(b) === "Suggest equipment")) return "An administrator has no “Suggest equipment”";
+  // What a recipe's own title says is decided one at a time. What its
+  // source says is said of every recipe in it, and those have a button to
+  // accept them together, saying how many.
+  if (buttons.some((b) => b.startsWith("Accept for all"))) return "A suggestion from a recipe's own title can be accepted for its whole source";
+  const shared = [...document.querySelectorAll(".suggestion-cards > li")].filter((li) => words(li.querySelector("h2")) === "Needs Slow cooker?");
+  const said = shared.map((li) => words(li.querySelector('a[href^="/recipes/"]')) + ": " + words(li.querySelector(".suggestion-reason")) + " " + [...li.querySelectorAll("button")].map(words).join(", "));
+  const wanted = ["Bean Chili", "Pot Roast"].map((title) => title + ": Its source's title says “slow cooker”. Accept, Accept for all 2 in this source, Dismiss");
+  if (said.sort().join(" | ") !== wanted.join(" | ")) return "The slow-cooker book's suggestions read “" + said.join(" | ") + "”";
   return "";
 })()`;
 // Only a moderator has them, and the way to add to the list.
@@ -1196,6 +1204,17 @@ async function seed() {
     editions: [{ edition_id: grillingBook.editions[0].id, page: "12" }],
     ingredients: ["Corn"],
   });
+  // A book about one appliance: each of its recipes gets the same
+  // suggestion, which a moderator may accept for all of them at once.
+  const cookerBook = await api("/api/sources/manual", "admin", { title: "Slow Cooker Suppers", authors: ["Ann Author"] });
+  const cookerBookShown = await api(`/api/sources/${cookerBook.id}`, "admin");
+  for (const [title, page] of [["Bean Chili", "8"], ["Pot Roast", "20"]]) {
+    await api(`/api/sources/${cookerBook.id}/recipes`, "admin", {
+      title,
+      editions: [{ edition_id: cookerBookShown.editions[0].id, page }],
+      ingredients: ["Onions"],
+    });
+  }
   await api("/api/sources/manual", "admin", {
     title: "Ann Authors Best Bakes",
     authors: ["Ann Author"],

@@ -27,7 +27,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import Float, case, func, select
+from sqlalchemy import Float, Text, case, cast, func, literal_column, select
 
 from openlarder import (
     allergen_rules,
@@ -121,6 +121,12 @@ class EquipmentRef(BaseModel):
     exists: bool
     # The recipe needs it already, or something that counts as it.
     already: bool = False
+    # Suggested because of the recipe's source (its title, or a tag of
+    # it): how many other open suggestions are of the same thing for the
+    # same source's recipes, to accept with this one. Whatever each one's
+    # own reason: in a book about slow cookers, "Slow Cooker Beans" says it
+    # of itself, and is one of the book's all the same.
+    others_in_source: int = 0
 
 
 class SuggestionOut(BaseModel):
@@ -350,6 +356,23 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
             select(Equipment).where(Equipment.id.in_([t[1] for t in kit_targets.values()]))
         )
     }
+    # How many each source-wide suggestion has beside it, by (source,
+    # thing): one question for the page's rows.
+    beside: dict[tuple[uuid.UUID, uuid.UUID], int] = {}
+    source_wide = [
+        r for r in rows if r.id in kit_targets and equipment_rules.of_its_source(r.reason)
+    ]
+    if source_wide:
+        # Written once: said twice, each has its own parameter for the key,
+        # and Postgres takes the two for different columns to group by.
+        thing_id = literal_column("suggestions.proposal ->> 'equipment_id'")
+        for source_id, equipment_id, n in await session.execute(
+            _together()
+            .with_only_columns(Recipe.source_id, thing_id, func.count())
+            .where(thing_id.in_({str(kit_targets[r.id][1]) for r in source_wide}))
+            .group_by(Recipe.source_id, thing_id)
+        ):
+            beside[source_id, uuid.UUID(equipment_id)] = n
     tags = {
         t.id: t
         for t in await session.scalars(
@@ -444,6 +467,10 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 name=thing.name if thing else str(p.get("equipment_name") or "(unnamed)"),
                 exists=bool(thing and thing.listed and not thing.assumed),
                 already=bool(found and thing and await _needs_already(session, rid, thing)),
+                # Itself not counted; none once it's decided.
+                others_in_source=max(0, beside.get((found[2], eid), 0) - 1)
+                if found and r.status == "open" and equipment_rules.of_its_source(r.reason)
+                else 0,
             )
         title_ref = None
         if r.id in on_sources:
@@ -575,6 +602,22 @@ async def _has_tag(session, recipe_id: uuid.UUID, tag_id: uuid.UUID) -> bool:
     return bool(
         await session.scalar(select(own.exists()))
         or await session.scalar(select(inherited.exists()))
+    )
+
+
+def _together():
+    """The open equipment suggestions, each with its recipe: what a
+    moderator accepts together is those of them for one thing and one
+    source's recipes. Only for recipes anyone can see, as the rules read
+    them."""
+    return (
+        select(Suggestion)
+        .join(Recipe, cast(Recipe.id, Text) == Suggestion.proposal["recipe_id"].astext)
+        .where(
+            Suggestion.kind == equipment_rules.KIND,
+            Suggestion.status == "open",
+            visibility.recipes_seen_by(None),
+        )
     )
 
 
@@ -715,6 +758,60 @@ class Done(BaseModel):
     done: int
     # Decided already, gone, hidden, or not an allergen suggestion.
     skipped: int
+
+
+@router.post("/{suggestion_id}/accept-source", response_model=Done, dependencies=[SameOrigin])
+async def accept_for_source(
+    suggestion_id: uuid.UUID, admin: ModeratorUser, session: Session
+) -> Done:
+    """Accept an equipment suggestion and every other of the same thing
+    for its source's recipes. For a book about one appliance, which files a
+    suggestion for each of its recipes (equipment_rules.py), where one
+    decision is all of them. Only from a suggestion whose reason is the
+    source's: where nothing says it of the source, a recipe's own title is
+    read one at a time ("Grilled Cheese")."""
+    row = await _open_or_404(session, admin, suggestion_id)
+    target = _equipment_target(row)
+    recipe = await session.get(Recipe, target[0]) if target else None
+    thing = await session.get(Equipment, target[1]) if target else None
+    if not equipment_rules.of_its_source(row.reason):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This one is about its own recipe, not its source: accept it by itself.",
+        )
+    if recipe is None or thing is None or not thing.listed:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This can't be accepted: its recipe or its equipment has gone. Dismiss it.",
+        )
+    if thing.assumed:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"This can't be accepted: {needs.assumed_message(thing)} Dismiss it.",
+        )
+    rows = list(
+        await session.scalars(
+            _together()
+            .where(
+                Recipe.source_id == recipe.source_id,
+                Suggestion.proposal["equipment_id"].astext == str(thing.id),
+            )
+            .with_for_update(of=Suggestion)
+        )
+    )
+    done = 0
+    for each in rows:
+        its = _equipment_target(each)
+        its_recipe = await session.get(Recipe, its[0]) if its else None
+        if its_recipe is None:
+            continue
+        # Each is the moderator's edit, marked with what suggested it.
+        await history.via(session, f"suggestion:{each.id}")
+        await needs.add(session, its_recipe, thing)
+        each.status, each.decided_by, each.decided_at = "accepted", admin.id, func.now()
+        done += 1
+    await session.commit()
+    return Done(done=done, skipped=len(rows) - done)
 
 
 @router.post("/accept-allergens", response_model=Done, dependencies=[SameOrigin])
