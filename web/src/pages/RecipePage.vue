@@ -4,6 +4,7 @@ import { arrange } from "../shops";
 import GrocerChooser from "../components/GrocerChooser.vue";
 import DietCheck from "../components/DietCheck.vue";
 import { grocerHref, grocerNow, loadGrocers } from "../grocery";
+import { equipmentHref, kitchenShopNow, loadKitchenShops } from "../kitchen";
 import { loadAllergens, notice as allergenNotice } from "../allergens";
 import { buyHref, DISCLOSURE, notes, shopName } from "../buying";
 import TagEditor from "../components/TagEditor.vue";
@@ -68,6 +69,8 @@ async function flagResolved(updated: Flag) {
 onMounted(loadAllergens);
 // The grocers, for the rows' Shop buttons.
 onMounted(loadGrocers);
+// And the kitchen shops, for the needs' (kitchen.ts).
+onMounted(loadKitchenShops);
 onMounted(async () => {
   try {
     const res = await fetch(`/api/recipes/${props.id}`);
@@ -421,19 +424,58 @@ const buyLinks = computed(() => (edition.value ? arrange(edition.value.buy) : []
                     >{{ " " }}<span class="page-ref">{{ need.detail }}</span></template
                   >
                 </span>
-                <!-- The spec: muted, on what isn't had, and nothing on what
-                     is: "no green ticks". -->
-                <!-- Its space is written out, as the row's are: the two are
-                     side by side with nothing between them, and it read
-                     "Biscuit cutterYou don't have this" (the a11y check). -->
-                <span v-if="need.have === false" class="muted need-lacking">{{
-                  " You don't have this"
-                }}</span>
+                <!-- The row's right end: what isn't had, then Shop, "like
+                     ingredients have" (Ray's equipment spec, 2026-11-15). -->
+                <span v-if="need.have === false || kitchenShopNow()" class="row-shop need-end">
+                  <!-- The spec: muted, on what isn't had, and nothing on what
+                       is: "no green ticks". Its space is written out, as the
+                       row's are: the two are side by side with nothing
+                       between them, and it read "Biscuit cutterYou don't have
+                       this" (the a11y check). -->
+                  <span v-if="need.have === false" class="muted need-lacking">{{
+                    " You don't have this"
+                  }}</span>
+                  <!-- One Shop button for each thing the need names: "Shop",
+                       or with a choice of them, the thing's name. -->
+                  <template v-if="kitchenShopNow()">
+                    <a
+                      v-for="o in need.options"
+                      :key="o.id"
+                      :href="equipmentHref(kitchenShopNow()!, o.id)"
+                      rel="sponsored noopener"
+                      class="shop-pill"
+                    >
+                      <span>
+                        <svg viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M2 3h2.5l2 9.5h8.5l1.75-6.5H5.6" />
+                          <circle cx="8" cy="16" r="1.1" />
+                          <circle cx="14" cy="16" r="1.1" />
+                        </svg>
+                        <template v-if="need.options.length > 1"
+                          ><span class="visually-hidden">Shop for </span>{{ o.name }}</template
+                        >
+                        <template v-else
+                          >Shop<span class="visually-hidden"> for {{ o.name.toLowerCase() }}</span></template
+                        >
+                      </span>
+                    </a>
+                  </template>
+                </span>
               </li>
             </ul>
             <p v-if="!recipe.equipment_checked" class="status">
               At least these: nobody has said yet whether that's all.
             </p>
+            <!-- A third notice on the page, on purpose, for the reason the
+                 first two are separate: each is beside the links it's
+                 about (the spec; Ray, 2026-11-12, of the first two). -->
+            <div v-if="kitchenShopNow()" class="commission">
+              <p class="muted">
+                OpenLarder may earn a commission from these Shop links.
+                <template v-if="kitchenShopNow()?.note">{{ kitchenShopNow()!.note }}{{ " " }}</template>
+                <a href="/terms#commissions">How this works</a>
+              </p>
+            </div>
           </section>
           <p v-else-if="recipe.equipment_checked" class="status recipe-needs">
             No special equipment.
@@ -687,6 +729,12 @@ p.recipe-needs a {
 .need-lacking {
   font-size: var(--text-sm);
   white-space: nowrap;
+}
+/* Beside Shop, on its line, and a word's width from it (after .row-shop's
+   own gap, which is between pills). */
+.row-shop.need-end {
+  align-items: center;
+  gap: 0 0.75rem;
 }
 /* A row: the names on the left, Shop at the right end. */
 .ingredient-rows {

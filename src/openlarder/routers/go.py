@@ -1,7 +1,8 @@
 """/go/<retailer>/<edition>: count a buy-link click, then send it on; and
 /go/grocer/<grocer>/<ingredient>, the same for an ingredient's grocery
-link (grocery.py); and /go/producer/<key>, the same for a producer's
-(producers.py).
+link (grocery.py); /go/equipment/<shop>/<equipment>, the same for a piece
+of equipment's shop link (kitchen.py); and /go/producer/<key>, the same for
+a producer's (producers.py).
 
 It records the edition, the retailer, the time and the OpenLarder page the
 link was on; no user, IP address or cookie, and nothing for a bot. *Ray and
@@ -16,13 +17,15 @@ from fastapi import APIRouter, Header, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
-from openlarder import buying, grocery, producers, visibility
+from openlarder import buying, grocery, kitchen, producers, visibility
 from openlarder.auth import Viewer
 from openlarder.author_names import shown_name
 from openlarder.db import Session
 from openlarder.models import (
     Author,
     Edition,
+    Equipment,
+    EquipmentClick,
     GroceryClick,
     Ingredient,
     ProducerClick,
@@ -133,6 +136,45 @@ async def go_grocer(
             GroceryClick(
                 ingredient_id=ingredient_id, grocer=grocer, page=buying.page_of(page, referer)
             )
+        )
+        await session.commit()
+    return RedirectResponse(target, status_code=status.HTTP_302_FOUND, headers=NO_STORE)
+
+
+@router.get(
+    "/api/kitchen-shops", response_model=list[kitchen.KitchenShopOut], include_in_schema=True
+)
+async def kitchen_shops(session: Session) -> list[kitchen.KitchenShopOut]:
+    """The shops a piece of equipment's link can go to, in the order
+    offered: those switched on with their affiliate setting in place."""
+    return await kitchen.offered(session)
+
+
+@router.get("/go/equipment/{shop}/{equipment_id}")
+async def go_equipment(
+    shop: str,
+    equipment_id: uuid.UUID,
+    session: Session,
+    viewer: Viewer,
+    page: str | None = Query(default=None, alias="from", max_length=2000),
+    user_agent: str | None = Header(default=None),
+    referer: str | None = Header(default=None),
+) -> RedirectResponse:
+    """As /go/grocer/: only a thing the visitor may see, so the address of
+    one a hidden recipe brought in tells nobody its name."""
+    thing = await session.scalar(
+        select(Equipment).where(Equipment.id == equipment_id, visibility.equipment_seen_by(viewer))
+    )
+    target = (
+        await kitchen.destination(session, shop, thing.shopping_term or thing.name)
+        if thing
+        else None
+    )
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such link.", headers=NO_STORE)
+    if not buying.is_bot(user_agent):
+        session.add(
+            EquipmentClick(equipment_id=equipment_id, shop=shop, page=buying.page_of(page, referer))
         )
         await session.commit()
     return RedirectResponse(target, status_code=status.HTTP_302_FOUND, headers=NO_STORE)

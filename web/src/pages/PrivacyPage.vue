@@ -104,6 +104,12 @@ document.title = "Privacy policy · OpenLarder";
       earns a commission on what's bought, and counts the click (which ingredient, which grocer,
       when, and which page), recording nothing about who clicked.
     </p>
+    <p>
+      A piece of equipment can have a link to shop for it, on its own page and on a recipe that
+      needs it, which searches a shop such as Amazon for it. These work the same way: OpenLarder
+      earns a commission on what's bought, and counts the click (which piece of equipment, which
+      shop, when, and which page), recording nothing about who clicked.
+    </p>
     <p v-if="anyProducers">
       Some ingredients, and the <a href="/producers">Producers</a> page, link to a farm, a mill or
       a maker that sells ingredients itself. What following the link earns, and for whom, is said

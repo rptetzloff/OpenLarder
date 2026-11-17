@@ -124,6 +124,9 @@ PEOPLE = (
     "daily_counts",
     "ad_conversions",
     "producer_clicks",
+    # The equipment list stays through a reset of the catalog, and so do
+    # the clicks on its things' shop links.
+    "equipment_clicks",
     "revisions",
 )
 # Never emptied. A new table must be named in one of the three lists

@@ -426,14 +426,31 @@ const NEEDS = (rows) => `(() => {
   if (!block) return "The recipe's page has no Needs";
   const ingredients = [...document.querySelectorAll("section.recipe-section")].find((x) => x.querySelector("h2")?.textContent.includes("Ingredients"));
   if (!(block.compareDocumentPosition(ingredients) & Node.DOCUMENT_POSITION_FOLLOWING)) return "Needs isn't above the ingredients";
-  const said = [...block.querySelectorAll("li")].map((li) => li.textContent.replace(/\\s+/g, " ").trim());
+  // A row's own words: what it needs, without the Shop links at its end.
+  const sans = (li) => { const row = li.cloneNode(true); row.querySelectorAll(".shop-pill").forEach((a) => a.remove()); return row; };
+  const said = [...block.querySelectorAll("li")].map((li) => sans(li).textContent.replace(/\\s+/g, " ").trim());
   if (said.join(" | ") !== ${JSON.stringify(rows.join(" | "))}) return "Needs reads “" + said.join(" | ") + "”";
   const short = [...block.querySelectorAll('li a[href^="/equipment/"]')].find((a) => a.getBoundingClientRect().height < 44);
   if (short) return "“" + short.textContent.trim() + "” is " + Math.round(short.getBoundingClientRect().height) + "px to tap";
   // Each thing a row names is a link to it: the row, without its size, is its links with "or" between them.
-  const named = (li) => { const row = li.cloneNode(true); row.querySelector(".page-ref")?.remove(); return row.textContent.replace(/\\s+/g, " ").trim(); };
+  const named = (li) => { const row = sans(li); row.querySelector(".page-ref")?.remove(); return row.textContent.replace(/\\s+/g, " ").trim(); };
   const plain = [...block.querySelectorAll("li")].find((li) => named(li) !== [...li.querySelectorAll('a[href^="/equipment/"]')].map((a) => a.textContent.trim()).join(" or "));
   if (plain) return "A thing in “" + named(plain) + "” isn't a link to its equipment";
+  // And each has a Shop link, "like ingredients have" (Ray's equipment
+  // spec, 2026-11-15, Part 8): through OpenLarder's own address, which
+  // counts the click, for the thing it's beside, and named for it. With
+  // the notice of the commission under the block, the page's third.
+  for (const li of block.querySelectorAll("li")) {
+    const things = [...li.querySelectorAll('.row-names a[href^="/equipment/"]')];
+    const pills = [...li.querySelectorAll("a.shop-pill")];
+    const wanted = things.map((a) => "/go/equipment/amazon/" + a.getAttribute("href").split("/").pop() + "?from=" + encodeURIComponent(location.pathname));
+    if (pills.map((a) => a.getAttribute("href")).join() !== wanted.join()) return "The Shop links of “" + named(li) + "” go to “" + pills.map((a) => a.getAttribute("href")).join(" | ") + "”";
+    const names = things.map((a) => "Shop for " + (things.length > 1 ? a.textContent.trim() : a.textContent.trim().toLowerCase()));
+    if (pills.map((a) => a.textContent.replace(/\\s+/g, " ").trim()).join() !== names.join()) return "The Shop links of “" + named(li) + "” read “" + pills.map((a) => a.textContent.replace(/\\s+/g, " ").trim()).join(" | ") + "”";
+    if (pills.some((a) => a.getAttribute("rel") !== "sponsored noopener")) return "A Shop link of “" + named(li) + "” isn't marked as sponsored";
+  }
+  const notice = block.querySelector(".commission")?.textContent.replace(/\\s+/g, " ").trim() ?? "";
+  if (!notice.startsWith("OpenLarder may earn a commission from these Shop links. As an Amazon Associate") || !block.querySelector('.commission a[href="/terms#commissions"]')) return "Under Needs the notice of the commission reads “" + notice + "”";
   return "";
 })()`;
 // addIt: nothing for whoever can't add it; true for whoever may change the
@@ -737,10 +754,16 @@ const SEARCH_EQUIPMENT = ({ chip, box, has, needs, hasnt }) => `(() => {
   return "";
 })()`;
 // A piece of equipment's page leads to the search for what needs it, as an
-// ingredient's does; what any kitchen has leads nowhere.
+// ingredient's does, and to a shop for it, with the notice of the
+// commission under them (Ray's equipment spec, 2026-11-15, Part 8); what
+// any kitchen has leads nowhere, and has no notice.
 const SEARCH_WITH = (words) => `(() => {
-  const links = [...document.querySelectorAll(".ingredient-actions a")].map((a) => a.textContent.replace(/\\s+/g, " ").trim() + " " + a.getAttribute("href").replace(/[0-9a-f-]{36}/, "ID"));
-  return links.join() === ${JSON.stringify(words ? words + " /search?needs=ID" : "")} ? "" : "The page's search link reads “" + links.join(" | ") + "”";
+  const links = [...document.querySelectorAll(".ingredient-actions a")].map((a) => a.textContent.replace(/\\s+/g, " ").trim() + " " + a.getAttribute("href").replace(/[0-9a-f-]{36}/g, "ID"));
+  const wanted = ${JSON.stringify(words ? `${words} /search?needs=ID | Shop at Amazon /go/equipment/amazon/ID?from=%2Fequipment%2FID` : "")};
+  if (links.join(" | ") !== wanted) return "The page's search and shop links read “" + links.join(" | ") + "”";
+  const notice = document.querySelector(".equipment-page .commission")?.textContent.replace(/\\s+/g, " ").trim() ?? "";
+  if (${!!words} ? !notice.startsWith("OpenLarder may earn a commission from this Shop link. As an Amazon Associate") : notice) return "The page's notice of the commission reads “" + notice + "”";
+  return "";
 })()`;
 // Your equipment (Ray, 2026-11-16: "Named lists, like the larder", and
 // "Have / Want"). Its owner sees his two lists; in the kitchen, a thing
@@ -839,7 +862,8 @@ const LACKING = (rows, lacking) => `(() => {
   const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
   const block = document.querySelector("section.recipe-needs");
   if (!block) return "The recipe's page has no Needs";
-  const said = [...block.querySelectorAll("li")].map(words);
+  // A row's own words, without the Shop links at its end.
+  const said = [...block.querySelectorAll("li")].map((li) => { const row = li.cloneNode(true); row.querySelectorAll(".shop-pill").forEach((a) => a.remove()); return words(row); });
   if (said.join(" | ") !== ${JSON.stringify(rows.join(" | "))}) return "Needs reads “" + said.join(" | ") + "”";
   const head = words(block.querySelector("h2"));
   const wanted = ${JSON.stringify(lacking ? `Needs ${rows.length} · ${lacking} you don't have` : `Needs ${rows.length}`)};
@@ -1385,6 +1409,10 @@ async function seed() {
       supplies: [cheese],
     });
   }
+  // The kitchen shop, switched on: it's seeded off, with the booksellers'
+  // tag (migration 0086), and equipment's Shop links wait for it.
+  const kitchenShop = (await api("/api/admin/shops", "admin")).find((g) => g.kind === "kitchen").shops[0];
+  await api(`/api/admin/shops/${kitchenShop.id}/enabled`, "admin", { enabled: true }, "PUT");
   const visit = await fetch(`${BASE}/go/producer/green-acre?from=/producers`, {
     redirect: "manual",
     headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },

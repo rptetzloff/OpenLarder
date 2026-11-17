@@ -30,6 +30,7 @@ from openlarder.models.dumps import Dump
 from openlarder.models.equipment import (
     Equipment,
     EquipmentAlias,
+    EquipmentClick,
     EquipmentCountsAs,
     EquipmentOption,
     RecipeEquipment,
@@ -89,6 +90,7 @@ __all__ = [
     "IngredientEmbedding",
     "Equipment",
     "EquipmentAlias",
+    "EquipmentClick",
     "EquipmentCountsAs",
     "EquipmentOption",
     "Ingredient",

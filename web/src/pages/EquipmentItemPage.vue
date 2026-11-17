@@ -5,6 +5,7 @@ import Crumbs from "../components/Crumbs.vue";
 import EquipmentPicker from "../components/EquipmentPicker.vue";
 import HistoryPanel from "../components/HistoryPanel.vue";
 import ReportButton from "../components/ReportButton.vue";
+import { equipmentHref, kitchenShopNow, loadKitchenShops } from "../kitchen";
 import {
   addAlias,
   countAs,
@@ -147,7 +148,10 @@ async function remove() {
   }
 }
 
-onMounted(() => load());
+onMounted(() => {
+  load();
+  loadKitchenShops();
+});
 </script>
 
 <template>
@@ -194,7 +198,25 @@ onMounted(() => load());
           <a :href="`/search?needs=${equipment.id}`" class="primary"
             >Search with {{ equipment.name.toLowerCase() }}</a
           >
+          <!-- As an ingredient's "Shop at" (Ray's equipment spec,
+               2026-11-15: "a Shop button"). -->
+          <a
+            v-if="kitchenShopNow()"
+            :href="equipmentHref(kitchenShopNow()!, equipment.id)"
+            class="secondary"
+            rel="sponsored noopener"
+            >Shop at {{ kitchenShopNow()!.label }}</a
+          >
         </div>
+      </div>
+      <!-- The spec: the disclosure "on the equipment page, worded as the
+           ingredient one is". -->
+      <div v-if="!equipment.assumed && kitchenShopNow()" class="commission">
+        <p class="muted">
+          OpenLarder may earn a commission from this Shop link.
+          <template v-if="kitchenShopNow()?.note">{{ kitchenShopNow()!.note }}{{ " " }}</template>
+          <a href="/terms#commissions">How this works</a>
+        </p>
       </div>
 
       <!-- As an ingredient's page: one line when there's nothing to say,

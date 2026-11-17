@@ -1,5 +1,6 @@
 """Where a link out of the site can earn: the booksellers on a book's page,
-the grocers on an ingredient's, and (not yet) producers.
+the grocers on an ingredient's, the producers, and the kitchen shops on a
+piece of equipment's (0086).
 
 *Decided by Ray, 2026-11-13:* the affiliate settings move out of
 environment variables, where changing one meant a redeploy, into a table an
@@ -31,7 +32,9 @@ from openlarder.models.base import Base, uuid_pk
 class Shop(Base):
     __tablename__ = "shops"
     __table_args__ = (
-        CheckConstraint("kind IN ('bookseller', 'grocer', 'producer')", name="kind_known"),
+        CheckConstraint(
+            "kind IN ('bookseller', 'grocer', 'producer', 'kitchen')", name="kind_known"
+        ),
         CheckConstraint(
             "builder IN ('bookshop', 'amazon', 'wrapped', 'template', 'direct')",
             name="builder_known",

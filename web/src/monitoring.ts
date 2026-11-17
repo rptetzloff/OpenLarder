@@ -36,6 +36,10 @@ export interface ClicksPage {
   // Producers' links (producers.py).
   producer_clicks: number;
   producers: { retailer: string; label: string; clicks: number; last_7_days: number }[];
+  // Equipment's shop links (kitchen.py), as the grocery links are.
+  equipment_clicks: number;
+  kitchen_shops: { retailer: string; label: string; clicks: number; last_7_days: number }[];
+  equipment: { equipment_id: string; name: string; clicks: number }[];
 }
 
 async function get<T>(url: string): Promise<T> {

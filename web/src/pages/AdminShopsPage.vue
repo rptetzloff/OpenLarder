@@ -29,7 +29,12 @@ const adding = ref<ShopKind | null>(null);
 const allowed = computed(() => !!props.user?.may_run);
 
 const EARNS = { affiliate: "Affiliate", referral: "Referral", none: "Earns nothing" };
-const ONE = { bookseller: "bookseller", grocer: "grocer", producer: "producer" };
+const ONE = {
+  bookseller: "bookseller",
+  grocer: "grocer",
+  producer: "producer",
+  kitchen: "kitchen shop",
+};
 // What a producer supplies and where it ships, in a line.
 const supplying = (s: Shop) =>
   `${s.supplies.length ? `Supplies ${s.supplies.map((i) => i.name.toLowerCase()).join(", ")}` : "Supplies nothing yet"} · ${
@@ -119,8 +124,8 @@ watch(allowed, (yes) => yes && !groups.value && load(), { immediate: true });
     <div class="list-head">
       <h1>Shops</h1>
       <p class="muted">
-        The booksellers on a book's page, the grocers on an ingredient's and the producers, in the
-        order shown.
+        The booksellers on a book's page, the grocers on an ingredient's, the producers, and the
+        kitchen shops on a piece of equipment's, in the order shown.
       </p>
     </div>
     <p v-if="!allowed" class="status">This is for administrators.</p>

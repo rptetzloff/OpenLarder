@@ -65,7 +65,9 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-else-if="!page" class="status">Loading…</p>
       <p
-        v-else-if="!page.clicks && !page.grocery_clicks && !page.producer_clicks"
+        v-else-if="
+          !page.clicks && !page.grocery_clicks && !page.producer_clicks && !page.equipment_clicks
+        "
         class="status"
       >
         No clicks in this time.
@@ -77,6 +79,9 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
             producers'</template
           ><template v-else> and {{ n(page.grocery_clicks) }} on ingredients'</template> in
           {{ page.days }} days.
+          <template v-if="page.equipment_clicks"
+            >{{ n(page.equipment_clicks) }} on equipment's.</template
+          >
         </p>
         <div class="tool-panels clicks-panels">
           <section class="tool-panel" aria-labelledby="by-shop">
@@ -180,6 +185,45 @@ watch(allowed, (yes) => yes && !page.value && load(), { immediate: true });
                   <a :href="`/ingredients/${i.ingredient_id}`" class="strong">{{ i.name }}</a>
                 </td>
                 <td class="numeric"><span class="cell-label">Clicks </span>{{ n(i.clicks) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+        <!-- Equipment's shop links, laid out as the grocers' are. -->
+        <template v-if="page.equipment_clicks">
+          <h2 class="section-title">Kitchen shops</h2>
+          <table class="recipe-table pairs">
+            <thead>
+              <tr>
+                <th scope="col">Shop</th>
+                <th scope="col" class="numeric">Clicks</th>
+                <th scope="col" class="numeric">Last 7 days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="k in page.kitchen_shops" :key="k.retailer">
+                <td>{{ k.label }}</td>
+                <td class="numeric"><span class="cell-label">Clicks </span>{{ n(k.clicks) }}</td>
+                <td class="numeric">
+                  <span class="cell-label">Last 7 days </span>{{ n(k.last_7_days) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <h2 class="section-title">Equipment clicked most</h2>
+          <table class="recipe-table tally">
+            <thead>
+              <tr>
+                <th scope="col">Equipment</th>
+                <th scope="col" class="numeric">Clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in page.equipment" :key="e.equipment_id">
+                <td>
+                  <a :href="`/equipment/${e.equipment_id}`" class="strong">{{ e.name }}</a>
+                </td>
+                <td class="numeric"><span class="cell-label">Clicks </span>{{ n(e.clicks) }}</td>
               </tr>
             </tbody>
           </table>
