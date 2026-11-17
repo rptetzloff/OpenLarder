@@ -28,7 +28,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated November 15, 2026</p>
+    <p class="updated">Last updated November 16, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -176,6 +176,12 @@ document.title = "Privacy policy · OpenLarder";
         isn't part of the open data, the edit history or the API;
       </li>
       <li>
+        your equipment, if you keep lists of it: your lists' names, and each thing's name, the
+        piece of equipment it's matched to, and whether you have it or want it. Only you see it,
+        and the members of the groups you share a list with (their editors change what's on it);
+        it isn't part of the open data, the edit history or the API;
+      </li>
+      <li>
         the notes you write on recipes: your words, and which of your groups you share each
         with. A note is seen only by you and the members of the groups you check; moderators and
         administrators don't see it; it isn't part of the open data, the edit history or the API;
@@ -195,7 +201,7 @@ document.title = "Privacy policy · OpenLarder";
         you want. Only you see it,
         and the members of the groups you share it with (their editors change what's on it); it
         isn't part of the open data, the edit history or the API. Leaving a group stops sharing
-        your shelf, saved recipes, larder lists and family collections with it;
+        your shelf, saved recipes, larder lists, equipment lists and family collections with it;
       </li>
       <li>
         what you add to or change in the catalog, with your display name and when: its edit
@@ -283,7 +289,7 @@ document.title = "Privacy policy · OpenLarder";
     <p>
       You can delete your account yourself, from Your account. That removes, at once, your user
       record, your sessions and API keys, your group memberships, your family collections and the
-      edit history recorded for them, your larder lists, your shelf, your saved recipes, your ratings and notes, your votes on requests, your suggested
+      edit history recorded for them, your larder lists, your equipment lists, your shelf, your saved recipes, your ratings and notes, your votes on requests, your suggested
       changes still open, and what you've added that is still waiting for review. A group you were
       the last admin of passes to its longest-standing member; one with nobody else in it is
       deleted. What you added to the catalog that has been published stays, because you licensed

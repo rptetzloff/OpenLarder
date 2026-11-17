@@ -1,6 +1,7 @@
 """The personal larder (migrations 0046, 0047; routers/larder.py): each
 person's lists of what they have, and the groups they share them with.
-Private; not catalog data."""
+Their equipment lists are the same again (0084; routers/equipment_lists.py),
+and their shelf and saved recipes are here too. Private; not catalog data."""
 
 import uuid
 from datetime import datetime
@@ -69,6 +70,68 @@ class LarderListGroup(Base):
 
     list_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("larder_lists.id", ondelete="CASCADE"), nullable=False
+    )
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class EquipmentList(Timestamps, Base):
+    """A list of equipment someone has or wants, as a LarderList is of what
+    they have to cook with (migration 0084; *Ray, 2026-11-16: "Named lists,
+    like the larder"*)."""
+
+    __tablename__ = "equipment_lists"
+    __table_args__ = (CheckConstraint("name <> ''", name="name_not_empty"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Theirs to name: "Kitchen", "Cabin", "Camping box".
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Their order.
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+
+class EquipmentListItem(Timestamps, Base):
+    __tablename__ = "equipment_list_items"
+    __table_args__ = (
+        CheckConstraint("name <> ''", name="name_not_empty"),
+        CheckConstraint("state IN ('have', 'want')", name="state_known"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("equipment_lists.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Their own name for it ("Nana's Dutch oven").
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # What it is (Dutch oven); none until matched. It counts as everything
+    # it counts as too (a stand mixer is a mixer).
+    equipment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("equipment.id", ondelete="SET NULL"), index=True
+    )
+    # have, or want (kept on the list, not counted): as a book on a shelf.
+    # *Ray, 2026-11-16.* A larder's "low" has no meaning for equipment.
+    state: Mapped[str] = mapped_column(Text, nullable=False, server_default="have")
+
+
+class EquipmentListGroup(Base):
+    """An equipment list shared with a group, as a larder list is: its view
+    members see it, its edit and admin members change what's on it."""
+
+    __tablename__ = "equipment_list_groups"
+    __table_args__ = (PrimaryKeyConstraint("list_id", "group_id"),)
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("equipment_lists.id", ondelete="CASCADE"), nullable=False
     )
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True

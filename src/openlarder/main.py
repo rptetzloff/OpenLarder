@@ -46,6 +46,7 @@ from openlarder.routers import (
     book_requests,
     covers,
     equipment,
+    equipment_lists,
     flags,
     foods,
     go,
@@ -219,6 +220,7 @@ app.include_router(imports.router)
 app.include_router(covers.router)
 app.include_router(dumps_routes.router)
 app.include_router(equipment.router)
+app.include_router(equipment_lists.router)
 app.include_router(flags.router)
 app.include_router(go.router)
 app.include_router(groups.router)

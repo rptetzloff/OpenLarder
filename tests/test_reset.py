@@ -95,6 +95,10 @@ async def test_the_catalog_goes_and_the_rest_stays(people, adb) -> None:
         text("INSERT INTO larder_items (list_id, ingredient_id, name) VALUES (:l, :i, 'Eggs')"),
         {"l": larder, "i": eggs},
     )
+    # Their equipment: the equipment list stays, so what they have of it does.
+    kitchen = (await ann.post("/api/equipment-lists/lists", json={"name": "Kitchen"})).json()["id"]
+    wok = await ann.post(f"/api/equipment-lists/lists/{kitchen}/items", json={"name": "Wok"})
+    assert wok.json()["equipment"] == "Wok"
     assert await adb.scalar(text("SELECT source_id FROM book_requests")) == book
     tags_before = await adb.scalar(text("SELECT count(*) FROM tags"))
     listed = [
@@ -118,6 +122,12 @@ async def test_the_catalog_goes_and_the_rest_stays(people, adb) -> None:
     ]
     assert await adb.scalar(text("SELECT count(*) FROM users")) >= 1
     assert await adb.scalar(text("SELECT count(*) FROM larder_lists")) == 1
+    assert (
+        await adb.scalar(
+            text("SELECT count(*) FROM equipment_list_items WHERE equipment_id IS NOT NULL")
+        )
+        == 1
+    )
     assert (await adb.execute(text("SELECT status, source_id FROM book_requests"))).one() == (
         "open",
         None,
@@ -143,6 +153,8 @@ async def test_everything_leaves_only_the_tag_list(people, adb) -> None:
     ann = await people("ann")
     await ann.post("/api/requests", json={"title": "Plenty"})
     await ann.post("/api/larder/lists", json={"name": "Pantry"})
+    kitchen = (await ann.post("/api/equipment-lists/lists", json={"name": "Kitchen"})).json()["id"]
+    await ann.post(f"/api/equipment-lists/lists/{kitchen}/items", json={"name": "Wok"})
     await adb.execute(text("INSERT INTO sources (title) VALUES ('Plenty')"))
     await adb.execute(
         text(
@@ -154,6 +166,7 @@ async def test_everything_leaves_only_the_tag_list(people, adb) -> None:
     tags_before = await adb.scalar(text("SELECT count(*) FROM tags"))
     found = await reset.counts(adb, everything=True)
     assert (found["users"], found["book_requests"], found["larder_lists"]) == (1, 1, 1)
+    assert (found["equipment_lists"], found["equipment_list_items"]) == (1, 1)
 
     await reset.reset(adb, everything=True)
 

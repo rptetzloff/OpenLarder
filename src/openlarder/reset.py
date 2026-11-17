@@ -16,11 +16,12 @@ them: which ingredients each producer supplies (the producers stay),
 people's larder items (the lists stay, empty), shelves, saved recipes,
 ratings and notes, the catalog's edit history, flags, reports, suggested
 changes, n8n's suggestions and embeddings, and import history. Accounts,
-groups, larder lists and requests stay; requests are unlinked from their
+groups, larder lists, people's equipment lists (the equipment list stays,
+so what they have of it does) and requests stay; requests are unlinked from their
 books, to link again as each comes back (migration 0050).
 
 `--everything` empties those too: every account with its sessions, API keys,
-larder lists and group memberships, every group, request and vote, all edit
+larder and equipment lists and group memberships, every group, request and vote, all edit
 history, the sign-ups recorded for ads (adclicks.py), the clicks on
 producers' links, and the list of published data dumps (the files stay in
 their bucket; a fresh dump is built within the hour). Anyone signing in
@@ -110,6 +111,11 @@ PEOPLE = (
     "group_invites",
     "larder_lists",
     "larder_list_groups",
+    # The equipment list stays through a reset of the catalog, so what
+    # people have of it does too: these go only with everything.
+    "equipment_lists",
+    "equipment_list_items",
+    "equipment_list_groups",
     "shelf_groups",
     "saved_groups",
     "book_requests",
@@ -223,7 +229,10 @@ async def _main(confirm: str | None, everything: bool) -> int:
                 " you too: make yourself owner again by hand."
             )
         else:
-            print("Accounts, groups, larder lists, requests and the tag and equipment lists stay.")
+            print(
+                "Accounts, groups, larder lists, people's equipment lists, requests and the"
+                " tag and equipment lists stay."
+            )
         try:
             answer = confirm if confirm is not None else input(f"Type {host} to go ahead: ")
         except EOFError:

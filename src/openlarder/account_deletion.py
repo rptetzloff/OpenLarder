@@ -9,7 +9,8 @@ agreement (ODbL) stays, no longer showing who.
   them (it holds what was in them); what they added that's still waiting
   for review, or was sent back, unless someone else has added to it; their
   open suggested changes; their votes on requests; and, through the
-  database, their sessions, API keys, larder lists and group memberships.
+  database, their sessions, API keys, larder and equipment lists and group
+  memberships.
 - **Stays, without their name:** published books and recipes, requests
   they made, reports, and every other record that names who did it
   (ON DELETE SET NULL).

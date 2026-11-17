@@ -29,6 +29,7 @@ import InvitePage from "./pages/InvitePage.vue";
 import IngredientPage from "./pages/IngredientPage.vue";
 import IngredientsPage from "./pages/IngredientsPage.vue";
 import LarderPage from "./pages/LarderPage.vue";
+import MyEquipmentPage from "./pages/MyEquipmentPage.vue";
 import ShelfPage from "./pages/ShelfPage.vue";
 import SavedPage from "./pages/SavedPage.vue";
 import BookEditPage from "./pages/BookEditPage.vue";
@@ -87,6 +88,9 @@ const onReview = path === "/admin/review";
 const onReports = path === "/admin/reports";
 const onRequests = path === "/requests";
 const onLarder = path === "/larder";
+// Ray's equipment spec, 2026-11-15: "/equipment/mine". It isn't a piece of
+// equipment's page: those are /equipment/<id>.
+const onMyEquipment = path === "/equipment/mine";
 const onShelf = path === "/shelf";
 const onSaved = path === "/saved";
 // Sign-in's own two pages (routers/auth.py): where a new account chooses
@@ -195,6 +199,7 @@ onMounted(async () => {
     <AdminReportsPage v-else-if="onReports" :user="user" />
     <RequestsPage v-else-if="onRequests" :user="user" />
     <LarderPage v-else-if="onLarder" :user="user" />
+    <MyEquipmentPage v-else-if="onMyEquipment" :user="user" />
     <ShelfPage v-else-if="onShelf" :user="user" />
     <SavedPage v-else-if="onSaved" :user="user" />
     <FlagsPage v-else-if="flagScope" :user="user" :scope="flagScope" />
@@ -2547,6 +2552,11 @@ main h2 {
 }
 .larder-items > li.state-out .larder-item-name strong {
   text-decoration: line-through;
+  color: var(--muted);
+}
+/* Equipment someone wants (MyEquipmentPage.vue): on the list, not had. Not
+   struck through, which says gone; its Want button says which it is. */
+.larder-items > li.state-want .larder-item-name strong {
   color: var(--muted);
 }
 .larder-item-name button {

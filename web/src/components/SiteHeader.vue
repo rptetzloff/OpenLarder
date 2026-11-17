@@ -31,8 +31,13 @@ const SECTIONS = [
   { href: "/equipment", label: "Equipment" },
   { href: "/authors", label: "Authors" },
 ];
+// Your own equipment: under My kitchen, though its address is under the
+// catalog's Equipment, which isn't where you are when you're on it.
+const MY_EQUIPMENT = "/equipment/mine";
 const KITCHEN = [
   { href: "/larder", label: "Larder" },
+  // Ray's equipment spec, 2026-11-15: "Equipment", after Larder.
+  { href: MY_EQUIPMENT, label: "Equipment" },
   { href: "/shelf", label: "Shelf" },
   { href: "/saved", label: "Saved" },
   { href: "/groups", label: "Groups" },
@@ -42,7 +47,13 @@ const account = computed(() => [
   ...(props.user?.may_edit ? [{ href: "/admin", label: "Admin" }] : []),
 ]);
 const here = (href: string) =>
-  props.path === href || props.path.startsWith(`${href}/`) ? "page" : undefined;
+  (
+    props.path === MY_EQUIPMENT
+      ? href === MY_EQUIPMENT
+      : props.path === href || props.path.startsWith(`${href}/`)
+  )
+    ? "page"
+    : undefined;
 const name = computed(() => props.user?.display_name ?? "Account");
 // The account menu's button shows about twelve letters of a name; a longer
 // one is said in full inside the menu.
