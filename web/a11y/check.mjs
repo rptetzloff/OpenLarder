@@ -830,6 +830,24 @@ const OWN_EQUIPMENT = ({ lists, has, hasnt, all }) => `(() => {
   }
   return "";
 })()`;
+// "You don't have this" (Ray's equipment spec, 2026-11-15): on a recipe's
+// page, for someone with equipment on a list, each need they can't meet
+// says so, and the heading counts them; a need they can meet says nothing
+// ("no green ticks"). Cy has everything the biscuits need across his two
+// lists; Ada sees only his kitchen, which has the stand mixer.
+const LACKING = (rows, lacking) => `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const block = document.querySelector("section.recipe-needs");
+  if (!block) return "The recipe's page has no Needs";
+  const said = [...block.querySelectorAll("li")].map(words);
+  if (said.join(" | ") !== ${JSON.stringify(rows.join(" | "))}) return "Needs reads “" + said.join(" | ") + "”";
+  const head = words(block.querySelector("h2"));
+  const wanted = ${JSON.stringify(lacking ? `Needs ${rows.length} · ${lacking} you don't have` : `Needs ${rows.length}`)};
+  if (head !== wanted) return "The heading reads “" + head + "”, not “" + wanted + "”";
+  const cut = [...block.querySelectorAll(".need-lacking")].find((n) => n.getBoundingClientRect().height > 30);
+  if (cut) return "“You don't have this” is broken over two lines";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1543,6 +1561,8 @@ function pages(s) {
     ["/equipment/mine", "cook", { phone: true, expect: `(${HOW_FOLDED(false)}) || (${MY_EQUIPMENT}) || (${MINE_IN_MENU})` }],
     ["/equipment/mine", "admin", { phone: true, expect: MY_EQUIPMENT_SHARED }],
     ["/equipment/mine", null, { expect: HOW_FOLDED(true) }],
+    [`/recipes/${s.biscuits.id}`, "cook", { phone: true, expect: LACKING(["Biscuit cutter", "Stand mixer or Hand mixer", "Cast-iron skillet 10-inch"], 0) }],
+    [`/recipes/${s.biscuits.id}`, "admin", { phone: true, expect: LACKING(["Biscuit cutter You don't have this", "Stand mixer or Hand mixer", "Cast-iron skillet 10-inch You don't have this"], 2) }],
     ["/search?equipment=mine", "cook", { phone: true, expect: OWN_EQUIPMENT({ lists: ["Kitchen", "Cabin"], has: "Cheddar Biscuits", all: true }) }],
     [`/search?q=cheddar&el=${s.kitchenList}&el=${s.cabinList}`, "cook", { expect: OWN_EQUIPMENT({ lists: ["Kitchen", "Cabin"], has: "Cheddar Biscuits" }) }],
     [`/search?q=cheddar&el=${s.kitchenList}`, "cook", { phone: true, expect: OWN_EQUIPMENT({ lists: ["Kitchen"], hasnt: "Cheddar Biscuits" }) }],

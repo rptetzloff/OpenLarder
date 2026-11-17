@@ -19,6 +19,11 @@ A list is its owner's, and shared with the household groups they choose, as
 a larder's is: a group's view members see it, its edit and admin members
 change what's on it. Renaming, removing and sharing a list stay with its
 owner.
+
+What someone has (`had`, `held`) is what's on their lists and those shared
+with them, had and not wanted, matched, and theirs to see. Search keeps to
+it (routers/search.py, equipment=mine), and a recipe's page says which of
+its needs it doesn't meet (routers/recipes.py).
 """
 
 import uuid
@@ -30,6 +35,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, or_, select
 
+from openlarder import equipment as kit
 from openlarder import needs, visibility
 from openlarder.auth import CurrentUser, SameOrigin
 from openlarder.db import Session
@@ -65,6 +71,51 @@ def seen_list_ids(user: User):
     return select(EquipmentList.id).where(
         or_(EquipmentList.owner_id == user.id, EquipmentList.id.in_(shared))
     )
+
+
+async def had(
+    session,
+    viewer: User,
+    lists: list[uuid.UUID] = (),
+    items: list[uuid.UUID] = (),
+    without: list[uuid.UUID] = (),
+) -> list[uuid.UUID]:
+    """The equipment the viewer has, as larder_ingredients finds what's in
+    their larder: on their lists and those shared with them, had and not
+    wanted, of the equipment they may see; only the things named, if some
+    are, or else only the lists named, if some are; less the things left
+    out."""
+    query = (
+        select(func.distinct(EquipmentListItem.equipment_id))
+        .join(EquipmentList, EquipmentList.id == EquipmentListItem.list_id)
+        .join(Equipment, Equipment.id == EquipmentListItem.equipment_id)
+        .where(
+            EquipmentList.id.in_(seen_list_ids(viewer)),
+            EquipmentListItem.state == "have",
+            visibility.equipment_seen_by(viewer),
+        )
+    )
+    if items:
+        query = query.where(EquipmentListItem.id.in_(items))
+    elif lists:
+        query = query.where(EquipmentList.id.in_(lists))
+    if without:
+        query = query.where(EquipmentListItem.id.not_in(without))
+    return list(await session.scalars(query))
+
+
+async def held(session, viewer: User | None) -> set[uuid.UUID] | None:
+    """Everything someone has, and everything each thing of theirs counts
+    as, to hold a need against: with a stand mixer, a mixer too. None for
+    someone signed out, or with nothing that counts on a list: there's
+    nothing to say of what they don't have until they've said what they
+    do."""
+    if viewer is None:
+        return None
+    own = await had(session, viewer)
+    if not own:
+        return None
+    return set(await session.scalars(kit.ancestry(*own, name="held_equipment")))
 
 
 @dataclass
