@@ -18,6 +18,7 @@ from openlarder import (
     archiving,
     buying,
     detector,
+    equipment_rules,
     ingredients,
     needs,
     openlibrary,
@@ -764,6 +765,10 @@ async def add_recipe(
     if source.kind != "family" and not user.publishes_directly:
         recipe.review = "pending"
     await references.relink(session, source_id)
+    # Saved with no equipment said, what its title suggests it needs goes
+    # to the Suggestions queue, if anyone can see it (equipment_rules.py).
+    await session.flush()
+    await equipment_rules.sweep(session, recipes=[recipe.id])
     await session.commit()
     if pages := await archiving.uncopied(session, recipe.id):
         background.add_task(archiver.run, pages)
@@ -794,6 +799,9 @@ async def change_recipe(
     if recipe.review == "returned" and not user.may_edit:
         recipe.review = "pending"
     await references.relink(session, recipe.source_id)
+    # A changed title is read again (equipment_rules.py).
+    await session.flush()
+    await equipment_rules.sweep(session, recipes=[recipe.id])
     await session.commit()
     if pages := await archiving.uncopied(session, recipe.id):
         background.add_task(archiver.run, pages)

@@ -52,7 +52,7 @@ class Suggestion(Base):
     __table_args__ = (
         CheckConstraint(
             "kind IN ('merge', 'parent', 'line_fix', 'tag', 'allergen',"
-            " 'title_case', 'title_apostrophe')",
+            " 'title_case', 'title_apostrophe', 'equipment')",
             name="kind_known",
         ),
         CheckConstraint("status IN ('open', 'accepted', 'dismissed')", name="status_known"),
@@ -76,7 +76,7 @@ class Suggestion(Base):
     # merge or parent: two ingredient ids, the lower first; line_fix: a flag;
     # tag: a recipe's id and a tag's (0033); allergen: an ingredient's id and
     # an allergen's key (0060); title_case or title_apostrophe: a source's
-    # id (0071).
+    # id (0071); equipment: a recipe's id and a piece of equipment's (0085).
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     target: Mapped[object] = mapped_column(JSONB, nullable=False)
     proposal: Mapped[object] = mapped_column(JSONB, nullable=False)

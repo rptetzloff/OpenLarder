@@ -12,6 +12,7 @@ import {
   type Suggestion,
   type SuggestionPage,
   suggestAllergens,
+  suggestEquipment,
   suggestTitles,
 } from "../suggestions";
 import type { Me } from "../me";
@@ -94,6 +95,24 @@ async function runTitles() {
   }
 }
 
+async function runEquipment() {
+  busy.value = true;
+  note.value = actionError.value = "";
+  try {
+    const n = await suggestEquipment();
+    note.value =
+      n === 0
+        ? "Nothing new to suggest."
+        : `${n.toLocaleString()} new equipment ${n === 1 ? "suggestion" : "suggestions"}.`;
+    kind.value = n ? "equipment" : "";
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 async function runAllergens() {
   busy.value = true;
   note.value = actionError.value = "";
@@ -151,7 +170,8 @@ watch(allowed, (yes) => {
       <h1>Suggestions</h1>
       <p class="muted">
         A local model compared ingredients that look alike, and read recipes for the tags they
-        could have, and suggests what to do.
+        could have, and suggests what to do. Rules read names and titles, and suggest allergens,
+        title fixes and equipment.
       </p>
     </div>
     <p v-if="!user" class="status"><SignInLink /> to see suggestions.</p>
@@ -200,6 +220,15 @@ watch(allowed, (yes) => {
           Suggest title fixes
         </button>
         <button
+          v-if="user.may_run"
+          type="button"
+          class="secondary small"
+          :disabled="busy"
+          @click="runEquipment"
+        >
+          Suggest equipment
+        </button>
+        <button
           v-if="kind === 'allergen' && state === 'open' && likelyShown.length"
           type="button"
           class="primary small"
@@ -229,6 +258,12 @@ watch(allowed, (yes) => {
           A book's title that looks to be in sentence case, or to have lost an apostrophe, is
           suggested with the change. Accepting changes the title; dismiss one that's styled that
           way on purpose, and it isn't suggested for that book again.
+        </p>
+        <p>
+          Equipment is suggested for a recipe with none recorded, from its title (“gelato”: an ice
+          cream maker), its tags and its book. Accepting adds it to what the recipe needs, and
+          leaves the recipe saying that may not be all. Check each: a grilled cheese needs no grill.
+          Dismissed, it isn't suggested for that recipe again.
         </p>
       </details>
       <p v-if="note" class="status" role="status">{{ note }}</p>

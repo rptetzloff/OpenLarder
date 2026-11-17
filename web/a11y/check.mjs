@@ -848,6 +848,22 @@ const LACKING = (rows, lacking) => `(() => {
   if (cut) return "“You don't have this” is broken over two lines";
   return "";
 })()`;
+// Equipment in the Suggestions queue (Ray's equipment spec, 2026-11-15): a
+// recipe with none recorded, the thing its title says it probably needs,
+// and why, for a moderator to accept or dismiss; an administrator has the
+// button that reads the whole catalog again.
+const SUGGESTED_EQUIPMENT = `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const card = [...document.querySelectorAll(".suggestion-cards > li")].find((li) => words(li.querySelector("h2")) === "Needs Grill?");
+  if (!card) return "No suggestion asks whether a recipe needs a grill: " + [...document.querySelectorAll(".suggestion-cards h2")].map(words).join(" | ");
+  const links = [...card.querySelectorAll("a")].map((a) => words(a) + " " + a.getAttribute("href").replace(/[0-9a-f-]{36}/, "ID"));
+  if (links.join(" | ") !== "Grilled Corn /recipes/ID | The grilling book /sources/ID | Grill /equipment/ID") return "The suggestion's links read “" + links.join(" | ") + "”";
+  if (words(card.querySelector(".suggestion-reason")) !== "Its title says “grilled”.") return "The suggestion's reason reads “" + words(card.querySelector(".suggestion-reason")) + "”";
+  const buttons = [...card.querySelectorAll("button")].map(words);
+  if (!buttons.includes("Accept") || !buttons.includes("Dismiss")) return "The suggestion's buttons are “" + buttons.join(" | ") + "”";
+  if (![...document.querySelectorAll(".row-actions button")].some((b) => words(b) === "Suggest equipment")) return "An administrator has no “Suggest equipment”";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1140,7 +1156,15 @@ async function seed() {
 
   // Two books whose titles the rules question as they arrive (title_rules.py),
   // for the Suggestions queue: one in sentence case, one missing an apostrophe.
-  await api("/api/sources/manual", "admin", { title: "The grilling book", authors: ["Ann Author"] });
+  const grilling = await api("/api/sources/manual", "admin", { title: "The grilling book", authors: ["Ann Author"] });
+  // And a recipe in it with no equipment said, whose title the rules read
+  // as needing a grill (equipment_rules.py): that goes to the queue too.
+  const grillingBook = await api(`/api/sources/${grilling.id}`, "admin");
+  await api(`/api/sources/${grilling.id}/recipes`, "admin", {
+    title: "Grilled Corn",
+    editions: [{ edition_id: grillingBook.editions[0].id, page: "12" }],
+    ingredients: ["Corn"],
+  });
   await api("/api/sources/manual", "admin", {
     title: "Ann Authors Best Bakes",
     authors: ["Ann Author"],
@@ -1530,7 +1554,7 @@ function pages(s) {
     [`/recipes/${s.imported}`, "admin", { phone: true, expect: EQUIPMENT_FLAGS }],
     ["/admin/import", "admin", { phone: true, then: `document.querySelector("main details.how").open = true`, expect: onPhone(IMPORT_COLUMNS) }],
     ["/admin/imports", "admin"],
-    ["/admin/suggestions", "admin"],
+    ["/admin/suggestions", "admin", { phone: true, expect: SUGGESTED_EQUIPMENT }],
     ["/admin/api", "admin"],
     ["/admin/clicks", "admin", { expect: CRUMBS }],
     ["/admin/merges", "admin"],

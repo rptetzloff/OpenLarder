@@ -32,14 +32,19 @@ from sqlalchemy import Float, case, func, select
 from openlarder import (
     allergen_rules,
     allergens,
+    equipment_rules,
     history,
     ingredients,
+    needs,
     title_rules,
     visibility,
 )
+from openlarder import equipment as kit
 from openlarder.auth import AdminUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
+    Equipment,
+    EquipmentOption,
     Ingredient,
     IngredientAllergen,
     IngredientOption,
@@ -55,8 +60,10 @@ from openlarder.models import (
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 PAGE = 50
 # What accepting can do; line fixes wait for Workflow 3 and a page of their own.
-ACTIONABLE = {"merge", "parent", "tag", "allergen", *title_rules.KINDS}
-Kind = Literal["merge", "parent", "line_fix", "tag", "allergen", "title_case", "title_apostrophe"]
+ACTIONABLE = {"merge", "parent", "tag", "allergen", *title_rules.KINDS, equipment_rules.KIND}
+Kind = Literal[
+    "merge", "parent", "line_fix", "tag", "allergen", "title_case", "title_apostrophe", "equipment"
+]
 
 
 class Side(BaseModel):
@@ -106,6 +113,16 @@ class TitleRef(BaseModel):
     unchanged: bool
 
 
+class EquipmentRef(BaseModel):
+    id: uuid.UUID
+    # Its name now, or the one it had when it was suggested, if it has gone.
+    name: str
+    # Still in the list, and not marked as any kitchen's since.
+    exists: bool
+    # The recipe needs it already, or something that counts as it.
+    already: bool = False
+
+
 class SuggestionOut(BaseModel):
     id: uuid.UUID
     kind: str
@@ -122,6 +139,8 @@ class SuggestionOut(BaseModel):
     allergen: AllergenRef | None = None
     # title_case, title_apostrophe: the book and the title proposed.
     title: TitleRef | None = None
+    # equipment: the recipe (as recipe), and the thing it probably needs.
+    equipment: EquipmentRef | None = None
     reason: str | None
     similarity: float | None
     # merge-v2 on: the model's word for how sure it is. A 12B model asked
@@ -197,6 +216,18 @@ def _title_target(row: Suggestion) -> tuple[uuid.UUID, str, str] | None:
         return None
 
 
+def _equipment_target(row: Suggestion) -> tuple[uuid.UUID, uuid.UUID] | None:
+    """An equipment suggestion's recipe and piece of equipment; None if it
+    doesn't name both."""
+    p = row.proposal if isinstance(row.proposal, dict) else {}
+    if row.kind != equipment_rules.KIND:
+        return None
+    try:
+        return uuid.UUID(str(p["recipe_id"])), uuid.UUID(str(p["equipment_id"]))
+    except (KeyError, ValueError):
+        return None
+
+
 def _named(row: Suggestion) -> list[uuid.UUID]:
     """The ingredients a suggestion names."""
     if ids := _ids(row):
@@ -256,12 +287,26 @@ async def _visible(session, viewer: User, rows: list[Suggestion]) -> list[Sugges
         if titled
         else set()
     )
+    # Equipment's, as titles': the rules read only what anyone can see, so
+    # a recipe that's hidden now (its book made private, or sent back) is
+    # out for everyone, a moderator who could see it included.
+    needing = {t[0] for r in rows if (t := _equipment_target(r))}
+    hidden_needing = (
+        set(
+            await session.scalars(
+                select(Recipe.id).where(Recipe.id.in_(needing), ~visibility.recipes_seen_by(None))
+            )
+        )
+        if needing
+        else set()
+    )
     return [
         r
         for r in rows
         if not (hidden & set(_named(r)))
         and not ((t := _tag_target(r)) and t[0] in hidden_recipes)
         and not ((s := _title_target(r)) and s[0] in hidden_sources)
+        and not ((e := _equipment_target(r)) and e[0] in hidden_needing)
     ]
 
 
@@ -290,12 +335,19 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
         ).all()
     )
     targets = {r.id: t for r in rows if (t := _tag_target(r))}
+    kit_targets = {r.id: t for r in rows if (t := _equipment_target(r))}
     recipes = {
         rid: (title, chapter, sid, stitle)
         for rid, title, chapter, sid, stitle in await session.execute(
             select(Recipe.id, Recipe.title, Recipe.chapter, Source.id, Source.title)
             .join(Source, Source.id == Recipe.source_id)
-            .where(Recipe.id.in_([t[0] for t in targets.values()]))
+            .where(Recipe.id.in_([t[0] for t in (*targets.values(), *kit_targets.values())]))
+        )
+    }
+    kit_things = {
+        e.id: e
+        for e in await session.scalars(
+            select(Equipment).where(Equipment.id.in_([t[1] for t in kit_targets.values()]))
         )
     }
     tags = {
@@ -374,6 +426,25 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 exists=tag is not None,
                 already=bool(found and tag and await _has_tag(session, rid, tid)),
             )
+        equipment_ref = None
+        if r.id in kit_targets:
+            rid, eid = kit_targets[r.id]
+            found = recipes.get(rid)
+            recipe_ref = RecipeRef(
+                id=rid,
+                title=found[0] if found else str(p.get("recipe_title") or "(unnamed)"),
+                chapter=found[1] if found else None,
+                source_id=found[2] if found else None,
+                source_title=found[3] if found else None,
+                exists=found is not None,
+            )
+            thing = kit_things.get(eid)
+            equipment_ref = EquipmentRef(
+                id=eid,
+                name=thing.name if thing else str(p.get("equipment_name") or "(unnamed)"),
+                exists=bool(thing and thing.listed and not thing.assumed),
+                already=bool(found and thing and await _needs_already(session, rid, thing)),
+            )
         title_ref = None
         if r.id in on_sources:
             source_id, was, proposed = on_sources[r.id]
@@ -405,10 +476,15 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 tag=tag_ref,
                 allergen=allergen_ref,
                 title=title_ref,
+                equipment=equipment_ref,
                 actionable=r.kind in ACTIONABLE
                 and (
                     bool(title_ref and title_ref.exists and title_ref.unchanged)
                     if r.kind in title_rules.KINDS
+                    else bool(
+                        recipe_ref and equipment_ref and recipe_ref.exists and equipment_ref.exists
+                    )
+                    if r.kind == equipment_rules.KIND
                     else bool(recipe_ref and tag_ref and recipe_ref.exists and tag_ref.exists)
                     if r.kind == "tag"
                     else bool(a and a.exists and allergen_ref and allergen_ref.exists)
@@ -502,6 +578,20 @@ async def _has_tag(session, recipe_id: uuid.UUID, tag_id: uuid.UUID) -> bool:
     )
 
 
+async def _needs_already(session, recipe_id: uuid.UUID, thing: Equipment) -> bool:
+    """The recipe needs the thing already, or something that counts as it."""
+    return bool(
+        await session.scalar(
+            select(EquipmentOption.id)
+            .where(
+                EquipmentOption.recipe_id == recipe_id,
+                EquipmentOption.equipment_id.in_(kit.family(thing.id, name="needed_already")),
+            )
+            .limit(1)
+        )
+    )
+
+
 @router.post("/{suggestion_id}/accept", response_model=SuggestionOut, dependencies=[SameOrigin])
 async def accept(
     suggestion_id: uuid.UUID, body: Accept, admin: ModeratorUser, session: Session
@@ -524,6 +614,25 @@ async def accept(
         return await _decide(session, admin, row, "accepted")
     if row.kind == "allergen":
         await _record_allergen(session, row)
+        return await _decide(session, admin, row, "accepted")
+    if row.kind == equipment_rules.KIND:
+        target = _equipment_target(row)
+        recipe = await session.get(Recipe, target[0]) if target else None
+        thing = await session.get(Equipment, target[1]) if target else None
+        if recipe is None or thing is None or not thing.listed:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "This can't be accepted: its recipe or its equipment has gone. Dismiss it.",
+            )
+        if thing.assumed:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"This can't be accepted: {needs.assumed_message(thing)} Dismiss it.",
+            )
+        # Added after what the recipe needs already, and nothing said of
+        # whether that's all: the rule knew one thing (Ray's equipment
+        # spec, 2026-11-15). Needed already, there's nothing to add.
+        await needs.add(session, recipe, thing)
         return await _decide(session, admin, row, "accepted")
     if row.kind in title_rules.KINDS:
         target = _title_target(row)
@@ -645,6 +754,15 @@ class Suggested(BaseModel):
 async def suggest_allergens(admin: AdminUser, session: Session) -> Suggested:
     """Suggest allergens from ingredients' names (allergen_rules.py)."""
     return Suggested(suggested=await allergen_rules.suggest(session))
+
+
+@router.post("/equipment", response_model=Suggested, dependencies=[SameOrigin])
+async def suggest_equipment(admin: AdminUser, session: Session) -> Suggested:
+    """Suggest equipment for the recipes that have none recorded, from
+    their titles, tags and sources (equipment_rules.py)."""
+    new = await equipment_rules.sweep(session)
+    await session.commit()
+    return Suggested(suggested=new)
 
 
 @router.post("/titles", response_model=Suggested, dependencies=[SameOrigin])

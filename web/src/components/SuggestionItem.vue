@@ -20,6 +20,7 @@ const gone = computed(
   () =>
     [s.value.a, s.value.b].some((side) => side && !side.exists) ||
     (s.value.kind === "tag" && !(s.value.recipe?.exists && s.value.tag?.exists)) ||
+    (s.value.kind === "equipment" && !(s.value.recipe?.exists && s.value.equipment?.exists)) ||
     (s.value.kind === "allergen" && !s.value.allergen?.exists) ||
     (!!s.value.title && !(s.value.title.exists && s.value.title.unchanged)),
 );
@@ -88,6 +89,26 @@ async function act(action: "accept" | "dismiss") {
         <span v-if="!s.tag.exists" class="muted"> (gone)</span>
       </p>
     </template>
+    <!-- Equipment a rule says a recipe probably needs (Ray's equipment
+         spec, 2026-11-15), laid out as a tag for a recipe is. -->
+    <template v-else-if="s.kind === 'equipment' && s.recipe && s.equipment">
+      <!-- As the search's chip words it: the names don't all take an article. -->
+      <h2>Needs {{ s.equipment.name }}?</h2>
+      <p>
+        <a v-if="s.recipe.exists" :href="`/recipes/${s.recipe.id}`">{{ s.recipe.title }}</a>
+        <span v-else>{{ s.recipe.title }} (gone)</span>
+        <template v-if="s.recipe.source_title">
+          in <a :href="`/sources/${s.recipe.source_id}`">{{ s.recipe.source_title }}</a></template
+        ><template v-if="s.recipe.chapter">, “{{ s.recipe.chapter }}”</template>
+      </p>
+      <p>
+        <a v-if="s.equipment.exists" :href="`/equipment/${s.equipment.id}`">{{
+          s.equipment.name
+        }}</a>
+        <span v-else>{{ s.equipment.name }}</span>
+        <span v-if="s.equipment.already" class="muted"> · it needs this already</span>
+      </p>
+    </template>
     <template v-else-if="s.kind === 'allergen' && s.a && s.allergen">
       <h2>
         {{ s.allergen.status === "contains" ? "Contains" : "May contain" }}
@@ -144,6 +165,8 @@ async function act(action: "accept" | "dismiss") {
               : "The book has been deleted since, so this can only be dismissed."
             : s.kind === "tag"
             ? "Its recipe or its tag has been deleted since, so it can only be dismissed."
+            : s.kind === "equipment"
+            ? "Its recipe has gone, or its equipment isn't in the list any more, so it can only be dismissed."
             : s.kind === "allergen" && s.a?.exists
               ? "That allergen isn't on the list any more, so it can only be dismissed."
               : "An ingredient this names has been merged or deleted since, so it can only be dismissed."
