@@ -27,7 +27,7 @@ onMounted(async () => {
 <template>
   <article>
     <h1>Terms of service</h1>
-    <p class="updated">Last updated November 16, 2026</p>
+    <p class="updated">Last updated November 17, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks: which book, which page, and
@@ -103,8 +103,8 @@ onMounted(async () => {
     <h2 id="commissions">Buy and shop links</h2>
     <p>
       Links to buy a book, and an ingredient's or a piece of equipment's Shop link, go to shops
-      OpenLarder is an affiliate of: a bookshop, a grocer you choose, or a shop that sells kitchen
-      equipment. If you buy something after following one, OpenLarder may earn a commission from
+      OpenLarder is an affiliate of: a bookshop, a grocer you choose, or a shop you choose that
+      sells kitchen equipment. If you buy something after following one, OpenLarder may earn a commission from
       the shop, at no cost to you. The links are made from the book's ISBN, or the ingredient's or
       the equipment's name: no shop pays to be listed, and nothing in the catalog is there because
       of a commission. As an Amazon Associate, OpenLarder earns from

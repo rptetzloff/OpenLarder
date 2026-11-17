@@ -28,7 +28,7 @@ document.title = "Privacy policy · OpenLarder";
 <template>
   <article>
     <h1>Privacy policy</h1>
-    <p class="updated">Last updated November 16, 2026</p>
+    <p class="updated">Last updated November 17, 2026</p>
 
     <p>
       OpenLarder is a free, open index of the recipes in cookbooks, run by Ray Tetzloff as an
@@ -120,7 +120,8 @@ document.title = "Privacy policy · OpenLarder";
       decide what to show you.
     </p>
     <p>
-      You can choose which shops show and in what order, and which grocer to shop at. Signed in,
+      You can choose which shops show and in what order, and which grocer and which kitchen shop
+      to shop at. Signed in,
       that choice is kept with your account. Signed out, your browser keeps it in its own storage,
       not in a cookie, and it is never sent to OpenLarder.
     </p>

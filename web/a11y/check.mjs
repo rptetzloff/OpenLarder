@@ -451,6 +451,13 @@ const NEEDS = (rows) => `(() => {
   }
   const notice = block.querySelector(".commission")?.textContent.replace(/\\s+/g, " ").trim() ?? "";
   if (!notice.startsWith("OpenLarder may earn a commission from these Shop links. As an Amazon Associate") || !block.querySelector('.commission a[href="/terms#commissions"]')) return "Under Needs the notice of the commission reads “" + notice + "”";
+  // And, with two shops on offer, which the links go to is the visitor's
+  // to choose, as a grocer is (Ray, 2026-11-16: treated the same): a
+  // labelled choice beside the notice, on the first until they choose.
+  const choice = block.querySelector(".kitchen-shop-chooser select");
+  const offered = [...(choice?.options ?? [])].map((o) => o.textContent.trim());
+  if (offered.join() !== "Amazon,Panhandle" || choice.value !== "amazon") return "The kitchen shops to choose from are “" + offered.join(" | ") + "”, on “" + choice?.value + "”";
+  if (!choice.closest("label")?.textContent.trim().startsWith("Shop at")) return "The choice of kitchen shop has no label";
   return "";
 })()`;
 // addIt: nothing for whoever can't add it; true for whoever may change the
@@ -1413,6 +1420,16 @@ async function seed() {
   // tag (migration 0086), and equipment's Shop links wait for it.
   const kitchenShop = (await api("/api/admin/shops", "admin")).find((g) => g.kind === "kitchen").shops[0];
   await api(`/api/admin/shops/${kitchenShop.id}/enabled`, "admin", { enabled: true }, "PUT");
+  // And a second, after it, so there's a choice of them to show.
+  await api("/api/admin/shops", "admin", {
+    key: "panhandle",
+    kind: "kitchen",
+    label: "Panhandle",
+    builder: "template",
+    product_template: "https://panhandle.example/search?q={term}",
+    earns: "none",
+    enabled: true,
+  });
   const visit = await fetch(`${BASE}/go/producer/green-acre?from=/producers`, {
     redirect: "manual",
     headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36" },

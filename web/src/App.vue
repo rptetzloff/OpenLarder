@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { adoptGrocer } from "./grocery";
+import { adoptKitchenShop } from "./kitchen";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
@@ -150,6 +151,7 @@ onMounted(async () => {
     user.value = res.ok ? await res.json() : null;
     adoptAccount(user.value);
     adoptGrocer(user.value);
+    adoptKitchenShop(user.value);
   } catch {
     user.value = null;
   }
