@@ -13,6 +13,21 @@ from openlarder.author_names import name_key
 from openlarder.models import Base
 
 
+@pytest.fixture(autouse=True)
+def leaves_no_history(engine):
+    """Some tests here commit rows of their own, to try a migration or a
+    trigger on them, and delete them at the end. The history's triggers
+    record those rows coming and going, and that stayed: run straight
+    after this file, tests/test_history.py read changes nobody made and
+    three of its tests failed (the whole suite passed, by its order).
+    What a test here adds to the history is taken out again."""
+    with engine.begin() as conn:
+        last = conn.execute(text("SELECT coalesce(max(id), 0) FROM revisions")).scalar_one()
+    yield
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM revisions WHERE id > :last"), {"last": last})
+
+
 def _diet(db: Connection, name: str) -> uuid.UUID:
     """One of the diets migration 0018 seeds."""
     return db.scalar(text("SELECT id FROM tags WHERE kind = 'diet' AND name = :n"), {"n": name})

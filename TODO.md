@@ -1140,16 +1140,21 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [ ] A change to what a thing counts as is in that thing's
             history, and not in the history of the thing it was made to
             count as.
-          - [ ] The History panel says "History began on November 10,
+          - [x] The History panel said "History began on November 10,
             2026" under a thing with no changes; equipment's began with
-            migration 0080.
-          - [ ] No test opens a History panel in the accessibility check
-            but equipment's one: the other pages' are the same component,
-            unlooked at.
-          - [ ] `tests/test_history.py` fails three tests when run straight
-            after `tests/test_catalog_schema.py` alone (on `dev` too): the
-            schema tests' own rows, deleted at the end, are in the history
-            the other tests then read. The whole suite passes.
+            migration 0080. It says November 15, 2026 there, the day
+            #210 was merged (#231).
+          - [x] No test opened a History panel in the accessibility check
+            but equipment's one. It opens one on an ingredient's page, a
+            recipe's, a source's and an author's too, and waits for it
+            to load, which the one it had didn't (#231): each lists its
+            changes with who and when, and a thing with none says since
+            when.
+          - [x] `tests/test_history.py` failed three tests when run
+            straight after `tests/test_catalog_schema.py` alone: the
+            schema tests' own rows, deleted at the end, were in the
+            history the other tests then read. The schema tests take
+            out of the history what they put in (#231).
       - [ ] 2. The recipe form's field, bulk entry's and the import's; the
         "Needs" block on a recipe's page; the flag reason; how many
         recipes have equipment recorded, on the admin overview.

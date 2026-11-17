@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { type Change, type Kind, historyOf } from "../history";
 import ChangeList from "./ChangeList.vue";
 
@@ -8,6 +8,13 @@ import ChangeList from "./ChangeList.vue";
 const props = defineProps<{ kind: Kind; id: string; canRevert?: boolean; startOpen?: boolean }>();
 const changes = ref<Change[] | null>(null);
 const error = ref("");
+
+// When a kind's history began: nothing earlier was recorded, so a record
+// with no changes says since when. Equipment's came with its tools (#210,
+// migration 0080, merged 2026-11-15); the rest's with the history itself.
+// It said November 10 under a piece of equipment too.
+const BEGAN: Partial<Record<Kind, string>> = { equipment: "November 15, 2026" };
+const began = computed(() => BEGAN[props.kind] ?? "November 10, 2026");
 
 async function load() {
   try {
@@ -38,6 +45,6 @@ const reverted = () => location.reload();
       :can-revert="canRevert"
       @reverted="reverted"
     />
-    <p v-else class="status">No changes recorded yet. History began on November 10, 2026.</p>
+    <p v-else class="status">No changes recorded yet. History began on {{ began }}.</p>
   </details>
 </template>
