@@ -111,6 +111,18 @@ def _by_words(rules: Iterable[tuple[str, tuple[str, ...]]], text: str) -> dict[s
     return out
 
 
+# How a reason begins when it's the recipe's source that says so, by its
+# title or a tag: every recipe of that source is suggested the same thing,
+# and a moderator may accept them together (routers/suggestions.py). Read
+# off the reason, so it's true of the suggestions filed before this was
+# asked of them.
+OF_ITS_SOURCE = "Its source"
+
+
+def of_its_source(reason: str | None) -> bool:
+    return bool(reason) and reason.startswith(OF_ITS_SOURCE)
+
+
 def suggested(
     title: str,
     tags: Iterable[str] = (),

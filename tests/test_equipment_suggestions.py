@@ -243,3 +243,137 @@ async def test_a_thing_marked_as_any_kitchens_cant_be_accepted(mo, ad, adb) -> N
     # And nothing new is suggested of it.
     await _recipe(mo, book, "Cornmeal Waffles")
     assert await _open(mo) == []
+
+
+async def test_a_sources_suggestions_are_accepted_together(mo, people, adb) -> None:
+    """A book about one appliance files a suggestion for each of its
+    recipes: one decision is all of them, and only them."""
+    bible = await _book(mo, adb, "The Slow Cooker Bible")
+    chili = await _recipe(mo, bible, "Chili")
+    stew = await _recipe(mo, bible, "Beef Stew")
+    ribs = await _recipe(mo, bible, "Smoked Ribs")
+    beans = await _recipe(mo, bible, "Slow Cooker Beans")
+    other = await _book(mo, adb, "Slow Cooker Revolution")
+    theirs = await _recipe(mo, other, "Pot Roast")
+    plain = await _book(mo, adb, "Plenty")
+    own = await _recipe(mo, plain, "Slow Cooker Oats")
+    found = {(s["recipe"]["title"], s["equipment"]["name"]): s for s in await _open(mo)}
+    reasons = {k: s["reason"] for k, s in found.items()}
+    assert reasons["Beef Stew", "Slow cooker"] == "Its source's title says “slow cooker”."
+    assert reasons["Slow Cooker Beans", "Slow cooker"] == "Its title says “slow cooker”."
+    # Where the book says it, the others of the book's are beside it: the
+    # beans too, which say it of themselves. The roast is another book's.
+    # The oats' book says nothing, and the ribs' smoker is their own: read
+    # one at a time. And the beans' own card doesn't offer the rest.
+    assert {k: s["equipment"]["others_in_source"] for k, s in found.items()} == {
+        ("Chili", "Slow cooker"): 3,
+        ("Beef Stew", "Slow cooker"): 3,
+        ("Smoked Ribs", "Slow cooker"): 3,
+        ("Slow Cooker Beans", "Slow cooker"): 0,
+        ("Smoked Ribs", "Smoker"): 0,
+        ("Pot Roast", "Slow cooker"): 0,
+        ("Slow Cooker Oats", "Slow cooker"): 0,
+    }
+    for alone in (
+        ("Slow Cooker Oats", "Slow cooker"),
+        ("Smoked Ribs", "Smoker"),
+        ("Slow Cooker Beans", "Slow cooker"),
+    ):
+        refused = await mo.post(f"{QUEUE}/{found[alone]['id']}/accept-source")
+        assert refused.status_code == 409 and "by itself" in refused.json()["detail"], alone
+    # Not for whoever isn't a moderator.
+    stew_id = found["Beef Stew", "Slow cooker"]["id"]
+    assert (await (await people("ann")).post(f"{QUEUE}/{stew_id}/accept-source")).status_code == 403
+    # One sent back since isn't anyone's to see, and is left.
+    await adb.execute(text("UPDATE recipes SET review = 'returned' WHERE id = :r"), {"r": chili})
+    done = await mo.post(f"{QUEUE}/{stew_id}/accept-source")
+    assert done.status_code == 200 and done.json() == {"done": 3, "skipped": 0}
+    for accepted in (stew, ribs, beans):
+        assert await _needs(mo, accepted) == (False, ["Slow cooker"])
+    for untouched in (theirs, own):
+        assert await _needs(mo, untouched) == (False, [])
+    await adb.execute(text("UPDATE recipes SET review = 'published' WHERE id = :r"), {"r": chili})
+    assert await _needs(mo, chili) == (False, [])
+    left = {(s["recipe"]["title"], s["equipment"]["name"]): s for s in await _open(mo)}
+    assert sorted(left) == [
+        ("Chili", "Slow cooker"),
+        ("Pot Roast", "Slow cooker"),
+        ("Slow Cooker Oats", "Slow cooker"),
+        ("Smoked Ribs", "Smoker"),
+    ]
+    # The chili is alone now, and accepted as one of one.
+    assert left["Chili", "Slow cooker"]["equipment"]["others_in_source"] == 0
+    last = await mo.post(f"{QUEUE}/{left['Chili', 'Slow cooker']['id']}/accept-source")
+    assert last.json() == {"done": 1, "skipped": 0}
+    # Each is the moderator's edit, marked with its own suggestion.
+    marked = await adb.scalar(
+        text(
+            "SELECT count(DISTINCT via) FROM revisions WHERE table_name = 'recipe_equipment'"
+            " AND via LIKE 'suggestion:%'"
+        )
+    )
+    assert marked == 4
+    # Decided: not again.
+    assert (await mo.post(f"{QUEUE}/{stew_id}/accept-source")).status_code == 409
+    decided = await _open(mo, state="decided")
+    assert all(s["equipment"]["others_in_source"] == 0 for s in decided)
+
+
+async def test_a_thing_thats_any_kitchens_isnt_accepted_for_a_source(mo, adb) -> None:
+    bible = await _book(mo, adb, "The Slow Cooker Bible")
+    chili = await _recipe(mo, bible, "Chili")
+    await _recipe(mo, bible, "Beef Stew")
+    [first, _] = await _open(mo)
+    marked = await mo.put(
+        f"/api/equipment/{first['equipment']['id']}/assumed", json={"assumed": True}
+    )
+    assert marked.status_code == 200, marked.text
+    refused = await mo.post(f"{QUEUE}/{first['id']}/accept-source")
+    assert refused.status_code == 409 and "any kitchen" in refused.json()["detail"]
+    assert await _needs(mo, chili) == (False, [])
+    assert len(await _open(mo)) == 2
+
+
+async def test_a_source_tagged_for_a_thing_is_accepted_together_too(mo, ad, adb) -> None:
+    plain = await _book(mo, adb, "Plenty")
+    ribs = await _recipe(mo, plain, "Ribs")
+    wings = await _recipe(mo, plain, "Wings")
+    for tag in ("Grilling", "Smoking"):
+        await adb.execute(
+            text(
+                "INSERT INTO source_tags (source_id, tag_id)"
+                " SELECT :s, id FROM tags WHERE name = :n"
+            ),
+            {"s": plain[0], "n": tag},
+        )
+    assert (await ad.post(f"{QUEUE}/equipment")).json() == {"suggested": 4}
+    found = await _open(mo)
+    # Two things said of the source, each of both its recipes: a thing's
+    # are together, and the other thing's aren't with them.
+    assert _said(found) == [
+        ("Ribs", "Grill"),
+        ("Ribs", "Smoker"),
+        ("Wings", "Grill"),
+        ("Wings", "Smoker"),
+    ]
+    assert [s["equipment"]["others_in_source"] for s in found] == [1, 1, 1, 1]
+    # One of them needs a charcoal grill by the time it's decided: accepted,
+    # with nothing to add.
+    await mo.put(
+        f"/api/recipes/{wings}",
+        json={
+            "title": "Wings",
+            "editions": [{"edition_id": plain[1]}],
+            "ingredients": ["eggs"],
+            "equipment": ["charcoal grill"],
+        },
+    )
+    grill = next(s for s in found if s["equipment"]["name"] == "Grill")
+    done = await mo.post(f"{QUEUE}/{grill['id']}/accept-source")
+    assert done.json() == {"done": 2, "skipped": 0}
+    assert await _needs(mo, ribs) == (False, ["Grill"])
+    assert await _needs(mo, wings) == (True, ["Charcoal grill"])
+    # The smokers are still to decide, and still together.
+    left = await _open(mo)
+    assert _said(left) == [("Ribs", "Smoker"), ("Wings", "Smoker")]
+    assert [s["equipment"]["others_in_source"] for s in left] == [1, 1]

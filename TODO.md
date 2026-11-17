@@ -1450,10 +1450,21 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             pressure cooker, air fryer, sous vide, bread machine. A
             book called "Ice Cream" or "The Grilling Book" isn't read
             that way.
-          - [ ] A book about one appliance files a suggestion for every
-            recipe in it, each accepted by itself. Allergens have
-            "Accept the likely ones shown"; equipment has nothing like
-            it yet.
+          - [x] A book about one appliance files a suggestion for every
+            recipe in it, and each was accepted by itself. They're
+            accepted together now (#227): where the reason is the
+            source's (its title, or a tag of it), the card has "Accept
+            for all 37 in this source", which accepts every open
+            suggestion of that thing for that source's recipes, each as
+            the moderator's edit marked with its own suggestion.
+            - A recipe of that source whose own title says it too
+              ("Slow Cooker Beans") goes with the rest; its own card
+              doesn't offer them.
+            - Where nothing says it of the source there's no such
+              button: "Grilled Cheese" in a plain book is decided by
+              itself.
+            - What's together is worked out from each suggestion's
+              reason, so it holds for those filed before this.
           - [ ] The queue's page loads every open suggestion to count
             them by kind, which its own comment calls small
             ("hundreds"). A first sweep of the whole catalog may file

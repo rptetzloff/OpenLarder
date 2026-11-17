@@ -55,7 +55,15 @@ export interface Suggestion {
   // probably needs (equipment_rules.py). exists: still in the list, and
   // not marked as any kitchen's; already: the recipe needs it, or
   // something that counts as it.
-  equipment: { id: string; name: string; exists: boolean; already: boolean } | null;
+  // others_in_source: for one suggested because of its source, how many
+  // other open ones say the same of that source's recipes.
+  equipment: {
+    id: string;
+    name: string;
+    exists: boolean;
+    already: boolean;
+    others_in_source: number;
+  } | null;
   reason: string | null;
   similarity: number | null;
   // merge-v2 on: the model's word for how sure it is.
@@ -125,6 +133,11 @@ export async function suggestTitles(): Promise<number> {
 // from their titles, tags and sources; how many are new.
 export async function suggestEquipment(): Promise<number> {
   return (await post("/api/suggestions/equipment")).suggested;
+}
+
+// Accept an equipment suggestion and every other like it for its source.
+export async function acceptForSource(id: string): Promise<{ done: number; skipped: number }> {
+  return post(`/api/suggestions/${id}/accept-source`);
 }
 
 // Accept many allergen suggestions at once.

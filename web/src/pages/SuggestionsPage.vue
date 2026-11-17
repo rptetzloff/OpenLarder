@@ -149,6 +149,14 @@ async function acceptLikely() {
   }
 }
 
+// A source's equipment suggestions accepted together: say how many, and
+// load again, since they aren't all on the page.
+async function together(done: number) {
+  note.value = `Accepted ${done.toLocaleString()}.`;
+  actionError.value = "";
+  await load();
+}
+
 function decided(updated: Suggestion) {
   // Stays in place, marked, until the next load; the counts follow now.
   items.value = items.value.map((s) => (s.id === updated.id ? updated : s));
@@ -263,7 +271,9 @@ watch(allowed, (yes) => {
           Equipment is suggested for a recipe with none recorded, from its title (“gelato”: an ice
           cream maker), its tags and its book. Accepting adds it to what the recipe needs, and
           leaves the recipe saying that may not be all. Check each: a grilled cheese needs no grill.
-          Dismissed, it isn't suggested for that recipe again.
+          Dismissed, it isn't suggested for that recipe again. One that comes from the recipe's
+          source (a book about slow cookers) can be accepted for all of that source's recipes at
+          once.
         </p>
       </details>
       <p v-if="note" class="status" role="status">{{ note }}</p>
@@ -274,7 +284,13 @@ watch(allowed, (yes) => {
         {{ state === "open" ? "No open suggestions." : "None decided yet." }}
       </p>
       <ul v-else class="suggestion-cards">
-        <SuggestionItem v-for="s in items" :key="s.id" :suggestion="s" @decided="decided" />
+        <SuggestionItem
+          v-for="s in items"
+          :key="s.id"
+          :suggestion="s"
+          @decided="decided"
+          @together="together"
+        />
       </ul>
       <button
         v-if="page && items.length < page.total"

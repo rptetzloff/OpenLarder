@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { type Side, type Suggestion, decide } from "../suggestions";
+import { type Side, type Suggestion, acceptForSource, decide } from "../suggestions";
 
 // One suggestion, with Accept and Dismiss while it's open.
 const props = defineProps<{ suggestion: Suggestion }>();
-const emit = defineEmits<{ decided: [suggestion: Suggestion] }>();
+const emit = defineEmits<{
+  decided: [suggestion: Suggestion];
+  // Several were accepted at once: how many, for the page to say and to
+  // load again.
+  together: [done: number];
+}>();
 
 // Followed, not copied: once decided, the page hands back the new state.
 const s = computed(() => props.suggestion);
@@ -27,6 +32,26 @@ const gone = computed(
 
 function uses(side: Side) {
   return side.recipes === 1 ? "1 recipe" : `${side.recipes.toLocaleString()} recipes`;
+}
+
+// A book about one appliance has this suggestion for each of its recipes:
+// all of them, in one decision.
+const inSource = computed(() => (s.value.equipment?.others_in_source ?? 0) + 1);
+async function acceptAll() {
+  const { equipment, recipe, id } = s.value;
+  const asked =
+    `Add ${equipment!.name} to all ${inSource.value} recipes of “${recipe!.source_title}” ` +
+    "it's suggested for?";
+  if (!confirm(asked)) return;
+  busy.value = true;
+  error.value = "";
+  try {
+    emit("together", (await acceptForSource(id)).done);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function act(action: "accept" | "dismiss") {
@@ -176,6 +201,15 @@ async function act(action: "accept" | "dismiss") {
       <div class="row-actions">
         <button v-if="s.actionable" type="button" class="primary small" :disabled="busy" @click="act('accept')">
           Accept
+        </button>
+        <button
+          v-if="s.actionable && s.equipment?.others_in_source"
+          type="button"
+          class="secondary small accept-source"
+          :disabled="busy"
+          @click="acceptAll"
+        >
+          Accept for all {{ inSource }} in this source
         </button>
         <button type="button" class="secondary small" :disabled="busy" @click="act('dismiss')">
           Dismiss
