@@ -16,7 +16,8 @@ export interface Suggestion {
     | "tag"
     | "allergen"
     | "title_case"
-    | "title_apostrophe";
+    | "title_apostrophe"
+    | "equipment";
   decision: string | null;
   keep: "a" | "b" | null;
   a: Side | null;
@@ -50,6 +51,11 @@ export interface Suggestion {
     exists: boolean;
     unchanged: boolean;
   } | null;
+  // equipment: the recipe (as recipe), and the piece of equipment it
+  // probably needs (equipment_rules.py). exists: still in the list, and
+  // not marked as any kitchen's; already: the recipe needs it, or
+  // something that counts as it.
+  equipment: { id: string; name: string; exists: boolean; already: boolean } | null;
   reason: string | null;
   similarity: number | null;
   // merge-v2 on: the model's word for how sure it is.
@@ -76,6 +82,7 @@ export const KIND_LABELS: Record<string, string> = {
   allergen: "Allergen",
   title_case: "Title capitals",
   title_apostrophe: "Title apostrophe",
+  equipment: "Equipment for a recipe",
   line_fix: "Line fix",
 };
 
@@ -112,6 +119,12 @@ export async function suggestAllergens(): Promise<number> {
 // apostrophe); how many are new.
 export async function suggestTitles(): Promise<number> {
   return (await post("/api/suggestions/titles")).suggested;
+}
+
+// Administrators: suggest equipment for the recipes with none recorded,
+// from their titles, tags and sources; how many are new.
+export async function suggestEquipment(): Promise<number> {
+  return (await post("/api/suggestions/equipment")).suggested;
 }
 
 // Accept many allergen suggestions at once.

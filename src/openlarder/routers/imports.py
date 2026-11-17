@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from openlarder import history, importer, isbn, title_rules
+from openlarder import equipment_rules, history, importer, isbn, title_rules
 from openlarder.agreement import require_agreement
 from openlarder.auth import AdminUser, SameOrigin
 from openlarder.db import Session
@@ -268,6 +268,9 @@ async def finish_run(
     # The titles the run brought, with the rest: any in sentence case go to
     # the Suggestions queue (title_rules.py), as the typos go to flags.
     await title_rules.sweep(session)
+    # And the recipes it brought with no equipment said: what their titles,
+    # tags and books suggest goes to the same queue (equipment_rules.py).
+    await equipment_rules.sweep(session)
     run.books_added, run.books_existing, run.books_failed = (
         body.books_added,
         body.books_existing,

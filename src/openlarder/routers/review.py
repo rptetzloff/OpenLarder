@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.orm import aliased
 
-from openlarder import agreement, title_rules, trust
+from openlarder import agreement, equipment_rules, title_rules, trust
 from openlarder.auth import CurrentUser, ModeratorUser, SameOrigin
 from openlarder.db import Session
 from openlarder.models import (
@@ -241,9 +241,11 @@ async def decide_source(
     # Publishing it links the requests for it (migration 0050); they stay
     # open until someone marks them done (Ray, 2026-11-10).
     if body.action == "approve":
-        # Anyone can see it now: its title is read as a new book's is.
+        # Anyone can see it now: its title is read as a new book's is, and
+        # its published recipes' for the equipment they suggest.
         await session.flush()
         await title_rules.sweep(session, only=[source.id])
+        await equipment_rules.sweep(session, sources=[source.id])
     await session.commit()
     await session.refresh(source)
     return _item(source, await _names(session, [source.created_by]))
@@ -265,6 +267,9 @@ async def decide_recipe(
         await session.flush()
         # Enough approved now to be trusted (trust.py)?
         await trust.consider(session, recipe.created_by, settings)
+        # Anyone can see it now, if its source is published: what its title
+        # suggests it needs goes to the queue (equipment_rules.py).
+        await equipment_rules.sweep(session, recipes=[recipe.id])
     await session.commit()
     await session.refresh(recipe)
     return _item(recipe, await _names(session, [recipe.created_by]))
@@ -308,6 +313,8 @@ async def approve_all(
         await trust.consider(session, maker, settings)
     if published_source:
         await title_rules.sweep(session, only=[source.id])
+    # Its recipes are published now, whether or not the source just was.
+    await equipment_rules.sweep(session, sources=[source.id])
     await session.commit()
     return Approved(source=published_source, recipes=result.rowcount)
 

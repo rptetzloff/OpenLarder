@@ -1424,6 +1424,41 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       - [ ] 4. The suggestion queue, from titles, tags and sources. *Ray,
         2026-11-15, asked whether he wanted it, the spec having taken
         "agree on all" to mean so: yes.*
+        - [x] Equipment in the Suggestions queue (#224, migration 0085;
+          `equipment_rules.py`, as `title_rules.py` is for titles). A
+          recipe with no equipment said gets a suggestion for each
+          thing its title names or is made in, each technique tag named
+          for a thing (its own or its source's), and the appliance its
+          book is titled for. A moderator accepts, which adds the need
+          after those it has, as an edit of theirs marked with the
+          suggestion, and leaves the recipe saying that may not be all;
+          or dismisses, and it isn't suggested for that recipe again.
+          Nothing is added unreviewed: the rules are sometimes wrong,
+          and say so.
+          - Read when a recipe is saved or approved, when a source is
+            approved, when an import finishes, and by an administrator's
+            "Suggest equipment" on the Suggestions page.
+          - Only recipes anyone can see: nothing is filed for one in a
+            family's collection or waiting for review, so no row holds
+            its title. Not one whose equipment someone has said is
+            whole (*Claude's choice, 2026-11-16*: they've looked, and a
+            rule knows less). Not a thing the recipe needs already, or
+            something that counts as it.
+          - Which appliances a whole book is about is a short list
+            (*Claude's, 2026-11-16*; the spec says "titled for one
+            appliance"): slow cooker, Instant Pot or multicooker,
+            pressure cooker, air fryer, sous vide, bread machine. A
+            book called "Ice Cream" or "The Grilling Book" isn't read
+            that way.
+          - [ ] A book about one appliance files a suggestion for every
+            recipe in it, each accepted by itself. Allergens have
+            "Accept the likely ones shown"; equipment has nothing like
+            it yet.
+          - [ ] The queue's page loads every open suggestion to count
+            them by kind, which its own comment calls small
+            ("hundreds"). A first sweep of the whole catalog may file
+            thousands. Not measured against the live catalog.
+          - [ ] The rules know English, and only the words in them.
       - [ ] 5. Shop links, with their clicks and the disclosure.
       - [x] Equipment is a section of the header, not a link in the
         footer (#208). *Ray, 2026-11-15*, of the footer the spec had put

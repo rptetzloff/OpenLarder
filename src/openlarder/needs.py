@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from openlarder import equipment as kit
 from openlarder.ingredients import match_key
 from openlarder.models import (
     Equipment,
@@ -383,6 +384,38 @@ async def write(
     recipe.equipment_checked = bool(wanted) or bool(nothing_special)
     await session.flush()
     await sweep(session)
+
+
+async def add(session: AsyncSession, recipe: Recipe, thing: Equipment) -> bool:
+    """One more need of a recipe, met by one thing, after those it has.
+    Whether its needs are all recorded is left as it was: this is for what
+    a rule suggests (equipment_rules.py), which knows one thing a recipe
+    needs and not the rest. False, and nothing added, when a need of the
+    recipe is met already by the thing, or by something that counts as it:
+    a recipe needing a charcoal grill needs no grill beside it."""
+    met = await session.scalar(
+        select(EquipmentOption.id)
+        .where(
+            EquipmentOption.recipe_id == recipe.id,
+            EquipmentOption.equipment_id.in_(kit.family(thing.id, name="suggested_equipment")),
+        )
+        .limit(1)
+    )
+    if met is not None:
+        return False
+    last = await session.scalar(
+        select(func.max(RecipeEquipment.position)).where(RecipeEquipment.recipe_id == recipe.id)
+    )
+    need_row = RecipeEquipment(recipe_id=recipe.id, position=(last or 0) + 1, detail=None)
+    session.add(need_row)
+    await session.flush()
+    session.add(
+        EquipmentOption(
+            recipe_equipment_id=need_row.id, recipe_id=recipe.id, rank=1, equipment_id=thing.id
+        )
+    )
+    await session.flush()
+    return True
 
 
 async def sweep(session: AsyncSession) -> None:
