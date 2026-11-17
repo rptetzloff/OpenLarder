@@ -42,16 +42,18 @@ export interface Equipment {
 }
 
 // sort "name": A to Z, rather than most needed first; assumed: what any
-// kitchen has too.
+// kitchen has too; under: each one's count takes in what counts as it,
+// which is what a search finds when it's chosen.
 export async function listEquipment(
   q: string,
   offset = 0,
-  options: { sort?: "uses" | "name"; assumed?: boolean } = {},
+  options: { sort?: "uses" | "name"; assumed?: boolean; under?: boolean } = {},
 ): Promise<EquipmentList> {
   const query = new URLSearchParams({ q });
   if (offset) query.set("offset", String(offset));
   if (options.sort === "name") query.set("sort", "name");
   if (options.assumed) query.set("assumed", "true");
+  if (options.under) query.set("under", "true");
   const res = await fetch(`/api/equipment?${query}`);
   if (!res.ok) throw new Error("The equipment couldn't be loaded.");
   return res.json();

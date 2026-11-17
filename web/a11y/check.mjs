@@ -760,6 +760,24 @@ const SEARCH_EQUIPMENT = ({ chip, box, has, needs, hasnt }) => `(() => {
   if (hasnt && hasnt in hits) return "The search finds “" + hasnt + "”";
   return "";
 })()`;
+// A search box's suggestions say what choosing each one finds: a thing's
+// recipes and those of whatever counts as it, an ingredient's and those of
+// everything under it. By the recipes naming it alone, "Mixer" said 0
+// recipes and found the stand mixer's. Typed here, and read once offered.
+const TYPE_IN = (box, words) => `(async () => {
+  const input = document.getElementById(${JSON.stringify(box)});
+  input.focus();
+  input.value = ${JSON.stringify(words)};
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  const list = () => input.closest(".chip-input").nextElementSibling;
+  for (let i = 0; i < 80 && !list()?.matches("ul.options"); i++) await new Promise((r) => setTimeout(r, 100));
+})()`;
+const OFFERED = (box, wanted) => `(() => {
+  const list = document.getElementById(${JSON.stringify(box)}).closest(".chip-input").nextElementSibling;
+  const said = list?.matches("ul.options") ? [...list.querySelectorAll(".option")].map((b) => b.textContent.replace(/\\s+/g, " ").trim()) : [];
+  for (const line of ${JSON.stringify(wanted)}) if (!said.includes(line)) return "Typing in the box offers “" + said.join(" | ") + "”, without “" + line + "”";
+  return "";
+})()`;
 // A piece of equipment's page leads to the search for what needs it, as an
 // ingredient's does, and to a shop for it, with the notice of the
 // commission under them (Ray's equipment spec, 2026-11-15, Part 8); what
@@ -1591,6 +1609,9 @@ function pages(s) {
     [`/search?needs=${s.standMixer}`, null, { phone: true, expect: SEARCH_EQUIPMENT({ chip: "Needs Stand mixer", box: "search-needs", has: "Cheddar Biscuits", needs: "needs Biscuit cutter, Stand mixer or Hand mixer and 1 more" }) }],
     [`/search?q=cheddar&no_equipment=${s.standMixer}`, "cook", { phone: true, expect: SEARCH_EQUIPMENT({ chip: "Without Stand mixer", box: "search-no-equipment", has: "Cheddar Biscuits", needs: "needs Biscuit cutter, Stand mixer or Hand mixer and 1 more" }) }],
     [`/search?q=cheddar&no_equipment=${s.mixer}`, null, { expect: SEARCH_EQUIPMENT({ chip: "Without Mixer", box: "search-no-equipment", hasnt: "Cheddar Biscuits" }) }],
+    [`/search?needs=${s.wok}`, null, { phone: true, then: TYPE_IN("search-needs", "mixer"), expect: onPhone(OFFERED("search-needs", ["Mixer 1 recipe", "Stand mixer 1 recipe", "Hand mixer 1 recipe"])) }],
+    // 37 recipes name butter; 3 more use the aged cheddar put under it.
+    ["/search", null, { phone: true, then: TYPE_IN("search-ingredient", "butter"), expect: onPhone(OFFERED("search-ingredient", ["Butter 40 recipes"])) }],
     [`/equipment/${s.standMixer}`, null, { phone: true, expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe")})` }],
     [`/equipment/${s.mixer}`, null, { expect: `(${EQUIPMENT_RECIPES(["Cheddar Biscuits: Stand mixer or Hand mixer"])}) || (${EQUIPMENT_SAYS("Needed for 1 recipe, including everything it includes")})` }],
     [`/equipment/${s.multicooker}`, "admin", { expect: `(${ADMIN_BAR("This equipment")}) || (${EQUIPMENT_TOOLS})` }],

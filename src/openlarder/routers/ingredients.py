@@ -306,6 +306,9 @@ async def list_ingredients(
     # (case, plurals and punctuation aside): the front page's example
     # searches find theirs in one request.
     name: Annotated[list[str] | None, Query(max_length=20)] = None,
+    # Count the recipes using anything under each one too, and order by
+    # that: what a search finds when it's chosen (cheese finds cheddar).
+    under: bool = False,
 ) -> IngredientList:
     named: list[ColumnElement[bool]] = [visibility.ingredients_seen_by(viewer)]
     if name:
@@ -340,6 +343,23 @@ async def list_ingredients(
         # answer as slow as the whole list.
         uses = uses.where(IngredientOption.ingredient_id.in_(select(Ingredient.id).where(*named)))
     uses = uses.group_by(IngredientOption.ingredient_id).subquery()
+    if under:
+        # The families of what's typed, and no others, for the reason
+        # above. Measured 2026-11-17 on the check's database with 7,000
+        # ingredients and 300,000 lines: a letter matching 5,252 took 0.22
+        # seconds where the count above takes 0.13; a word matching 875,
+        # 0.08 for 0.06.
+        tree = ingredients.rooted_family(name="under_each", where=named)
+        uses = (
+            select(
+                tree.c.root.label("ingredient_id"),
+                func.count(func.distinct(IngredientOption.recipe_id)).label("n"),
+            )
+            .join(IngredientOption, IngredientOption.ingredient_id == tree.c.id)
+            .where(visibility.options_seen_by(viewer))
+            .group_by(tree.c.root)
+            .subquery()
+        )
     query = (
         select(Ingredient.id, Ingredient.name, func.coalesce(uses.c.n, 0), Ingredient.parent_id)
         .outerjoin(uses, uses.c.ingredient_id == Ingredient.id)

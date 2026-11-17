@@ -3,7 +3,7 @@
 import uuid
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 from fake_broker import _sign_in, make_admins
 
@@ -563,3 +563,84 @@ async def test_missing_max_is_nought_one_or_two_and_needs_ingredients(
     # And it isn't something to search by.
     alone = await client.get("/api/search", params={"missing_max": 0})
     assert alone.status_code == 422
+
+
+async def _offered(c, q, **params):
+    """What the search page's boxes offer for what's typed, in order, each
+    with its count."""
+    response = await c.get("/api/ingredients", params={"q": q, "under": "true", **params})
+    assert response.status_code == 200, response.text
+    return {i["name"]: i["recipes"] for i in response.json()["ingredients"]}
+
+
+async def test_a_box_counts_what_choosing_an_ingredient_finds(
+    admin, work, adb, client, people
+) -> None:
+    """It counted the recipes using exactly that ingredient, so "Cheese"
+    said 1 recipe and found three."""
+    await _add(admin, work, "Rarebit", "1", ["Aged Cheddar", "Bread"])
+    await _add(admin, work, "Toastie", "2", ["Cheese", "Bread"])
+    await _add(admin, work, "Ploughman's", "3", ["Cheddar", "Aged Cheddar"])
+    await _add(admin, work, "Cheesecake", "4", ["Cream Cheese", "Egg"])
+    cheese, cheddar, aged = [await _id(adb, n) for n in ("Cheese", "Cheddar", "Aged Cheddar")]
+    parent = "UPDATE ingredients SET parent_id = :p WHERE id = :i"
+    await adb.execute(text(parent), {"p": cheese, "i": cheddar})
+    await adb.execute(text(parent), {"p": cheddar, "i": aged})
+
+    offered = await _offered(client, "che")
+    # Cheese's are cheddar's and aged cheddar's too, each recipe once (the
+    # ploughman's uses both); cream cheese has "cheese" in it and isn't
+    # under it. The most found first, where by the recipes naming it cheese
+    # came after aged cheddar.
+    assert offered == {"Cheese": 3, "Aged Cheddar": 2, "Cheddar": 2, "Cream Cheese": 1}
+    assert list(offered)[0] == "Cheese"
+    for name, count in offered.items():
+        assert (await _search(client, await _id(adb, name)))["total"] == count, name
+    # Without it, the list is as it was: the recipes naming each.
+    exact = (await client.get("/api/ingredients", params={"q": "che"})).json()["ingredients"]
+    assert {i["name"]: i["recipes"] for i in exact} == {
+        "Aged Cheddar": 2,
+        "Cheddar": 1,
+        "Cheese": 1,
+        "Cream Cheese": 1,
+    }
+    # The names asked for by name are counted the same way.
+    named = await client.get("/api/ingredients", params={"name": "cheese", "under": "true"})
+    assert [(i["name"], i["recipes"]) for i in named.json()["ingredients"]] == [("Cheese", 3)]
+    # A family's recipe is counted for them and for nobody else.
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Box", "acknowledged": True})
+    ).json()["id"]
+    made = await ann.post(
+        f"/api/sources/{box}/recipes", json={"title": "Nana's", "ingredients": ["aged cheddar"]}
+    )
+    assert made.status_code == 201, made.text
+    hers = await _offered(ann, "che")
+    assert hers == {"Cheese": 4, "Aged Cheddar": 3, "Cheddar": 3, "Cream Cheese": 1}
+    for other in (client, await people("mo", role="moderator")):
+        assert await _offered(other, "che") == offered
+
+
+async def test_a_boxs_counting_starts_from_what_was_typed(client, async_engine) -> None:
+    """What's said to the database, since the answer is the same either
+    way: the families counted are those of what the typing matches, not of
+    every ingredient or thing there is. The box asks at each letter."""
+    said: list[str] = []
+
+    def note(conn, cursor, statement, parameters, context, executemany) -> None:
+        said.append(" ".join(statement.split()))
+
+    event.listen(async_engine.sync_engine, "before_cursor_execute", note)
+    try:
+        for what in ("ingredients", "equipment"):
+            said.clear()
+            found = await client.get(f"/api/{what}", params={"q": "che", "under": "true"})
+            assert found.status_code == 200, found.text
+            counted = [q for q in said if "WITH RECURSIVE under_each" in q]
+            assert counted, what
+            for q in counted:
+                # The family's start, before what's under it is added.
+                assert " ILIKE " in q.split(" UNION ")[0], (what, q)
+    finally:
+        event.remove(async_engine.sync_engine, "before_cursor_execute", note)
