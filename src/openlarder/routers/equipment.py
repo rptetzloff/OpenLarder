@@ -116,6 +116,10 @@ async def list_equipment(
     sort: Literal["uses", "name"] = "uses",
     # What any kitchen has, too. Without it, only what a recipe can list.
     assumed: bool = False,
+    # Count the recipes needing anything that counts as each one too, and
+    # order by that: what a search finds when it's chosen (a mixer finds
+    # the stand mixer's). As the ingredients' list does.
+    under: bool = False,
 ) -> EquipmentList:
     listed: list[ColumnElement[bool]] = [visibility.equipment_seen_by(viewer)]
     if not assumed:
@@ -138,6 +142,18 @@ async def list_equipment(
         .group_by(EquipmentOption.equipment_id)
         .subquery()
     )
+    if under:
+        tree = equipment.rooted_family(*listed, name="under_each")
+        uses = (
+            select(
+                tree.c.root.label("equipment_id"),
+                func.count(func.distinct(EquipmentOption.recipe_id)).label("n"),
+            )
+            .join(EquipmentOption, EquipmentOption.equipment_id == tree.c.id)
+            .where(visibility.needs_seen_by(viewer))
+            .group_by(tree.c.root)
+            .subquery()
+        )
     query = (
         select(Equipment.id, Equipment.name, Equipment.assumed, func.coalesce(uses.c.n, 0))
         .outerjoin(uses, uses.c.equipment_id == Equipment.id)

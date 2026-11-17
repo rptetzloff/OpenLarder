@@ -405,8 +405,14 @@ function finder<T extends Named>(find: (q: string) => Promise<T[]>, taken: () =>
   return { query, suggestions };
 }
 
+// A suggestion's count is what choosing it finds: an ingredient's recipes
+// and those of everything under it, a thing's and those of whatever counts
+// as it. By the recipes naming it alone, "Mixer" said 0 recipes and found
+// the stand mixer's.
+const UNDER = { under: true };
+
 const unwantedFind = finder(
-  async (q) => (await listIngredients(q)).ingredients,
+  async (q) => (await listIngredients(q, 0, UNDER)).ingredients,
   () => [...unwanted.value, ...chosen.value],
 );
 function addUnwanted(item: Named) {
@@ -425,8 +431,8 @@ function dropUnwanted(id: string, refocus = true) {
 // The same two boxes for equipment. What any kitchen has isn't offered:
 // no recipe lists it, so there'd be nothing to find or to leave out.
 const taken = () => [...needing.value, ...noKit.value];
-const needFind = finder(async (q) => (await listEquipment(q)).equipment, taken);
-const noKitFind = finder(async (q) => (await listEquipment(q)).equipment, taken);
+const needFind = finder(async (q) => (await listEquipment(q, 0, UNDER)).equipment, taken);
+const noKitFind = finder(async (q) => (await listEquipment(q, 0, UNDER)).equipment, taken);
 function addNeeded(item: Named) {
   if (needing.value.length < MAX_EQUIPMENT) needing.value.push({ id: item.id, name: item.name });
   needFind.query.value = "";
@@ -459,7 +465,7 @@ function kitSaid(needs: string[]) {
 }
 
 const ingredientFind = finder(
-  async (q) => (await listIngredients(q)).ingredients,
+  async (q) => (await listIngredients(q, 0, UNDER)).ingredients,
   () => [...chosen.value, ...unwanted.value],
 );
 const sourceFind = finder(

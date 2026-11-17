@@ -45,6 +45,22 @@ def family(*equipment_ids: uuid.UUID, name: str = "equipment_family"):
     return select(tree.c.id)
 
 
+def rooted_family(*conditions, name: str = "equipment_rooted"):
+    """As family, for every thing meeting the conditions at once, each row
+    saying which of them it counts as (root, id): how many recipes need a
+    mixer, the stand mixer's among them."""
+    tree = (
+        select(Equipment.id.label("root"), Equipment.id.label("id"))
+        .where(*conditions)
+        .cte(name=name, recursive=True)
+    )
+    return tree.union(
+        select(tree.c.root, EquipmentCountsAs.equipment_id).where(
+            EquipmentCountsAs.counts_as_id == tree.c.id
+        )
+    )
+
+
 def ancestry(*equipment_ids: uuid.UUID, name: str = "equipment_ancestry"):
     """The things and everything they count as, as a select of IDs: someone
     with a stand mixer has a mixer. family's other direction, and UNION for

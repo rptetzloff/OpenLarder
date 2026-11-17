@@ -100,16 +100,18 @@ export function whereItIs(r: Listed): string {
 }
 
 // sort "name": A to Z, rather than most used first; top: only those that
-// come under nothing.
+// come under nothing; under: each one's count takes in what's under it,
+// which is what a search finds when it's chosen.
 export async function listIngredients(
   q: string,
   offset = 0,
-  options: { sort?: "uses" | "name"; top?: boolean } = {},
+  options: { sort?: "uses" | "name"; top?: boolean; under?: boolean } = {},
 ): Promise<IngredientList> {
   const query = new URLSearchParams({ q });
   if (offset) query.set("offset", String(offset));
   if (options.sort === "name") query.set("sort", "name");
   if (options.top) query.set("top", "true");
+  if (options.under) query.set("under", "true");
   const res = await fetch(`/api/ingredients?${query}`);
   if (!res.ok) throw new Error("The ingredients couldn't be loaded.");
   return res.json();

@@ -162,3 +162,45 @@ async def test_a_search_takes_so_much_equipment(client, book) -> None:
         assert over.status_code == 422 and "equipment" in over.json()["detail"], param
         under = await client.get("/api/search", params={"q": "kit", param: many[:-1]})
         assert under.status_code == 200, param
+
+
+async def _offered(c, q: str, **params) -> dict[str, int]:
+    """What the search page's boxes offer for what's typed, in order, each
+    with its count."""
+    response = await c.get("/api/equipment", params={"q": q, "under": "true", **params})
+    assert response.status_code == 200, response.text
+    return {e["name"]: e["recipes"] for e in response.json()["equipment"]}
+
+
+async def test_a_box_counts_what_choosing_a_thing_finds(people, client, book, adb) -> None:
+    """It counted the recipes needing exactly that thing, so "Mixer" said 0
+    recipes and found three."""
+    offered = await _offered(client, "mixer")
+    # A mixer's are the stand mixer's and the hand mixer's, each recipe
+    # once (the cake offers both); and the most found comes first, where by
+    # the recipes naming it the mixer came last.
+    assert offered == {"Mixer": 3, "Stand mixer": 3, "Hand mixer": 1}
+    assert list(offered) == ["Mixer", "Stand mixer", "Hand mixer"]
+    for name, count in offered.items():
+        found = await _found(client, needs=await _thing(adb, name))
+        assert found["total"] == count, name
+    # Without it, the list is as it was: the recipes naming each.
+    exact = (await client.get("/api/equipment", params={"q": "mixer"})).json()["equipment"]
+    assert {e["name"]: e["recipes"] for e in exact} == {
+        "Stand mixer": 3,
+        "Hand mixer": 1,
+        "Mixer": 0,
+    }
+    # A family's recipe is counted for them and for nobody else.
+    ann = await people("ann")
+    box = (
+        await ann.post("/api/sources/family", json={"title": "Box", "acknowledged": True})
+    ).json()["id"]
+    made = await ann.post(
+        f"/api/sources/{box}/recipes",
+        json={"title": "Nana's", "ingredients": ["eggs"], "equipment": ["hand mixer"]},
+    )
+    assert made.status_code == 201, made.text
+    assert await _offered(ann, "mixer") == {"Mixer": 4, "Stand mixer": 3, "Hand mixer": 2}
+    for other in (client, await people("mo3", role="moderator")):
+        assert await _offered(other, "mixer") == offered

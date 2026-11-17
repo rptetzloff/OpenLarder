@@ -1347,9 +1347,22 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
             it.
           - What any kitchen has isn't offered in either box, and its
             page has no "Search with": no recipe lists it.
-          - [ ] A suggestion in either box counts the recipes needing
-            exactly that thing, so "Mixer" says 0 recipes and finds the
-            ones needing a stand mixer.
+          - [x] A suggestion in either box counted the recipes needing
+            exactly that thing, so "Mixer" said 0 recipes and found the
+            ones needing a stand mixer. It counts what choosing it finds
+            (#229, 2026-11-17): the thing's recipes and those of whatever
+            counts as it, each once, and the most found comes first. The
+            ingredients' two boxes did the same ("Cheese" counted the
+            recipes naming cheese and found cheddar's), and are changed
+            with them: the lists ask with `under=true`. *Claude's choice,
+            not asked for:* that a box's count is what the search finds.
+            The Ingredients and Equipment lists, the recipe form's
+            pickers and each page's own count are as they were, the
+            recipes naming it. Timed on the check's database with 7,000
+            ingredients (5,000 under another) and 30,000 recipes of ten
+            lines, on this machine: one letter typed, matching 5,252,
+            0.13 seconds before and 0.22 after; a word matching 875, 0.06
+            and 0.08; 138 or fewer, no difference. Not the live server.
         - [x] My equipment (#221, migration 0084), at `/equipment/mine`,
           "Equipment" in the My kitchen menu after Larder. *Ray,
           2026-11-16, asked how sharing works when the spec gives it no
