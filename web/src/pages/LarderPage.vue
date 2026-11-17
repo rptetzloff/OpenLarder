@@ -76,7 +76,8 @@ function rename(list: List) {
 }
 
 function drop(list: List) {
-  const what = list.items.length ? ` and the ${list.items.length} things on it` : "";
+  const n = list.items.length;
+  const what = n ? ` and the ${n === 1 ? "one thing" : `${n} things`} on it` : "";
   if (confirm(`Remove “${list.name}”${what}?`)) act(() => removeList(list.id));
 }
 

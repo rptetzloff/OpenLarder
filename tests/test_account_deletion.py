@@ -66,6 +66,17 @@ async def test_what_goes_and_what_stays(people, client, adb) -> None:
         "INSERT INTO larder_lists (owner_id, name) VALUES (:u, 'Pantry') RETURNING id",
         u=ann_id,
     )
+    kitchen = await _scalar(
+        adb,
+        "INSERT INTO equipment_lists (owner_id, name) VALUES (:u, 'Kitchen') RETURNING id",
+        u=ann_id,
+    )
+    await _scalar(
+        adb,
+        "INSERT INTO equipment_list_items (list_id, name, equipment_id)"
+        " SELECT :l, 'Wok', id FROM equipment WHERE name = 'Wok' RETURNING id",
+        l=kitchen,
+    )
     request = await _scalar(
         adb,
         "INSERT INTO book_requests (title, requested_by) VALUES ('Jerusalem', :u) RETURNING id",
@@ -89,6 +100,8 @@ async def test_what_goes_and_what_stays(people, client, adb) -> None:
     assert await _scalar(adb, "SELECT count(*) FROM sources WHERE id = :s", s=box) == 0
     assert await _scalar(adb, "SELECT count(*) FROM revisions WHERE source_id = :s", s=box) == 0
     assert await _scalar(adb, "SELECT count(*) FROM larder_lists WHERE id = :l", l=larder) == 0
+    assert await _scalar(adb, "SELECT count(*) FROM equipment_lists") == 0
+    assert await _scalar(adb, "SELECT count(*) FROM equipment_list_items") == 0
     assert await _scalar(adb, "SELECT count(*) FROM recipes WHERE id = :r", r=waiting) == 0
     assert await _scalar(adb, "SELECT count(*) FROM request_votes") == 0
     # What was given to the catalog stays, without its name.

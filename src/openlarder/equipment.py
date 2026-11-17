@@ -25,6 +25,7 @@ from openlarder.models import (
     Equipment,
     EquipmentAlias,
     EquipmentCountsAs,
+    EquipmentListItem,
     EquipmentOption,
     MergedRecord,
 )
@@ -220,6 +221,11 @@ async def merge(session: AsyncSession, source: Equipment, target: Equipment) -> 
     # Other names can't clash: a key means one thing.
     await session.execute(
         update(EquipmentAlias).where(EquipmentAlias.equipment_id == s).values(equipment_id=t)
+    )
+    # People's lists keep what they have, under the name kept, as their
+    # larders do when an ingredient is merged.
+    await session.execute(
+        update(EquipmentListItem).where(EquipmentListItem.equipment_id == s).values(equipment_id=t)
     )
     # What the one going counted as, and what counted as it, do so of the
     # one kept; a link between the two, or one the other has, is dropped.

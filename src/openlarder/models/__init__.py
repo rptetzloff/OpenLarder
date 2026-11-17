@@ -40,6 +40,9 @@ from openlarder.models.groups import Group, GroupInvite, GroupMember, SourceGrou
 from openlarder.models.history import Revision
 from openlarder.models.imports import ImportRun, ImportRunLine
 from openlarder.models.larder import (
+    EquipmentList,
+    EquipmentListGroup,
+    EquipmentListItem,
     LarderItem,
     LarderList,
     LarderListGroup,
@@ -92,6 +95,9 @@ __all__ = [
     "IngredientAlias",
     "IngredientAllergen",
     "IngredientOption",
+    "EquipmentList",
+    "EquipmentListGroup",
+    "EquipmentListItem",
     "LarderItem",
     "LinkSuggestion",
     "LarderList",

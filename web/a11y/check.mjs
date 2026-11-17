@@ -742,6 +742,58 @@ const SEARCH_WITH = (words) => `(() => {
   const links = [...document.querySelectorAll(".ingredient-actions a")].map((a) => a.textContent.replace(/\\s+/g, " ").trim() + " " + a.getAttribute("href").replace(/[0-9a-f-]{36}/, "ID"));
   return links.join() === ${JSON.stringify(words ? words + " /search?needs=ID" : "")} ? "" : "The page's search link reads “" + links.join(" | ") + "”";
 })()`;
+// Your equipment (Ray, 2026-11-16: "Named lists, like the larder", and
+// "Have / Want"). Its owner sees his two lists; in the kitchen, a thing
+// matched to a piece of equipment, one that isn't and says so, and one he
+// wants, which is marked and doesn't count. How many count is said, and
+// agrees with the list.
+const MY_EQUIPMENT = `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const lists = [...document.querySelectorAll(".equipment-lists-page .larder-list")];
+  if (lists.map((l) => words(l.querySelector("h2"))).join() !== "Kitchen,Cabin") return "The lists are “" + lists.map((l) => words(l.querySelector("h2"))).join(" | ") + "”";
+  const item = (name) => [...lists[0].querySelectorAll(".larder-items > li")].find((li) => words(li.querySelector("strong")) === name);
+  const pressed = (li) => [...li.querySelectorAll('.kind-filter button[aria-pressed="true"]')].map(words).join();
+  const mixer = item("Stand mixer"), cauldron = item("Nana's cauldron"), maker = item("Ice cream maker");
+  if (!mixer?.querySelector('.larder-item-name a[href^="/equipment/"]') || pressed(mixer) !== "Have") return "The stand mixer reads “" + words(mixer) + "”";
+  if (!words(cauldron).includes("not matched, so it doesn't count") || !words(cauldron).includes("Choose what it is")) return "The thing nothing matches reads “" + words(cauldron) + "”";
+  if (pressed(maker) !== "Want" || !maker.classList.contains("state-want")) return "The thing wanted reads “" + words(maker) + "”";
+  const group = maker.querySelector(".kind-filter");
+  if (group.getAttribute("role") !== "group" || group.getAttribute("aria-label") !== "Ice cream maker: have or want" || [...group.querySelectorAll("button")].map(words).join() !== "Have,Want") return "A thing's states are “" + words(group) + "”, named “" + group.getAttribute("aria-label") + "”";
+  const said = words(document.querySelector(".larder-summary")).match(/^(\\d+) of (\\d+) things count as equipment you have\\.$/);
+  const had = [...document.querySelectorAll(".larder-items > li")].filter((li) => pressed(li) === "Have" && li.querySelector('.larder-item-name a[href^="/equipment/"]')).length;
+  if (!said || Number(said[1]) !== had || Number(said[2]) !== document.querySelectorAll(".larder-items > li").length) return "The page says “" + words(document.querySelector(".larder-summary")) + "” of " + had + " had";
+  if (!words(lists[0].querySelector(".larder-shared")).startsWith("Shared with ")) return "The kitchen doesn't say who it's shared with";
+  return "";
+})()`;
+// Someone it's shared with to view sees it as its owner's, with what each
+// thing is and no way to change it.
+const MY_EQUIPMENT_SHARED = `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const [list] = [...document.querySelectorAll(".equipment-lists-page .larder-list")];
+  if (words(list?.querySelector("h2")) !== "Kitchen") return "The list shared with her is “" + words(list?.querySelector("h2")) + "”";
+  if (!/'s, shared with you through .+: you can see it, not change it\\.$/.test(words(list.querySelector(".larder-shared")))) return "The shared list says “" + words(list.querySelector(".larder-shared")) + "”";
+  if (list.querySelector("form, .kind-filter, .larder-list-head button")) return "A list she can only see has something to change it with";
+  const states = [...list.querySelectorAll(".larder-state")].map(words);
+  if (!states.includes("Have") || !states.includes("Want")) return "The shared list's things say “" + states.join(" | ") + "”";
+  return "";
+})()`;
+// It's under My kitchen, and that's where the header says you are: not in
+// the catalog's Equipment, whose address its own begins with.
+const MINE_IN_MENU = `(() => {
+  const marked = [...document.querySelectorAll('.site-header a[aria-current="page"]')].map((a) => a.getAttribute("href"));
+  if (!marked.length || marked.some((href) => href !== "/equipment/mine")) return "On Your equipment the header marks “" + marked.join(" | ") + "”";
+  const kitchen = [...document.querySelectorAll('.site-header a[href="/equipment/mine"]')].map((a) => a.textContent.trim());
+  if (!kitchen.length || kitchen.some((said) => said !== "Equipment")) return "My kitchen's link to it reads “" + kitchen.join(" | ") + "”";
+  const after = [...document.querySelectorAll('.site-header a[href="/equipment/mine"]')].every((a) => a.closest("li")?.previousElementSibling?.querySelector('a[href="/larder"]'));
+  return after ? "" : "Equipment isn't after Larder in My kitchen";
+})()`;
+// "Choose what it is", pressed: a box to find the piece of equipment in,
+// labelled with the thing's own name.
+const CHOOSE_EQUIPMENT = `(() => {
+  const box = document.querySelector('.equipment-lists-page input[id^="pick-"]');
+  if (!box) return "“Choose what it is” opens no box";
+  return document.querySelector('label[for="' + box.id + '"]')?.textContent.includes("What “Nana's cauldron” is") ? "" : "The box to find the equipment in isn't labelled with the thing's name";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1113,6 +1165,16 @@ async function seed() {
   const seat = await api(`/api/groups/${group.id}/invites`, "cook", { role: "view" });
   await api(`/api/invites/${seat.token}/accept`, "admin", {});
   await api(`/api/larder/items/${butter.id}`, "cook", { state: "out" }, "PATCH");
+  // Cy's equipment, in lists as his larder is (Ray, 2026-11-16): a thing
+  // matched, one under a name of his own that matches nothing, and one he
+  // wants. His kitchen is shared with the family, as his pantry is; Ada
+  // views it.
+  const kitchen = await api("/api/equipment-lists/lists", "cook", { name: "Kitchen" });
+  await api("/api/equipment-lists/lists", "cook", { name: "Cabin" });
+  await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: "Stand mixer" });
+  await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: "Nana's cauldron" });
+  await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: "Ice cream maker", state: "want" });
+  await api(`/api/equipment-lists/lists/${kitchen.id}/groups`, "cook", { groups: [group.id] }, "PUT");
   // Cy owns the book, the edition with the recipe's page.
   await api(`/api/shelf/${book.id}`, "cook", { edition_id: biscuitPage.pages[0].edition_id }, "PUT");
   // And shares his shelf with the family group: Ada sees it.
@@ -1190,6 +1252,7 @@ async function seed() {
   await api(`/api/recipes/${word.id}/rating`, "cook", { spoons: 5 }, "PUT");
   await api("/api/requests", "cook", { title: LONG, author: LONG, note: `${LONG} ${address}` });
   await api(`/api/larder/lists/${pantry.id}/items`, "cook", { name: LONG });
+  await api(`/api/equipment-lists/lists/${kitchen.id}/items`, "cook", { name: LONG });
   // A click on its buy link, as a browser sends one (a click with no
   // browser's name is taken for a bot's and not counted), so Buy-link clicks
   // has the title to show. The shop it leads to is never asked for anything.
@@ -1437,6 +1500,9 @@ function pages(s) {
     ["/larder", "admin"],
     ["/search?larder=1", "cook"],
     ["/larder", null, { expect: HOW_FOLDED(true) }],
+    ["/equipment/mine", "cook", { phone: true, expect: `(${HOW_FOLDED(false)}) || (${MY_EQUIPMENT}) || (${MINE_IN_MENU})` }],
+    ["/equipment/mine", "admin", { phone: true, expect: MY_EQUIPMENT_SHARED }],
+    ["/equipment/mine", null, { expect: HOW_FOLDED(true) }],
     ["/shelf", "cook", { phone: true, expect: `(${WANTS_ON_SHELF}) || (${HOW_FOLDED(false)})` }],
     ["/shelf", "admin", { phone: true, expect: WANTS_ON_SHELF }],
     ["/shelf", null, { phone: true, expect: HOW_FOLDED(true) }],
@@ -1458,6 +1524,9 @@ function pages(s) {
     // "How this works" opened by hand on each, on a phone.
     ["/shelf", "cook", { phone: true, then: OPEN_HOW }],
     ["/larder", "cook", { phone: true, then: OPEN_HOW }],
+    ["/equipment/mine", "cook", { phone: true, then: OPEN_HOW }],
+    ["/equipment/mine", "cook", { phone: true, then: `[...document.querySelectorAll(".equipment-lists-page .larder-items > li")].find((li) => li.querySelector("strong").textContent.trim() === "Nana's cauldron").querySelector(".larder-item-name button").click()`, expect: onPhone(CHOOSE_EQUIPMENT) }],
+    ["/equipment/mine", "cook", { phone: true, then: `[...document.querySelectorAll(".equipment-lists-page .larder-list-head button")].find((b) => b.textContent.trim() === "Share").click()`, expect: onPhone(`document.querySelector(".equipment-lists-page fieldset.larder-share legend")?.textContent.trim() === "Who else sees it" ? "" : "Share opens nothing to choose a group in"`) }],
     ["/saved", "cook", { phone: true, then: OPEN_HOW }],
     ["/saved#notes", "cook", { expect: THUMBS_DRAWN }],
     ["/saved#notes", "admin"],

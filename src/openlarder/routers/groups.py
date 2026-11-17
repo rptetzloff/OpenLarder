@@ -26,6 +26,8 @@ from sqlalchemy import delete, func, select, update
 from openlarder.auth import CurrentUser, SameOrigin, hash_token, new_token
 from openlarder.db import Session
 from openlarder.models import (
+    EquipmentList,
+    EquipmentListGroup,
     Group,
     GroupInvite,
     GroupMember,
@@ -137,8 +139,8 @@ LAST_ADMIN = "A group needs an admin: make someone else one first, or delete the
 
 
 async def _unshare(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    """Stop sharing someone's collections, larder lists, shelf, saved
-    recipes and notes with a group they've left."""
+    """Stop sharing someone's collections, larder and equipment lists,
+    shelf, saved recipes and notes with a group they've left."""
     await session.execute(
         delete(SourceGroup).where(
             SourceGroup.group_id == group_id,
@@ -150,6 +152,14 @@ async def _unshare(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) ->
             LarderListGroup.group_id == group_id,
             LarderListGroup.list_id.in_(
                 select(LarderList.id).where(LarderList.owner_id == user_id)
+            ),
+        )
+    )
+    await session.execute(
+        delete(EquipmentListGroup).where(
+            EquipmentListGroup.group_id == group_id,
+            EquipmentListGroup.list_id.in_(
+                select(EquipmentList.id).where(EquipmentList.owner_id == user_id)
             ),
         )
     )

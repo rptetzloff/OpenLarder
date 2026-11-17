@@ -1350,14 +1350,43 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           - [ ] A suggestion in either box counts the recipes needing
             exactly that thing, so "Mixer" says 0 recipes and finds the
             ones needing a stand mixer.
-        - [ ] My equipment. *Ray, 2026-11-16, asked how sharing works
-          when the spec gives it no lists: "it should work like larder
-          and book lists work".* So: named lists, each shared with
-          household groups, as the larder's are; the spec's single
-          checklist is set aside.
+        - [x] My equipment (#221, migration 0084), at `/equipment/mine`,
+          "Equipment" in the My kitchen menu after Larder. *Ray,
+          2026-11-16, asked how sharing works when the spec gives it no
+          lists: "it should work like larder and book lists work".* That
+          fitted both, which are built differently (the shelf is one
+          list a person, shared whole; the larder is several named
+          lists), so he was asked which: *"Named lists, like the
+          larder".* So it is the larder over again, and the spec's
+          single checklist and `user_equipment` table are set aside:
+          lists a person names, each shared with household groups by
+          the larder's rules; a thing on one under a name of their own,
+          matched to a piece of equipment by its name or another name
+          (a size typed with it set aside), or chosen; one nothing
+          matches kept, and never added to the equipment list.
+          - Each thing is one they have or one they want. *Ray,
+            2026-11-16, asked what states it has, a larder's "low"
+            having no meaning here: "Have / Want"*, as a book on a
+            shelf is. Wanted stays on its list and doesn't count.
+          - As the larder: merging equipment moves people's items;
+            leaving a group stops sharing with it; the lists go with
+            their owner's account; they're in no dump, no public read
+            and no edit history; the privacy page and the delete box
+            name them. A reset of the catalog leaves them, since the
+            equipment list stays too.
+          - A thing a hidden recipe brought in is matched only for
+            someone who can see that recipe.
+          - Found on the way: removing a list with one thing on it
+            asked about "the 1 things on it", on the larder's page too.
+            Fixed on both.
+          - [ ] Nothing uses the lists yet: the page says how many
+            things count, and that is all they do until the next two
+            items.
+          - [ ] The larder's page has "What can I make?", "Search with
+            this list" and a tick on each thing to search with. This
+            page has none of them until search can use the lists.
         - [ ] "Only what I have the equipment for" (`equipment=mine`),
-          and "You don't have this" on a recipe's page. Both wait for My
-          equipment.
+          and "You don't have this" on a recipe's page.
       - [ ] 4. The suggestion queue, from titles, tags and sources. *Ray,
         2026-11-15, asked whether he wanted it, the spec having taken
         "agree on all" to mean so: yes.*
