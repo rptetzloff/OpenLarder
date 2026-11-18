@@ -81,7 +81,10 @@ onMounted(async () => {
       recipe.value = await res.json();
       editionId.value = recipe.value!.pages[0]?.edition_id ?? null;
       if (props.user && recipe.value!.source.kind === "book") showYours(recipe.value!);
-      if (props.user !== null) flags.value = await recipeFlags(props.id);
+      // Its flags are beside the recipe, not the recipe: if they can't be
+      // fetched, the page is the recipe without them. (They aren't in the
+      // copy kept on a device, and their failing took the whole page.)
+      if (props.user !== null) flags.value = await recipeFlags(props.id).catch(() => []);
       document.title = `${recipe.value!.title} · ${recipe.value!.source.title} · OpenLarder`;
     }
   } catch {

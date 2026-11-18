@@ -127,12 +127,13 @@ weren't there.
 On a device where someone has switched it on ("Keep my kitchen on this
 device", on Account's page), it also keeps a copy of what is theirs: the
 larder, shelf, equipment and saved recipes pages, what those ask the server
-for, and what they're drawn with. Those are still fetched from the network
+for, what they're drawn with, and each recipe they have saved with their
+notes on it, so its page opens too. Those are still fetched from the network
 every time; the copy answers only when the network doesn't. The copy is
 taken off the device when the switch is turned off, on signing out or
 deleting the account, when the server says nobody or somebody else is
 signed in, and after 30 days without the server saying its owner is. What
-may be kept is listed in `sw.js` (`PAGES`, `DATA`), and
+may be kept is listed in `sw.js` (`PAGES`, `DATA`, `RECIPE`), and
 `tests/test_offline.py` fails when that list changes: adding to it adds to
 what stays on a device, and to the Privacy page.
 

@@ -1763,6 +1763,10 @@ function pages(s) {
     ["/equipment/mine", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Your equipment", "Kitchen") }],
     ["/saved", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Saved recipes", "Cheddar Biscuits") }],
     ["/search?q=biscuits", "cook", { phone: true, kept: true, expect: KEPT_LINKS }],
+    // A recipe he has saved is in the copy, with what it needs; one he
+    // hasn't is the page for no connection.
+    [`/recipes/${s.biscuits.id}`, "cook", { phone: true, kept: true, expect: KEPT_PAGE("Cheddar Biscuits", "Aged cheddar") }],
+    [`/recipes/${s.web.id}`, "cook", { phone: true, kept: true, expect: KEPT_LINKS }],
     ["/", "cook", { phone: true, leaving: true, expect: LEFT }],
     ["/search", null, { expect: FILTERS_IN_MORE }],
     [`/search?i=${s.cheddar}`, null],
