@@ -970,8 +970,33 @@ const SUGGESTED_EQUIPMENT = `(() => {
   if (said.sort().join(" | ") !== wanted.join(" | ")) return "The slow-cooker book's suggestions read “" + said.join(" | ") + "”";
   return "";
 })()`;
+// Ingredients that count as another by their names, in the same queue
+// (Ray, 2026-11-17: a list of families he approves). Each member of a
+// family has a suggestion saying what it counts as and why, the nearest
+// of the family first; each can be accepted with the rest of its family,
+// by a button saying how many and which; and an administrator has the
+// button that reads the ingredients again.
+const SUGGESTED_FAMILY = `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const counting = [...document.querySelectorAll(".suggestion-cards > li")].filter((li) => words(li.querySelector("h2")) === "Does one count as the other?");
+  // One that something else suggested is one of no family, and is decided
+  // by itself.
+  const cards = counting.filter((li) => words(li.querySelector(".suggestion-reason")).startsWith("Its name ends with"));
+  if (counting.length === cards.length) return "The queue has no “counts as” suggestion but the families'";
+  if (counting.some((li) => !cards.includes(li) && li.querySelector("button.accept-family"))) return "A suggestion that isn't one of a family can be accepted with one";
+  const said = cards.map((li) => words(li.querySelector("p")) + ": " + words(li.querySelector(".suggestion-reason")) + " " + [...li.querySelectorAll("button")].map(words).join(", "));
+  const wanted = [
+    "Pearl onion counts as Onion: Its name ends with “Onion”, one of the Onion family. Accept, Accept for all 2 in the Onion family, Dismiss",
+    "Red pearl onion counts as Pearl onion: Its name ends with “Pearl onion”, one of the Onion family. Accept, Accept for all 2 in the Onion family, Dismiss",
+  ];
+  if (said.sort().join(" | ") !== wanted.join(" | ")) return "The onion family's suggestions read “" + said.join(" | ") + "”";
+  const links = [...cards[0].querySelectorAll("p a")].map((a) => (a.getAttribute("href") ?? "").replace(/[0-9a-f-]{36}/, "ID"));
+  if (links.join() !== "/ingredients/ID,/ingredients/ID") return "A suggestion's ingredients lead to “" + links.join(" | ") + "”";
+  if (![...document.querySelectorAll(".row-actions button")].some((b) => words(b) === "Suggest ingredient families")) return "An administrator has no “Suggest ingredient families”";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
-const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
+const NO_TOOLS =`document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
   const panel = document.querySelector("main details.add-panel");
   if (panel?.querySelector("summary")?.textContent.trim() !== "Add equipment") return "A moderator has no “Add equipment” on the list";
@@ -1277,13 +1302,17 @@ async function seed() {
   // suggestion, which a moderator may accept for all of them at once.
   const cookerBook = await api("/api/sources/manual", "admin", { title: "Slow Cooker Suppers", authors: ["Ann Author"] });
   const cookerBookShown = await api(`/api/sources/${cookerBook.id}`, "admin");
-  for (const [title, page] of [["Bean Chili", "8"], ["Pot Roast", "20"]]) {
+  // The pot roast has two more onions, which count as onion by their
+  // names (name_families.py): filed here as an administrator's button
+  // files them, for the queue.
+  for (const [title, page, more] of [["Bean Chili", "8", []], ["Pot Roast", "20", ["Pearl onion", "Red pearl onion"]]]) {
     await api(`/api/sources/${cookerBook.id}/recipes`, "admin", {
       title,
       editions: [{ edition_id: cookerBookShown.editions[0].id, page }],
-      ingredients: ["Onions"],
+      ingredients: ["Onions", ...more],
     });
   }
+  await api("/api/suggestions/families", "admin", {});
   await api("/api/sources/manual", "admin", {
     title: "Ann Authors Best Bakes",
     authors: ["Ann Author"],
@@ -1698,7 +1727,7 @@ function pages(s) {
     [`/recipes/${s.imported}`, "admin", { phone: true, expect: EQUIPMENT_FLAGS }],
     ["/admin/import", "admin", { phone: true, then: `document.querySelector("main details.how").open = true`, expect: onPhone(IMPORT_COLUMNS) }],
     ["/admin/imports", "admin"],
-    ["/admin/suggestions", "admin", { phone: true, expect: SUGGESTED_EQUIPMENT }],
+    ["/admin/suggestions", "admin", { phone: true, expect: `(${SUGGESTED_EQUIPMENT}) || (${SUGGESTED_FAMILY})` }],
     ["/admin/api", "admin"],
     ["/admin/clicks", "admin", { expect: CRUMBS }],
     ["/admin/merges", "admin"],

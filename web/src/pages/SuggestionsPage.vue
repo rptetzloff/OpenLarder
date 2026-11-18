@@ -13,6 +13,7 @@ import {
   type SuggestionPage,
   suggestAllergens,
   suggestEquipment,
+  suggestFamilies,
   suggestTitles,
 } from "../suggestions";
 import type { Me } from "../me";
@@ -149,8 +150,26 @@ async function acceptLikely() {
   }
 }
 
-// A source's equipment suggestions accepted together: say how many, and
-// load again, since they aren't all on the page.
+async function runFamilies() {
+  busy.value = true;
+  note.value = actionError.value = "";
+  try {
+    const n = await suggestFamilies();
+    note.value =
+      n === 0
+        ? "Nothing new to suggest."
+        : `${n.toLocaleString()} new “counts as” ${n === 1 ? "suggestion" : "suggestions"}.`;
+    kind.value = n ? "parent" : "";
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+// A source's equipment suggestions, or a family's, accepted together: say
+// how many, and load again, since they aren't all on the page.
 async function together(done: number) {
   note.value = `Accepted ${done.toLocaleString()}.`;
   actionError.value = "";
@@ -179,7 +198,7 @@ watch(allowed, (yes) => {
       <p class="muted">
         A local model compared ingredients that look alike, and read recipes for the tags they
         could have, and suggests what to do. Rules read names and titles, and suggest allergens,
-        title fixes and equipment.
+        title fixes, equipment and which ingredients count as another.
       </p>
     </div>
     <p v-if="!user" class="status"><SignInLink /> to see suggestions.</p>
@@ -237,6 +256,15 @@ watch(allowed, (yes) => {
           Suggest equipment
         </button>
         <button
+          v-if="user.may_run"
+          type="button"
+          class="secondary small"
+          :disabled="busy"
+          @click="runFamilies"
+        >
+          Suggest ingredient families
+        </button>
+        <button
           v-if="kind === 'allergen' && state === 'open' && likelyShown.length"
           type="button"
           class="primary small"
@@ -274,6 +302,13 @@ watch(allowed, (yes) => {
           Dismissed, it isn't suggested for that recipe again. One that comes from the recipe's
           source (a book about slow cookers) can be accepted for all of that source's recipes at
           once.
+        </p>
+        <p>
+          An ingredient is suggested to count as another where its name ends with the other's and
+          the other is one of the families listed for it (“Goat Cheese”: cheese), so a search for
+          cheese finds it. Only those families: almond butter isn't butter, and nothing says it
+          is. A family was looked at whole before it was listed, so its suggestions can be
+          accepted together; one that counts as something else by then is left for you.
         </p>
       </details>
       <p v-if="note" class="status" role="status">{{ note }}</p>

@@ -2259,6 +2259,43 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
       flags on public recipes are all no_ingredients, reference and
       duplicate-title ones as of 2026-11-09, none of them a model's job);
       the "Run now" webhook.
+      - [x] **What counts as what, from names (#232).** Found 2026-11-17,
+        checking #229 on the live site: 6 of 6,947 ingredients counted
+        as another, so a search for cheese missed Goat Cheese, Blue
+        Cheese and 47 more. A name ending with another ingredient's
+        would be 4,464 suggestions, many wrong (Almond Butter, Coconut
+        Milk, Dr Pepper). *Ray, 2026-11-17, asked how: a list he
+        approves; shown it: "looks good".* 69 families
+        (`name_families.py`), each with what it leaves out; from that
+        day's public dump they are 1,189 suggestions, which the rule in
+        the repo was checked to give, pair for pair. "Suggest ingredient
+        families" on the Suggestions page files them as "counts as"
+        suggestions (an administrator's, as the other rules' buttons
+        are); each says its family and can be accepted with the rest of
+        it, "Accept for all 57 in the Cheese family", which leaves alone
+        one that counts as something else by then. Tried on the check's
+        database with the dump's names loaded: 1,164 filed in 1.2
+        seconds, as the rule predicted there; the queue's page in 0.07
+        seconds with them open; the 95 of Chile accepted together in
+        0.5 seconds, each under the nearest of its family. That
+        machine, not the live server.
+        - [ ] Ray: press "Suggest ingredient families" on the live site,
+          and accept the families.
+        - [ ] A family's head spelt two ways is two families ("Chile",
+          "Chili"), and a head in the plural ("Chives", "Noodles") isn't
+          found by a member in the singular.
+        - [ ] A member whose name doesn't end with the head (Parmesan,
+          Scallion) is untouched: Wikidata's "subclass of" may say it,
+          for the ingredients linked to an item.
+        - [ ] The words refused whole (Butter, Milk, Cream, Flour, Oil,
+          Pepper, Beans) have real members among the wrong ones (Brown
+          Butter, Whole Milk). A list of names for each would take
+          them; nothing does yet.
+        - [ ] The list is as the catalog was on 2026-11-17. A new kind
+          of ingredient gets a suggestion only if its family is listed.
+        - [ ] The tests can't see a sweep that isn't committed: their
+          requests share one connection. True of the other rules'
+          buttons too. That it is kept was seen on the built image.
 
 ## Found along the way
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { type Side, type Suggestion, acceptForSource, decide } from "../suggestions";
+import { type Side, type Suggestion, acceptForFamily, acceptForSource, decide } from "../suggestions";
 
 // One suggestion, with Accept and Dismiss while it's open.
 const props = defineProps<{ suggestion: Suggestion }>();
@@ -47,6 +47,24 @@ async function acceptAll() {
   error.value = "";
   try {
     emit("together", (await acceptForSource(id)).done);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+// A family of ingredients has one of these for each member (57 for
+// Cheese), and the family was looked at whole before it was listed: all
+// of them, in one decision, as a source's equipment is.
+const inFamily = computed(() => (s.value.family?.others ?? 0) + 1);
+async function acceptFamily() {
+  const { family, id } = s.value;
+  if (!confirm(`Accept all ${inFamily.value} suggested for the ${family!.name} family?`)) return;
+  busy.value = true;
+  error.value = "";
+  try {
+    emit("together", (await acceptForFamily(id)).done);
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -210,6 +228,15 @@ async function act(action: "accept" | "dismiss") {
           @click="acceptAll"
         >
           Accept for all {{ inSource }} in this source
+        </button>
+        <button
+          v-if="s.actionable && s.family?.others"
+          type="button"
+          class="secondary small accept-family"
+          :disabled="busy"
+          @click="acceptFamily"
+        >
+          Accept for all {{ inFamily }} in the {{ s.family.name }} family
         </button>
         <button type="button" class="secondary small" :disabled="busy" @click="act('dismiss')">
           Dismiss

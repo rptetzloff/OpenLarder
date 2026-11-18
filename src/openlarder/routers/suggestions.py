@@ -35,6 +35,7 @@ from openlarder import (
     equipment_rules,
     history,
     ingredients,
+    name_families,
     needs,
     title_rules,
     visibility,
@@ -129,6 +130,16 @@ class EquipmentRef(BaseModel):
     others_in_source: int = 0
 
 
+class FamilyRef(BaseModel):
+    # The family's head ("Cheese"): its name now, or the one it had when
+    # this was suggested, if it has gone.
+    id: uuid.UUID
+    name: str
+    # How many other open suggestions are of the same family, to accept
+    # with this one.
+    others: int = 0
+
+
 class SuggestionOut(BaseModel):
     id: uuid.UUID
     kind: str
@@ -147,6 +158,8 @@ class SuggestionOut(BaseModel):
     title: TitleRef | None = None
     # equipment: the recipe (as recipe), and the thing it probably needs.
     equipment: EquipmentRef | None = None
+    # parent, from names (name_families.py): the family it is one of.
+    family: FamilyRef | None = None
     reason: str | None
     similarity: float | None
     # merge-v2 on: the model's word for how sure it is. A 12B model asked
@@ -232,6 +245,32 @@ def _equipment_target(row: Suggestion) -> tuple[uuid.UUID, uuid.UUID] | None:
         return uuid.UUID(str(p["recipe_id"])), uuid.UUID(str(p["equipment_id"]))
     except (KeyError, ValueError):
         return None
+
+
+def _family(row: Suggestion) -> uuid.UUID | None:
+    """The head of the family a "counts as" suggestion is one of, where
+    the rules by name made it (name_families.py); None for any other."""
+    p = row.proposal if isinstance(row.proposal, dict) else {}
+    if row.kind != name_families.KIND or not p.get("family_id"):
+        return None
+    try:
+        return uuid.UUID(str(p["family_id"]))
+    except ValueError:
+        return None
+
+
+def _of_families(viewer: User):
+    """The open suggestions that are one of a family, for this moderator:
+    not one naming an ingredient hidden from them, which the queue doesn't
+    show them either."""
+    hidden = select(cast(Ingredient.id, Text)).where(~visibility.ingredients_seen_by(viewer))
+    return select(Suggestion).where(
+        Suggestion.kind == name_families.KIND,
+        Suggestion.status == "open",
+        Suggestion.proposal["family_id"].astext.is_not(None),
+        Suggestion.proposal["a_id"].astext.not_in(hidden),
+        Suggestion.proposal["b_id"].astext.not_in(hidden),
+    )
 
 
 def _named(row: Suggestion) -> list[uuid.UUID]:
@@ -373,6 +412,29 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
             .group_by(Recipe.source_id, thing_id)
         ):
             beside[source_id, uuid.UUID(equipment_id)] = n
+    # The same for a family's: how many open ones each has, by its head.
+    families = {r.id: f for r in rows if (f := _family(r))}
+    in_family: dict[uuid.UUID, int] = {}
+    heads: dict[uuid.UUID, str] = {}
+    if families:
+        head_id = literal_column("suggestions.proposal ->> 'family_id'")
+        for family_id, n in await session.execute(
+            _of_families(viewer)
+            .with_only_columns(head_id, func.count())
+            .where(head_id.in_({str(f) for f in families.values()}))
+            .group_by(head_id)
+        ):
+            in_family[uuid.UUID(family_id)] = n
+        heads = dict(
+            (
+                await session.execute(
+                    select(Ingredient.id, Ingredient.name).where(
+                        Ingredient.id.in_(set(families.values())),
+                        visibility.ingredients_seen_by(viewer),
+                    )
+                )
+            ).all()
+        )
     tags = {
         t.id: t
         for t in await session.scalars(
@@ -504,6 +566,16 @@ async def _out(session, viewer: User, rows: list[Suggestion]) -> list[Suggestion
                 allergen=allergen_ref,
                 title=title_ref,
                 equipment=equipment_ref,
+                family=FamilyRef(
+                    id=families[r.id],
+                    name=heads.get(families[r.id]) or str(p.get("family_name") or "(unnamed)"),
+                    # Itself not counted; none once it's decided.
+                    others=max(0, in_family.get(families[r.id], 0) - 1)
+                    if r.status == "open"
+                    else 0,
+                )
+                if r.id in families
+                else None,
                 actionable=r.kind in ACTIONABLE
                 and (
                     bool(title_ref and title_ref.exists and title_ref.unchanged)
@@ -818,6 +890,51 @@ async def accept_for_source(
     return Done(done=done, skipped=len(rows) - done)
 
 
+@router.post("/{suggestion_id}/accept-family", response_model=Done, dependencies=[SameOrigin])
+async def accept_for_family(
+    suggestion_id: uuid.UUID, admin: ModeratorUser, session: Session
+) -> Done:
+    """Accept a "counts as" suggestion and every other open one of its
+    family: the rules by name file one for each member (name_families.py),
+    57 for Cheese, and the family was looked at whole before it was listed
+    there. One whose ingredient counts as something else by now is left
+    open, for a decision of its own: taking it here would undo what
+    someone set since."""
+    row = await _open_or_404(session, admin, suggestion_id)
+    family = _family(row)
+    if family is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This one isn't one of a family: accept it by itself."
+        )
+    rows = list(
+        await session.scalars(
+            _of_families(admin)
+            .where(Suggestion.proposal["family_id"].astext == str(family))
+            .with_for_update()
+        )
+    )
+    done = 0
+    for each in rows:
+        ids = _ids(each)
+        found = [await session.get(Ingredient, i) for i in ids] if ids else []
+        if len(found) != 2 or None in found or each.proposal.get("decision") != "a_under_b":
+            continue
+        child, parent = found
+        if child.parent_id not in (None, parent.id):
+            continue
+        # Each is the moderator's edit, marked with what suggested it.
+        await history.via(session, f"suggestion:{each.id}")
+        try:
+            async with session.begin_nested():
+                await ingredients.set_parent(session, child, parent)
+        except ValueError:
+            continue
+        each.status, each.decided_by, each.decided_at = "accepted", admin.id, func.now()
+        done += 1
+    await session.commit()
+    return Done(done=done, skipped=len(rows) - done)
+
+
 @router.post("/accept-allergens", response_model=Done, dependencies=[SameOrigin])
 async def accept_allergens(body: Ids, admin: ModeratorUser, session: Session) -> Done:
     """Accept many allergen suggestions at once: a page of likely ones."""
@@ -862,6 +979,15 @@ async def suggest_equipment(admin: AdminUser, session: Session) -> Suggested:
     """Suggest equipment for the recipes that have none recorded, from
     their titles, tags and sources (equipment_rules.py)."""
     new = await equipment_rules.sweep(session)
+    await session.commit()
+    return Suggested(suggested=new)
+
+
+@router.post("/families", response_model=Suggested, dependencies=[SameOrigin])
+async def suggest_families(admin: AdminUser, session: Session) -> Suggested:
+    """Suggest what counts as what among ingredients, from the families
+    their names put them in (name_families.py)."""
+    new = await name_families.sweep(session)
     await session.commit()
     return Suggested(suggested=new)
 
