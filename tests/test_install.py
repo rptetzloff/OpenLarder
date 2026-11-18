@@ -78,3 +78,24 @@ def test_the_manifest_is_asked_for_afresh(tmp_path) -> None:
     assert served.media_type == "application/manifest+json"
     # Only the manifest: an icon is kept as any file is.
     assert "cache-control" not in spa_response(tmp_path, "icon-192.png").headers
+
+
+def test_an_iphone_is_told_how() -> None:
+    """*Ray, 2026-11-18: "first iphone offer".* Safari makes no offer a
+    page can take up, so on an iPhone or iPad the footer's button says how
+    to install it; that it does is asked of a browser told it's an iPhone,
+    in the accessibility check. Here, that the button is the one people
+    see elsewhere, and that the browser's own offer can't take its place."""
+    install = (WEB / "src" / "install.ts").read_text(encoding="utf-8")
+    assert "/iPhone|iPad|iPod/.test(navigator.userAgent)" in install
+    # An iPad asking for the desktop site says it's a Mac with a touch screen.
+    assert 'navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1' in install
+    # Opened from its icon already, nothing is said.
+    assert ".standalone === true" in install and "(display-mode: standalone)" in install
+    app = (WEB / "src" / "App.vue").read_text(encoding="utf-8")
+    first = app.index('v-if="installByHand"')
+    assert first < app.index('v-else-if="canInstall"')
+    assert app.count("        Install the app\n") == 2
+    assert 'aria-controls="install-how"' in app and 'id="install-how"' in app
+    assert "tap Share (the square with an arrow pointing" in app
+    assert "up), then Add to Home Screen." in app

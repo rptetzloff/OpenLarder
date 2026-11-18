@@ -1006,6 +1006,26 @@ const SUGGESTED_FAMILY = `(() => {
 // only while there is an offer. Chrome makes a real one here, which can't
 // be pressed by a script; so one is made by hand, as Chrome makes it, and
 // the button asks that one's question once and goes.
+// An iPhone, and an iPad asking for the desktop site, which says it's a
+// Mac and has a touch screen (how.ua). Safari offers nothing a page can
+// take up, so the footer's button says how instead, when pressed.
+const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1";
+const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15";
+const INSTALL_HOW = (shown) => `(async () => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const how = document.getElementById("install-how");
+  const button = document.querySelector('.site-footer button[aria-controls="install-how"]');
+  if (!${shown}) return how || button ? "A computer is told how to install the app on an iPhone" : "";
+  if (!how || !button) return "On an iPhone the footer doesn't say how to install the app";
+  if (document.querySelectorAll(".site-footer .install-app").length !== 1) return "The footer has more than one way to install the app";
+  if (words(button) !== "Install the app" || button.type !== "button") return "The footer's button reads “" + words(button) + "”";
+  if (button.getAttribute("aria-expanded") !== "false" || !how.hidden) return "How to install it is shown before anyone asked";
+  button.click();
+  await new Promise((r) => setTimeout(r, 100));
+  if (button.getAttribute("aria-expanded") !== "true" || how.hidden || !how.getClientRects().length) return "Pressed, the button doesn't show how to install it";
+  if (!/tap Share .*, then Add to Home Screen\\./.test(words(how))) return "How to install it says “" + words(how) + "”";
+  return "";
+})()`;
 const OFFER_INSTALL = `(async () => {
   const offer = new Event("beforeinstallprompt", { cancelable: true });
   offer.prompt = async () => { window.__asked = (window.__asked ?? 0) + 1; };
@@ -1749,6 +1769,7 @@ function pages(s) {
   // own; how.then: script to run there first, for a state a click makes;
   // how.expect: script that answers what the page shows wrongly, or nothing;
   // how.installable: ask Chrome whether it would offer to install the site;
+  // how.ua: as that browser says it is (an iPhone);
   // how.offline: open the page with no connection; how.kept: the same, on
   // a device that keeps a copy of what is theirs; how.leaving: sign out
   // first, having kept one.
@@ -1756,6 +1777,10 @@ function pages(s) {
     ["/", null],
     ["/", "admin"],
     ["/", null, { phone: true, installable: true, then: OFFER_INSTALL, expect: onPhone(INSTALL_OFFERED) }],
+    ["/", null, { phone: true, ua: IPHONE, expect: INSTALL_HOW(true) }],
+    // A Mac with no touch screen is a computer; at a phone's width the
+    // check gives it one, and it's an iPad.
+    ["/", null, { ua: MAC, expect: `innerWidth < 640 ? "" : (${INSTALL_HOW(false)})` }],
     ["/search?q=biscuits", null, { phone: true, offline: true, expect: OFFLINE_PAGE }],
     ["/account", "cook", { phone: true, expect: KEPT_SWITCH_OFF }],
     ["/larder", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Your larder", "Pantry") }],
@@ -2142,9 +2167,12 @@ async function browser(n) {
   // blur event whatever is focused: the Undo line on Saved recipes, which
   // waits for focus to leave it, never saw it leave (2026-11-15).
   await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  // What it says it is, to say again after a view that says otherwise.
+  const userAgent = (await send("Browser.getVersion")).result.userAgent;
   await send("Fetch.enable", { patterns: [{ urlPattern: "*/covers/*" }] });
   await send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
   return {
+    userAgent,
     send,
     evaluate,
     connection,
@@ -2308,9 +2336,15 @@ async function check(b, path, who, theme, width, how = {}) {
     await sleep(1500);
   }
   if (how.offline || how.kept) await b.connection(true);
+  if (how.ua)
+    await b.send("Emulation.setUserAgentOverride", {
+      userAgent: how.ua,
+      platform: how.ua.includes("iPhone") ? "iPhone" : "MacIntel",
+    });
   try {
     return await look(b, path, theme, width, how);
   } finally {
+    if (how.ua) await b.send("Emulation.setUserAgentOverride", { userAgent: b.userAgent });
     if (how.offline || how.kept) await b.connection(false);
     // The next view begins with no copy on the device, as a device does.
     if (how.kept) await b.evaluate(`caches.delete("openlarder-yours-v1")`).catch(() => {});
