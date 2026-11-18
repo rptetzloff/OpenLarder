@@ -476,6 +476,8 @@ Weighed against it, and not ruled out:
 
 If the stores come up again, the two things to settle first are Apple's review and Amazon's approval, and only those two companies can.
 
+**What is kept on a device.** For everyone, one page, to show when there's no connection. And only where its owner switches it on, a copy of what is theirs (larder, shelf, equipment, saved recipes), to read with no connection. *Decided by Ray, 2026-11-17: "only where switched on"*, over keeping it wherever someone is signed in, or wherever the app is installed: a copy on a shared computer is a private collection left behind, and the one who presses the switch is the one it would hurt. It is taken off at sign-out, and by the other rules in `web/public/sw.js`.
+
 ## MVP vs later phases
 
 The MVP proves the catalog is useful with a few hundred books indexed; social features and the write API wait.

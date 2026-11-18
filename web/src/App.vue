@@ -4,7 +4,7 @@ import { adoptKitchenShop } from "./kitchen";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
 import { canInstall, install, watchForInstall } from "./install";
-import { keepAnOfflinePage } from "./offline";
+import { keepAnOfflinePage, keptAsOf } from "./offline";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
@@ -141,6 +141,14 @@ const notice = ref<string | null>(null);
 // page only then, so it never leads to an empty one.
 const anyProducers = ref(false);
 
+// Said in the band under the header while the page is showing the copy
+// kept on this device: how old it is, in the reader's own time.
+const keptSaid = computed(() =>
+  keptAsOf.value === null
+    ? ""
+    : new Date(keptAsOf.value).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" }),
+);
+
 // "Skip to content": focus goes to the page, without the address changing.
 const content = ref<HTMLElement | null>(null);
 const skip = () => content.value?.focus();
@@ -173,6 +181,15 @@ onMounted(async () => {
     <p>{{ notice }}</p>
   </aside>
   <SiteHeader :user="user" :path="path" />
+  <!-- With no connection, on a device that keeps a copy of what is yours
+       (offline.ts): the page is that copy, and says so, with how old it
+       is and that nothing can be changed until the connection is back. -->
+  <aside v-if="keptSaid" class="kept-notice" role="status">
+    <p>
+      No connection. This is the copy kept on this device, as it was on {{ keptSaid }}. Changes
+      can't be saved until you're back online.
+    </p>
+  </aside>
   <!-- A page's admin tools go here, under the header (BookPage's Teleport). -->
   <div id="admin-bar"></div>
   <main id="content" ref="content" tabindex="-1">
@@ -731,6 +748,22 @@ a.secondary.small::after {
   margin: 0 auto;
   padding: 0.5rem 1rem;
   text-align: center;
+}
+/* The band under the header while the page is the copy kept on this
+   device (offline.ts). */
+.kept-notice {
+  background: var(--chip);
+  color: var(--fg);
+  font-size: 0.9375rem;
+}
+.kept-notice p {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0.5rem 1.5rem;
+}
+.kept-here .check {
+  display: block;
+  font-weight: 600;
 }
 .admin-bar {
   background: var(--admin-bg);
