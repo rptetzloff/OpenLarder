@@ -4,6 +4,7 @@ import { adoptKitchenShop } from "./kitchen";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
 import { canInstall, install, watchForInstall } from "./install";
+import { keepAnOfflinePage } from "./offline";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
@@ -121,6 +122,8 @@ const theme = ref<ThemeChoice>(savedTheme());
 // The browser may offer to install the site as an app at any time from
 // here on (install.ts); the footer has the button while it does.
 watchForInstall();
+// And something to show when it's opened with no connection (offline.ts).
+keepAnOfflinePage();
 
 // undefined while asking, null when signed out.
 const user = ref<Me | null | undefined>(undefined);

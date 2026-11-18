@@ -1021,6 +1021,26 @@ const INSTALL_OFFERED = `(async () => {
   if (document.querySelector(".site-footer .install-app")) return "Once answered, the button is still there, with no offer behind it";
   return "";
 })()`;
+// A page opened with no connection (how.offline): the site's own page says
+// so, where the browser's error was, at the address that was asked for,
+// which "Try again" asks for again. It is the one thing kept on the
+// device, so it draws on nothing else of the site's; and it is in the
+// theme the rest is in.
+const OFFLINE_PAGE = `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  if (words(document.querySelector("h1")) !== "No connection") return "With no connection the page is headed “" + words(document.querySelector("h1")) + "”, titled “" + document.title + "”";
+  if (document.title !== "No connection · OpenLarder") return "The page with no connection is titled “" + document.title + "”";
+  if (location.pathname + location.search !== "/search?q=biscuits") return "The address is " + location.pathname + location.search + ", not the page asked for";
+  const again = [...document.querySelectorAll("a")].find((a) => words(a) === "Try again");
+  if (!again || again.href !== location.href) return "“Try again” leads to " + (again ? again.href : "nothing") + ", not the page asked for";
+  const fetched = document.querySelectorAll('link[rel="stylesheet"], script[src], img, link[rel="preload"], iframe');
+  if (fetched.length) return "The page asks for " + fetched.length + " thing(s) that can't arrive with no connection";
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const ground = getComputedStyle(document.body).backgroundColor;
+  if (ground !== (dark ? "rgb(20, 32, 26)" : "rgb(250, 246, 236)")) return "In the " + (dark ? "dark" : "light") + " theme its background is " + ground;
+  if (document.querySelector('meta[name="robots"]')?.content !== "noindex") return "The page with no connection may be indexed";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1659,11 +1679,13 @@ function pages(s) {
   // phone's width too, for a page that shows a phone something of its
   // own; how.then: script to run there first, for a state a click makes;
   // how.expect: script that answers what the page shows wrongly, or nothing;
-  // how.installable: ask Chrome whether it would offer to install the site.
+  // how.installable: ask Chrome whether it would offer to install the site;
+  // how.offline: open the page with no connection.
   return [
     ["/", null],
     ["/", "admin"],
     ["/", null, { phone: true, installable: true, then: OFFER_INSTALL, expect: onPhone(INSTALL_OFFERED) }],
+    ["/search?q=biscuits", null, { phone: true, offline: true, expect: OFFLINE_PAGE }],
     ["/search", null, { expect: FILTERS_IN_MORE }],
     [`/search?i=${s.cheddar}`, null],
     ["/search?q=biscuits", null, { expect: `(${THUMBS_DRAWN}) || (${FILTERS_IN_MORE})` }],
@@ -2128,6 +2150,19 @@ async function phone(b, width) {
   await b.send("Emulation.setTouchEmulationEnabled", { enabled: width < 600, maxTouchPoints: 5 });
 }
 
+// A connection as it usually is; with offline, none.
+const CONNECTION = { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 };
+// The site's service worker is running this page and has kept its one
+// page; or what's missing, after ten seconds.
+const SERVICE_WORKER_READY = `(async () => {
+  if (!("serviceWorker" in navigator)) return "This browser has no service workers";
+  for (let i = 0; i < 100; i++) {
+    if (navigator.serviceWorker.controller && (await caches.match("/offline.html"))) return "";
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return navigator.serviceWorker.controller ? "The service worker hasn't kept a page for when there's no connection" : "No service worker is running the page";
+})()`;
+
 // One view: what's wrong with it, what axe couldn't decide, and what it was
 // still waiting for if it never stopped.
 async function check(b, path, who, theme, width, how = {}) {
@@ -2143,6 +2178,25 @@ async function check(b, path, who, theme, width, how = {}) {
       url: `${BASE}/`,
       httpOnly: true,
     });
+  // With no connection: the site is opened first, so its service worker
+  // is there and has kept its page, and then the connection is cut as
+  // Chrome cuts a page's. It is put back when the view has been looked at
+  // (below), whatever was found.
+  if (how.offline) {
+    await go(b, `${BASE}/`);
+    const ready = await b.evaluate(SERVICE_WORKER_READY);
+    if (ready) return { problems: [ready], undecided: [], busy: "" };
+    await b.send("Network.emulateNetworkConditions", { ...CONNECTION, offline: true });
+  }
+  try {
+    return await look(b, path, theme, width, how);
+  } finally {
+    if (how.offline) await b.send("Network.emulateNetworkConditions", CONNECTION);
+  }
+}
+
+// A page as it is opened, and what's wrong with it.
+async function look(b, path, theme, width, how) {
   let busy = await go(b, `${BASE}${path}`);
   if (how.then && width < 600) {
     await b.evaluate(how.then);

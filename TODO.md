@@ -1964,12 +1964,33 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           hear: it is Share, then Add to Home Screen, and nothing says
           so.
         - [ ] The shortcuts have no icons of their own.
-      - [ ] Something to show with no signal. Nothing is kept on the
-        device, so opened offline the app is the browser's error page. A
-        page of its own first; then what is yours (larder, shelf,
-        equipment, saved recipes) to read offline, taken off the device
-        at sign-out: a private collection must not stay on a shared
-        phone. Another cache to get right, on top of Cloudflare's.
+      - [x] **A page for when there's no connection (#234).** Opened
+        with no signal the app was the browser's error page. A service
+        worker (`web/public/sw.js`) keeps one page of the site's own
+        (`offline.html`) and shows it where a page can't be fetched at
+        all, at the address that was asked for; "Try again" asks again,
+        and it goes by itself when the connection is back. That is all
+        the worker does: every request goes to the network as if it
+        weren't there, and nothing of the catalog or of anyone's is on
+        the device. The worker and its page are sent to be asked for
+        afresh, so Cloudflare, which keeps a `.js` file by its name,
+        holds no old one. Asked of Chrome on the built image: the page
+        is shown with the connection cut, and the browser's error is
+        back with a worker that doesn't serve it. The accessibility
+        check opens a page with no connection, and all its other views
+        now load through the worker. README, "The service worker", has
+        how it's changed and how it's got rid of.
+        - [ ] Not tried on a phone, nor in Safari or Firefox: asked of
+          Chrome on this computer.
+        - [ ] Someone who has never opened the site has no worker, and
+          sees the browser's error. So does the first visit's first page.
+        - [ ] The page's colours are a copy of App.vue's, kept true by a
+          test and not by the build.
+      - [ ] What is yours, to read with no connection: larder, shelf,
+        equipment, saved recipes. Taken off the device at sign-out: a
+        private collection must not stay on a shared phone. Another
+        cache to get right, on top of Cloudflare's, and the first thing
+        kept on a device that can go stale.
 
 - [x] **"Want this book"** (#195). *Ray, 2026-11-14: "Add want this
       book to to-do", after asking when it had been removed.* It never was
