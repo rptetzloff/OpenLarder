@@ -64,6 +64,22 @@ def test_it_is_a_page_of_the_sites_and_not_one_to_find() -> None:
     assert chosen in PAGE and chosen in index
 
 
+def _answers(method: str) -> set[str]:
+    """Every address the server answers that way. Not the API's own
+    description of itself, which leaves out what it doesn't publish
+    (the shops' links)."""
+
+    def walk(routes):
+        for route in routes:
+            if method in (getattr(route, "methods", None) or ()):
+                yield route.path
+            inner = getattr(getattr(route, "original_router", None), "routes", None)
+            if inner:
+                yield from walk(inner)
+
+    return set(walk(app.routes))
+
+
 def _list(name: str) -> list[str]:
     """One of the worker's lists of addresses, as it's written there."""
     [body] = re.findall(rf"const {name} = \[(.*?)\];", WORKER, re.S)
@@ -103,9 +119,13 @@ def test_what_it_keeps_for_someone_is_what_the_four_pages_need() -> None:
         "/api/equipment-lists",
         "/api/saved",
         "/api/notes",
+        "/api/allergens",
+        "/api/diets",
+        "/api/grocers",
+        "/api/kitchen-shops",
     ]
     # Each is a GET the server answers, for someone signed in.
-    gets = {path for path, how in app.openapi()["paths"].items() if "get" in how}
+    gets = _answers("GET")
     for address in data:
         assert address in gets, address
     # And each is asked for by the site: who is signed in, and each page's own.
@@ -114,11 +134,52 @@ def test_what_it_keeps_for_someone_is_what_the_four_pages_need() -> None:
         assert f'"{address}"' in sources or f"`{address}`" in sources, address
 
 
+def test_it_keeps_each_saved_recipe_and_no_other() -> None:
+    """*Ray, 2026-11-17: "yes, as the next PR".* A saved recipe and its
+    owner's notes on it are kept, so its page can be read; which recipes
+    is what the saved list says, and the site says when that changes."""
+    [pattern] = re.findall(r"const RECIPE = /(.*)/;", WORKER)
+    kept = re.compile(pattern.replace(r"\/", "/"))
+    one = "0a1b2c3d-0000-4000-8000-123456789abc"
+    assert kept.match(f"/api/recipes/{one}") and kept.match(f"/api/recipes/{one}/notes")
+    # Nothing else of a recipe's, and nothing that isn't one recipe.
+    for other in ("/flags", "/rating", "/history", "/notes/x"):
+        assert not kept.match(f"/api/recipes/{one}{other}"), other
+    for other in ("/api/recipes", "/api/recipes/", "/api/recipes/check", f"/api/saved/{one}"):
+        assert not kept.match(other), other
+    # Both are GETs the server answers.
+    assert {"/api/recipes/{recipe_id}", "/api/recipes/{recipe_id}/notes"} <= _answers("GET")
+    # One only looked at isn't kept: a recipe's answer is taken into the
+    # copy only where the copy has that recipe already.
+    assert "  if (RECIPE.test(path) && !(await cache.match(path))) return;\n" in WORKER
+    # Their own list, and so many of it.
+    assert "?.recipes;" in WORKER and ".shared" not in WORKER
+    assert re.findall(r"const MOST = (\d+);", WORKER) == ["200"]
+    assert ".slice(0, MOST);" in WORKER
+    # The page of one that is kept is opened from the copy; any other
+    # recipe's is the page for no connection.
+    assert "(recipe && (await copy(`/api/recipes/${recipe[1]}`)))" in WORKER
+    # Saving and taking off the list both tell the worker.
+    saved = (WEB / "src" / "saved.ts").read_text(encoding="utf-8")
+    assert saved.count(".then(told);") == 2 and "savedChanged();" in saved
+    asked = (WEB / "src" / "offline.ts").read_text(encoding="utf-8")
+    assert 'postMessage({ type: "saved" })' in asked
+    assert 'if (event.data?.type === "saved") event.waitUntil(resaved());' in WORKER
+    # A recipe's page is the recipe, with or without its flags, which the
+    # copy doesn't hold.
+    page = (WEB / "src" / "pages" / "RecipePage.vue").read_text(encoding="utf-8")
+    assert "flags.value = await recipeFlags(props.id).catch(() => []);" in page
+    privacy = " ".join(
+        (WEB / "src" / "pages" / "PrivacyPage.vue").read_text(encoding="utf-8").split()
+    )
+    assert "each recipe you have saved with your notes on it" in privacy
+
+
 def test_the_copy_goes_when_its_owner_does() -> None:
     """What ends a session by the site's own forms is what the worker
     takes the copy off for, before the request leaves; and a copy is good
     for as long as a session is, and no longer."""
-    posts = {path for path, how in app.openapi()["paths"].items() if "post" in how}
+    posts = _answers("POST")
     leaving = _list("LEAVING")
     assert leaving == ["/api/auth/logout", "/api/account/delete"]
     for address in leaving:
@@ -136,6 +197,11 @@ def test_the_copy_goes_when_its_owner_does() -> None:
     said = " ".join(privacy.split())
     assert f"signed in for {SESSION_LIFETIME.days} days" in said
     assert "It is off unless you switch it on, on each device." in said
+    # Let go, it stays gone: the copy is opened as the worker starts and
+    # when it's switched on, and never by asking whether it's there, which
+    # made an empty one after its owner had signed out.
+    assert WORKER.count("caches.open(YOURS)") == 2
+    assert WORKER.count("caches.has(YOURS)") == 1
     # A new worker is no reason to lose it.
     assert "if (name !== KEPT && name !== YOURS) await caches.delete(name);" in WORKER
 

@@ -22,6 +22,14 @@
 // (PARTS). Each is fetched from the network every time, and a copy kept as
 // it comes; the copy answers only when the network doesn't.
 //
+// And each recipe they have saved, with their notes on it (RECIPE), so
+// its page can be read: what a recipe needs is what is wanted in a shop.
+// *Ray, 2026-11-17, asked whether the copy should hold that: "yes, as
+// the next PR".* Which recipes is what their saved list says, each time
+// the list is fetched, and when the site says it has changed: those newly
+// saved are fetched, and those no longer saved are let go. Their own
+// list, not the ones shared with them; and no more than MOST.
+//
 // When it goes, all of it at once (forget):
 // - the switch is turned off;
 // - signing out, or deleting the account, by the site's own forms: before
@@ -56,7 +64,20 @@ const DATA = [
   "/api/equipment-lists",
   "/api/saved",
   "/api/notes",
+  // What a recipe's page asks for besides the recipe: the same for every
+  // recipe and everyone.
+  "/api/allergens",
+  "/api/diets",
+  "/api/grocers",
+  "/api/kitchen-shops",
 ];
+// A saved recipe, and its owner's notes on it; and its page.
+const RECIPE = /^\/api\/recipes\/[0-9a-f-]{36}(\/notes)?$/;
+const RECIPE_PAGE = /^\/recipes\/([0-9a-f-]{36})$/;
+// As many saved recipes as are kept: the first of the list. Each is two
+// requests when it's first kept.
+const MOST = 200;
+const data = (path) => DATA.includes(path) || RECIPE.test(path);
 // The build's script and stylesheet, the fonts, and the pictures in the
 // header and the tab.
 const PARTS =
@@ -69,20 +90,35 @@ const OLDEST = 30 * 24 * 60 * 60 * 1000;
 // What ends a session by the site's own forms.
 const LEAVING = ["/api/auth/logout", "/api/account/delete"];
 
-// Whether this device's switch is on, as far as is known: asked once as the
-// worker starts, and a page being opened waits for the answer, so whatever
-// that page then asks for is answered knowing it.
+// Whether this device's switch is on, and the copy while there is one:
+// asked once as the worker starts, and a page being opened waits for the
+// answer, so whatever that page then asks for is answered knowing it.
+//
+// The copy is opened here and when it's switched on, and nowhere else. To
+// open one is to make one, if it isn't there: a request that asked whether
+// there was a copy, and then opened it, made an empty one where another
+// request had just let it go, and a device was left saying it kept a copy
+// after its owner signed out (found 2026-11-18, by the flow run against
+// this worker in a browser: nothing of anyone's was in it).
 let on = false;
-const known = caches.has(YOURS).then((there) => {
-  on = there;
+let kept = null;
+const known = caches.has(YOURS).then(async (there) => {
+  if (!there) return;
+  kept = await caches.open(YOURS);
+  on = true;
 });
 
 async function yours() {
-  return (await caches.has(YOURS)) ? caches.open(YOURS) : null;
+  await known;
+  return kept;
 }
 
 async function forget() {
+  // After the worker has found out whether there is one: let go before
+  // that, it would be opened, and so made, a moment later.
+  await known;
   on = false;
+  kept = null;
   await caches.delete(YOURS);
 }
 
@@ -155,10 +191,52 @@ async function settle(path, response) {
     if (!me?.id || me.id !== whose?.id) return forget();
     await own(cache, me.id);
   }
+  // A recipe is kept because it's saved (recipes, below): one only looked
+  // at isn't, and one that is kept is brought up to date.
+  if (RECIPE.test(path) && !(await cache.match(path))) return;
   // What the page is drawn with doesn't change under its name: kept once.
-  if (!DATA.includes(path) && (await cache.match(path))) return;
+  if (!data(path) && (await cache.match(path))) return;
   await keep(cache, path, response);
   await prune(cache, path);
+}
+
+// The saved recipes, as the saved list just fetched has them: each kept
+// with its notes, a few at a time, and what is no longer saved let go.
+// What can't be fetched now is left for the next time.
+async function recipes(saved) {
+  const cache = await yours();
+  if (!cache || !saved) return;
+  const listed = (await saved.json().catch(() => null))?.recipes;
+  if (!Array.isArray(listed)) return;
+  const ids = listed
+    .map((recipe) => recipe?.id)
+    .filter((id) => typeof id === "string" && /^[0-9a-f-]{36}$/.test(id))
+    .slice(0, MOST);
+  const wanted = new Set(ids.flatMap((id) => [`/api/recipes/${id}`, `/api/recipes/${id}/notes`]));
+  for (const request of await cache.keys()) {
+    const path = new URL(request.url).pathname;
+    if (RECIPE.test(path) && !wanted.has(path)) await cache.delete(request);
+  }
+  const missing = [];
+  for (const path of wanted) if (!(await cache.match(path))) missing.push(path);
+  while (missing.length)
+    await Promise.all(
+      missing.splice(0, 6).map(async (path) => {
+        const response = await fetch(path).catch(() => null);
+        // Asked again: the copy may have gone while this was on its way.
+        if (response?.ok && kept === cache) await keep(cache, path, response);
+      }),
+    );
+}
+
+// The saved list has changed, the site says (saved.ts): fetched again, and
+// the recipes with it.
+async function resaved() {
+  if (!(await yours())) return;
+  const response = await fetch("/api/saved").catch(() => null);
+  if (!response) return;
+  await settle("/api/saved", response.clone());
+  if (response.ok) await recipes(response);
 }
 
 // The page that asked is told its answer came from the copy, and how old
@@ -178,10 +256,12 @@ async function part(event, path) {
   } catch (failed) {
     const kept = await copy(path);
     if (!kept) throw failed;
-    if (DATA.includes(path)) await tell(event.clientId, kept.at);
+    if (data(path)) await tell(event.clientId, kept.at);
     return kept.response;
   }
   await settle(path, response.clone());
+  // Not waited for: the page has its list while the recipes are fetched.
+  if (path === "/api/saved" && response.ok) event.waitUntil(recipes(response.clone()));
   return response;
 }
 
@@ -198,7 +278,10 @@ async function page(event, path) {
   } catch {
     // No answer at all: no connection, or no server. An answer that is
     // an error is the server's to give, and was returned above.
-    if (PAGES.includes(path)) {
+    // One of the four, or the page of a recipe that's kept: any other
+    // recipe's would only say it couldn't be loaded.
+    const recipe = path.match(RECIPE_PAGE);
+    if (PAGES.includes(path) || (recipe && (await copy(`/api/recipes/${recipe[1]}`)))) {
       const kept = await copy(SHELL);
       if (kept) return kept.response;
     }
@@ -213,8 +296,10 @@ async function start({ user, parts }) {
   const asked = await fetch("/api/auth/me");
   const me = asked.ok ? await asked.json() : null;
   if (!me?.id || me.id !== user) throw new Error("Nobody is signed in.");
+  await known;
   await forget();
   const cache = await caches.open(YOURS);
+  kept = cache;
   on = true;
   await own(cache, me.id);
   const drawn = (Array.isArray(parts) ? parts : []).filter(
@@ -228,6 +313,8 @@ async function start({ user, parts }) {
     }
     await keep(cache, key, response);
   }
+  // And the recipes saved, as many as can be fetched now.
+  await recipes(await cache.match("/api/saved"));
 }
 
 self.addEventListener("install", (event) => {
@@ -269,12 +356,13 @@ self.addEventListener("fetch", (event) => {
   }
   // A device whose switch is off: none of the rest is this worker's business.
   if (!on) return;
-  if ((DATA.includes(url.pathname) && !url.search) || PARTS.test(url.pathname))
+  if ((data(url.pathname) && !url.search) || PARTS.test(url.pathname))
     event.respondWith(part(event, url.pathname));
 });
 
 // The switch on Account's page: "keep" answers whether a copy is kept now,
-// "forget" that none is.
+// "forget" that none is. And "saved", from wherever a recipe is saved or
+// taken off the list: nothing to answer.
 self.addEventListener("message", (event) => {
   const answer = (kept, why) => event.ports[0]?.postMessage({ kept, why });
   if (event.data?.type === "keep")
@@ -285,4 +373,5 @@ self.addEventListener("message", (event) => {
       ),
     );
   if (event.data?.type === "forget") event.waitUntil(forget().then(() => answer(false)));
+  if (event.data?.type === "saved") event.waitUntil(resaved());
 });

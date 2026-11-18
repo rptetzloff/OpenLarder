@@ -45,7 +45,8 @@ async function ask(message: object): Promise<{ kept: boolean; why?: string }> {
   if (!worker) throw new Error("This browser hasn't started the part of OpenLarder that keeps a copy.");
   return new Promise((resolve, reject) => {
     const channel = new MessageChannel();
-    const late = setTimeout(() => reject(new Error("That took too long. Try again.")), 60_000);
+    // Long enough for a long saved list: each recipe is fetched as it's kept.
+    const late = setTimeout(() => reject(new Error("That took too long. Try again.")), 180_000);
     channel.port1.onmessage = (event) => {
       clearTimeout(late);
       resolve(event.data);
@@ -65,6 +66,12 @@ export async function keepHere(user: string): Promise<void> {
     .map((url) => url.pathname);
   const answer = await ask({ type: "keep", user, parts: [...new Set(parts)] });
   if (!answer.kept) throw new Error("The copy couldn't be kept. Check your connection and try again.");
+}
+
+// A recipe has been saved, or taken off the list: where a copy is kept,
+// the worker fetches the list again, and keeps or lets go of the recipe.
+export function savedChanged() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.controller?.postMessage({ type: "saved" });
 }
 
 // Takes the copy off this device.

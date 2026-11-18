@@ -56,7 +56,8 @@ async function change(event: Event) {
         Keep my kitchen on this device
       </label>
       <p id="keep-here-help" class="muted">
-        Your larder, shelf, equipment and saved recipes can then be read here with no connection.
+        Your larder, shelf, equipment and saved recipes, and each saved recipe's page, can then
+        be read here with no connection.
         A copy of them stays on this device until you switch this off or sign out. Leave it off
         on a computer you share.
       </p>

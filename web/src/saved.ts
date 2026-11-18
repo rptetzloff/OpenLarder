@@ -1,6 +1,7 @@
 // Saved recipes (routers/saved.py): the ones you want to cook, and the ones
 // you have; shared with household groups as the shelf is.
 import type { Listed } from "./ingredients";
+import { savedChanged } from "./offline";
 
 export type State = "want" | "cooked";
 
@@ -67,9 +68,15 @@ const whose = (owner?: string) => (owner ? `?owner=${owner}` : "");
 
 export const mySaved = () => send<Saved>("/api/saved");
 export const isSaved = (recipeId: string) => send<IsSaved>(`/api/saved/${recipeId}`);
+// After either, a copy kept on this device is told (offline.ts): it holds
+// each saved recipe, so one newly saved is fetched and one removed let go.
+const told = <T>(done: T): T => {
+  savedChanged();
+  return done;
+};
 export const save = (recipeId: string, state: State, owner?: string) =>
-  send<IsSaved>(`/api/saved/${recipeId}${whose(owner)}`, "PUT", { state });
+  send<IsSaved>(`/api/saved/${recipeId}${whose(owner)}`, "PUT", { state }).then(told);
 export const unsave = (recipeId: string, owner?: string) =>
-  send<void>(`/api/saved/${recipeId}${whose(owner)}`, "DELETE");
+  send<void>(`/api/saved/${recipeId}${whose(owner)}`, "DELETE").then(told);
 export const shareSaved = (groups: string[]) =>
   send<Saved>("/api/saved/groups", "PUT", { groups });

@@ -2028,9 +2028,38 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           each: right while the build is one of each (sw.js, prune).
         - [ ] What a page is drawn with is kept as it's fetched, so a
           font no kept page has shown yet isn't there until one does.
-      - [ ] Each saved recipe's ingredients, kept with it. *Ray,
+      - [x] **Each saved recipe, kept with it (#236).** *Ray,
         2026-11-17: "yes, as the next PR".* What a recipe needs is what
-        is wanted in a shop.
+        is wanted in a shop. Where a copy is kept, it holds each recipe
+        its owner has saved and their notes on it, so the recipe's own
+        page opens with no connection: where it is, what it needs, its
+        ingredients. A recipe's page turned out to need little: with
+        only the recipe answered it draws whole, less its rating and
+        whether it's saved, once its flags' failing stopped taking the
+        page with it (that was so with a connection too). Which recipes
+        is what the saved list says: those newly saved are fetched when
+        the list is, and when a recipe is saved or taken off (the site
+        tells the worker); those no longer saved are let go. A recipe
+        only looked at isn't kept, and with no connection one that
+        isn't kept is the page for that, not a page saying it couldn't
+        be loaded. Their own list, not the ones shared with them, and
+        the first 200 of it (*Claude's choices*).
+        - [x] **A copy let go stays gone.** Found 2026-11-18 by this
+          PR's flow, run in a browser: #235's worker, live for a day,
+          asked whether there was a copy and then opened it, and
+          opening makes one. Where another request had just let the
+          copy go (signing out), an empty one was made, and the device
+          said it kept a copy still. Nothing of anyone's was in it: it
+          had no owner, so nothing was answered from it, and the next
+          sign-in took it off. The copy is opened as the worker starts
+          and when it's switched on, and nowhere else.
+        - [ ] A long saved list is fetched two requests a recipe, six
+          at a time, when it's switched on: not timed against the live
+          server. Past 200 recipes, the rest aren't kept, and nothing
+          on the page says so.
+        - [ ] A saved recipe's rating, whether it's saved, and whether
+          its book is on the shelf aren't in the copy: the page from
+          the copy leaves them out.
 
 - [x] **"Want this book"** (#195). *Ray, 2026-11-14: "Add want this
       book to to-do", after asking when it had been removed.* It never was
