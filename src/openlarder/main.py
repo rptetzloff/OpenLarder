@@ -268,6 +268,13 @@ def meta_tags(tags: dict[str, str]) -> str:
 
 # index.html is never reused without asking: see spa_response.
 RECHECK = {"Cache-Control": "no-cache"}
+# Nor are these. The manifest says what installing the site as an app
+# means, and a browser reads it again to learn that has changed. The
+# service worker is fetched again by a browser to learn whether there is a
+# new one, and the page it keeps is fetched by it as the server has it: an
+# old copy of either, held by Cloudflare (which keeps a .js file by its
+# name), would leave every browser with the worker it had.
+FRESH = frozenset({"site.webmanifest", "sw.js", "offline.html"})
 
 
 def spa_response(
@@ -292,12 +299,7 @@ def spa_response(
     candidate = (web_dir / path).resolve()
     if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
         if candidate.name != "index.html":
-            # The manifest says what installing the site as an app means,
-            # and a browser reads it again to learn that has changed: asked
-            # for afresh, as index.html is, so neither a browser nor
-            # Cloudflare keeps an old one.
-            fresh = RECHECK if candidate.suffix == ".webmanifest" else None
-            return FileResponse(candidate, headers=fresh)
+            return FileResponse(candidate, headers=RECHECK if candidate.name in FRESH else None)
     if not tags and not head_end and page is None:
         return FileResponse(web_dir / "index.html", headers=RECHECK)
     shell = (web_dir / "index.html").read_text(encoding="utf-8")

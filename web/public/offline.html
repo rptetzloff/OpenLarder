@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#2E4A3B" />
+    <title>No connection · OpenLarder</title>
+    <!-- Shown by the service worker (sw.js) when a page can't be fetched. It
+         is the only thing kept on the device, so it stands alone: no
+         stylesheet, script file, font or picture of the site's, none of
+         which would arrive. Its colours are App.vue's tokens, copied, and
+         tests/test_offline.py fails when they stop agreeing. -->
+    <style>
+      :root {
+        --bg: #faf6ec;
+        --fg: #2e4a3b;
+        --muted: #56665c;
+        --link: #b5532c;
+        --focus: #b5532c;
+      }
+      :root[data-theme="dark"] {
+        --bg: #14201a;
+        --fg: #f2ede0;
+        --muted: #a9b5ac;
+        --link: #e58b63;
+        --focus: #e8b866;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 28rem;
+        padding: 2rem 1.5rem;
+      }
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.75rem;
+        line-height: 1.2;
+      }
+      p {
+        margin: 0 0 1rem;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      a {
+        display: inline-block;
+        padding: 0.625rem 0;
+        min-height: 1.5rem;
+        color: var(--link);
+        font-weight: 700;
+      }
+      a:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+    </style>
+    <script>
+      // The theme chosen on the site, as index.html reads it.
+      (function () {
+        var choice = null;
+        try {
+          choice = localStorage.getItem("openlarder_theme");
+        } catch (e) {}
+        var dark =
+          choice === "dark" ||
+          (choice !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+      // Back online, the page that was asked for is asked for again.
+      window.addEventListener("online", function () {
+        location.reload();
+      });
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>No connection</h1>
+      <p>OpenLarder looks everything up as you ask for it, so it needs one.</p>
+      <p class="muted">This page goes by itself when you're back online.</p>
+      <!-- The address is still the page that was asked for: this asks again. -->
+      <p><a href="">Try again</a></p>
+    </main>
+  </body>
+</html>

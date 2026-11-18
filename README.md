@@ -116,6 +116,27 @@ Setting it up, in order:
    shows nothing. Google refuses a made-up click id, so the whole path is
    checked with one real click on an ad and a new account.
 
+### The service worker
+
+The site can be installed as an app (`web/public/site.webmanifest`), and a
+service worker, `web/public/sw.js`, gives it a page to show when there's no
+connection (`web/public/offline.html`). It keeps that one page and nothing
+else; every request goes to the network as if it weren't there.
+
+A browser that has opened the site keeps the worker until it's given
+another, so:
+
+- **To change it,** change `sw.js`. A browser fetches it again by itself
+  (it's sent `no-cache`, as the page it keeps and the manifest are) and the
+  new one takes over at once. If the page it keeps has changed, give `KEPT`
+  a new name, so it's fetched again.
+- **To be rid of it,** ship a `sw.js` whose `activate` calls
+  `self.registration.unregister()`, and leave it there. Deleting the file
+  leaves the old worker running in every browser that has it.
+
+It isn't asked for under the dev server (`npm run dev`), only by a built
+site.
+
 ### Data dumps
 
 The weekly ODbL dumps (dumps.py) go to S3-compatible object storage, and
