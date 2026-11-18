@@ -1936,6 +1936,41 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
 
 ## Planned features
 
+- [ ] **An app to install.** *Ray, 2026-11-17, asked about apps and shown
+      three ways with what each costs: the site made installable; the
+      site wrapped for the app stores; apps written for each phone. "Ok,
+      sounds good for now", of the first.* It is the site, opened from
+      its own icon without the browser's bars: one codebase, and merged
+      is still live. The stores aren't ruled out; what would have to be
+      settled first is in SCOPING.md, "Apps".
+      - [x] **It can be installed (#233).** Chrome said of the site as it
+        was, "start-url-not-valid": the manifest named no page to open,
+        so no browser offered to install it, though the icons and the
+        rest had been there since the brand kit. It names one now, says
+        which app it is, and has shortcuts to Search, Larder and Saved
+        recipes; and it is asked for afresh, so a change to it reaches a
+        browser and isn't kept by Cloudflare. Asked again, Chrome has no
+        objection, and makes its offer to a page of the built image
+        within half a second. The footer has "Install the app" while a
+        browser is offering, and at no other time: pressed, it asks the
+        browser's own question. Chrome, Edge and Samsung Internet offer,
+        on Android and on a computer. *Claude's choices, not asked for:*
+        the footer; and that the browser's own bar on a first visit is
+        held back for it. The accessibility check asks Chrome whether
+        it would offer, so a manifest broken again is found.
+        - [ ] Not tried on a phone: asked of Chrome on this computer, and
+          a phone's Chrome shows its own sheet. Ray: install it on yours.
+        - [ ] An iPhone is told nothing. Safari makes no offer a page can
+          hear: it is Share, then Add to Home Screen, and nothing says
+          so.
+        - [ ] The shortcuts have no icons of their own.
+      - [ ] Something to show with no signal. Nothing is kept on the
+        device, so opened offline the app is the browser's error page. A
+        page of its own first; then what is yours (larder, shelf,
+        equipment, saved recipes) to read offline, taken off the device
+        at sign-out: a private collection must not stay on a shared
+        phone. Another cache to get right, on top of Cloudflare's.
+
 - [x] **"Want this book"** (#195). *Ray, 2026-11-14: "Add want this
       book to to-do", after asking when it had been removed.* It never was
       there: nothing in the code or its history had it. What there was

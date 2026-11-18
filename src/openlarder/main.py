@@ -292,7 +292,12 @@ def spa_response(
     candidate = (web_dir / path).resolve()
     if path and candidate.is_file() and web_dir.resolve() in candidate.parents:
         if candidate.name != "index.html":
-            return FileResponse(candidate)
+            # The manifest says what installing the site as an app means,
+            # and a browser reads it again to learn that has changed: asked
+            # for afresh, as index.html is, so neither a browser nor
+            # Cloudflare keeps an old one.
+            fresh = RECHECK if candidate.suffix == ".webmanifest" else None
+            return FileResponse(candidate, headers=fresh)
     if not tags and not head_end and page is None:
         return FileResponse(web_dir / "index.html", headers=RECHECK)
     shell = (web_dir / "index.html").read_text(encoding="utf-8")

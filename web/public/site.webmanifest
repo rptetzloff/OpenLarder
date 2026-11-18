@@ -1,6 +1,11 @@
 {
   "name": "OpenLarder",
   "short_name": "OpenLarder",
+  "description": "A free, open index of cookbook recipes: find where a recipe is, and what goes in it.",
+  "lang": "en-US",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -21,5 +26,11 @@
   ],
   "theme_color": "#2E4A3B",
   "background_color": "#FAF6EC",
-  "display": "standalone"
+  "display": "standalone",
+  "categories": ["food", "books"],
+  "shortcuts": [
+    { "name": "Search", "url": "/search" },
+    { "name": "Larder", "url": "/larder" },
+    { "name": "Saved recipes", "url": "/saved" }
+  ]
 }

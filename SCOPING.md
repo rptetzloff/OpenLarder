@@ -465,6 +465,17 @@ Python and Vue, matching the structure of Sederunt and Sennight, self-hosted on 
 
 No multi-tenancy: one public catalog.
 
+### Apps
+
+*Decided by Ray, 2026-11-17: the installable web app, for now.* The site, installed from the browser and opened from its own icon. What it is used for on a phone (a larder in a shop, which book a recipe is in) needs nothing a browser can't do, and it keeps one codebase and no review between a merge and a release.
+
+Weighed against it, and not ruled out:
+
+- **The site wrapped for the app stores** (Capacitor). A listing in each store, and what only an app has (a barcode scanner for ISBNs, notifications that arrive). Against: Apple's review turns away an app that is a website in a wrapper (its guideline 4.2), after the work is done; sign-in by Google or GitHub obliges an equivalent that keeps an email private, which in practice is Sign in with Apple (4.8); the site signs in by a cookie, and an app would need a way of its own; Amazon's Associates programme has a separate policy for apps, whose breach ends the whole agreement, and its own pages disagree on whether an app is approved; $99 a year to Apple and $25 once to Google; and every release waits on a review, with old versions left in use.
+- **Apps written for each phone.** The best to use, and three codebases to keep in step by one person.
+
+If the stores come up again, the two things to settle first are Apple's review and Amazon's approval, and only those two companies can.
+
 ## MVP vs later phases
 
 The MVP proves the catalog is useful with a few hundred books indexed; social features and the write API wait.

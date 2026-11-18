@@ -995,8 +995,34 @@ const SUGGESTED_FAMILY = `(() => {
   if (![...document.querySelectorAll(".row-actions button")].some((b) => words(b) === "Suggest ingredient families")) return "An administrator has no “Suggest ingredient families”";
   return "";
 })()`;
+// Installing the site as an app (Ray, 2026-11-17: the installable web
+// app, for now). Whether a browser offers to is Chrome's to say, and an
+// entry can ask it (how.installable): of the manifest as it was it said
+// "start-url-not-valid", and no browser offered. The footer has a button
+// only while there is an offer. Chrome makes a real one here, which can't
+// be pressed by a script; so one is made by hand, as Chrome makes it, and
+// the button asks that one's question once and goes.
+const OFFER_INSTALL = `(async () => {
+  const offer = new Event("beforeinstallprompt", { cancelable: true });
+  offer.prompt = async () => { window.__asked = (window.__asked ?? 0) + 1; };
+  offer.userChoice = Promise.resolve({ outcome: "dismissed" });
+  window.dispatchEvent(offer);
+  window.__barStopped = offer.defaultPrevented;
+  await new Promise((r) => setTimeout(r, 200));
+})()`;
+const INSTALL_OFFERED = `(async () => {
+  if (!window.__barStopped) return "The browser's own bar isn't held back for the footer's button";
+  const button = document.querySelector(".site-footer button.install-app");
+  if (!button) return "With the browser's offer, the footer has no button to install the app";
+  if (button.textContent.replace(/\\s+/g, " ").trim() !== "Install the app" || button.type !== "button") return "The footer's button reads “" + button.textContent.trim() + "”";
+  button.click();
+  await new Promise((r) => setTimeout(r, 200));
+  if (window.__asked !== 1) return "Pressing it asked the browser " + (window.__asked ?? 0) + " times";
+  if (document.querySelector(".site-footer .install-app")) return "Once answered, the button is still there, with no offer behind it";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
-const NO_TOOLS =`document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
+const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
   const panel = document.querySelector("main details.add-panel");
   if (panel?.querySelector("summary")?.textContent.trim() !== "Add equipment") return "A moderator has no “Add equipment” on the list";
@@ -1632,10 +1658,12 @@ function pages(s) {
   // [path, who, how]: who is signed in, or nobody. how.phone: axe at the
   // phone's width too, for a page that shows a phone something of its
   // own; how.then: script to run there first, for a state a click makes;
-  // how.expect: script that answers what the page shows wrongly, or nothing.
+  // how.expect: script that answers what the page shows wrongly, or nothing;
+  // how.installable: ask Chrome whether it would offer to install the site.
   return [
     ["/", null],
     ["/", "admin"],
+    ["/", null, { phone: true, installable: true, then: OFFER_INSTALL, expect: onPhone(INSTALL_OFFERED) }],
     ["/search", null, { expect: FILTERS_IN_MORE }],
     [`/search?i=${s.cheddar}`, null],
     ["/search?q=biscuits", null, { expect: `(${THUMBS_DRAWN}) || (${FILTERS_IN_MORE})` }],
@@ -2130,6 +2158,13 @@ async function check(b, path, who, theme, width, how = {}) {
   if (how.expect && !between) {
     const wrong = await b.evaluate(how.expect);
     if (wrong) problems.push(wrong);
+  }
+  // Chrome's own word on whether the site can be installed as an app. It
+  // is of the site, not the page, so one entry asks, once a theme.
+  if (how.installable && width >= 600) {
+    const said = await b.send("Page.getInstallabilityErrors");
+    for (const e of said.result?.installabilityErrors ?? [{ errorId: "Chrome didn't say" }])
+      problems.push(`Chrome won't offer to install the site: ${e.errorId}`);
   }
   const overflow = await overflowOf(b, width);
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px at ${width}px wide`);

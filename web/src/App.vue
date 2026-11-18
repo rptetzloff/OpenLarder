@@ -3,6 +3,7 @@ import { adoptGrocer } from "./grocery";
 import { adoptKitchenShop } from "./kitchen";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
+import { canInstall, install, watchForInstall } from "./install";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
 import AccountPage from "./pages/AccountPage.vue";
@@ -117,6 +118,9 @@ const groupId = match(`/groups/${UUID}`);
 const inviteCode = match("/invite/([A-Za-z0-9_-]+)");
 
 const theme = ref<ThemeChoice>(savedTheme());
+// The browser may offer to install the site as an app at any time from
+// here on (install.ts); the footer has the button while it does.
+watchForInstall();
 
 // undefined while asking, null when signed out.
 const user = ref<Me | null | undefined>(undefined);
@@ -232,6 +236,11 @@ onMounted(async () => {
       <a href="/data">Open data</a>
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
+      <!-- Only while the browser offers it: a button that did nothing
+           would be worse than none (install.ts). -->
+      <button v-if="canInstall" type="button" class="link install-app" @click="install">
+        Install the app
+      </button>
       <span class="theme-choice">
         <label for="theme">Theme</label>
         <select id="theme" v-model="theme" @change="chooseTheme(theme)">
@@ -434,7 +443,8 @@ main .numeric {
   gap: 0.5rem 1.25rem;
   padding: 1.25rem 1.5rem 2rem;
 }
-.site-footer a {
+.site-footer a,
+.site-footer button.link {
   color: var(--link);
 }
 main > article,
