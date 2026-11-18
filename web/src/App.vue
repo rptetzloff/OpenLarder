@@ -3,7 +3,7 @@ import { adoptGrocer } from "./grocery";
 import { adoptKitchenShop } from "./kitchen";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
-import { canInstall, install, installByHand, watchForInstall } from "./install";
+import { INSTALL_STEPS, canInstall, install, installByHand, watchForInstall } from "./install";
 import { keepAnOfflinePage, keptAsOf } from "./offline";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
@@ -284,8 +284,7 @@ onMounted(async () => {
       </span>
     </div>
     <p v-if="installByHand" id="install-how" class="install-how" :hidden="!installShown">
-      To install OpenLarder on this iPhone or iPad, tap Share (the square with an arrow pointing
-      up), then Add to Home Screen. It then opens from its own icon, like an app.
+      {{ INSTALL_STEPS }}
     </p>
   </footer>
 </template>
