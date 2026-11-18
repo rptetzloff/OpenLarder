@@ -1986,11 +1986,51 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           sees the browser's error. So does the first visit's first page.
         - [ ] The page's colours are a copy of App.vue's, kept true by a
           test and not by the build.
-      - [ ] What is yours, to read with no connection: larder, shelf,
-        equipment, saved recipes. Taken off the device at sign-out: a
-        private collection must not stay on a shared phone. Another
-        cache to get right, on top of Cloudflare's, and the first thing
-        kept on a device that can go stale.
+      - [x] **What is yours, to read with no connection (#235).**
+        Larder, shelf, equipment and saved recipes, kept on a device
+        where its owner has switched that on. *Ray, 2026-11-17, asked
+        on which devices a copy may be kept: "only where switched
+        on".* The switch is "Keep my kitchen on this device", under
+        "This device" on Account's page: off to begin with on every
+        device, and it says a copy stays there and to leave it off on a
+        shared computer. Switched on, the worker fetches and keeps the
+        four pages, what they ask the server for and what they're
+        drawn with, all or none; after that each is fetched from the
+        network every time and the copy brought up to date, and the
+        copy answers only when the network doesn't. A page from the
+        copy says so in a band under the header, with how old it is and
+        that nothing can be saved. Any other page with no connection is
+        the page for that, which lists the four.
+        The copy goes, all of it: when the switch is turned off; before
+        the request leaves, on signing out or deleting the account by
+        the site's forms; when the server says nobody is signed in, or
+        someone else is; and when it's asked for more than 30 days (a
+        session's length) since the server last said its owner was
+        signed in. Each was seen in a browser against the built image,
+        and each rule, taken out of the worker, was seen to leave the
+        copy behind. The accessibility check switches it on, reads the
+        four pages with the connection cut (the worker's too: cutting
+        the page's alone left the worker fetching), and signs out for
+        real with sessions of its own. *Claude's choices, not asked
+        for:* the 30 days; that it is all or none; the words.
+        - [ ] Not tried on a phone, nor in Safari or Firefox.
+        - [ ] A device that never comes online again keeps its copy
+          until someone opens the site there after the 30 days: the
+          worker takes it off when it's asked for, and nothing runs
+          until then.
+        - [ ] Signing out with no connection takes the copy off, and
+          then shows the browser's own error page: the request to sign
+          out is a form's, which the worker doesn't answer for. The
+          session isn't ended until it gets through.
+        - [ ] Nothing can be changed with no connection: a change tried
+          says it couldn't be saved, as it does when the server fails.
+        - [ ] The script and the stylesheet kept are the latest one of
+          each: right while the build is one of each (sw.js, prune).
+        - [ ] What a page is drawn with is kept as it's fetched, so a
+          font no kept page has shown yet isn't there until one does.
+      - [ ] Each saved recipe's ingredients, kept with it. *Ray,
+        2026-11-17: "yes, as the next PR".* What a recipe needs is what
+        is wanted in a shop.
 
 - [x] **"Want this book"** (#195). *Ray, 2026-11-14: "Add want this
       book to to-do", after asking when it had been removed.* It never was

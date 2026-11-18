@@ -21,6 +21,16 @@ SELECT id, sha256(('a11y-check-token-' || subject || '-0123456789abcdef')::bytea
 FROM people
 ON CONFLICT (token_hash) DO UPDATE SET expires_at = EXCLUDED.expires_at;
 
+-- Four more sessions of Cy's, each ended for real by one view of the check:
+-- signing out takes the copy kept on a device with it (public/sw.js), and
+-- the session the rest of the check uses is left alone.
+INSERT INTO user_sessions (user_id, token_hash, expires_at)
+SELECT u.id, sha256(('a11y-check-token-leaving-' || view || '-0123456789abcdef')::bytea),
+       now() + interval '1 day'
+FROM users u, (VALUES ('light-1280'), ('light-360'), ('dark-1280'), ('dark-360')) AS views(view)
+WHERE u.issuer = 'a11y-check' AND u.subject = 'cook'
+ON CONFLICT (token_hash) DO UPDATE SET expires_at = EXCLUDED.expires_at;
+
 -- Suggestions for the admin queue, as n8n writes them; nothing in the API
 -- adds one. The ingredients are used by nothing, so anyone may see them; the
 -- third suggestion names one that has gone.

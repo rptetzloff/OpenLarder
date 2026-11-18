@@ -277,6 +277,15 @@ document.title = "Privacy policy · OpenLarder";
       theme you choose (light or dark), and, while you sign in from an invite link, that link, so
       you come back to it.
     </p>
+    <p>
+      It keeps one page of OpenLarder's, to show when you have no connection. And only if you
+      switch it on, under “This device” on your account's page, it keeps a copy of your larder,
+      shelf, equipment and saved recipes on that device, lists shared with you among them, so
+      you can read them with no connection. The copy is taken off the device when you switch
+      that off, sign out or delete your account there, and when the device hasn't been online
+      and signed in for 30 days. It is off unless you switch it on, on each device. Anyone who
+      can use the device while it's on can read the copy: leave it off on a computer you share.
+    </p>
 
     <h2>Contributions</h2>
     <p>

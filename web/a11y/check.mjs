@@ -44,6 +44,10 @@ const TOKENS = {
   // Signed in, with no name chosen yet: only the welcome page is theirs.
   new: "a11y-check-token-new-0123456789abcdef",
 };
+// Sessions of Cy's that a view ends for real, by signing out (how.leaving):
+// one for each view that does, so the one the rest use is left alone
+// (users.sql).
+const LEAVING = (theme, width) => `a11y-check-token-leaving-${theme}-${width}-0123456789abcdef`;
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1041,6 +1045,71 @@ const OFFLINE_PAGE = `(() => {
   if (document.querySelector('meta[name="robots"]')?.content !== "noindex") return "The page with no connection may be indexed";
   return "";
 })()`;
+// A copy of what is someone's, kept on a device to read with no connection
+// (Ray, 2026-11-17: "only where switched on"). The switch is on Account's
+// page, off to begin with, and says what switching it on leaves behind.
+const KEPT_SWITCH_OFF = `(async () => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const panel = document.querySelector(".kept-here");
+  if (!panel) return "Account's page has nothing about this device";
+  if (words(panel.querySelector("h2")) !== "This device") return "The panel is headed “" + words(panel.querySelector("h2")) + "”";
+  const box = panel.querySelector('input[type="checkbox"]#keep-here');
+  if (!box) return "The panel has no switch";
+  for (let i = 0; i < 50 && box.disabled; i++) await new Promise((r) => setTimeout(r, 100));
+  if (box.checked || box.disabled) return "The switch is " + (box.checked ? "on" : "not to be pressed") + " before anyone has pressed it";
+  if (words(box.closest("label")) !== "Keep my kitchen on this device") return "The switch is labelled “" + words(box.closest("label")) + "”";
+  const help = words(document.getElementById(box.getAttribute("aria-describedby")));
+  if (!help.includes("stays on this device until you switch this off or sign out") || !help.includes("Leave it off on a computer you share")) return "The switch is explained “" + help + "”";
+  if (await caches.has("openlarder-yours-v1")) return "A copy is kept on this device with the switch off";
+  return "";
+})()`;
+// Switched on as a person would (how.kept, how.leaving): the box pressed,
+// and the copy waited for. Answers what went wrong, or nothing.
+const KEEP_HERE = `(async () => {
+  if (!("serviceWorker" in navigator)) return "This browser has no service workers";
+  await navigator.serviceWorker.ready;
+  for (let i = 0; i < 100 && !navigator.serviceWorker.controller; i++) await new Promise((r) => setTimeout(r, 100));
+  const box = document.getElementById("keep-here");
+  if (!box) return "Account's page has no switch to keep a copy";
+  for (let i = 0; i < 50 && box.disabled; i++) await new Promise((r) => setTimeout(r, 100));
+  box.click();
+  const said = () => (document.querySelector(".kept-here .status, .kept-here .error")?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  for (let i = 0; i < 200 && said() !== "A copy is kept on this device."; i++) await new Promise((r) => setTimeout(r, 100));
+  if (said() !== "A copy is kept on this device.") return "Switched on, the panel says “" + said() + "”";
+  return (await caches.has("openlarder-yours-v1")) ? "" : "The panel says a copy is kept, and none is";
+})()`;
+// With no connection, one of the four pages is the copy: drawn as it was,
+// under a band that says it is a copy and how old.
+const KEPT_PAGE = (heading, has) => `(async () => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  if (words(document.querySelector("h1")) !== ${JSON.stringify(heading)}) return "With no connection the page is headed “" + words(document.querySelector("h1")) + "”, titled “" + document.title + "”";
+  const band = document.querySelector('aside.kept-notice[role="status"]');
+  const said = words(band);
+  if (!/^No connection\\. This is the copy kept on this device, as it was on .*\\d{4}.*\\. Changes can't be saved until you're back online\\.$/.test(said)) return "The band says “" + said + "”";
+  if (document.querySelector(".site-header") && !(band.compareDocumentPosition(document.querySelector("main")) & Node.DOCUMENT_POSITION_FOLLOWING)) return "The band isn't above the page";
+  const shown = words(document.querySelector("main"));
+  if (!shown.includes(${JSON.stringify(has)})) return "The page from the copy doesn't show “${has}”";
+  if (/couldn't be loaded|Loading…/.test(shown)) return "The page from the copy says “" + shown.slice(0, 120) + "”";
+  return (await caches.has("openlarder-yours-v1")) ? "" : "The copy is gone while it's being read";
+})()`;
+// And a page that isn't one of the four is the page for no connection,
+// which leads to the four.
+const KEPT_LINKS = `(() => {
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  if (words(document.querySelector("h1")) !== "No connection") return "With no connection the page is headed “" + words(document.querySelector("h1")) + "”";
+  const nav = document.querySelector("nav#kept");
+  if (!nav || nav.hidden || !nav.getClientRects().length) return "The page for no connection doesn't lead to what's kept on this device";
+  const links = [...nav.querySelectorAll("a")].map((a) => words(a) + " " + a.getAttribute("href"));
+  if (links.join(" | ") !== "Larder /larder | Shelf /shelf | Equipment /equipment/mine | Saved recipes /saved") return "What's kept is listed as “" + links.join(" | ") + "”";
+  return words(nav.querySelector("h2")) === "Kept on this device" ? "" : "The list is headed “" + words(nav.querySelector("h2")) + "”";
+})()`;
+// Signing out by the site's own form takes the copy off the device
+// (how.leaving, which signs out for real, with a session of its own).
+const LEFT = `(async () => {
+  if (await caches.has("openlarder-yours-v1")) return "Signed out, the copy is still on the device";
+  if (!document.querySelector('a[href^="/api/auth/login"]')) return "After signing out the page doesn't offer to sign in";
+  return "";
+})()`;
 // Only a moderator has them, and the way to add to the list.
 const NO_TOOLS = `document.querySelector("#admin-bar .admin-bar, .fix-ingredient, .add-panel") ? "Someone who isn't a moderator is shown the tools" : ""`;
 const ADD_EQUIPMENT = `(() => {
@@ -1680,12 +1749,21 @@ function pages(s) {
   // own; how.then: script to run there first, for a state a click makes;
   // how.expect: script that answers what the page shows wrongly, or nothing;
   // how.installable: ask Chrome whether it would offer to install the site;
-  // how.offline: open the page with no connection.
+  // how.offline: open the page with no connection; how.kept: the same, on
+  // a device that keeps a copy of what is theirs; how.leaving: sign out
+  // first, having kept one.
   return [
     ["/", null],
     ["/", "admin"],
     ["/", null, { phone: true, installable: true, then: OFFER_INSTALL, expect: onPhone(INSTALL_OFFERED) }],
     ["/search?q=biscuits", null, { phone: true, offline: true, expect: OFFLINE_PAGE }],
+    ["/account", "cook", { phone: true, expect: KEPT_SWITCH_OFF }],
+    ["/larder", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Your larder", "Pantry") }],
+    ["/shelf", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Your shelf", "Books you want") }],
+    ["/equipment/mine", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Your equipment", "Kitchen") }],
+    ["/saved", "cook", { phone: true, kept: true, expect: KEPT_PAGE("Saved recipes", "Cheddar Biscuits") }],
+    ["/search?q=biscuits", "cook", { phone: true, kept: true, expect: KEPT_LINKS }],
+    ["/", "cook", { phone: true, leaving: true, expect: LEFT }],
     ["/search", null, { expect: FILTERS_IN_MORE }],
     [`/search?i=${s.cheddar}`, null],
     ["/search?q=biscuits", null, { expect: `(${THUMBS_DRAWN}) || (${FILTERS_IN_MORE})` }],
@@ -1992,12 +2070,20 @@ async function browser(n) {
   // the page after it.
   const inflight = new Map();
   const state = { loader: "", loaded: new Set() };
+  // The site's service worker, as Chrome attaches it: it has a connection
+  // of its own, which cutting the page's leaves alone (connection, below).
+  const workers = new Set();
   ws.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
     if (m.id && pending.has(m.id)) {
       pending.get(m.id)(m);
       pending.delete(m.id);
     }
+    if (m.method === "Target.attachedToTarget" && m.params.targetInfo.type === "service_worker")
+      workers.add(m.params.sessionId);
+    if (m.method === "Target.detachedFromTarget") workers.delete(m.params.sessionId);
+    // What a worker asks for isn't the page's to wait for.
+    if (m.sessionId) return;
     // Not the tab's icon: Chrome asks for that itself, and was seen never
     // to say it had come.
     if (m.method === "Network.requestWillBeSent" && !m.params.request.url.includes("/favicon."))
@@ -2022,12 +2108,22 @@ async function browser(n) {
       else send("Fetch.failRequest", { requestId, errorReason: "Failed" });
     }
   });
-  const send = (method, params = {}) =>
+  const send = (method, params = {}, sessionId) =>
     new Promise((r) => {
       const n = ++id;
       pending.set(n, r);
-      ws.send(JSON.stringify({ id: n, method, params }));
+      ws.send(JSON.stringify({ id: n, method, params, ...(sessionId ? { sessionId } : {}) }));
     });
+  // The connection cut, or put back: the page's, and the service worker's
+  // own, since what the worker fetches for a page goes by that.
+  const connection = async (offline) => {
+    const how = { offline, latency: 0, downloadThroughput: -1, uploadThroughput: -1 };
+    await send("Network.emulateNetworkConditions", how);
+    for (const worker of workers) {
+      await send("Network.enable", {}, worker);
+      await send("Network.emulateNetworkConditions", how, worker);
+    }
+  };
   const evaluate = async (expression) => {
     const m = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
     if (m.result?.exceptionDetails) throw new Error(m.result.exceptionDetails.exception?.description);
@@ -2043,7 +2139,16 @@ async function browser(n) {
   // waits for focus to leave it, never saw it leave (2026-11-15).
   await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   await send("Fetch.enable", { patterns: [{ urlPattern: "*/covers/*" }] });
-  return { send, evaluate, failures, inflight, state, close: () => (ws.close(), proc.kill()) };
+  await send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+  return {
+    send,
+    evaluate,
+    connection,
+    failures,
+    inflight,
+    state,
+    close: () => (ws.close(), proc.kill()),
+  };
 }
 
 // Pages load their data after they're drawn: "Loading…" is still up, or a
@@ -2150,8 +2255,6 @@ async function phone(b, width) {
   await b.send("Emulation.setTouchEmulationEnabled", { enabled: width < 600, maxTouchPoints: 5 });
 }
 
-// A connection as it usually is; with offline, none.
-const CONNECTION = { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 };
 // The site's service worker is running this page and has kept its one
 // page; or what's missing, after ten seconds.
 const SERVICE_WORKER_READY = `(async () => {
@@ -2174,24 +2277,39 @@ async function check(b, path, who, theme, width, how = {}) {
   if (who)
     await b.send("Network.setCookie", {
       name: "openlarder_session",
-      value: TOKENS[who],
+      value: how.leaving ? LEAVING(theme, width) : TOKENS[who],
       url: `${BASE}/`,
       httpOnly: true,
     });
+  const stopped = (problem) => ({ problems: [problem], undecided: [], busy: "" });
   // With no connection: the site is opened first, so its service worker
-  // is there and has kept its page, and then the connection is cut as
-  // Chrome cuts a page's. It is put back when the view has been looked at
-  // (below), whatever was found.
+  // is there and has kept its page, and then the connection is cut. It is
+  // put back when the view has been looked at (below), whatever was found.
   if (how.offline) {
     await go(b, `${BASE}/`);
     const ready = await b.evaluate(SERVICE_WORKER_READY);
-    if (ready) return { problems: [ready], undecided: [], busy: "" };
-    await b.send("Network.emulateNetworkConditions", { ...CONNECTION, offline: true });
+    if (ready) return stopped(ready);
   }
+  // A copy of what is theirs, switched on as a person would, on Account's
+  // page. how.kept: then the connection is cut, and the page is read from
+  // the copy. how.leaving: then they sign out by the site's own form, for
+  // real, and the page is opened signed out.
+  if (how.kept || how.leaving) {
+    await go(b, `${BASE}/account`);
+    const kept = await b.evaluate(KEEP_HERE);
+    if (kept) return stopped(kept);
+  }
+  if (how.leaving) {
+    await b.evaluate(`document.querySelector('form[action="/api/auth/logout"]').submit()`);
+    await sleep(1500);
+  }
+  if (how.offline || how.kept) await b.connection(true);
   try {
     return await look(b, path, theme, width, how);
   } finally {
-    if (how.offline) await b.send("Network.emulateNetworkConditions", CONNECTION);
+    if (how.offline || how.kept) await b.connection(false);
+    // The next view begins with no copy on the device, as a device does.
+    if (how.kept) await b.evaluate(`caches.delete("openlarder-yours-v1")`).catch(() => {});
   }
 }
 

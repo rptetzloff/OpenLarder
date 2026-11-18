@@ -120,8 +120,21 @@ Setting it up, in order:
 
 The site can be installed as an app (`web/public/site.webmanifest`), and a
 service worker, `web/public/sw.js`, gives it a page to show when there's no
-connection (`web/public/offline.html`). It keeps that one page and nothing
-else; every request goes to the network as if it weren't there.
+connection (`web/public/offline.html`). For everyone, it keeps that one
+page and nothing else, and every request goes to the network as if it
+weren't there.
+
+On a device where someone has switched it on ("Keep my kitchen on this
+device", on Account's page), it also keeps a copy of what is theirs: the
+larder, shelf, equipment and saved recipes pages, what those ask the server
+for, and what they're drawn with. Those are still fetched from the network
+every time; the copy answers only when the network doesn't. The copy is
+taken off the device when the switch is turned off, on signing out or
+deleting the account, when the server says nobody or somebody else is
+signed in, and after 30 days without the server saying its owner is. What
+may be kept is listed in `sw.js` (`PAGES`, `DATA`), and
+`tests/test_offline.py` fails when that list changes: adding to it adds to
+what stays on a device, and to the Privacy page.
 
 A browser that has opened the site keeps the worker until it's given
 another, so:

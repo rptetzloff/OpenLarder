@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from openlarder.main import FRESH, spa_response
+from openlarder.auth import SESSION_LIFETIME
+from openlarder.main import FRESH, app, spa_response
 from test_colour_tokens import _tokens
 
 WEB = Path(__file__).resolve().parents[1] / "web"
@@ -63,14 +64,89 @@ def test_it_is_a_page_of_the_sites_and_not_one_to_find() -> None:
     assert chosen in PAGE and chosen in index
 
 
-def test_the_worker_keeps_that_page_and_nothing_else() -> None:
+def _list(name: str) -> list[str]:
+    """One of the worker's lists of addresses, as it's written there."""
+    [body] = re.findall(rf"const {name} = \[(.*?)\];", WORKER, re.S)
+    return re.findall(r'"(/[^"]*)"', body)
+
+
+def test_the_worker_keeps_one_page_for_everyone() -> None:
     [kept] = re.findall(r'const OFFLINE = "(/[^"]+)";', WORKER)
     assert (PUBLIC / kept.lstrip("/")).is_file()
-    # One page added to what's kept, and nothing put there as it's fetched.
-    assert WORKER.count("cache.add(") == 1
-    assert "cache.put(" not in WORKER and "addAll(" not in WORKER
-    # Only a page being opened is its business.
-    assert 'event.request.mode !== "navigate" || event.request.method !== "GET"' in WORKER
+    # That page is all that is kept where nobody has asked for more: one
+    # thing is added to that cache, and nothing is put there as it's fetched.
+    assert WORKER.count("cache.add(") == 1 and "addAll(" not in WORKER
+    # A device whose switch is off: only a page being opened passes through.
+    assert "  if (!on) return;\n" in WORKER
+
+
+def test_what_it_keeps_for_someone_is_what_the_four_pages_need() -> None:
+    """The copy kept where someone has switched it on (*Ray, 2026-11-17:
+    "only where switched on"*): the pages are the site's, what they ask
+    for is the server's to give, and the page for no connection leads to
+    exactly those pages."""
+    pages, data = _list("PAGES"), _list("DATA")
+    assert pages == ["/larder", "/shelf", "/equipment/mine", "/saved"]
+    header = (WEB / "src" / "components" / "SiteHeader.vue").read_text(encoding="utf-8")
+    for page in pages:
+        assert f'"{page}"' in header, page
+    assert re.findall(r'<li><a href="(/[^"]+)">', PAGE) == pages
+    # What is kept of someone's is this and no more: who they are, what
+    # the site says of itself, and what each of the four pages asks for.
+    # Adding to it is adding to what stays on a device, and to the Privacy
+    # page.
+    assert data == [
+        "/api/auth/me",
+        "/api/site",
+        "/api/larder",
+        "/api/shelf",
+        "/api/equipment-lists",
+        "/api/saved",
+        "/api/notes",
+    ]
+    # Each is a GET the server answers, for someone signed in.
+    gets = {path for path, how in app.openapi()["paths"].items() if "get" in how}
+    for address in data:
+        assert address in gets, address
+    # And each is asked for by the site: who is signed in, and each page's own.
+    sources = "".join(f.read_text(encoding="utf-8") for f in (WEB / "src").rglob("*.*"))
+    for address in data:
+        assert f'"{address}"' in sources or f"`{address}`" in sources, address
+
+
+def test_the_copy_goes_when_its_owner_does() -> None:
+    """What ends a session by the site's own forms is what the worker
+    takes the copy off for, before the request leaves; and a copy is good
+    for as long as a session is, and no longer."""
+    posts = {path for path, how in app.openapi()["paths"].items() if "post" in how}
+    leaving = _list("LEAVING")
+    assert leaving == ["/api/auth/logout", "/api/account/delete"]
+    for address in leaving:
+        assert address in posts, address
+    header = (WEB / "src" / "components" / "SiteHeader.vue").read_text(encoding="utf-8")
+    assert '<form method="post" action="/api/auth/logout">' in header
+    [oldest] = re.findall(r"const OLDEST = ([\d *]+);", WORKER)
+    milliseconds = 1
+    for factor in oldest.split("*"):
+        milliseconds *= int(factor)
+    assert milliseconds == SESSION_LIFETIME.total_seconds() * 1000
+    # The Privacy page says the same number of days, and that it's off
+    # unless switched on.
+    privacy = (WEB / "src" / "pages" / "PrivacyPage.vue").read_text(encoding="utf-8")
+    said = " ".join(privacy.split())
+    assert f"signed in for {SESSION_LIFETIME.days} days" in said
+    assert "It is off unless you switch it on, on each device." in said
+    # A new worker is no reason to lose it.
+    assert "if (name !== KEPT && name !== YOURS) await caches.delete(name);" in WORKER
+
+
+def test_the_copy_has_one_name_everywhere() -> None:
+    [name] = re.findall(r'const YOURS = "([^"]+)";', WORKER)
+    asked = (WEB / "src" / "offline.ts").read_text(encoding="utf-8")
+    assert f'const YOURS = "{name}";' in asked
+    assert f'caches.has("{name}")' in PAGE
+    check = (WEB / "a11y" / "check.mjs").read_text(encoding="utf-8")
+    assert f'caches.has("{name}")' in check
 
 
 def test_the_site_asks_for_the_worker_it_has() -> None:

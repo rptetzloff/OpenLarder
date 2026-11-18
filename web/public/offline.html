@@ -58,6 +58,15 @@
         color: var(--link);
         font-weight: 700;
       }
+      h2 {
+        margin: 1.5rem 0 0.25rem;
+        font-size: 1.125rem;
+      }
+      ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
       a:focus-visible {
         outline: 2px solid var(--focus);
         outline-offset: 2px;
@@ -75,6 +84,11 @@
           (choice !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
       })();
+      // Shown only where there is a copy to read: the worker's name for it.
+      if (window.caches)
+        caches.has("openlarder-yours-v1").then(function (kept) {
+          if (kept) document.getElementById("kept").hidden = false;
+        });
       // Back online, the page that was asked for is asked for again.
       window.addEventListener("online", function () {
         location.reload();
@@ -88,6 +102,17 @@
       <p class="muted">This page goes by itself when you're back online.</p>
       <!-- The address is still the page that was asked for: this asks again. -->
       <p><a href="">Try again</a></p>
+      <!-- On a device that keeps a copy of what is someone's (the switch on
+           Account's page; sw.js), these four can be read as they were. -->
+      <nav id="kept" aria-labelledby="kept-title" hidden>
+        <h2 id="kept-title">Kept on this device</h2>
+        <ul>
+          <li><a href="/larder">Larder</a></li>
+          <li><a href="/shelf">Shelf</a></li>
+          <li><a href="/equipment/mine">Equipment</a></li>
+          <li><a href="/saved">Saved recipes</a></li>
+        </ul>
+      </nav>
     </main>
   </body>
 </html>

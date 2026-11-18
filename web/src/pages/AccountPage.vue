@@ -5,6 +5,7 @@ import AgreementPanel from "../components/AgreementPanel.vue";
 import ApiKeys from "../components/ApiKeys.vue";
 import ContributionsPanel from "../components/ContributionsPanel.vue";
 import DeleteAccount from "../components/DeleteAccount.vue";
+import KeptHere from "../components/KeptHere.vue";
 import ProposalsPanel from "../components/ProposalsPanel.vue";
 import NameForm from "../components/NameForm.vue";
 import { fetchFlags } from "../flags";
@@ -91,6 +92,7 @@ const n = (v: number | null, one: string, many: string) =>
             <a :href="user.account_url">Manage sign-in methods and passkeys</a>
           </p>
         </section>
+        <KeptHere :user-id="user.id" />
       </div>
       <div v-if="user.may_claim" class="tool-panels account-panels">
         <AgreementPanel :agreed="user.agreed" :agreed-at="user.agreed_at" @accepted="accepted" />
