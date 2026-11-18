@@ -1960,9 +1960,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
         it would offer, so a manifest broken again is found.
         - [ ] Not tried on a phone: asked of Chrome on this computer, and
           a phone's Chrome shows its own sheet. Ray: install it on yours.
-        - [ ] An iPhone is told nothing. Safari makes no offer a page can
-          hear: it is Share, then Add to Home Screen, and nothing says
-          so.
+        - [x] An iPhone was told nothing: Safari makes no offer a page
+          can hear. *Ray, 2026-11-18: "first iphone offer".* On an
+          iPhone or iPad, not opened from its icon, the footer's "Install
+          the app" shows how: Share, then Add to Home Screen (#237). An
+          iPad asking for the desktop site says it's a Mac, and is told
+          apart by its touch screen. The accessibility check visits as an
+          iPhone and as a Mac. *Claude's choice:* the same button, shown
+          always there, rather than a note that appears unasked.
+          - [ ] Not tried on an iPhone: asked of Chrome told it's one.
         - [ ] The shortcuts have no icons of their own.
       - [x] **A page for when there's no connection (#234).** Opened
         with no signal the app was the browser's error page. A service

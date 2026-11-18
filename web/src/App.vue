@@ -3,7 +3,7 @@ import { adoptGrocer } from "./grocery";
 import { adoptKitchenShop } from "./kitchen";
 import { adoptAccount } from "./shops";
 import { computed, onMounted, ref } from "vue";
-import { canInstall, install, watchForInstall } from "./install";
+import { canInstall, install, installByHand, watchForInstall } from "./install";
 import { keepAnOfflinePage, keptAsOf } from "./offline";
 import { chooseTheme, savedTheme, type ThemeChoice } from "./theme";
 import type { Me } from "./me";
@@ -122,6 +122,8 @@ const theme = ref<ThemeChoice>(savedTheme());
 // The browser may offer to install the site as an app at any time from
 // here on (install.ts); the footer has the button while it does.
 watchForInstall();
+// On an iPhone or iPad, how to install it, shown when asked.
+const installShown = ref(false);
 // And something to show when it's opened with no connection (offline.ts).
 keepAnOfflinePage();
 
@@ -256,9 +258,20 @@ onMounted(async () => {
       <a href="/data">Open data</a>
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
-      <!-- Only while the browser offers it: a button that did nothing
-           would be worse than none (install.ts). -->
-      <button v-if="canInstall" type="button" class="link install-app" @click="install">
+      <!-- On an iPhone or iPad it says how; elsewhere, only while the
+           browser offers it: a button that did nothing would be worse than
+           none (install.ts). -->
+      <button
+        v-if="installByHand"
+        type="button"
+        class="link install-app"
+        aria-controls="install-how"
+        :aria-expanded="installShown"
+        @click="installShown = !installShown"
+      >
+        Install the app
+      </button>
+      <button v-else-if="canInstall" type="button" class="link install-app" @click="install">
         Install the app
       </button>
       <span class="theme-choice">
@@ -270,6 +283,10 @@ onMounted(async () => {
         </select>
       </span>
     </div>
+    <p v-if="installByHand" id="install-how" class="install-how" :hidden="!installShown">
+      To install OpenLarder on this iPhone or iPad, tap Share (the square with an arrow pointing
+      up), then Add to Home Screen. It then opens from its own icon, like an app.
+    </p>
   </footer>
 </template>
 
@@ -466,6 +483,12 @@ main .numeric {
 .site-footer a,
 .site-footer button.link {
   color: var(--link);
+}
+.install-how {
+  max-width: var(--page);
+  margin: -1rem auto 0;
+  padding: 0 1.5rem 2rem;
+  color: var(--fg);
 }
 main > article,
 main > section {

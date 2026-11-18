@@ -24,6 +24,22 @@ const offer = ref<InstallOffer | null>(null);
 // browser's offer can be used once.
 export const canInstall = computed(() => offer.value !== null);
 
+// An iPhone or iPad, not opened from its icon already: there it is Share,
+// then Add to Home Screen, and the footer says so (*Ray, 2026-11-18:
+// "first iphone offer"*). An iPad asking for the desktop site says it's a
+// Mac, and only a touch screen tells them apart. Any browser there: each
+// is Safari underneath, and each has Add to Home Screen in its Share.
+function apple(): boolean {
+  const ios =
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const opened =
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    matchMedia("(display-mode: standalone)").matches;
+  return ios && !opened;
+}
+export const installByHand = apple();
+
 // Called once, as the app starts: the browser may make its offer at any
 // time after the page loads.
 export function watchForInstall() {
