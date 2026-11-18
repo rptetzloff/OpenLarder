@@ -64,6 +64,9 @@ export interface Suggestion {
     already: boolean;
     others_in_source: number;
   } | null;
+  // parent, from the ingredients' names: the family it is one of (its
+  // head, "Cheese"), and how many other open ones are of that family.
+  family: { id: string; name: string; others: number } | null;
   reason: string | null;
   similarity: number | null;
   // merge-v2 on: the model's word for how sure it is.
@@ -133,6 +136,17 @@ export async function suggestTitles(): Promise<number> {
 // from their titles, tags and sources; how many are new.
 export async function suggestEquipment(): Promise<number> {
   return (await post("/api/suggestions/equipment")).suggested;
+}
+
+// Administrators: suggest what counts as what among ingredients, from
+// the families their names put them in; how many are new.
+export async function suggestFamilies(): Promise<number> {
+  return (await post("/api/suggestions/families")).suggested;
+}
+
+// Accept a "counts as" suggestion and every other open one of its family.
+export async function acceptForFamily(id: string): Promise<{ done: number; skipped: number }> {
+  return post(`/api/suggestions/${id}/accept-family`);
 }
 
 // Accept an equipment suggestion and every other like it for its source.
