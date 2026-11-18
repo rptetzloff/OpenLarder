@@ -25,8 +25,9 @@ const offer = ref<InstallOffer | null>(null);
 export const canInstall = computed(() => offer.value !== null);
 
 // An iPhone or iPad, not opened from its icon already: there it is Share,
-// then Add to Home Screen, and the footer says so (*Ray, 2026-11-18:
-// "first iphone offer"*). An iPad asking for the desktop site says it's a
+// then Add to Home Screen, and the footer and the header's Menu say so
+// (*Ray, 2026-11-18: "first iphone offer"*; the Menu as well, since the
+// footer is a scroll to the bottom away). An iPad asking for the desktop site says it's a
 // Mac, and only a touch screen tells them apart. Any browser there: each
 // is Safari underneath, and each has Add to Home Screen in its Share.
 function apple(): boolean {
@@ -39,6 +40,11 @@ function apple(): boolean {
   return ios && !opened;
 }
 export const installByHand = apple();
+// What it says there, in the footer and in the header's Menu alike.
+export const INSTALL_STEPS =
+  "To install OpenLarder on this iPhone or iPad, tap Share (the square with an " +
+  "arrow pointing up), then Add to Home Screen. It then opens from its own " +
+  "icon, like an app.";
 
 // Called once, as the app starts: the browser may make its offer at any
 // time after the page loads.

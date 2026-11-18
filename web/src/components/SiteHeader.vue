@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import SignInLink from "./SignInLink.vue";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { Me } from "../me";
 import HeaderMenu from "./HeaderMenu.vue";
+import { INSTALL_STEPS, canInstall, install, installByHand } from "../install";
 
 // The site's header (Ray's cleanup pass, section 3, 2026-11-11): the logo
 // and its sections; signed in, two menus, "My kitchen" and the account.
@@ -17,6 +18,9 @@ import HeaderMenu from "./HeaderMenu.vue";
 // nothing ran over, but "My kitchen" was squeezed from 122px to 111px.
 // 62rem (992px) leaves 20px to spare; 61rem would leave 4px.
 // Requests is in the footer: it doesn't need to be prominent.
+// "Install the app" is in the footer and, where there's a Menu, at the end
+// of it too, whenever the footer has it (install.ts): the footer is a
+// scroll to the bottom away.
 const props = defineProps<{
   // undefined while asking, null when signed out.
   user: Me | null | undefined;
@@ -58,6 +62,8 @@ const name = computed(() => props.user?.display_name ?? "Account");
 // The account menu's button shows about twelve letters of a name; a longer
 // one is said in full inside the menu.
 const cut = computed(() => name.value.length > 12);
+// On an iPhone or iPad, how to install it, shown when asked.
+const installShown = ref(false);
 </script>
 
 <template>
@@ -138,6 +144,23 @@ const cut = computed(() => name.value.length > 12);
           <ul v-else-if="user === null">
             <li><SignInLink /></li>
           </ul>
+          <ul v-if="installByHand || canInstall" class="install">
+            <li>
+              <button
+                v-if="installByHand"
+                type="button"
+                aria-controls="menu-install-how"
+                :aria-expanded="installShown"
+                @click="installShown = !installShown"
+              >
+                Install the app
+              </button>
+              <button v-else type="button" @click="install">Install the app</button>
+              <p v-if="installByHand" id="menu-install-how" :hidden="!installShown">
+                {{ INSTALL_STEPS }}
+              </p>
+            </li>
+          </ul>
         </HeaderMenu>
       </div>
     </div>
@@ -191,6 +214,17 @@ const cut = computed(() => name.value.length > 12);
 }
 .phone-only {
   display: none;
+}
+/* Set off from what's above it: it isn't a page of the site. */
+.install {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+.install p {
+  margin: 0.25rem 0 0;
+  padding: 0 0.625rem;
+  color: var(--fg);
 }
 @media (max-width: 62rem) {
   .wide-only {

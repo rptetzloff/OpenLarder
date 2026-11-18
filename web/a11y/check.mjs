@@ -1026,6 +1026,36 @@ const INSTALL_HOW = (shown) => `(async () => {
   if (!/tap Share .*, then Add to Home Screen\\./.test(words(how))) return "How to install it says “" + words(how) + "”";
   return "";
 })()`;
+// The same, from the header's Menu, where there is one (up to 62rem):
+// "iphone", it says how, and the Menu stays open to read it; "offer", it
+// asks the browser's question once and goes.
+const MENU_INSTALL = (kind) => `(async () => {
+  if (!matchMedia("(max-width: 62rem)").matches) return "";
+  const words = (e) => (e?.textContent ?? "").replace(/\\s+/g, " ").trim();
+  const menu = document.querySelector('.site-header button[aria-controls="phone-menu"]');
+  if (!menu) return "There's no Menu";
+  menu.click();
+  await new Promise((r) => setTimeout(r, 100));
+  const items = [...document.querySelectorAll("#phone-menu button")].filter((b) => words(b) === "Install the app");
+  if (items.length !== 1) return "The Menu has " + items.length + " “Install the app”";
+  const [item] = items;
+  if (!item.getClientRects().length || item.type !== "button") return "The Menu's “Install the app” can't be pressed";
+  if (${JSON.stringify(kind)} === "offer") {
+    item.click();
+    await new Promise((r) => setTimeout(r, 200));
+    if (window.__asked !== 1) return "Pressing the Menu's asked the browser " + (window.__asked ?? 0) + " times";
+    return document.querySelector("#phone-menu .install") ? "Once answered, the Menu still offers to install the app" : "";
+  }
+  const how = document.getElementById("menu-install-how");
+  if (!how || item.getAttribute("aria-controls") !== "menu-install-how") return "On an iPhone the Menu's “Install the app” doesn't say how";
+  if (item.getAttribute("aria-expanded") !== "false" || !how.hidden) return "In the Menu, how to install it is shown before anyone asked";
+  item.click();
+  await new Promise((r) => setTimeout(r, 100));
+  if (item.getAttribute("aria-expanded") !== "true" || how.hidden || !how.getClientRects().length) return "Pressed, the Menu's “Install the app” doesn't show how";
+  if (!/tap Share .*, then Add to Home Screen\\./.test(words(how))) return "In the Menu, how to install it says “" + words(how) + "”";
+  if (menu.getAttribute("aria-expanded") !== "true") return "Pressing “Install the app” closed the Menu before it could be read";
+  return words(how) === words(document.getElementById("install-how")) ? "" : "The Menu and the footer say different things";
+})()`;
 const OFFER_INSTALL = `(async () => {
   const offer = new Event("beforeinstallprompt", { cancelable: true });
   offer.prompt = async () => { window.__asked = (window.__asked ?? 0) + 1; };
@@ -1778,6 +1808,8 @@ function pages(s) {
     ["/", "admin"],
     ["/", null, { phone: true, installable: true, then: OFFER_INSTALL, expect: onPhone(INSTALL_OFFERED) }],
     ["/", null, { phone: true, ua: IPHONE, expect: INSTALL_HOW(true) }],
+    ["/", null, { phone: true, then: OFFER_INSTALL, expect: onPhone(MENU_INSTALL("offer")) }],
+    ["/", "cook", { phone: true, ua: IPHONE, expect: MENU_INSTALL("iphone") }],
     // A Mac with no touch screen is a computer; at a phone's width the
     // check gives it one, and it's an iPad.
     ["/", null, { ua: MAC, expect: `innerWidth < 640 ? "" : (${INSTALL_HOW(false)})` }],

@@ -1969,6 +1969,15 @@ finishes, with the PR number, and add what it finds. *Ray, 2026-11-08.*
           iPhone and as a Mac. *Claude's choice:* the same button, shown
           always there, rather than a note that appears unasked.
           - [ ] Not tried on an iPhone: asked of Chrome told it's one.
+          - [x] **In the header's Menu too (#238).** *Ray, 2026-11-18:
+            "you just have to scroll all the way to the bottom to see that
+            note".* Wherever the footer has "Install the app", the Menu
+            (a phone, and anything up to 62rem) has it last, under a line,
+            and it does the same: the steps on an iPhone, shown inside the
+            Menu, or the browser's question elsewhere. The steps are one
+            sentence in install.ts, so both say the same.
+            - [ ] Not in the wide header: an iPad held sideways (1024px
+              and up) has no Menu, so it's still the footer there.
         - [ ] The shortcuts have no icons of their own.
       - [x] **A page for when there's no connection (#234).** Opened
         with no signal the app was the browser's error page. A service

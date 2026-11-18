@@ -97,5 +97,22 @@ def test_an_iphone_is_told_how() -> None:
     assert first < app.index('v-else-if="canInstall"')
     assert app.count("        Install the app\n") == 2
     assert 'aria-controls="install-how"' in app and 'id="install-how"' in app
-    assert "tap Share (the square with an arrow pointing" in app
-    assert "up), then Add to Home Screen." in app
+    assert "{{ INSTALL_STEPS }}" in app
+    s = install[install.index("export const INSTALL_STEPS =") :]
+    assert '"To install OpenLarder on this iPhone or iPad, tap Share (the square with an " +' in s
+    assert '"arrow pointing up), then Add to Home Screen. It then opens from its own " +' in s
+
+
+def test_the_menu_offers_it_where_the_footer_does() -> None:
+    """*Ray, 2026-11-18: "you just have to scroll all the way to the bottom
+    to see that note".* The header's Menu has it too, on the same terms,
+    and says the same words; that pressing it does what the footer's does
+    is asked of a browser, in the accessibility check."""
+    header = (WEB / "src" / "components" / "SiteHeader.vue").read_text(encoding="utf-8")
+    start = header.index('<HeaderMenu id="phone-menu"')
+    menu = header[start : header.index("</HeaderMenu>", start)]
+    assert '<ul v-if="installByHand || canInstall" class="install">' in menu
+    assert menu.count("Install the app") == 2
+    assert 'v-if="installByHand"' in menu and '@click="install"' in menu
+    assert 'aria-controls="menu-install-how"' in menu and 'id="menu-install-how"' in menu
+    assert "{{ INSTALL_STEPS }}" in menu
